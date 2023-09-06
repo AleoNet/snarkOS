@@ -69,22 +69,6 @@ pub fn initialize_logger(level: u8) {
     let _ = tracing_subscriber::fmt().with_env_filter(filter).with_target(level == 3).try_init();
 }
 
-/// Initializes a beacon router. Setting the `listening_port = 0` will result in a random port being assigned.
-#[allow(dead_code)]
-pub async fn beacon(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNetwork> {
-    Router::new(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), listening_port),
-        NodeType::Beacon,
-        sample_account(),
-        &[],
-        max_peers,
-        true,
-    )
-    .await
-    .expect("couldn't create beacon router")
-    .into()
-}
-
 /// Initializes a client router. Setting the `listening_port = 0` will result in a random port being assigned.
 #[allow(dead_code)]
 pub async fn client(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNetwork> {

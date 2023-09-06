@@ -38,8 +38,8 @@ use rand_chacha::ChaChaRng;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
 
-/// The recommended minimum number of 'open files' limit for a beacon.
-/// Beacons should be able to handle at least 1000 concurrent connections, each requiring 2 sockets.
+/// The recommended minimum number of 'open files' limit for a validator.
+/// Validators should be able to handle at least 1000 concurrent connections, each requiring 2 sockets.
 #[cfg(target_family = "unix")]
 const RECOMMENDED_MIN_NOFILES_LIMIT: u64 = 2048;
 
@@ -55,9 +55,6 @@ pub struct Start {
     #[clap(default_value = "3", long = "network")]
     pub network: u16,
 
-    /// Specify this node as a beacon
-    #[clap(long = "beacon")]
-    pub beacon: bool,
     /// Specify this node as a validator
     #[clap(long = "validator")]
     pub validator: bool,
@@ -181,7 +178,7 @@ impl Start {
     /// Returns the CDN to prefetch initial blocks from, from the given configurations.
     fn parse_cdn(&self) -> Option<String> {
         // Determine if the node type is not declared.
-        let is_no_node_type = !(self.beacon || self.validator || self.prover || self.client);
+        let is_no_node_type = !(self.validator || self.prover || self.client);
 
         // Disable CDN if:
         //  1. The node is in development mode.
@@ -242,12 +239,6 @@ impl Start {
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
         // and the REST IP to `3030 + dev`.
         if let Some(dev) = self.dev {
-            // Only one beacon node is allowed in testing. To avoid ambiguity, we require
-            // the beacon to be the first node in the dev network.
-            if dev > 0 && self.beacon {
-                bail!("At most one beacon at '--dev 0' is supported in development mode");
-            }
-
             // TODO (howardwu): Remove me after we stabilize syncing.
             crate::commands::Clean::remove_ledger(N::ID, Some(dev))?;
 
@@ -309,9 +300,7 @@ impl Start {
 
     /// Returns the node type, from the given configurations.
     const fn parse_node_type(&self) -> NodeType {
-        if self.beacon {
-            NodeType::Beacon
-        } else if self.validator {
+        if self.validator {
             NodeType::Validator
         } else if self.prover {
             NodeType::Prover
@@ -363,7 +352,7 @@ impl Start {
             );
 
             // If the node is running a REST server, print the REST IP and JWT.
-            if node_type.is_beacon() || node_type.is_validator() {
+            if node_type.is_validator() {
                 if let Some(rest_ip) = rest_ip {
                     println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
 
@@ -374,15 +363,14 @@ impl Start {
             }
         }
 
-        // If the node is a beacon or validator, check if the open files limit is lower than recommended.
+        // If the node is a validator, check if the open files limit is lower than recommended.
         #[cfg(target_family = "unix")]
-        if node_type.is_beacon() || node_type.is_validator() {
+        if node_type.is_validator() {
             crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT);
         }
 
         // Initialize the node.
         match node_type {
-            NodeType::Beacon => Node::new_beacon(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, account, &trusted_peers, genesis, self.dev).await,
@@ -392,7 +380,7 @@ impl Start {
     /// Returns a runtime for the node.
     fn runtime() -> Runtime {
         // TODO (howardwu): Fix this.
-        // let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) = if !Self::node_type().is_beacon() {
+        // let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) = if !Self::node_type().is_validator() {
         //     ((num_cpus::get() / 8 * 2).max(1), num_cpus::get(), (num_cpus::get() / 8 * 5).max(1))
         // } else {
         //     (num_cpus::get(), 512, num_cpus::get()) // 512 is tokio's current default
@@ -465,31 +453,6 @@ mod tests {
 
     #[test]
     fn test_parse_cdn() {
-        // Beacon (Prod)
-        let config = Start::try_parse_from(["snarkos", "--beacon", "--private-key", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_some());
-        let config =
-            Start::try_parse_from(["snarkos", "--beacon", "--private-key", "aleo1xx", "--cdn", "url"].iter()).unwrap();
-        assert!(config.parse_cdn().is_some());
-        let config =
-            Start::try_parse_from(["snarkos", "--beacon", "--private-key", "aleo1xx", "--cdn", ""].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
-
-        // Beacon (Dev)
-        let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "--private-key", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
-        let config = Start::try_parse_from(
-            ["snarkos", "--dev", "0", "--beacon", "--private-key", "aleo1xx", "--cdn", "url"].iter(),
-        )
-        .unwrap();
-        assert!(config.parse_cdn().is_none());
-        let config = Start::try_parse_from(
-            ["snarkos", "--dev", "0", "--beacon", "--private-key", "aleo1xx", "--cdn", ""].iter(),
-        )
-        .unwrap();
-        assert!(config.parse_cdn().is_none());
-
         // Validator (Prod)
         let config = Start::try_parse_from(["snarkos", "--validator", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_some());
@@ -598,11 +561,6 @@ mod tests {
 
         let _config = Start::try_parse_from(["snarkos", "--dev", ""].iter()).unwrap_err();
 
-        // Remove this for Phase 3.
-        let mut config =
-            Start::try_parse_from(["snarkos", "--dev", "1", "--beacon", "--private-key", ""].iter()).unwrap();
-        config.parse_development::<CurrentNetwork>(&mut vec![], &mut vec![]).unwrap_err();
-
         let mut trusted_peers = vec![];
         let mut trusted_validators = vec![];
         let mut config = Start::try_parse_from(["snarkos", "--dev", "0"].iter()).unwrap();
@@ -612,27 +570,10 @@ mod tests {
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
         assert_eq!(trusted_validators.len(), 3);
-        assert!(!config.beacon);
         assert!(!config.validator);
         assert!(!config.prover);
         assert!(!config.client);
         assert_ne!(expected_genesis, prod_genesis);
-
-        let mut trusted_peers = vec![];
-        let mut trusted_validators = vec![];
-        let mut config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "--private-key", ""].iter()).unwrap();
-        config.parse_development::<CurrentNetwork>(&mut trusted_peers, &mut trusted_validators).unwrap();
-        let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
-        assert_eq!(trusted_peers.len(), 0);
-        assert_eq!(trusted_validators.len(), 3);
-        assert!(config.beacon);
-        assert!(!config.validator);
-        assert!(!config.prover);
-        assert!(!config.client);
-        assert_eq!(genesis, expected_genesis);
 
         let mut trusted_peers = vec![];
         let mut trusted_validators = vec![];
@@ -644,7 +585,6 @@ mod tests {
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
         assert_eq!(trusted_peers.len(), 1);
         assert_eq!(trusted_validators.len(), 3);
-        assert!(!config.beacon);
         assert!(config.validator);
         assert!(!config.prover);
         assert!(!config.client);
@@ -660,7 +600,6 @@ mod tests {
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
         assert_eq!(trusted_peers.len(), 2);
         assert_eq!(trusted_validators.len(), 3);
-        assert!(!config.beacon);
         assert!(!config.validator);
         assert!(config.prover);
         assert!(!config.client);
@@ -676,7 +615,6 @@ mod tests {
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
         assert_eq!(trusted_peers.len(), 3);
         assert_eq!(trusted_validators.len(), 3);
-        assert!(!config.beacon);
         assert!(!config.validator);
         assert!(!config.prover);
         assert!(config.client);

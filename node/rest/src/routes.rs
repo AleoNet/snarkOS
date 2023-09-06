@@ -183,8 +183,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_state_path_for_commitment(&commitment)?))
     }
 
-    // GET /testnet3/beacons
-    pub(crate) async fn get_beacons(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+    // GET /testnet3/committee/latest
+    pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
             Some(consensus) => Ok(ErasedJson::pretty(consensus.ledger().latest_committee()?)),
             None => Err(RestError("route isn't available for this node type".to_string())),

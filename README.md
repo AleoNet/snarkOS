@@ -183,7 +183,6 @@ USAGE:
 OPTIONS:
         --network <NETWORK_ID>           Specify the network ID of this node [default: 3]
         
-        --beacon <PRIVATE_KEY>           Specify this node as a beacon, with the account private key as an argument
         --validator <PRIVATE KEY>        Specify this node as a validator, with the account private key as an argument
         --prover <PRIVATE KEY>           Specify this node as a prover, with the given account private key as an argument
         --client <PRIVATE_KEY>           Specify this node as a client, with an optional account private key as an argument
@@ -231,7 +230,6 @@ It is important to initialize the nodes starting from `0` and incrementing by `1
 
 The following is a list of options to initialize a node (replace `<NODE_ID>` with a number starting from `0`):
 ```
-cargo run --release -- start --nodisplay --dev <NODE_ID> --beacon
 cargo run --release -- start --nodisplay --dev <NODE_ID> --validator
 cargo run --release -- start --nodisplay --dev <NODE_ID> --prover
 cargo run --release -- start --nodisplay --dev <NODE_ID> --client

@@ -14,7 +14,6 @@
 
 use crate::{Outbound, Peer};
 use snarkos_node_messages::{
-    BeaconPropose,
     BlockRequest,
     DataBlocks,
     Message,
@@ -61,53 +60,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // This match statement handles the inbound message by deserializing the message,
         // checking the message is valid, and then calling the appropriate (trait) handler.
         match message {
-            Message::BeaconPropose(message) => {
-                // Ensure this node is a beacon.
-                ensure!(self.router().node_type().is_beacon(), "[BeaconPropose] This node is not a beacon");
-                // Ensure the peer is a beacon.
-                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconPropose] '{peer_ip}' is not a beacon");
-
-                // Clone the serialized message.
-                let serialized = message.clone();
-                // Perform the deferred non-blocking deserialization of the block.
-                let block = match message.block.deserialize().await {
-                    Ok(block) => block,
-                    Err(error) => bail!("[BeaconPropose] {error}"),
-                };
-                // Check that the block parameters match.
-                if message.round != block.round()
-                    || message.block_height != block.height()
-                    || message.block_hash != block.hash()
-                {
-                    bail!("Peer '{peer_ip}' is not following the 'BeaconPropose' protocol")
-                }
-                // TODO (howardwu): Preemptively check the block signature is valid against the peer's account address.
-                //  Only the block proposer should be able to send a valid block signature. This message type should not
-                //  be propagated by any other peers.
-                // Handle the block proposal.
-                match self.beacon_propose(peer_ip, serialized, block) {
-                    true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid block proposal"),
-                }
-            }
-            Message::BeaconTimeout(_message) => {
-                // Ensure this node is a beacon.
-                ensure!(self.router().node_type().is_beacon(), "[BeaconTimeout] This node is not a beacon");
-                // Ensure the peer is a beacon.
-                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconTimeout] '{peer_ip}' is not a beacon");
-                // TODO (howardwu): Add timeout handling.
-                // Disconnect as the peer is not following the protocol.
-                bail!("Peer '{peer_ip}' is not following the protocol")
-            }
-            Message::BeaconVote(_message) => {
-                // Ensure this node is a beacon.
-                ensure!(self.router().node_type().is_beacon(), "[BeaconVote] This node is not a beacon");
-                // Ensure the peer is a beacon.
-                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconVote] '{peer_ip}' is not a beacon");
-                // TODO (howardwu): Add vote handling.
-                // Disconnect as the peer is not following the protocol.
-                bail!("Peer '{peer_ip}' is not following the protocol")
-            }
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
 
@@ -270,24 +222,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         }
     }
 
-    /// Handles a `BeaconPropose` message.
-    fn beacon_propose(&self, _peer_ip: SocketAddr, _serialized: BeaconPropose<N>, _block: Block<N>) -> bool {
-        // pub const ALEO_MAXIMUM_FORK_DEPTH: u32 = (NUM_RECENTS as u32).saturating_sub(1);
-        //
-        // // Retrieve the connected peers by height.
-        // let mut peers = self.router().sync().get_sync_peers_by_height();
-        // // Retain the peers that 1) not the sender, and 2) are within the fork depth of the given block.
-        // peers.retain(|(ip, height)| *ip != peer_ip && *height < block.height() + ALEO_MAXIMUM_FORK_DEPTH);
-        //
-        // // Broadcast the `BeaconPropose` to the peers.
-        // if !peers.is_empty() {
-        //     for (peer_ip, _) in peers {
-        //         self.send(peer_ip, Message::BeaconPropose(serialized.clone()));
-        //     }
-        // }
-        false
-    }
-
     /// Handles a `BlockRequest` message.
     fn block_request(&self, peer_ip: SocketAddr, _message: BlockRequest) -> bool;
 
@@ -321,9 +255,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             return false;
         }
 
-        // If the peer is a beacon or validator, ensure there are block locators.
-        if (message.node_type.is_beacon() || message.node_type.is_validator()) && message.block_locators.is_none() {
-            warn!("Peer '{peer_ip}' is a beacon or validator, but no block locators were provided");
+        // If the peer is a validator, ensure there are block locators.
+        if message.node_type.is_validator() && message.block_locators.is_none() {
+            warn!("Peer '{peer_ip}' is a validator, but no block locators were provided");
             return false;
         }
         // If the peer is a prover or client, ensure there are no block locators.
@@ -353,24 +287,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             return false;
         }
 
-        // TODO (howardwu): For this case, if your canon height is not within NUM_RECENTS of the beacon,
-        //  then disconnect.
-
-        // // If this node is not a beacon and is syncing, the peer is a beacon, and this node is ahead, proceed to disconnect.
-        // if E::NODE_TYPE != NodeType::Beacon
-        //     && E::status().is_syncing()
-        //     && node_type == NodeType::Beacon
-        //     && state.ledger().reader().latest_cumulative_weight() > block_header.cumulative_weight()
-        // {
-        //     trace!("Disconnecting from {} (ahead of beacon)", peer_ip);
-        //     break;
-        // }
-
         // TODO (howardwu): For this case, check that the peer is not within NUM_RECENTS, and disconnect.
-        //  As the beacon, you should disconnect any node type that is not caught up.
+        //  As the validator, you should disconnect any node type that is not caught up.
 
-        // // If this node is a beacon, the peer is not a beacon and is syncing, proceed to disconnect.
-        // if self.node_type == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
+        // // If this node is a validator, the peer is not a validator and is syncing, proceed to disconnect.
+        // if self.node_type == NodeType::Validator && node_type != NodeType::Validator && peer_status == Status::Syncing {
         //     warn!("Dropping '{peer_addr}' as this node is ahead");
         //     return Some(DisconnectReason::INeedToSyncFirst);
         // }

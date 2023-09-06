@@ -62,11 +62,6 @@ impl<N: Network> Peer<N> {
         self.node_type
     }
 
-    /// Returns `true` if the peer is a beacon.
-    pub const fn is_beacon(&self) -> bool {
-        self.node_type.is_beacon()
-    }
-
     /// Returns `true` if the peer is a validator.
     pub const fn is_validator(&self) -> bool {
         self.node_type.is_validator()

@@ -18,7 +18,7 @@
 mod common;
 use common::{node::*, test_peer::TestPeer};
 
-use snarkos_node::{Beacon, Client, Prover, Validator};
+use snarkos_node::{Client, Prover, Validator};
 use snarkos_node_router::Outbound;
 use snarkos_node_tcp::P2P;
 use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, Testnet3 as CurrentNetwork};
@@ -57,7 +57,7 @@ macro_rules! impl_connect {
     };
 }
 
-impl_connect!(Beacon, Client, Prover, Validator);
+impl_connect!(Client, Prover, Validator);
 
 // Implement the `Connect` trait for the test peer.
 #[async_trait::async_trait]
@@ -134,28 +134,9 @@ macro_rules! test_handshake {
     };
 }
 
-mod beacon {
-    // Initiator side (full node connects to synthetic peer).
-    test_handshake! {
-        beacon -> beacon = should_panic,
-        beacon -> client,
-        beacon -> validator,
-        beacon -> prover
-    }
-
-    // Responder side (synthetic peer connects to full node).
-    test_handshake! {
-        beacon <- beacon = should_panic,
-        beacon <- client,
-        beacon <- validator,
-        beacon <- prover
-    }
-}
-
 mod client {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        client -> beacon = should_panic,
         client -> client,
         client -> validator,
         client -> prover
@@ -163,7 +144,6 @@ mod client {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        client <- beacon = should_panic,
         client <- client,
         client <- validator,
         client <- prover
@@ -173,7 +153,6 @@ mod client {
 mod prover {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        prover -> beacon = should_panic,
         prover -> client,
         prover -> validator,
         prover -> prover
@@ -181,7 +160,6 @@ mod prover {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        prover <- beacon = should_panic,
         prover <- client,
         prover <- validator,
         prover <- prover
@@ -191,7 +169,6 @@ mod prover {
 mod validator {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        validator -> beacon = should_panic,
         validator -> client,
         validator -> validator,
         validator -> prover
@@ -199,7 +176,6 @@ mod validator {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        validator <- beacon = should_panic,
         validator <- client,
         validator <- validator,
         validator <- prover

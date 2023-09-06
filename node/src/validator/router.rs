@@ -218,7 +218,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         false
     }
 
-    /// Propagates the unconfirmed solution to all connected beacons and validators.
+    /// Propagates the unconfirmed solution to all connected validators.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
@@ -231,8 +231,6 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
             return true; // Maintain the connection.
         }
         let message = Message::UnconfirmedSolution(serialized);
-        // Propagate the "UnconfirmedSolution" to the connected beacons.
-        self.propagate_to_beacons(message.clone(), &[peer_ip]);
         // Propagate the "UnconfirmedSolution" to the connected validators.
         self.propagate_to_validators(message, &[peer_ip]);
         true
@@ -251,8 +249,6 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
             return true; // Maintain the connection.
         }
         let message = Message::UnconfirmedTransaction(serialized);
-        // Propagate the "UnconfirmedTransaction" to the connected beacons.
-        self.propagate_to_beacons(message.clone(), &[peer_ip]);
         // Propagate the "UnconfirmedTransaction" to the connected validators.
         self.propagate_to_validators(message, &[peer_ip]);
         true

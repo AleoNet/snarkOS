@@ -23,8 +23,6 @@ pub enum NodeType {
     Prover,
     /// A validator is a full node, capable of validating blocks.
     Validator,
-    /// A beacon is a full node, capable of producing blocks.
-    Beacon,
 }
 
 impl NodeType {
@@ -34,7 +32,6 @@ impl NodeType {
             Self::Client => "a client node",
             Self::Prover => "a prover node",
             Self::Validator => "a validator node",
-            Self::Beacon => "a beacon node",
         }
     }
 
@@ -52,11 +49,6 @@ impl NodeType {
     pub const fn is_validator(&self) -> bool {
         matches!(self, Self::Validator)
     }
-
-    /// Returns `true` if the node type is a beacon.
-    pub const fn is_beacon(&self) -> bool {
-        matches!(self, Self::Beacon)
-    }
 }
 
 impl core::fmt::Display for NodeType {
@@ -65,7 +57,6 @@ impl core::fmt::Display for NodeType {
             Self::Client => "Client",
             Self::Prover => "Prover",
             Self::Validator => "Validator",
-            Self::Beacon => "Beacon",
         })
     }
 }
