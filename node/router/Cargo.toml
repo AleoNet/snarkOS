@@ -121,6 +121,10 @@ version = "0.2"
 path = "../messages"
 features = [ "test" ]
 
+[dev-dependencies.snarkos-node-narwhal-locators]
+path = "../narwhal/locators"
+features = [ "test" ]
+
 [dev-dependencies.snarkos-node-router]
 path = "."
 features = [ "test" ]
