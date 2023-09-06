@@ -17,12 +17,6 @@
 #[macro_use]
 extern crate tracing;
 
-mod memory_pool;
-pub use memory_pool::*;
-
-// #[cfg(test)]
-// mod tests;
-
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{
