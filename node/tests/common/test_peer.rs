@@ -62,10 +62,6 @@ impl Pea2Pea for TestPeer {
 }
 
 impl TestPeer {
-    pub async fn beacon() -> Self {
-        Self::new(NodeType::Beacon, sample_account()).await
-    }
-
     pub async fn client() -> Self {
         Self::new(NodeType::Client, sample_account()).await
     }

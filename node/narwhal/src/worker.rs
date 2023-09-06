@@ -713,7 +713,7 @@ mod prop_tests {
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkvm::{
         console::account::Address,
-        ledger::committee::{Committee, MIN_STAKE},
+        ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
     };
 
     use test_strategy::proptest;
@@ -728,7 +728,7 @@ mod prop_tests {
             let rng = &mut TestRng::fixed(i as u64);
             let address = Address::new(rng.gen());
             info!("Validator {i}: {address}");
-            members.insert(address, (MIN_STAKE, false));
+            members.insert(address, (MIN_VALIDATOR_STAKE, false));
         }
         // Initialize the committee.
         Committee::<CurrentNetwork>::new(1u64, members).unwrap()

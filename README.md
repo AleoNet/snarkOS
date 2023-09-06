@@ -183,7 +183,6 @@ USAGE:
 OPTIONS:
         --network <NETWORK_ID>           Specify the network ID of this node [default: 3]
         
-        --beacon <PRIVATE_KEY>           Specify this node as a beacon, with the account private key as an argument
         --validator <PRIVATE KEY>        Specify this node as a validator, with the account private key as an argument
         --prover <PRIVATE KEY>           Specify this node as a prover, with the given account private key as an argument
         --client <PRIVATE_KEY>           Specify this node as a client, with an optional account private key as an argument
@@ -206,17 +205,24 @@ OPTIONS:
 
 ### 6.1 Quick Start
 
-In one terminal, start the beacon by running:
+In the first terminal, start the first validator by running:
 ```
-cargo run --release -- start --nodisplay --dev 0 --beacon ""
+cargo run --release -- start --nodisplay --dev 0 --validator
+```
+In the second terminal, start the second validator by running:
+```
+cargo run --release -- start --nodisplay --dev 1 --validator
+```
+In the third terminal, start the third validator by running:
+```
+cargo run --release -- start --nodisplay --dev 2 --validator
+```
+In the fourth terminal, start the fourth validator by running:
+```
+cargo run --release -- start --nodisplay --dev 3 --validator
 ```
 
-In a second terminal, run:
-```
-cargo run --release -- start --nodisplay --dev 1 --prover ""
-```
-
-This procedure can be repeated to start more nodes.
+From here, this procedure can be used to further start up provers and clients.
 
 ### 6.2 Operations
 
@@ -224,10 +230,9 @@ It is important to initialize the nodes starting from `0` and incrementing by `1
 
 The following is a list of options to initialize a node (replace `<NODE_ID>` with a number starting from `0`):
 ```
-cargo run --release -- start --nodisplay --dev <NODE_ID> --beacon ""
-cargo run --release -- start --nodisplay --dev <NODE_ID> --validator ""
-cargo run --release -- start --nodisplay --dev <NODE_ID> --prover ""
-cargo run --release -- start --nodisplay --dev <NODE_ID> --client ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --validator
+cargo run --release -- start --nodisplay --dev <NODE_ID> --prover
+cargo run --release -- start --nodisplay --dev <NODE_ID> --client
 cargo run --release -- start --nodisplay --dev <NODE_ID>
 ```
 

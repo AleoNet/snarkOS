@@ -43,7 +43,6 @@ use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
-#[cfg(not(feature = "test"))]
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
@@ -261,11 +260,6 @@ impl<N: Network> Router<N> {
         self.connected_peers.read().contains_key(ip)
     }
 
-    /// Returns `true` if the given peer IP is a connected beacon.
-    pub fn is_connected_beacon(&self, peer_ip: &SocketAddr) -> bool {
-        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_beacon())
-    }
-
     /// Returns `true` if the given peer IP is a connected validator.
     pub fn is_connected_validator(&self, peer_ip: &SocketAddr) -> bool {
         self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_validator())
@@ -303,11 +297,6 @@ impl<N: Network> Router<N> {
     /// Returns the number of connected peers.
     pub fn number_of_connected_peers(&self) -> usize {
         self.connected_peers.read().len()
-    }
-
-    /// Returns the number of connected beacons.
-    pub fn number_of_connected_beacons(&self) -> usize {
-        self.connected_peers.read().values().filter(|peer| peer.is_beacon()).count()
     }
 
     /// Returns the number of connected validators.
@@ -350,11 +339,6 @@ impl<N: Network> Router<N> {
         self.connected_peers.read().keys().copied().collect()
     }
 
-    /// Returns the list of connected beacons.
-    pub fn connected_beacons(&self) -> Vec<SocketAddr> {
-        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_beacon()).map(|(ip, _)| *ip).collect()
-    }
-
     /// Returns the list of connected validators.
     pub fn connected_validators(&self) -> Vec<SocketAddr> {
         self.connected_peers.read().iter().filter(|(_, peer)| peer.is_validator()).map(|(ip, _)| *ip).collect()
@@ -386,14 +370,9 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of bootstrap peers.
-    #[cfg(not(feature = "test"))]
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
-        if self.is_dev {
-            // In development mode, connect to the dedicated local beacon.
-            match self.node_type.is_beacon() {
-                true => vec![],
-                false => vec![SocketAddr::from(([127, 0, 0, 1], 4130))],
-            }
+        if cfg!(feature = "test") || self.is_dev {
+            vec![]
         } else {
             // TODO (howardwu): Change this for Phase 3.
             vec![
@@ -409,12 +388,6 @@ impl<N: Network> Router<N> {
                 SocketAddr::from_str("143.244.211.239:4133").unwrap(),
             ]
         }
-    }
-
-    /// Returns the list of bootstrap peers.
-    #[cfg(feature = "test")]
-    pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
-        vec![]
     }
 
     /// Returns the list of metrics for the connected peers.
@@ -472,7 +445,6 @@ impl<N: Network> Router<N> {
     ) -> Result<()> {
         // Retrieve the peer.
         if let Some(peer) = self.connected_peers.write().get_mut(&peer_ip) {
-            // TODO (howardwu): Consider permitting a validator->beacon and beacon->validator change.
             // Ensure the node type has not changed.
             if peer.node_type() != node_type {
                 bail!("Peer '{peer_ip}' has changed node types from {} to {node_type}", peer.node_type())

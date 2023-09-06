@@ -104,8 +104,9 @@ impl Deploy {
 
             // Prepare the fees.
             let fee_record = Developer::parse_record(&private_key, &self.record)?;
-            let (_, fee) =
-                vm.execute_fee_raw(&private_key, fee_record, fee_in_microcredits, deployment_id, Some(query), rng)?;
+            let fee_authorization =
+                vm.authorize_fee_private(&private_key, fee_record, fee_in_microcredits, deployment_id, rng)?;
+            let fee = vm.execute_fee_authorization(fee_authorization, Some(query), rng)?;
 
             // Construct the owner.
             let owner = ProgramOwner::new(&private_key, deployment_id, rng)?;

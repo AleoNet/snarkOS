@@ -26,7 +26,7 @@ use snarkos_node_narwhal::{
     MAX_GC_ROUNDS,
 };
 use snarkvm::{
-    ledger::committee::{Committee, MIN_STAKE},
+    ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
     prelude::TestRng,
 };
 
@@ -239,17 +239,14 @@ impl TestNetwork {
 
 // Initializes a new test committee.
 fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
-    const INITIAL_STAKE: u64 = MIN_STAKE;
-
     let mut accounts = Vec::with_capacity(n as usize);
     let mut members = IndexMap::with_capacity(n as usize);
     for i in 0..n {
         // Sample the account.
         let account = Account::new(&mut TestRng::fixed(i as u64)).unwrap();
-
         info!("Validator {}: {}", i, account.address());
 
-        members.insert(account.address(), (INITIAL_STAKE, false));
+        members.insert(account.address(), (MIN_VALIDATOR_STAKE, false));
         accounts.push(account);
     }
     // Initialize the committee.

@@ -30,9 +30,6 @@ pub use snarkos_node_router as router;
 pub use snarkos_node_tcp as tcp;
 pub use snarkvm;
 
-mod beacon;
-pub use beacon::*;
-
 mod client;
 pub use client::*;
 

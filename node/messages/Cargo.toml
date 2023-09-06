@@ -21,7 +21,7 @@ default = [ ]
 test = [ ]
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0"
 
 [dependencies.bincode]
 version = "1.0"
@@ -41,6 +41,10 @@ version = "1"
 
 [dependencies.serde]
 version = "1"
+
+[dependencies.snarkos-node-narwhal-locators]
+path = "../narwhal/locators"
+version = "=2.1.7"
 
 [dependencies.snarkvm]
 workspace = true
