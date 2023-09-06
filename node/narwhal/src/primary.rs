@@ -1068,11 +1068,9 @@ impl<N: Network> Primary<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::MAX_EXPIRATION_TIME_IN_SECS;
-
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
-    use snarkvm::ledger::committee::{Committee, MIN_STAKE};
+    use snarkvm::ledger::committee::{Committee, MIN_VALIDATOR_STAKE};
 
     use bytes::Bytes;
     use rand::RngCore;
@@ -1092,7 +1090,7 @@ mod tests {
             for i in 0..COMMITTEE_SIZE {
                 let socket_addr = format!("127.0.0.1:{}", 5000 + i).parse().unwrap();
                 let account = Account::new(rng).unwrap();
-                members.insert(account.address(), (MIN_STAKE, true));
+                members.insert(account.address(), (MIN_VALIDATOR_STAKE, true));
                 accounts.push((socket_addr, account));
             }
 
