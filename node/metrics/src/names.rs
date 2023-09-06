@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub const GAUGE_NAMES: [&str; 4] = [blocks::HEIGHT, peers::CONNECTED, peers::CANDIDATE, peers::RESTRICTED];
+pub const GAUGE_NAMES: [&str; 5] =
+    [blocks::HEIGHT, blocks::TRANSACTIONS, peers::CONNECTED, peers::CANDIDATE, peers::RESTRICTED];
 
 pub mod blocks {
     pub const HEIGHT: &str = "snarkos_blocks_height_total";
+    pub const TRANSACTIONS: &str = "snarkos_blocks_transactions_total";
+}
+
+pub mod primary {
+    pub const CURRENT_ROUND: &str = "snarkos_primary_current_round";
 }
 
 pub mod peers {

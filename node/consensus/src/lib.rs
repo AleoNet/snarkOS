@@ -17,7 +17,9 @@
 #[macro_use]
 extern crate tracing;
 
+use metrics::{counter, gauge};
 use snarkos_account::Account;
+use snarkos_node_metrics::blocks::{HEIGHT, TRANSACTIONS};
 use snarkos_node_narwhal::{
     helpers::{
         fmt_id,
@@ -229,6 +231,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
+
+        // Update metrics.
+        gauge!(HEIGHT, next_block.height() as f64);
+        counter!(TRANSACTIONS, next_block.transactions().len() as u64);
+
         info!(
             "\n\nAdvanced to block {} at round {} - {}\n",
             next_block.height(),

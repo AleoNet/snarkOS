@@ -40,8 +40,8 @@ members = [
 [workspace.dependencies.snarkvm]
 # git = "https://github.com/AleoHQ/snarkVM.git"
 # rev = "bafe8907d"
-#git = "https://github.com/AleoHQ/snarkVM.git"
-#rev = "ea0aea9cd"
+#git = "https://github.com/niklaslong/snarkVM.git"
+#branch = "metrics-rebased"
 path = "../snarkVM"
 #version = "=0.14.1"
 features = [ "circuit", "console", "rocks" ]
@@ -63,6 +63,10 @@ features = [ "derive" ]
 
 [dependencies.once_cell]
 version = "1"
+
+[dependencies.tokio]
+version = "1.28"
+features = [ "macros", "rt-multi-thread", "signal" ]
 
 [dependencies.snarkos-account]
 path = "./account"

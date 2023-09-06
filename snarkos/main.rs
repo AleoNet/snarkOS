@@ -14,7 +14,6 @@
 
 use snarkos_cli::{commands::CLI, helpers::Updater};
 use snarkos_node_env::EnvInfo;
-use snarkos_node_metrics as metrics;
 
 use clap::Parser;
 #[cfg(feature = "jemalloc")]
@@ -27,8 +26,6 @@ static GLOBAL: Jemalloc = Jemalloc;
 fn main() -> anyhow::Result<()> {
     // Register the environment information.
     EnvInfo::register();
-
-    metrics::initialize();
 
     // Parse the given arguments.
     let cli = CLI::parse();

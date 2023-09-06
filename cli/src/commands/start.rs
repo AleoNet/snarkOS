@@ -15,6 +15,7 @@
 use snarkos_account::Account;
 use snarkos_display::Display;
 use snarkos_node::{messages::NodeType, narwhal::MEMORY_POOL_PORT, Node};
+use snarkos_node_metrics as metrics;
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
@@ -113,9 +114,14 @@ impl Start {
         // Initialize the logger.
         let log_receiver = crate::helpers::initialize_logger(self.verbosity, self.nodisplay, self.logfile.clone());
         // Initialize the runtime.
+
         Self::runtime().block_on(async move {
             // Clone the configurations.
             let mut cli = self.clone();
+            // initialize metrics
+            if self.dev == Some(0) {
+                metrics::initialize();
+            }
             // Parse the network.
             match cli.network {
                 3 => {
