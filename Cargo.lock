@@ -3178,6 +3178,7 @@ dependencies = [
  "kadmium",
  "rayon",
  "serde",
+ "snarkos-node-narwhal-locators",
  "snarkvm",
  "snow",
  "tokio",
@@ -3223,6 +3224,7 @@ dependencies = [
  "sha2",
  "snarkos-account",
  "snarkos-node-narwhal-ledger-service",
+ "snarkos-node-narwhal-locators",
  "snarkos-node-tcp",
  "snarkvm",
  "test-strategy",
@@ -3242,6 +3244,17 @@ dependencies = [
  "async-trait",
  "snarkvm",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-node-narwhal-locators"
+version = "2.1.7"
+dependencies = [
+ "anyhow",
+ "indexmap 2.0.0",
+ "serde",
+ "snarkvm",
  "tracing",
 ]
 
@@ -3294,6 +3307,7 @@ dependencies = [
  "serde",
  "snarkos-account",
  "snarkos-node-messages",
+ "snarkos-node-narwhal-locators",
  "snarkos-node-router",
  "snarkos-node-tcp",
  "snarkvm",

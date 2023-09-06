@@ -20,6 +20,8 @@ extern crate async_trait;
 #[macro_use]
 extern crate tracing;
 
+pub use snarkos_node_narwhal_locators as locators;
+
 pub mod helpers;
 
 mod bft;

@@ -61,6 +61,10 @@ path = "./ledger-service"
 version = "=2.1.7"
 default-features = false
 
+[dependencies.snarkos-node-narwhal-locators]
+path = "./locators"
+version = "=2.1.7"
+
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
 version = "=2.1.7"

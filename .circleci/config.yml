@@ -244,6 +244,24 @@ jobs:
           workspace_member: node/narwhal
           cache_key: snarkos-node-narwhal-cache
 
+  node-narwhal-ledger-service:
+    docker:
+      - image: cimg/rust:1.72
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/narwhal/ledger-service
+          cache_key: snarkos-node-narwhal-ledger-service-cache
+
+  node-narwhal-locators:
+    docker:
+      - image: cimg/rust:1.72
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/narwhal/locators
+          cache_key: snarkos-node-narwhal-locators-cache
+
   node-rest:
     docker:
       - image: cimg/rust:1.72
@@ -331,6 +349,8 @@ workflows:
       - node-consensus
       - node-messages
       - node-narwhal
+      - node-narwhal-ledger-service
+      - node-narwhal-locators
       - node-rest
       - node-router
       - node-tcp

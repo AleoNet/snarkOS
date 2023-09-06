@@ -30,6 +30,7 @@ members = [
   "node/metrics",
   "node/narwhal",
   "node/narwhal/ledger-service",
+  "node/narwhal/locators",
   "node/rest",
   "node/router",
   "node/tcp",
