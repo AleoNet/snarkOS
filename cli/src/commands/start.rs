@@ -308,7 +308,7 @@ impl Start {
     }
 
     /// Returns the node type, from the given configurations.
-    const fn parse_node_type<N: Network>(&self) -> NodeType {
+    const fn parse_node_type(&self) -> NodeType {
         if self.beacon {
             NodeType::Beacon
         } else if self.validator {
@@ -341,7 +341,7 @@ impl Start {
         // Parse the private key of the node.
         let account = self.parse_private_key::<N>()?;
         // Parse the node type.
-        let node_type = self.parse_node_type::<N>();
+        let node_type = self.parse_node_type();
 
         // Parse the REST IP.
         let rest_ip = match self.norest {

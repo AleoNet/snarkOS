@@ -67,7 +67,7 @@ pub fn initialize_logger(verbosity: u8) {
     match verbosity {
         0 => std::env::set_var("RUST_LOG", "info"),
         1 => std::env::set_var("RUST_LOG", "debug"),
-        2 | 3 | 4 => std::env::set_var("RUST_LOG", "trace"),
+        2..=4 => std::env::set_var("RUST_LOG", "trace"),
         _ => std::env::set_var("RUST_LOG", "info"),
     };
 
