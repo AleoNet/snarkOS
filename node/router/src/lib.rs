@@ -373,7 +373,7 @@ impl<N: Network> Router<N> {
     /// Returns the list of bootstrap peers.
     #[cfg(not(feature = "test"))]
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
-        if self.is_dev.is_none() {
+        if !self.is_dev {
             // TODO (howardwu): Change this for Phase 3.
             vec![
                 SocketAddr::from_str("24.199.74.2:4133").unwrap(),
