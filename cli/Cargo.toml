@@ -54,7 +54,7 @@ default-features = false
 version = "1"
 
 [dependencies.self_update]
-version = "0.37"
+version = "0.38"
 
 [dependencies.serde]
 version = "1"
