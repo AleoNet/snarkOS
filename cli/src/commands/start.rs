@@ -389,14 +389,22 @@ impl Start {
 
     /// Returns a runtime for the node.
     fn runtime() -> Runtime {
-        // TODO (howardwu): Fix this.
-        // let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) = if !Self::node_type().is_validator() {
-        //     ((num_cpus::get() / 8 * 2).max(1), num_cpus::get(), (num_cpus::get() / 8 * 5).max(1))
-        // } else {
-        //     (num_cpus::get(), 512, num_cpus::get()) // 512 is tokio's current default
-        // };
+        // Retrieve the number of cores.
+        let num_cores = num_cpus::get();
+        // Determine the number of main cores.
+        let main_cores = match num_cores {
+            // Insufficient
+            0..=3 => unreachable!("The number of cores is insufficient"),
+            // Efficiency mode
+            4..=8 => 2,
+            // Standard mode
+            9..=16 => 4,
+            // Performance mode
+            _ => 8,
+        };
+
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
-            { (num_cpus::get().min(2), 512, num_cpus::get().saturating_sub(2).max(1)) };
+            { (num_cores.min(main_cores), 512, num_cores.saturating_sub(main_cores).max(1)) };
 
         // Initialize the parallelization parameters.
         rayon::ThreadPoolBuilder::new()
