@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_messages::BlockLocators;
+use snarkos_node_narwhal_locators::BlockLocators;
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
@@ -190,7 +190,7 @@ impl<N: Network> Sync<N> {
         // Ensure the given block locators are well-formed.
         locators.ensure_is_valid()?;
         // Insert the block locators into canon.
-        locators.checkpoints.into_iter().chain(locators.recents.into_iter()).for_each(|(height, hash)| {
+        locators.checkpoints.into_iter().chain(locators.recents).for_each(|(height, hash)| {
             self.insert_canon_locator(height, hash);
         });
         Ok(())
@@ -716,14 +716,14 @@ fn construct_request<N: Network>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_node_messages::helpers::block_locators::test_helpers::{
-        sample_block_locators,
-        sample_block_locators_with_fork,
+    use snarkos_node_narwhal_locators::{
+        test_helpers::{sample_block_locators, sample_block_locators_with_fork},
+        CHECKPOINT_INTERVAL,
+        NUM_RECENTS,
     };
     use snarkvm::prelude::Field;
 
     use indexmap::indexset;
-    use snarkos_node_messages::{CHECKPOINT_INTERVAL, NUM_RECENTS};
     use std::net::{IpAddr, Ipv4Addr};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;

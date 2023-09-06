@@ -65,15 +65,16 @@ pub mod prop_tests {
         helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
         TransmissionResponse,
     };
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::narwhal::{Data, Transmission, TransmissionID},
+    };
+
     use bytes::{Buf, BufMut, Bytes, BytesMut};
     use proptest::{
         collection,
         prelude::{any, BoxedStrategy, Strategy},
         prop_oneof,
-    };
-    use snarkvm::{
-        console::prelude::{FromBytes, ToBytes},
-        ledger::narwhal::{Data, Transmission, TransmissionID},
     };
     use test_strategy::proptest;
 

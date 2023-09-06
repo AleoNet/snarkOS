@@ -62,16 +62,18 @@ pub mod prop_tests {
         helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
         TransmissionRequest,
     };
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::narwhal::TransmissionID,
+    };
+
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         prelude::{BoxedStrategy, Strategy},
         prop_oneof,
     };
-    use snarkvm::{
-        console::prelude::{FromBytes, ToBytes},
-        ledger::narwhal::TransmissionID,
-    };
     use test_strategy::proptest;
+
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {

@@ -131,7 +131,7 @@ impl<N: Network, C: ConsensusStorage<N>> Routing<N> for Validator<N, C> {}
 
 impl<N: Network, C: ConsensusStorage<N>> Heartbeat<N> for Validator<N, C> {
     /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 1_000;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 200;
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {
@@ -218,7 +218,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         false
     }
 
-    /// Propagates the unconfirmed solution to all connected beacons and validators.
+    /// Propagates the unconfirmed solution to all connected validators.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
@@ -231,8 +231,6 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
             return true; // Maintain the connection.
         }
         let message = Message::UnconfirmedSolution(serialized);
-        // Propagate the "UnconfirmedSolution" to the connected beacons.
-        self.propagate_to_beacons(message.clone(), &[peer_ip]);
         // Propagate the "UnconfirmedSolution" to the connected validators.
         self.propagate_to_validators(message, &[peer_ip]);
         true
@@ -243,11 +241,14 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedTransaction<N>,
-        _transaction: Transaction<N>,
+        transaction: Transaction<N>,
     ) -> bool {
+        // Add the unconfirmed transaction to the memory pool.
+        if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction).await {
+            trace!("[UnconfirmedTransaction] {error}");
+            return true; // Maintain the connection.
+        }
         let message = Message::UnconfirmedTransaction(serialized);
-        // Propagate the "UnconfirmedTransaction" to the connected beacons.
-        self.propagate_to_beacons(message.clone(), &[peer_ip]);
         // Propagate the "UnconfirmedTransaction" to the connected validators.
         self.propagate_to_validators(message, &[peer_ip]);
         true

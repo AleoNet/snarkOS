@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-node-metrics"
+name = "snarkos-node-narwhal-locators"
 version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "A node for a decentralized operating system"
+description = "Locators to synchronize a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -16,12 +16,21 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
-[dependencies.metrics]
-version = "0.21"
+[features]
+default = [ ]
+test = [ ]
 
-[dependencies.metrics-exporter-prometheus]
-version = "0.12"
+[dependencies.anyhow]
+version = "1.0"
 
-[dependencies.tokio]
-version = "1.28"
-features = [ "rt" ]
+[dependencies.indexmap]
+version = "2.0"
+
+[dependencies.serde]
+version = "1"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.tracing]
+version = "0.1"

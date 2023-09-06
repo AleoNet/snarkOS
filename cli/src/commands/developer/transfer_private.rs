@@ -89,9 +89,9 @@ impl TransferPrivate {
             let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
 
-            // Prepare the fees.
+            // Prepare the fee.
             let fee_record = Developer::parse_record(&private_key, &self.fee_record)?;
-            let fee = (fee_record, self.fee);
+            let priority_fee = self.fee;
 
             // Prepare the inputs for a transfer.
             let input_record = Developer::parse_record(&private_key, &self.input_record)?;
@@ -102,7 +102,15 @@ impl TransferPrivate {
             ];
 
             // Create a new transaction.
-            vm.execute(&private_key, ("credits.aleo", "transfer_private"), inputs.iter(), Some(fee), Some(query), rng)?
+            vm.execute(
+                &private_key,
+                ("credits.aleo", "transfer_private"),
+                inputs.iter(),
+                Some(fee_record),
+                priority_fee,
+                Some(query),
+                rng,
+            )?
         };
         let locator = Locator::<CurrentNetwork>::from_str("credits.aleo/transfer_private")?;
         println!("✅ Created private transfer of {} microcredits to {}\n", &self.amount, self.recipient);

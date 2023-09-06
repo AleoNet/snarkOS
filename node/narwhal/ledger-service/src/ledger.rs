@@ -17,6 +17,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        committee::Committee,
         narwhal::{Data, TransmissionID},
         store::ConsensusStorage,
         Ledger,
@@ -24,6 +25,7 @@ use snarkvm::{
     prelude::{bail, Field, Network, Result},
 };
 
+use std::fmt;
 use tracing::*;
 
 /// A core ledger service that always returns `false`.
@@ -38,8 +40,39 @@ impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     }
 }
 
+impl<N: Network, C: ConsensusStorage<N>> fmt::Debug for CoreLedgerService<N, C> {
+    /// Implements a custom `fmt::Debug` for `CoreLedgerService`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CoreLedgerService").field("current_committee", &self.current_committee()).finish()
+    }
+}
+
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<N, C> {
+    /// Returns the current committee.
+    fn current_committee(&self) -> Result<Committee<N>> {
+        self.ledger.latest_committee()
+    }
+
+    /// Returns the committee for the given round.
+    /// If the given round is in the future, then the current committee is returned.
+    fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
+        match self.ledger.get_committee_for_round(round)? {
+            // Return the committee if it exists.
+            Some(committee) => Ok(committee),
+            // Return the current committee if the round is in the future.
+            None => {
+                // Retrieve the current committee.
+                let current_committee = self.current_committee()?;
+                // Return the current committee if the round is in the future.
+                match current_committee.starting_round() <= round {
+                    true => Ok(current_committee),
+                    false => bail!("No committee found for round {round} in the ledger"),
+                }
+            }
+        }
+    }
+
     /// Returns `false` for all queries.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
         // TODO (howardwu): Implement fetching certificates from ledger.

@@ -61,13 +61,24 @@ impl<N: Network> FromBytes for ChallengeRequest<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::ChallengeRequest;
+    use snarkos_account::Account;
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
+
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
-    use snarkos_node_narwhal_committee::prop_tests::any_valid_account;
-    use snarkvm::console::prelude::{FromBytes, ToBytes};
+    use rand::SeedableRng;
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_valid_account() -> BoxedStrategy<Account<CurrentNetwork>> {
+        any::<u64>()
+            .prop_map(|seed| match Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(seed)) {
+                Ok(account) => account,
+                Err(err) => panic!("Failed to create account {err}"),
+            })
+            .boxed()
+    }
 
     pub fn any_challenge_request() -> BoxedStrategy<ChallengeRequest<CurrentNetwork>> {
         (any_valid_account(), any::<u64>(), any::<u32>(), any::<u16>())

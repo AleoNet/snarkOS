@@ -285,20 +285,12 @@ impl<N: Network> Router<N> {
         message: &ChallengeRequest<N>,
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge request.
-        let &ChallengeRequest { version, listener_port: _, node_type, address, nonce: _ } = message;
+        let &ChallengeRequest { version, listener_port: _, node_type: _, address: _, nonce: _ } = message;
 
         // Ensure the message protocol version is not outdated.
         if version < Message::<N>::VERSION {
             warn!("Dropping '{peer_addr}' on version {version} (outdated)");
             return Some(DisconnectReason::OutdatedClientVersion);
-        }
-        // TODO (howardwu): Remove this after Phase 2.
-        if !self.is_dev
-            && node_type.is_beacon()
-            && address.to_string() != "aleo1q6qstg8q8shwqf5m6q5fcenuwsdqsvp4hhsgfnx5chzjm3secyzqt9mxm8"
-        {
-            warn!("Dropping '{peer_addr}' for an invalid {node_type}");
-            return Some(DisconnectReason::ProtocolViolation);
         }
         None
     }

@@ -66,13 +66,15 @@ impl<N: Network> FromBytes for WorkerPing<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{helpers::storage::prop_tests::any_transmission_id, WorkerPing};
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
+
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::hash_set,
         prelude::{BoxedStrategy, Strategy},
     };
-    use snarkvm::console::prelude::{FromBytes, ToBytes};
     use test_strategy::proptest;
+
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     pub fn any_worker_ping() -> BoxedStrategy<WorkerPing<CurrentNetwork>> {

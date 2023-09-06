@@ -17,12 +17,6 @@
 #[macro_use]
 extern crate tracing;
 
-mod memory_pool;
-pub use memory_pool::*;
-
-// #[cfg(test)]
-// mod tests;
-
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{
@@ -36,7 +30,6 @@ use snarkos_node_narwhal::{
     BFT,
     MAX_GC_ROUNDS,
 };
-use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkos_node_narwhal_ledger_service::CoreLedgerService;
 use snarkvm::{
     ledger::{
@@ -48,7 +41,6 @@ use snarkvm::{
     prelude::*,
 };
 
-use ::rand::thread_rng;
 use anyhow::Result;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -72,24 +64,19 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Initializes a new instance of consensus.
-    pub fn new(account: Account<N>, ledger: Ledger<N, C>, ip: Option<SocketAddr>, dev: Option<u16>) -> Result<Self> {
-        // Initialize the committee.
-        let committee = {
-            // TODO (howardwu): Fix the ledger round number.
-            // TODO (howardwu): Retrieve the real committee members.
-            // Sample the members.
-            let mut members = IndexMap::new();
-            for _ in 0..4 {
-                members.insert(Address::<N>::new(thread_rng().gen()), MIN_STAKE);
-            }
-            Committee::new(ledger.latest_round() + 1, members)?
-        };
-        // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new(committee, MAX_GC_ROUNDS);
+    pub fn new(
+        account: Account<N>,
+        ledger: Ledger<N, C>,
+        ip: Option<SocketAddr>,
+        trusted_validators: &[SocketAddr],
+        dev: Option<u16>,
+    ) -> Result<Self> {
         // Initialize the ledger service.
         let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
+        // Initialize the Narwhal storage.
+        let storage = NarwhalStorage::new(ledger_service.clone(), MAX_GC_ROUNDS);
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger_service, ip, dev)?;
+        let bft = BFT::new(account, storage, ledger_service, ip, trusted_validators, dev)?;
         // Return the consensus.
         Ok(Self { ledger, bft, primary_sender: Default::default(), handles: Default::default() })
     }
@@ -204,20 +191,30 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Process the committed subdag and transmissions from the BFT.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((committed_subdag, transmissions)) = rx_consensus_subdag.recv().await {
-                self_.process_bft_subdag(committed_subdag, transmissions).await;
+            while let Some((committed_subdag, transmissions, callback)) = rx_consensus_subdag.recv().await {
+                self_.process_bft_subdag(committed_subdag, transmissions, callback).await;
             }
         });
     }
 
     /// Processes the committed subdag and transmissions from the BFT.
-    async fn process_bft_subdag(&self, subdag: Subdag<N>, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
+    async fn process_bft_subdag(
+        &self,
+        subdag: Subdag<N>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        callback: oneshot::Sender<Result<()>>,
+    ) {
         // Try to advance to the next block.
-        if let Err(e) = self.try_advance_to_next_block(subdag, transmissions.clone()) {
+        let result = self.try_advance_to_next_block(subdag, transmissions.clone());
+        // If the block failed to advance, reinsert the transmissions into the memory pool.
+        if let Err(e) = &result {
             error!("Unable to advance to the next block - {e}");
             // On failure, reinsert the transmissions into the memory pool.
             self.reinsert_transmissions(transmissions).await;
         }
+        // Send the callback **after** advancing to the next block.
+        // Note: We must await the block to be advanced before sending the callback.
+        callback.send(result).ok();
     }
 
     /// Attempts to advance to the next block.
@@ -232,6 +229,12 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
+        info!(
+            "\n\nAdvanced to block {} at round {} - {}\n",
+            next_block.height(),
+            next_block.round(),
+            next_block.hash(),
+        );
         Ok(())
     }
 

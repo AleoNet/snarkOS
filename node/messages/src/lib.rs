@@ -20,15 +20,6 @@ extern crate tracing;
 pub mod helpers;
 pub use helpers::*;
 
-mod beacon_propose;
-pub use beacon_propose::BeaconPropose;
-
-mod beacon_timeout;
-pub use beacon_timeout::BeaconTimeout;
-
-mod beacon_vote;
-pub use beacon_vote::BeaconVote;
-
 mod block_request;
 pub use block_request::BlockRequest;
 
@@ -68,6 +59,7 @@ pub use unconfirmed_solution::UnconfirmedSolution;
 mod unconfirmed_transaction;
 pub use unconfirmed_transaction::UnconfirmedTransaction;
 
+use snarkos_node_narwhal_locators::BlockLocators;
 use snarkvm::prelude::{
     block::{Block, Header, Transaction},
     coinbase::{EpochChallenge, ProverSolution, PuzzleCommitment},
@@ -103,9 +95,6 @@ pub trait MessageTrait {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message<N: Network> {
-    BeaconPropose(BeaconPropose<N>),
-    BeaconTimeout(BeaconTimeout<N>),
-    BeaconVote(BeaconVote<N>),
     BlockRequest(BlockRequest),
     BlockResponse(BlockResponse<N>),
     ChallengeRequest(ChallengeRequest<N>),
@@ -135,9 +124,6 @@ impl<N: Network> Message<N> {
     #[inline]
     pub fn name(&self) -> Cow<'static, str> {
         match self {
-            Self::BeaconPropose(message) => message.name(),
-            Self::BeaconTimeout(message) => message.name(),
-            Self::BeaconVote(message) => message.name(),
             Self::BlockRequest(message) => message.name(),
             Self::BlockResponse(message) => message.name(),
             Self::ChallengeRequest(message) => message.name(),
@@ -158,22 +144,19 @@ impl<N: Network> Message<N> {
     #[inline]
     pub fn id(&self) -> u16 {
         match self {
-            Self::BeaconPropose(..) => 0,
-            Self::BeaconTimeout(..) => 1,
-            Self::BeaconVote(..) => 2,
-            Self::BlockRequest(..) => 3,
-            Self::BlockResponse(..) => 4,
-            Self::ChallengeRequest(..) => 5,
-            Self::ChallengeResponse(..) => 6,
-            Self::Disconnect(..) => 7,
-            Self::PeerRequest(..) => 8,
-            Self::PeerResponse(..) => 9,
-            Self::Ping(..) => 10,
-            Self::Pong(..) => 11,
-            Self::PuzzleRequest(..) => 12,
-            Self::PuzzleResponse(..) => 13,
-            Self::UnconfirmedSolution(..) => 14,
-            Self::UnconfirmedTransaction(..) => 15,
+            Self::BlockRequest(..) => 0,
+            Self::BlockResponse(..) => 1,
+            Self::ChallengeRequest(..) => 2,
+            Self::ChallengeResponse(..) => 3,
+            Self::Disconnect(..) => 4,
+            Self::PeerRequest(..) => 5,
+            Self::PeerResponse(..) => 6,
+            Self::Ping(..) => 7,
+            Self::Pong(..) => 8,
+            Self::PuzzleRequest(..) => 9,
+            Self::PuzzleResponse(..) => 10,
+            Self::UnconfirmedSolution(..) => 11,
+            Self::UnconfirmedTransaction(..) => 12,
         }
     }
 
@@ -183,9 +166,6 @@ impl<N: Network> Message<N> {
         self.id().write_le(&mut *writer)?;
 
         match self {
-            Self::BeaconPropose(message) => message.serialize(writer),
-            Self::BeaconTimeout(message) => message.serialize(writer),
-            Self::BeaconVote(message) => message.serialize(writer),
             Self::BlockRequest(message) => message.serialize(writer),
             Self::BlockResponse(message) => message.serialize(writer),
             Self::ChallengeRequest(message) => message.serialize(writer),
@@ -215,23 +195,20 @@ impl<N: Network> Message<N> {
 
         // Deserialize the data field.
         let message = match id {
-            0 => Self::BeaconPropose(MessageTrait::deserialize(bytes)?),
-            1 => Self::BeaconTimeout(MessageTrait::deserialize(bytes)?),
-            2 => Self::BeaconVote(MessageTrait::deserialize(bytes)?),
-            3 => Self::BlockRequest(MessageTrait::deserialize(bytes)?),
-            4 => Self::BlockResponse(MessageTrait::deserialize(bytes)?),
-            5 => Self::ChallengeRequest(MessageTrait::deserialize(bytes)?),
-            6 => Self::ChallengeResponse(MessageTrait::deserialize(bytes)?),
-            7 => Self::Disconnect(MessageTrait::deserialize(bytes)?),
-            8 => Self::PeerRequest(MessageTrait::deserialize(bytes)?),
-            9 => Self::PeerResponse(MessageTrait::deserialize(bytes)?),
-            10 => Self::Ping(MessageTrait::deserialize(bytes)?),
-            11 => Self::Pong(MessageTrait::deserialize(bytes)?),
-            12 => Self::PuzzleRequest(MessageTrait::deserialize(bytes)?),
-            13 => Self::PuzzleResponse(MessageTrait::deserialize(bytes)?),
-            14 => Self::UnconfirmedSolution(MessageTrait::deserialize(bytes)?),
-            15 => Self::UnconfirmedTransaction(MessageTrait::deserialize(bytes)?),
-            _ => bail!("Unknown message ID {id}"),
+            0 => Self::BlockRequest(MessageTrait::deserialize(bytes)?),
+            1 => Self::BlockResponse(MessageTrait::deserialize(bytes)?),
+            2 => Self::ChallengeRequest(MessageTrait::deserialize(bytes)?),
+            3 => Self::ChallengeResponse(MessageTrait::deserialize(bytes)?),
+            4 => Self::Disconnect(MessageTrait::deserialize(bytes)?),
+            5 => Self::PeerRequest(MessageTrait::deserialize(bytes)?),
+            6 => Self::PeerResponse(MessageTrait::deserialize(bytes)?),
+            7 => Self::Ping(MessageTrait::deserialize(bytes)?),
+            8 => Self::Pong(MessageTrait::deserialize(bytes)?),
+            9 => Self::PuzzleRequest(MessageTrait::deserialize(bytes)?),
+            10 => Self::PuzzleResponse(MessageTrait::deserialize(bytes)?),
+            11 => Self::UnconfirmedSolution(MessageTrait::deserialize(bytes)?),
+            12 => Self::UnconfirmedTransaction(MessageTrait::deserialize(bytes)?),
+            13.. => bail!("Unknown message ID {id}"),
         };
 
         Ok(message)

@@ -66,16 +66,19 @@ pub mod prop_tests {
         },
         CertificateResponse,
     };
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::{
+            committee::prop_tests::{CommitteeContext, ValidatorSet},
+            narwhal::{BatchCertificate, BatchHeader},
+        },
+    };
+
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::vec,
         prelude::{any, BoxedStrategy, Just, Strategy},
         sample::Selector,
-    };
-    use snarkos_node_narwhal_committee::prop_tests::{CommitteeContext, ValidatorSet};
-    use snarkvm::{
-        console::prelude::{FromBytes, ToBytes},
-        ledger::narwhal::{BatchCertificate, BatchHeader},
     };
     use test_strategy::proptest;
 
@@ -88,8 +91,7 @@ pub mod prop_tests {
                 let signer = selector.select(validators);
                 let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
 
-                BatchHeader::new(signer.account.private_key(), 0, now(), transmission_ids, Default::default(), &mut rng)
-                    .unwrap()
+                BatchHeader::new(&signer.private_key, 0, now(), transmission_ids, Default::default(), &mut rng).unwrap()
             })
             .boxed()
     }

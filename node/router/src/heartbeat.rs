@@ -57,7 +57,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         self.handle_puzzle_request();
     }
 
-    /// TODO (howardwu): Consider checking minimum number of beacons and validators, to exclude clients and provers.
+    /// TODO (howardwu): Consider checking minimum number of validators, to exclude clients and provers.
     /// This function performs safety checks on the setting for the minimum number of peers.
     fn safety_check_minimum_number_of_peers(&self) {
         // Perform basic sanity checks on the configuration for the number of peers.
@@ -66,9 +66,9 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MEDIAN_NUMBER_OF_PEERS);
         assert!(Self::MEDIAN_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
 
-        // If the node is not in development mode, and is a beacon or validator, check its median number of peers.
-        let is_beacon_or_validator = self.router().node_type().is_beacon() || self.router().node_type().is_validator();
-        if !self.router().is_dev() && is_beacon_or_validator && Self::MEDIAN_NUMBER_OF_PEERS < 2 * REDUNDANCY_FACTOR {
+        // If the node is not in development mode, and is a validator, check its median number of peers.
+        let is_validator = self.router().node_type().is_validator();
+        if !self.router().is_dev() && is_validator && Self::MEDIAN_NUMBER_OF_PEERS < 2 * REDUNDANCY_FACTOR {
             warn!("Caution - please raise the median number of peers to be at least {}", 2 * REDUNDANCY_FACTOR);
         }
     }
@@ -130,9 +130,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         }
     }
 
-    /// TODO (howardwu): If the node is a beacon, keep the beacons, and keep 0 clients and provers.
-    ///  If the node is a validator, keep REDUNDANCY_FACTOR beacons.
-    ///  If the node is a client or prover, prioritize validators, and keep 0 beacons.
+    /// TODO (howardwu): If the node is a validator, keep the validator.
     /// This function keeps the number of connected peers within the allowed range.
     fn handle_connected_peers(&self) {
         // Obtain the number of connected peers.
@@ -207,14 +205,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 true => connected_bootstrap.push(bootstrap_ip),
                 false => candidate_bootstrap.push(bootstrap_ip),
             }
-        }
-        // If the node is a beacon, ensure it is connected to all bootstrap peers.
-        if self.router().node_type().is_beacon() {
-            // TODO (howardwu): Enable with tests passing.
-            // for bootstrap_ip in candidate_bootstrap {
-            //     self.router().connect(bootstrap_ip);
-            // }
-            return;
         }
         // If there are not enough connected bootstrap peers, connect to more.
         if connected_bootstrap.is_empty() {

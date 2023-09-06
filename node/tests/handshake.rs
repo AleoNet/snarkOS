@@ -18,13 +18,15 @@
 mod common;
 use common::{node::*, test_peer::TestPeer};
 
-use snarkos_node::{Beacon, Client, Prover, Validator};
+use snarkos_node::{Client, Prover, Validator};
+use snarkos_node_router::Outbound;
 use snarkos_node_tcp::P2P;
 use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, Testnet3 as CurrentNetwork};
 
 use pea2pea::Pea2Pea;
 
-use std::{io, net::SocketAddr};
+use std::{io, net::SocketAddr, time::Duration};
+use tokio::time::sleep;
 
 // Trait to unify Pea2Pea and P2P traits.
 #[async_trait::async_trait]
@@ -55,7 +57,7 @@ macro_rules! impl_connect {
     };
 }
 
-impl_connect!(Beacon, Client, Prover, Validator);
+impl_connect!(Client, Prover, Validator);
 
 // Implement the `Connect` trait for the test peer.
 #[async_trait::async_trait]
@@ -132,28 +134,9 @@ macro_rules! test_handshake {
     };
 }
 
-mod beacon {
-    // Initiator side (full node connects to synthetic peer).
-    test_handshake! {
-        beacon -> beacon = should_panic,
-        beacon -> client,
-        beacon -> validator,
-        beacon -> prover
-    }
-
-    // Responder side (synthetic peer connects to full node).
-    test_handshake! {
-        beacon <- beacon = should_panic,
-        beacon <- client,
-        beacon <- validator,
-        beacon <- prover
-    }
-}
-
 mod client {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        client -> beacon = should_panic,
         client -> client,
         client -> validator,
         client -> prover
@@ -161,7 +144,6 @@ mod client {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        client <- beacon = should_panic,
         client <- client,
         client <- validator,
         client <- prover
@@ -171,7 +153,6 @@ mod client {
 mod prover {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        prover -> beacon = should_panic,
         prover -> client,
         prover -> validator,
         prover -> prover
@@ -179,7 +160,6 @@ mod prover {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        prover <- beacon = should_panic,
         prover <- client,
         prover <- validator,
         prover <- prover
@@ -189,7 +169,6 @@ mod prover {
 mod validator {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        validator -> beacon = should_panic,
         validator -> client,
         validator -> validator,
         validator -> prover
@@ -197,9 +176,113 @@ mod validator {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        validator <- beacon = should_panic,
         validator <- client,
         validator <- validator,
         validator <- prover
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn simultaneous_connection_attempt() {
+    // common::initialise_logger(3);
+
+    // Spin up 2 full nodes.
+    let node1 = validator().await;
+    let addr1 = node1.listening_addr();
+    let node2 = validator().await;
+    let addr2 = node2.listening_addr();
+
+    // Prepare connection attempts.
+    let node1_clone = node1.clone();
+    let conn1 = tokio::spawn(async move {
+        if let Some(conn_task) = node1_clone.router().connect(addr2) { conn_task.await.unwrap() } else { false }
+    });
+    let node2_clone = node2.clone();
+    let conn2 = tokio::spawn(async move {
+        if let Some(conn_task) = node2_clone.router().connect(addr1) { conn_task.await.unwrap() } else { false }
+    });
+
+    // Attempt to connect both nodes to one another at the same time.
+    let (result1, result2) = tokio::join!(conn1, conn2);
+    // A small anti-flakiness buffer.
+    sleep(Duration::from_millis(200)).await;
+
+    // Count connection successes.
+    let mut successes = 0;
+    if result1.unwrap() {
+        successes += 1;
+    }
+    if result2.unwrap() {
+        successes += 1;
+    }
+
+    // Record the number of connected peers for both nodes.
+    let tcp_connected1 = node1.tcp().num_connected();
+    let tcp_connected2 = node2.tcp().num_connected();
+    let router_connected1 = node1.router().number_of_connected_peers();
+    let router_connected2 = node2.router().number_of_connected_peers();
+
+    // It's possible for both attempts to fail and that's ok; the important
+    // thing is that at most a single connection is established in the end.
+    assert!(successes <= 1);
+
+    // If both attempts failed, all the counters should be 0; otherwise,
+    // all should be 1.
+    if successes == 0 {
+        assert_eq!(tcp_connected1, 0);
+        assert_eq!(tcp_connected2, 0);
+        assert_eq!(router_connected1, 0);
+        assert_eq!(router_connected2, 0);
+    } else {
+        assert_eq!(tcp_connected1, 1);
+        assert_eq!(tcp_connected2, 1);
+        assert_eq!(router_connected1, 1);
+        assert_eq!(router_connected2, 1);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn duplicate_connection_attempts() {
+    // common::initialise_logger(3);
+
+    // Spin up 2 full nodes.
+    let node1 = validator().await;
+    let node2 = validator().await;
+    let addr2 = node2.listening_addr();
+
+    // Prepare connection attempts.
+    let node1_clone = node1.clone();
+    let conn1 = tokio::spawn(async move {
+        if let Some(conn_task) = node1_clone.router().connect(addr2) { conn_task.await.unwrap() } else { false }
+    });
+    let node1_clone = node1.clone();
+    let conn2 = tokio::spawn(async move {
+        if let Some(conn_task) = node1_clone.router().connect(addr2) { conn_task.await.unwrap() } else { false }
+    });
+    let node1_clone = node1.clone();
+    let conn3 = tokio::spawn(async move {
+        if let Some(conn_task) = node1_clone.router().connect(addr2) { conn_task.await.unwrap() } else { false }
+    });
+
+    // Attempt to connect the 1st node to the other one several times at once.
+    let (result1, result2, result3) = tokio::join!(conn1, conn2, conn3);
+    // A small anti-flakiness buffer.
+    sleep(Duration::from_millis(200)).await;
+
+    // Count the successes.
+    let mut successes = 0;
+    if result1.unwrap() {
+        successes += 1;
+    }
+    if result2.unwrap() {
+        successes += 1;
+    }
+    if result3.unwrap() {
+        successes += 1;
+    }
+
+    // Connection checks.
+    assert_eq!(successes, 1);
+    assert_eq!(node1.router().number_of_connected_peers(), 1);
+    assert_eq!(node2.router().number_of_connected_peers(), 1);
 }
