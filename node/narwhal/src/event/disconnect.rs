@@ -44,8 +44,8 @@ impl From<DisconnectReason> for Disconnect {
 impl EventTrait for Disconnect {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> &'static str {
-        "Disconnect"
+    fn name(&self) -> Cow<'static, str> {
+        "Disconnect".into()
     }
 }
 

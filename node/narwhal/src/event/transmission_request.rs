@@ -36,8 +36,8 @@ impl<N: Network> From<TransmissionID<N>> for TransmissionRequest<N> {
 impl<N: Network> EventTrait for TransmissionRequest<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> &'static str {
-        "TransmissionRequest"
+    fn name(&self) -> Cow<'static, str> {
+        "TransmissionRequest".into()
     }
 }
 

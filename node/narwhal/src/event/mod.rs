@@ -55,11 +55,12 @@ use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 pub use std::io::Result as IoResult;
 
 pub trait EventTrait: ToBytes + FromBytes {
     /// Returns the event name.
-    fn name(&self) -> &'static str;
+    fn name(&self) -> Cow<'static, str>;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -89,7 +90,7 @@ impl<N: Network> Event<N> {
 
     /// Returns the event name.
     #[inline]
-    pub fn name(&self) -> &'static str {
+    pub fn name(&self) -> Cow<'static, str> {
         match self {
             Self::BatchPropose(event) => event.name(),
             Self::BatchSignature(event) => event.name(),

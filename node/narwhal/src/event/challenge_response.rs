@@ -22,8 +22,8 @@ pub struct ChallengeResponse<N: Network> {
 impl<N: Network> EventTrait for ChallengeResponse<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> &'static str {
-        "ChallengeResponse"
+    fn name(&self) -> Cow<'static, str> {
+        "ChallengeResponse".into()
     }
 }
 

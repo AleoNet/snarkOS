@@ -36,8 +36,8 @@ impl<N: Network> From<IndexSet<TransmissionID<N>>> for WorkerPing<N> {
 impl<N: Network> EventTrait for WorkerPing<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> &'static str {
-        "WorkerPing"
+    fn name(&self) -> Cow<'static, str> {
+        "WorkerPing".into()
     }
 }
 

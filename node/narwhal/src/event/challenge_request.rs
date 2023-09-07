@@ -32,8 +32,8 @@ impl<N: Network> ChallengeRequest<N> {
 impl<N: Network> EventTrait for ChallengeRequest<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> &'static str {
-        "ChallengeRequest"
+    fn name(&self) -> Cow<'static, str> {
+        "ChallengeRequest".into()
     }
 }
 

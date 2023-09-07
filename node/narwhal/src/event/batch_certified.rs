@@ -36,8 +36,8 @@ impl<N: Network> From<BatchCertificate<N>> for BatchCertified<N> {
 impl<N: Network> EventTrait for BatchCertified<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> &'static str {
-        "BatchCertified"
+    fn name(&self) -> Cow<'static, str> {
+        "BatchCertified".into()
     }
 }
 

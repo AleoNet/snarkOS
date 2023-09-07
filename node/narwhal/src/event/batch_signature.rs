@@ -31,8 +31,8 @@ impl<N: Network> BatchSignature<N> {
 impl<N: Network> EventTrait for BatchSignature<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> &'static str {
-        "BatchSignature"
+    fn name(&self) -> Cow<'static, str> {
+        "BatchSignature".into()
     }
 }
 

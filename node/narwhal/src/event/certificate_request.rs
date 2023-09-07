@@ -36,8 +36,8 @@ impl<N: Network> From<Field<N>> for CertificateRequest<N> {
 impl<N: Network> EventTrait for CertificateRequest<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> &'static str {
-        "CertificateRequest"
+    fn name(&self) -> Cow<'static, str> {
+        "CertificateRequest".into()
     }
 }
 
