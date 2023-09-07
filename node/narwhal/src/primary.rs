@@ -45,7 +45,6 @@ use snarkvm::{
     prelude::Field,
 };
 
-use async_recursion::async_recursion;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
@@ -373,7 +372,7 @@ impl<N: Network> Primary<N> {
         }
 
         // If the peer is ahead, use the batch header to sync up to the peer.
-        let transmissions = self.sync_with_header_from_peer(peer_ip, &batch_header).await?;
+        let transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
 
         // Ensure the batch is for the current round.
         // This method must be called after fetching previous certificates (above),
@@ -806,7 +805,7 @@ impl<N: Network> Primary<N> {
     ///   - Ensure the previous certificates are for the previous round (i.e. round - 1).
     ///   - Ensure the previous certificates have reached the quorum threshold.
     ///   - Ensure we have not already signed the batch ID.
-    #[async_recursion]
+    #[async_recursion::async_recursion]
     async fn sync_with_certificate_from_peer(
         &self,
         peer_ip: SocketAddr,
@@ -829,7 +828,7 @@ impl<N: Network> Primary<N> {
         }
 
         // If the peer is ahead, use the batch header to sync up to the peer.
-        let missing_transmissions = self.sync_with_header_from_peer(peer_ip, batch_header).await?;
+        let missing_transmissions = self.sync_with_batch_header_from_peer(peer_ip, batch_header).await?;
 
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.certificate_id()) {
@@ -850,7 +849,7 @@ impl<N: Network> Primary<N> {
 
     // TODO (howardwu): This method is a mess. There are many redundant checks and logic. Ignore these until design is stable.
     /// Recursively syncs using the given batch header.
-    async fn sync_with_header_from_peer(
+    async fn sync_with_batch_header_from_peer(
         &self,
         peer_ip: SocketAddr,
         batch_header: &BatchHeader<N>,
