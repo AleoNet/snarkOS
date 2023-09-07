@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_narwhal::locators::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENTS};
+use snarkos_node_narwhal::locators::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::prelude::{store::ConsensusStorage, Ledger, Network};
 
 use anyhow::Result;
@@ -24,10 +24,10 @@ pub fn get_block_locators<N: Network, C: ConsensusStorage<N>>(ledger: &Ledger<N,
     let latest_height = ledger.latest_height();
 
     // Initialize the recents map.
-    let mut recents = IndexMap::with_capacity(NUM_RECENTS);
+    let mut recents = IndexMap::with_capacity(NUM_RECENT_BLOCKS);
 
     // Retrieve the recent block hashes.
-    for height in latest_height.saturating_sub((NUM_RECENTS - 1) as u32)..=latest_height {
+    for height in latest_height.saturating_sub((NUM_RECENT_BLOCKS - 1) as u32)..=latest_height {
         recents.insert(height, ledger.get_hash(height)?);
     }
 

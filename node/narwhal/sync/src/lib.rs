@@ -724,7 +724,7 @@ mod tests {
     use snarkos_node_narwhal_locators::{
         test_helpers::{sample_block_locators, sample_block_locators_with_fork},
         CHECKPOINT_INTERVAL,
-        NUM_RECENTS,
+        NUM_RECENT_BLOCKS,
     };
     use snarkvm::prelude::Field;
 
@@ -760,12 +760,12 @@ mod tests {
         // Determine the number of peers within range of this sync pool.
         let num_peers_within_recent_range_of_canon = {
             // If no peers are within range, then set to 0.
-            if min_common_ancestor >= NUM_RECENTS as u32 {
+            if min_common_ancestor >= NUM_RECENT_BLOCKS as u32 {
                 0
             }
             // Otherwise, manually check the number of peers within range.
             else {
-                peers.iter().filter(|peer_ip| sync.get_peer_height(peer_ip).unwrap() < NUM_RECENTS as u32).count()
+                peers.iter().filter(|peer_ip| sync.get_peer_height(peer_ip).unwrap() < NUM_RECENT_BLOCKS as u32).count()
             }
         };
 
@@ -1047,7 +1047,7 @@ mod tests {
                     if peer1_height > peer2_height { peer1_height - peer2_height } else { peer2_height - peer1_height };
 
                 // Check the common ancestor.
-                if distance < NUM_RECENTS as u32 {
+                if distance < NUM_RECENT_BLOCKS as u32 {
                     let expected_ancestor = core::cmp::min(peer1_height, peer2_height);
                     assert_eq!(sync.get_common_ancestor(peer1_ip, peer2_ip), Some(expected_ancestor));
                     assert_eq!(sync.get_common_ancestor(peer2_ip, peer1_ip), Some(expected_ancestor));
