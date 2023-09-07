@@ -175,7 +175,7 @@ impl<N: Network> Proposal<N> {
 }
 
 #[cfg(test)]
-pub mod prop_tests {
+mod prop_tests {
     use crate::helpers::{
         now,
         storage::prop_tests::{AnyTransmission, AnyTransmissionID, CryptoTestRng},
