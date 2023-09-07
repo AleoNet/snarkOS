@@ -52,7 +52,7 @@ const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 /// - When a response is removed/completed, the `requests` map and `request_timestamps` map also remove the entry for the request height.
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
 #[derive(Debug)]
-pub struct Sync<N: Network> {
+pub struct BlockSync<N: Network> {
     local_ip: OnceCell<SocketAddr>,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
@@ -78,7 +78,7 @@ pub struct Sync<N: Network> {
     request_timeouts: RwLock<IndexMap<SocketAddr, Vec<Instant>>>,
 }
 
-impl<N: Network> Default for Sync<N> {
+impl<N: Network> Default for BlockSync<N> {
     fn default() -> Self {
         Self {
             local_ip: Default::default(),
@@ -93,7 +93,7 @@ impl<N: Network> Default for Sync<N> {
     }
 }
 
-impl<N: Network> Sync<N> {
+impl<N: Network> BlockSync<N> {
     /// Returns the listening address of the associated node.
     fn local_ip(&self) -> SocketAddr {
         *self.local_ip.get().expect("The local IP had not been set")
@@ -385,7 +385,7 @@ impl<N: Network> Sync<N> {
     }
 }
 
-impl<N: Network> Sync<N> {
+impl<N: Network> BlockSync<N> {
     /// Checks that a block request for the given height does not already exist.
     fn check_block_request(&self, height: u32) -> Result<()> {
         // Ensure the block height is not already canon.
@@ -727,15 +727,19 @@ mod tests {
     }
 
     /// Returns the sync pool, with the canonical map initialized to the given height.
-    fn sample_sync_at_height(height: u32) -> Sync<CurrentNetwork> {
-        let sync = Sync::<CurrentNetwork>::default();
+    fn sample_sync_at_height(height: u32) -> BlockSync<CurrentNetwork> {
+        let sync = BlockSync::<CurrentNetwork>::default();
         sync.set_local_ip(sample_local_ip());
         sync.insert_canon_locators(sample_block_locators(height)).unwrap();
         sync
     }
 
     /// Checks that the sync pool (starting at genesis) returns the correct requests.
-    fn check_prepare_block_requests(sync: Sync<CurrentNetwork>, min_common_ancestor: u32, peers: IndexSet<SocketAddr>) {
+    fn check_prepare_block_requests(
+        sync: BlockSync<CurrentNetwork>,
+        min_common_ancestor: u32,
+        peers: IndexSet<SocketAddr>,
+    ) {
         // Check test assumptions are met.
         assert_eq!(sync.latest_canon_height(), 0, "This test assumes the sync pool is at genesis");
 
