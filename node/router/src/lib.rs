@@ -72,7 +72,7 @@ pub struct InnerRouter<N: Network> {
     cache: Cache<N>,
     /// The resolver.
     resolver: Resolver,
-    /// The sync pool.
+    /// The block sync module.
     sync: BlockSync<N>,
     /// The set of trusted peers.
     trusted_peers: IndexSet<SocketAddr>,
@@ -236,7 +236,7 @@ impl<N: Network> Router<N> {
         self.account.address()
     }
 
-    /// Returns the sync pool.
+    /// Returns the block sync module.
     pub fn sync(&self) -> &BlockSync<N> {
         &self.sync
     }

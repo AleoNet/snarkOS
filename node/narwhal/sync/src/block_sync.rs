@@ -96,30 +96,34 @@ impl<N: Network> BlockSync<N> {
     pub fn set_local_ip(&self, local_ip: SocketAddr) {
         self.local_ip.set(local_ip).expect("The local IP was set more than once");
     }
+}
 
+// TODO (howardwu): Remove `canon` and replace it with a `LedgerService`. This will fix memory growth.
+#[allow(dead_code)]
+impl<N: Network> BlockSync<N> {
     /// Returns the latest block height in the sync pool.
-    pub fn latest_canon_height(&self) -> u32 {
+    fn latest_canon_height(&self) -> u32 {
         self.canon.read().keys().last().copied().unwrap_or(0)
     }
 
     /// Returns the canonical block height, if it exists.
-    pub fn get_canon_height(&self, hash: &N::BlockHash) -> Option<u32> {
+    fn get_canon_height(&self, hash: &N::BlockHash) -> Option<u32> {
         self.canon.read().iter().find(|(_, h)| h == &hash).map(|(h, _)| *h)
     }
 
     /// Returns the canonical block hash for the given block height, if it exists.
-    pub fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash> {
+    fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash> {
         self.canon.read().get(&height).copied()
     }
 
     /// Returns the latest block height of the given peer IP.
-    pub fn get_peer_height(&self, peer_ip: &SocketAddr) -> Option<u32> {
+    fn get_peer_height(&self, peer_ip: &SocketAddr) -> Option<u32> {
         self.locators.read().get(peer_ip).map(|locators| locators.latest_locator_height())
     }
 
     /// Returns a map of peer height to peer IPs.
     /// e.g. `{{ 127 => \[peer1, peer2\], 128 => \[peer3\], 135 => \[peer4, peer5\] }}`
-    pub fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
+    fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
         self.locators.read().iter().map(|(peer_ip, locators)| (locators.latest_locator_height(), *peer_ip)).fold(
             Default::default(),
             |mut map, (height, peer_ip)| {
@@ -130,7 +134,7 @@ impl<N: Network> BlockSync<N> {
     }
 
     /// Returns the list of peers with their heights, sorted by height (descending).
-    pub fn get_peers_by_height(&self) -> Vec<(SocketAddr, u32)> {
+    fn get_peers_by_height(&self) -> Vec<(SocketAddr, u32)> {
         self.locators
             .read()
             .iter()
@@ -140,20 +144,22 @@ impl<N: Network> BlockSync<N> {
     }
 
     /// Returns the common ancestor for the given peer pair, if it exists.
-    pub fn get_common_ancestor(&self, peer_a: SocketAddr, peer_b: SocketAddr) -> Option<u32> {
+    fn get_common_ancestor(&self, peer_a: SocketAddr, peer_b: SocketAddr) -> Option<u32> {
         self.common_ancestors.read().get(&PeerPair(peer_a, peer_b)).copied()
     }
 
     /// Returns the block request for the given height, if it exists.
-    pub fn get_block_request(&self, height: u32) -> Option<SyncRequest<N>> {
+    fn get_block_request(&self, height: u32) -> Option<SyncRequest<N>> {
         self.requests.read().get(&height).cloned()
     }
 
     /// Returns the timestamp of the last time the block was requested, if it exists.
-    pub fn get_block_request_timestamp(&self, height: u32) -> Option<Instant> {
+    fn get_block_request_timestamp(&self, height: u32) -> Option<Instant> {
         self.request_timestamps.read().get(&height).copied()
     }
+}
 
+impl<N: Network> BlockSync<N> {
     /// Inserts a canonical block hash for the given block height, overriding an existing entry if it exists.
     pub fn insert_canon_locator(&self, height: u32, hash: N::BlockHash) {
         if let Some(previous_hash) = self.canon.write().insert(height, hash) {
@@ -304,6 +310,8 @@ impl<N: Network> BlockSync<N> {
         Ok(())
     }
 
+    /// TODO (howardwu): Remove the `common_ancestor` entry. But check that this is safe
+    ///  (that we don't rely upon it for safety when we re-connect with the same peer).
     /// Removes the peer from the sync pool, if they exist.
     pub fn remove_peer(&self, peer_ip: &SocketAddr) {
         // Remove the locators entry for the given peer IP.
@@ -312,43 +320,6 @@ impl<N: Network> BlockSync<N> {
         self.remove_block_requests_to_peer(peer_ip);
         // Remove the timeouts for the peer.
         self.request_timeouts.write().remove(peer_ip);
-    }
-
-    /// Removes the block request for the given peer IP, if it exists.
-    pub fn remove_block_request_to_peer(&self, peer_ip: &SocketAddr, height: u32) {
-        let mut can_revoke = self.responses.read().get(&height).is_none();
-
-        // Remove the peer IP from the request entry. If the request entry is now empty,
-        // and the response entry for this height is also empty, then remove the request entry altogether.
-        if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
-            sync_ips.remove(peer_ip);
-            can_revoke &= sync_ips.is_empty();
-        }
-
-        if can_revoke {
-            self.requests.write().remove(&height);
-            self.request_timestamps.write().remove(&height);
-        }
-    }
-
-    /// Removes all block requests for the given peer IP.
-    pub fn remove_block_requests_to_peer(&self, peer_ip: &SocketAddr) {
-        // Acquire the write lock on the requests map.
-        let mut requests = self.requests.write();
-        // Acquire the read lock on the responses map.
-        let responses = self.responses.read();
-
-        // Remove the peer IP from the requests map. If any request entry is now empty,
-        // and its corresponding response entry is also empty, then remove that request entry altogether.
-        requests.retain(|height, (_, _, peer_ips)| {
-            peer_ips.remove(peer_ip);
-
-            let retain = !peer_ips.is_empty() || responses.get(height).is_some();
-            if !retain {
-                self.request_timestamps.write().remove(height);
-            }
-            retain
-        });
     }
 
     /// Removes the entire block request for the given height, if it exists.
@@ -427,6 +398,44 @@ impl<N: Network> BlockSync<N> {
         } else {
             bail!("The sync pool did not request block {height}")
         }
+    }
+
+    /// Removes the block request for the given peer IP, if it exists.
+    #[allow(dead_code)]
+    fn remove_block_request_to_peer(&self, peer_ip: &SocketAddr, height: u32) {
+        let mut can_revoke = self.responses.read().get(&height).is_none();
+
+        // Remove the peer IP from the request entry. If the request entry is now empty,
+        // and the response entry for this height is also empty, then remove the request entry altogether.
+        if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
+            sync_ips.remove(peer_ip);
+            can_revoke &= sync_ips.is_empty();
+        }
+
+        if can_revoke {
+            self.requests.write().remove(&height);
+            self.request_timestamps.write().remove(&height);
+        }
+    }
+
+    /// Removes all block requests for the given peer IP.
+    fn remove_block_requests_to_peer(&self, peer_ip: &SocketAddr) {
+        // Acquire the write lock on the requests map.
+        let mut requests = self.requests.write();
+        // Acquire the read lock on the responses map.
+        let responses = self.responses.read();
+
+        // Remove the peer IP from the requests map. If any request entry is now empty,
+        // and its corresponding response entry is also empty, then remove that request entry altogether.
+        requests.retain(|height, (_, _, peer_ips)| {
+            peer_ips.remove(peer_ip);
+
+            let retain = !peer_ips.is_empty() || responses.get(height).is_some();
+            if !retain {
+                self.request_timestamps.write().remove(height);
+            }
+            retain
+        });
     }
 
     /// Removes block requests that have timed out. This also removes the corresponding block responses,
