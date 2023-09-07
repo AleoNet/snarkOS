@@ -19,12 +19,14 @@ extern crate tracing;
 
 pub use snarkos_node_narwhal_sync_locators as locators;
 
+mod helpers;
+pub use helpers::*;
+
 use crate::locators::BlockLocators;
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
 use colored::Colorize;
-use core::hash::Hash;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
@@ -40,29 +42,7 @@ const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
-/// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
-pub type SyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
-
-#[derive(Copy, Clone, Debug)]
-pub struct PeerPair(SocketAddr, SocketAddr);
-
-impl Eq for PeerPair {}
-
-impl PartialEq for PeerPair {
-    fn eq(&self, other: &Self) -> bool {
-        (self.0 == other.0 && self.1 == other.1) || (self.0 == other.1 && self.1 == other.0)
-    }
-}
-
-impl Hash for PeerPair {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let (a, b) = if self.0 < self.1 { (self.0, self.1) } else { (self.1, self.0) };
-        a.hash(state);
-        b.hash(state);
-    }
-}
-
-/// A struct that keeps track of the current sync state.
+/// A struct that keeps track of the current block sync state.
 ///
 /// # State
 /// - When a request is inserted, the `requests` map and `request_timestamps` map insert an entry for the request height.
