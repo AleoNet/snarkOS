@@ -122,13 +122,13 @@ impl<N: Network> Storage<N> {
     /// Returns the current round.
     pub fn current_round(&self) -> u64 {
         // Get the current round.
-        self.current_round.load(Ordering::Relaxed)
+        self.current_round.load(Ordering::SeqCst)
     }
 
     /// Returns the `round` that garbage collection has occurred **up to** (inclusive).
     pub fn gc_round(&self) -> u64 {
         // Get the GC round.
-        self.gc_round.load(Ordering::Relaxed)
+        self.gc_round.load(Ordering::SeqCst)
     }
 
     /// Returns the maximum number of rounds to keep in storage.
@@ -150,7 +150,7 @@ impl<N: Network> Storage<N> {
         ensure!(next_round >= current_committee.starting_round(), "Next round is behind the current committee");
 
         // Update the current round.
-        self.current_round.store(next_round, Ordering::Relaxed);
+        self.current_round.store(next_round, Ordering::SeqCst);
 
         // Fetch the current GC round.
         let current_gc_round = self.gc_round();
@@ -167,7 +167,7 @@ impl<N: Network> Storage<N> {
                 }
             }
             // Update the GC round.
-            self.gc_round.store(next_gc_round, Ordering::Relaxed);
+            self.gc_round.store(next_gc_round, Ordering::SeqCst);
         }
 
         // Ensure the next round matches in storage.

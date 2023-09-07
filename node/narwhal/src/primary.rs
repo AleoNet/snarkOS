@@ -250,6 +250,7 @@ impl<N: Network> Primary<N> {
     pub async fn propose_batch(&self) -> Result<()> {
         // Check if the proposed batch has expired, and clear it if it has expired.
         self.check_proposed_batch_for_expiration().await?;
+
         // If there is a batch being proposed already,
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
@@ -612,18 +613,20 @@ impl<N: Network> Primary<N> {
 
     /// Checks if the proposed batch is expired, and clears the proposed batch if it has expired.
     async fn check_proposed_batch_for_expiration(&self) -> Result<()> {
-        // Check if the proposed batch is expired.
-        let is_expired = self.proposed_batch.read().as_ref().map_or(false, Proposal::is_expired);
-        // If the batch is expired, clear it.
-        if is_expired {
+        // Check if the proposed batch is timed out.
+        let is_timed_out = self.proposed_batch.read().as_ref().map_or(false, Proposal::is_timed_out);
+        // Check if the proposed batch is stale.
+        let is_round_stale = match self.proposed_batch.read().as_ref() {
+            Some(proposal) => proposal.round() < self.current_round(),
+            None => false,
+        };
+        // If the batch is expired, clear the proposed batch.
+        if is_timed_out || is_round_stale {
             // Reset the proposed batch.
             let proposal = self.proposed_batch.write().take();
             if let Some(proposal) = proposal {
                 self.reinsert_transmissions_into_workers(proposal)?;
             }
-            // If there are enough certificates to reach quorum threshold for the current round,
-            // then proceed to advance to the next round.
-            self.try_advance_to_next_round().await?;
         }
         Ok(())
     }
@@ -688,8 +691,8 @@ impl<N: Network> Primary<N> {
                 // TODO (howardwu): Fix to increment to the next round.
                 self.storage.increment_to_next_round()?;
             }
-            // Clear the proposed batch.
-            *self.proposed_batch.write() = None;
+            // Propose a batch for the next round.
+            self.propose_batch().await?;
         }
         Ok(())
     }

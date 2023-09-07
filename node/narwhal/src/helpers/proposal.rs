@@ -120,8 +120,8 @@ impl<N: Network> Proposal<N> {
         nonsigners
     }
 
-    /// Returns `true` if the proposal has expired.
-    pub fn is_expired(&self) -> bool {
+    /// Returns `true` if the proposal has timed out.
+    pub fn is_timed_out(&self) -> bool {
         now().saturating_sub(self.timestamp()) > MAX_EXPIRATION_TIME_IN_SECS
     }
 
