@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![forbid(unsafe_code)]
+
+#[macro_use]
+extern crate tracing;
+
 use snarkos_node_narwhal_locators::BlockLocators;
 use snarkvm::prelude::{block::Block, Network};
 
@@ -26,12 +31,12 @@ use rand::{prelude::IteratorRandom, CryptoRng, Rng};
 use std::{collections::BTreeMap, net::SocketAddr, time::Instant};
 
 pub const REDUNDANCY_FACTOR: usize = 3;
-pub const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
-pub const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
+const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
+const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
-pub const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
-pub const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
-pub const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
+const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
+const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
+const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
 /// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
 pub type SyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);

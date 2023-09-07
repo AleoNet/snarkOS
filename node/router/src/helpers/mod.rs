@@ -20,6 +20,3 @@ pub use peer::*;
 
 mod resolver;
 pub use resolver::*;
-
-mod sync;
-pub use sync::*;

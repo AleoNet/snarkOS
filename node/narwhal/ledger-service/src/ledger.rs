@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{fmt_id, LedgerService};
+use crate::LedgerService;
 use snarkvm::{
     ledger::{
         block::Transaction,
@@ -26,7 +26,6 @@ use snarkvm::{
 };
 
 use std::fmt;
-use tracing::*;
 
 /// A core ledger service that always returns `false`.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {

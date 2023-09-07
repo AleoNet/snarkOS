@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Outbound, Router, REDUNDANCY_FACTOR};
+use crate::{Outbound, Router};
 use snarkos_node_messages::{DisconnectReason, Message, PeerRequest, PuzzleRequest};
+use snarkos_node_narwhal_sync::REDUNDANCY_FACTOR;
 use snarkvm::prelude::Network;
 
 use colored::Colorize;

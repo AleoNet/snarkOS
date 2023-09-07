@@ -39,6 +39,7 @@ pub use routing::*;
 
 use snarkos_account::Account;
 use snarkos_node_messages::NodeType;
+use snarkos_node_narwhal_sync::Sync;
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 

@@ -31,6 +31,7 @@ members = [
   "node/narwhal",
   "node/narwhal/ledger-service",
   "node/narwhal/locators",
+  "node/narwhal/sync",
   "node/rest",
   "node/router",
   "node/tcp",
