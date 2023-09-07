@@ -73,11 +73,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
     }
 
-    /// Returns `false` for all queries.
+    /// Returns `true` if the ledger contains the given certificate ID in block history.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
-        // TODO (howardwu): Implement fetching certificates from ledger.
-        trace!("[CoreLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));
-        Ok(false)
+        self.ledger.contains_certificate(certificate_id)
     }
 
     /// Returns `true` if the transmission exists in the ledger.
