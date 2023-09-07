@@ -17,7 +17,9 @@
 #[macro_use]
 extern crate tracing;
 
-use snarkos_node_narwhal_locators::BlockLocators;
+pub use snarkos_node_narwhal_sync_locators as locators;
+
+use crate::locators::BlockLocators;
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
@@ -721,7 +723,7 @@ fn construct_request<N: Network>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_node_narwhal_locators::{
+    use crate::locators::{
         test_helpers::{sample_block_locators, sample_block_locators_with_fork},
         CHECKPOINT_INTERVAL,
         NUM_RECENT_BLOCKS,

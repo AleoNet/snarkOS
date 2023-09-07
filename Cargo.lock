@@ -3178,7 +3178,7 @@ dependencies = [
  "kadmium",
  "rayon",
  "serde",
- "snarkos-node-narwhal-locators",
+ "snarkos-node-narwhal-sync-locators",
  "snarkvm",
  "snow",
  "tokio",
@@ -3224,7 +3224,6 @@ dependencies = [
  "sha2",
  "snarkos-account",
  "snarkos-node-narwhal-ledger-service",
- "snarkos-node-narwhal-locators",
  "snarkos-node-narwhal-sync",
  "snarkos-node-tcp",
  "snarkvm",
@@ -3250,17 +3249,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snarkos-node-narwhal-locators"
-version = "2.1.7"
-dependencies = [
- "anyhow",
- "indexmap 2.0.0",
- "serde",
- "snarkvm",
- "tracing",
-]
-
-[[package]]
 name = "snarkos-node-narwhal-sync"
 version = "2.1.7"
 dependencies = [
@@ -3272,7 +3260,18 @@ dependencies = [
  "parking_lot",
  "rand",
  "serde",
- "snarkos-node-narwhal-locators",
+ "snarkos-node-narwhal-sync-locators",
+ "snarkvm",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-node-narwhal-sync-locators"
+version = "2.1.7"
+dependencies = [
+ "anyhow",
+ "indexmap 2.0.0",
+ "serde",
  "snarkvm",
  "tracing",
 ]
@@ -3316,9 +3315,7 @@ dependencies = [
  "futures",
  "futures-util",
  "indexmap 2.0.0",
- "itertools 0.11.0",
  "linked-hash-map",
- "once_cell",
  "parking_lot",
  "peak_alloc",
  "rand",
@@ -3326,7 +3323,6 @@ dependencies = [
  "serde",
  "snarkos-account",
  "snarkos-node-messages",
- "snarkos-node-narwhal-locators",
  "snarkos-node-narwhal-sync",
  "snarkos-node-router",
  "snarkos-node-tcp",

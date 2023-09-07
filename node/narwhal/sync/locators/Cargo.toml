@@ -1,5 +1,5 @@
 [package]
-name = "snarkos-node-narwhal-locators"
+name = "snarkos-node-narwhal-sync-locators"
 version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Locators to synchronize a decentralized operating system"

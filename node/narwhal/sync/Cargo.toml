@@ -16,6 +16,10 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = [ ]
+test = [ "snarkos-node-narwhal-sync-locators/test" ]
+
 [dependencies.anyhow]
 version = "1.0"
 
@@ -41,8 +45,8 @@ version = "0.8"
 [dependencies.serde]
 version = "1"
 
-[dependencies.snarkos-node-narwhal-locators]
-path = "../locators"
+[dependencies.snarkos-node-narwhal-sync-locators]
+path = "locators"
 version = "=2.1.7"
 
 [dependencies.snarkvm]

@@ -42,14 +42,8 @@ features = [ "thread-pool" ]
 version = "2.0"
 features = [ "rayon" ]
 
-[dependencies.itertools]
-version = "0.11"
-
 [dependencies.linked-hash-map]
 version = "0.5"
-
-[dependencies.once_cell]
-version = "1"
 
 [dependencies.parking_lot]
 version = "0.12"
@@ -69,10 +63,6 @@ version = "=2.1.7"
 
 [dependencies.snarkos-node-messages]
 path = "../messages"
-version = "=2.1.7"
-
-[dependencies.snarkos-node-narwhal-locators]
-path = "../narwhal/locators"
 version = "=2.1.7"
 
 [dependencies.snarkos-node-narwhal-sync]
@@ -125,8 +115,8 @@ version = "0.2"
 path = "../messages"
 features = [ "test" ]
 
-[dev-dependencies.snarkos-node-narwhal-locators]
-path = "../narwhal/locators"
+[dev-dependencies.snarkos-node-narwhal-sync]
+path = "../narwhal/sync"
 features = [ "test" ]
 
 [dev-dependencies.snarkos-node-router]
