@@ -1072,9 +1072,10 @@ mod tests {
     use super::*;
     use crate::MAX_EXPIRATION_TIME_IN_SECS;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
-    use snarkvm::ledger::committee::{Committee, MIN_VALIDATOR_STAKE};
+    use snarkvm::{ledger::committee::{Committee, MIN_VALIDATOR_STAKE}, prelude::{Address, Signature}};
 
     use bytes::Bytes;
+    use indexmap::IndexSet;
     use rand::RngCore;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -1204,6 +1205,58 @@ mod tests {
         signatures
     }
 
+    // Creates a signature of the batch ID for each committe member
+    // (excluding the primary).
+    fn peer_signatures_for_batch(
+        primary_address: Address<CurrentNetwork>,
+        accounts: &[(SocketAddr, Account<CurrentNetwork>)],
+        batch_id: Field<CurrentNetwork>,
+        rng: &mut TestRng,
+    ) -> IndexMap<Signature<CurrentNetwork>, i64> {
+        let mut signatures = IndexMap::new();
+        for (_, account) in accounts {
+            if account.address() == primary_address {
+                continue;
+            }
+
+            let timestamp = now();
+            let signature = account.sign(&[batch_id, Field::from_u64(timestamp as u64)], rng).unwrap();
+            signatures.insert(signature, timestamp);
+        }
+
+        signatures
+    }
+
+    // Creates a batch certificate.
+    fn create_batch_certificate(
+        primary_address: Address<CurrentNetwork>,
+        accounts: &[(SocketAddr, Account<CurrentNetwork>)],
+        round: u64,
+        previous_certificate_ids: IndexSet::<Field<CurrentNetwork>>,
+        rng: &mut TestRng,
+    ) -> (BatchCertificate::<CurrentNetwork>, HashMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>>) {
+        let timestamp = now();
+
+        let author = accounts.iter()
+            .find(|&(_, acct)| acct.address() == primary_address)
+            .map(|(_, acct)| acct.clone()).unwrap();
+        let private_key = author.private_key();
+
+        let (solution_commitment, solution) = sample_unconfirmed_solution(rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
+        let transmission_ids = [solution_commitment.into(), (&transaction_id).into()].into();
+        let transmissions = [
+            (solution_commitment.into(), Transmission::Solution(solution)),
+            ((&transaction_id).into(), Transmission::Transaction(transaction)),
+        ].into();
+
+        let batch_header =
+            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
+        let signatures = peer_signatures_for_batch(primary_address, &accounts, batch_header.batch_id(), rng);
+        let certificate = BatchCertificate::<CurrentNetwork>::new(batch_header, signatures).unwrap();
+        (certificate, transmissions)
+    }
+
     #[tokio::test]
     async fn test_propose_batch() {
         let mut rng = TestRng::default();
@@ -1226,6 +1279,45 @@ mod tests {
         primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Try to propose a batch again. This time, it should succeed.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_in_round() {
+        let round = 3;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Create a certificate chain up to round.
+        let mut previous_certificates = IndexSet::<Field<CurrentNetwork>>::new();
+        let mut next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
+        for cur_round in 1..round {
+            for (_, account) in accounts.iter() {
+                let (certificate, transmissions) = create_batch_certificate(account.address(), &accounts, cur_round, previous_certificates.clone(), &mut rng);
+                next_certificates.insert(certificate.certificate_id());
+                assert!(primary.storage.insert_certificate(certificate, transmissions).is_ok());
+            }
+
+            assert!(primary.storage.increment_to_next_round().is_ok());
+            previous_certificates = next_certificates;
+            next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
+        }
+
+        // Try to propose a batch. There are no transmissions in the workers so the method should
+        // just return without proposing a batch.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Generate a solution and a transaction.
+        let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Propose a batch again. This time, it should succeed.
         assert!(primary.propose_batch().await.is_ok());
         assert!(primary.proposed_batch.read().is_some());
     }
