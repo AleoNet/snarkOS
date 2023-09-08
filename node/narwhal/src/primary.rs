@@ -1433,6 +1433,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_batch_propose_from_peer_in_round_wrong_round() {
+        let round = 4;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Generate certificates.
+        let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Create a valid proposal with an author that isn't the primary.
+        let timestamp = now();
+        let proposal = create_test_proposal(
+            &accounts[1].1,
+            primary.ledger.current_committee().unwrap(),
+            round,
+            previous_certificates,
+            timestamp,
+            &mut rng,
+        );
+
+        // Make sure the primary is aware of the transmissions in the proposal.
+        for (transmission_id, transmission) in proposal.transmissions() {
+            primary.workers[0].process_transmission_from_peer(accounts[1].0, *transmission_id, transmission.clone())
+        }
+
+        // Try to process the batch proposal from the peer, should error.
+        assert!(
+            primary
+                .process_batch_propose_from_peer(accounts[1].0, BatchPropose {
+                    round: round + 1,
+                    batch_header: Data::Object(proposal.batch_header().clone())
+                })
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
     async fn test_batch_signature_from_peer() {
         let mut rng = TestRng::default();
         let (primary, accounts) = primary_without_handlers(&mut rng).await;
