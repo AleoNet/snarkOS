@@ -1660,4 +1660,41 @@ mod tests {
         // Check the round was incremented.
         assert_eq!(primary.current_round(), round);
     }
+
+    #[tokio::test]
+    async fn test_batch_signature_from_peer_in_round_no_quorum() {
+        let round = 7;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+        map_account_addresses(&primary, &accounts);
+
+        // Generate certificates.
+        let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Create a valid proposal.
+        let timestamp = now();
+        let proposal = create_test_proposal(
+            primary.gateway.account(),
+            primary.ledger.current_committee().unwrap(),
+            round,
+            previous_certificates,
+            timestamp,
+            &mut rng,
+        );
+
+        // Store the proposal on the primary.
+        *primary.proposed_batch.write() = Some(proposal);
+
+        // Each committee member signs the batch.
+        let signatures = peer_signatures_for_proposal(&primary, &accounts, &mut rng);
+
+        // Have the primary process only one signature, mimicking a lack of quorum.
+        let (socket_addr, signature) = signatures.first().unwrap();
+        primary.process_batch_signature_from_peer(*socket_addr, *signature).await.unwrap();
+
+        // Check the certificate was not created and stored by the primary.
+        assert!(!primary.storage.contains_certificate_in_round_from(round, primary.gateway.account().address()));
+        // Check the round was incremented.
+        assert_eq!(primary.current_round(), round);
+    }
 }
