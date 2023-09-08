@@ -1280,6 +1280,18 @@ mod tests {
         previous_certificates
     }
 
+    // Insert the account socket addresses into the resolver so that
+    // they are recognized as "connected".
+    fn map_account_addresses(
+        primary: &Primary<CurrentNetwork>,
+        accounts: &[(SocketAddr, Account<CurrentNetwork>)],
+    ) {
+        // First account is primary, which doesn't need to resolve.
+        for (addr, acct) in accounts.iter().skip(1) {
+            primary.gateway.resolver().insert_peer(*addr, *addr, acct.address());
+        }
+    }
+
     #[tokio::test]
     async fn test_propose_batch() {
         let mut rng = TestRng::default();
@@ -1473,12 +1485,7 @@ mod tests {
     async fn test_batch_signature_from_peer() {
         let mut rng = TestRng::default();
         let (primary, accounts) = primary_without_handlers(&mut rng).await;
-
-        // Insert the account socket address into the resolver so that they are recognized as
-        // "connected".
-        for accounts in accounts.iter().skip(1) {
-            primary.gateway.resolver().insert_peer(accounts.0, accounts.0, accounts.1.address());
-        }
+        map_account_addresses(&primary, &accounts);
 
         // Create a valid proposal.
         let round = 1;
@@ -1513,12 +1520,7 @@ mod tests {
     async fn test_batch_signature_from_peer_expired() {
         let mut rng = TestRng::default();
         let (primary, accounts) = primary_without_handlers(&mut rng).await;
-
-        // Insert the account socket address into the resolver so that they are recognized as
-        // "connected".
-        for accounts in accounts.iter().skip(1) {
-            primary.gateway.resolver().insert_peer(accounts.0, accounts.0, accounts.1.address());
-        }
+        map_account_addresses(&primary, &accounts);
 
         // Create an expired proposal.
         let round = 1;
@@ -1553,12 +1555,7 @@ mod tests {
     async fn test_batch_signature_from_peer_no_quorum() {
         let mut rng = TestRng::default();
         let (primary, accounts) = primary_without_handlers(&mut rng).await;
-
-        // Insert the account socket address into the resolver so that they are recognized as
-        // "connected".
-        for accounts in accounts.iter().skip(1) {
-            primary.gateway.resolver().insert_peer(accounts.0, accounts.0, accounts.1.address());
-        }
+        map_account_addresses(&primary, &accounts);
 
         // Create a valid proposal.
         let round = 1;
