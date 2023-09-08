@@ -1158,6 +1158,7 @@ mod tests {
         author: &Account<CurrentNetwork>,
         current_committee: Committee<CurrentNetwork>,
         round: u64,
+        previous_certificate_ids: IndexSet::<Field<CurrentNetwork>>,
         timestamp: i64,
         rng: &mut TestRng,
     ) -> Proposal<CurrentNetwork> {
@@ -1173,11 +1174,9 @@ mod tests {
             ((&transaction_id).into(), Transmission::Transaction(transaction)),
         ]
         .into();
-        // Prepare the certificate IDs.
-        let certificate_ids = Default::default();
         // Sign the batch header.
         let batch_header =
-            BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng).unwrap();
+            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
         // Construct the proposal.
         Proposal::new(current_committee, batch_header, transmissions).unwrap()
     }
@@ -1257,6 +1256,30 @@ mod tests {
         (certificate, transmissions)
     }
 
+    // Create a certificate chain up to round in primary storage.
+    fn store_certificate_chain(
+        primary: &Primary<CurrentNetwork>,
+        accounts: &[(SocketAddr, Account<CurrentNetwork>)],
+        round: u64,
+        rng: &mut TestRng,
+    ) -> IndexSet::<Field<CurrentNetwork>> {
+        let mut previous_certificates = IndexSet::<Field<CurrentNetwork>>::new();
+        let mut next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
+        for cur_round in 1..round {
+            for (_, account) in accounts.iter() {
+                let (certificate, transmissions) = create_batch_certificate(account.address(), &accounts, cur_round, previous_certificates.clone(), rng);
+                next_certificates.insert(certificate.certificate_id());
+                assert!(primary.storage.insert_certificate(certificate, transmissions).is_ok());
+            }
+
+            assert!(primary.storage.increment_to_next_round().is_ok());
+            previous_certificates = next_certificates;
+            next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
+        }
+
+        previous_certificates
+    }
+
     #[tokio::test]
     async fn test_propose_batch() {
         let mut rng = TestRng::default();
@@ -1289,20 +1312,8 @@ mod tests {
         let mut rng = TestRng::default();
         let (primary, accounts) = primary_without_handlers(&mut rng).await;
 
-        // Create a certificate chain up to round.
-        let mut previous_certificates = IndexSet::<Field<CurrentNetwork>>::new();
-        let mut next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
-        for cur_round in 1..round {
-            for (_, account) in accounts.iter() {
-                let (certificate, transmissions) = create_batch_certificate(account.address(), &accounts, cur_round, previous_certificates.clone(), &mut rng);
-                next_certificates.insert(certificate.certificate_id());
-                assert!(primary.storage.insert_certificate(certificate, transmissions).is_ok());
-            }
-
-            assert!(primary.storage.increment_to_next_round().is_ok());
-            previous_certificates = next_certificates;
-            next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
-        }
+        // Fill primary storage.
+        store_certificate_chain(&primary, &accounts, round, &mut rng);
 
         // Try to propose a batch. There are no transmissions in the workers so the method should
         // just return without proposing a batch.
@@ -1334,6 +1345,41 @@ mod tests {
             &accounts[1].1,
             primary.ledger.current_committee().unwrap(),
             round,
+            Default::default(),
+            timestamp,
+            &mut rng,
+        );
+
+        // Make sure the primary is aware of the transmissions in the proposal.
+        for (transmission_id, transmission) in proposal.transmissions() {
+            primary.workers[0].process_transmission_from_peer(accounts[1].0, *transmission_id, transmission.clone())
+        }
+
+        // Try to process the batch proposal from the peer, should succeed.
+        assert!(
+            primary
+                .process_batch_propose_from_peer(accounts[1].0, (*proposal.batch_header()).clone().into())
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_batch_propose_from_peer_in_round() {
+        let round = 2;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Generate certificates.
+        let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Create a valid proposal with an author that isn't the primary.
+        let timestamp = now();
+        let proposal = create_test_proposal(
+            &accounts[1].1,
+            primary.ledger.current_committee().unwrap(),
+            round,
+            previous_certificates,
             timestamp,
             &mut rng,
         );
@@ -1364,6 +1410,7 @@ mod tests {
             &accounts[1].1,
             primary.ledger.current_committee().unwrap(),
             round,
+            Default::default(),
             timestamp,
             &mut rng,
         );
@@ -1403,6 +1450,7 @@ mod tests {
             primary.gateway.account(),
             primary.ledger.current_committee().unwrap(),
             round,
+            Default::default(),
             timestamp,
             &mut rng,
         );
@@ -1442,6 +1490,7 @@ mod tests {
             primary.gateway.account(),
             primary.ledger.current_committee().unwrap(),
             round,
+            Default::default(),
             timestamp,
             &mut rng,
         );
@@ -1481,6 +1530,7 @@ mod tests {
             primary.gateway.account(),
             primary.ledger.current_committee().unwrap(),
             round,
+            Default::default(),
             timestamp,
             &mut rng,
         );
