@@ -164,7 +164,7 @@ async fn test_leader_election_consistency() {
         let mut leaders = Vec::new();
         for validator in validators.iter() {
             if validator.primary.current_round() == target_round {
-                let bft = validator.bft.as_ref().unwrap();
+                let bft = validator.bft.get().unwrap();
                 if let Some(leader) = bft.leader() {
                     // Validator is a live object - just because it's
                     // been on the current round above doesn't mean

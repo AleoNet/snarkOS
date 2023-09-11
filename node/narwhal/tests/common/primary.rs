@@ -30,7 +30,12 @@ use snarkvm::{
     prelude::TestRng,
 };
 
-use std::{collections::HashMap, ops::RangeBounds, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    ops::RangeBounds,
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
 
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -75,7 +80,7 @@ pub struct TestValidator {
     /// The channel sender of the primary.
     pub primary_sender: Option<PrimarySender<CurrentNetwork>>,
     /// The BFT instance. This is only set if the BFT is enabled.
-    pub bft: Option<BFT<CurrentNetwork>>,
+    pub bft: OnceLock<BFT<CurrentNetwork>>,
     /// The tokio handles of all long-running tasks associated with the validator (incl. cannons).
     pub handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -129,7 +134,10 @@ impl TestNetwork {
             };
 
             let test_validator =
-                TestValidator { id: id as u16, primary, primary_sender: None, bft, handles: Default::default() };
+                TestValidator { id: id as u16, primary, primary_sender: None, bft: OnceLock::new(), handles: Default::default() };
+            if let Some(bft) = bft {
+                assert!(test_validator.bft.set(bft).is_ok());
+            }
             validators.insert(id as u16, test_validator);
         }
 
@@ -141,7 +149,7 @@ impl TestNetwork {
         for validator in self.validators.values_mut() {
             let (primary_sender, primary_receiver) = init_primary_channels();
             validator.primary_sender = Some(primary_sender.clone());
-            if let Some(bft) = &mut validator.bft {
+            if let Some(bft) = validator.bft.get_mut() {
                 // Setup the channels and start the bft.
                 bft.run(primary_sender, primary_receiver, None).await.unwrap();
             } else {
