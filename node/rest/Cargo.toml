@@ -55,10 +55,6 @@ features = [ "derive" ]
 path = "../consensus"
 version = "=2.1.7"
 
-[dependencies.snarkos-node-env]
-path = "../env"
-version = "=2.1.7"
-
 [dependencies.snarkos-node-messages]
 path = "../messages"
 version = "=2.1.7"

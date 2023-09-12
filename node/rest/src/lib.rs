@@ -140,7 +140,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
             .route("/testnet3/beacons", get(Self::get_beacons))
             .route("/testnet3/node/address", get(Self::get_node_address))
-            .route("/testnet3/node/env", get(Self::get_env_info))
 
             // Pass in `Rest` to make things convenient.
             .with_state(self.clone())
