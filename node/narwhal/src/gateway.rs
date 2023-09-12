@@ -722,13 +722,12 @@ impl<N: Network> Handshake for Gateway<N> {
         }
 
         // If the handshake succeeded, announce it.
-        if let Ok((ref peer_ip, framed)) = handshake_result {
-            let FramedParts { codec, .. } = framed.into_parts();
-            let NoiseCodec { noise_state, .. } = codec;
-            self.noise_states.write().insert(*peer_ip, noise_state);
+        let (ref peer_ip, framed) = handshake_result?;
+        let FramedParts { codec, .. } = framed.into_parts();
+        let NoiseCodec { noise_state, .. } = codec;
+        self.noise_states.write().insert(*peer_ip, noise_state);
 
-            info!("{CONTEXT} Gateway is connected to '{peer_ip}'");
-        }
+        info!("{CONTEXT} Gateway is connected to '{peer_ip}'");
 
         Ok(connection)
     }
