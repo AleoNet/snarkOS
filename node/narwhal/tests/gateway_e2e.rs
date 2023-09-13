@@ -16,7 +16,7 @@
 mod common;
 
 use crate::common::{primary::new_test_committee, test_peer::TestPeer, CurrentNetwork, MockLedgerService};
-use snarkos_node_narwhal::{helpers::EventOrBytes, Disconnect, DisconnectReason, Event, Gateway};
+use snarkos_node_narwhal::{helpers::EventOrBytes, Disconnect, DisconnectReason, Event, Gateway, WorkerPing};
 use snarkos_node_tcp::P2P;
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
@@ -59,7 +59,9 @@ async fn handshake_responder_side_timeout() {
     deadline!(Duration::from_secs(5), move || gateway.tcp().num_connecting() == 0);
 }
 
-macro_rules! handshake_responder_side_unexpected {
+// The test peer connects to the gateway, completes the noise handshake and sends an unexpected
+// event. The gateway's handshake should be interrupted and the peer should be disconnected.
+macro_rules! handshake_responder_side_unexpected_event {
     ($test_name:ident, $payload:expr) => {
         paste::paste! {
             #[tokio::test(flavor = "multi_thread")]
@@ -74,7 +76,7 @@ macro_rules! handshake_responder_side_unexpected {
                 // Check the gateway is still handshaking with us.
                 assert_eq!(gateway.tcp().num_connecting(), 1);
 
-                // Send an unexpected disconnect.
+                // Send an unexpected event.
                 let _ = test_peer.unicast(
                     gateway.local_ip(),
                     $payload
@@ -99,7 +101,7 @@ macro_rules! handshake_responder_side_unexpected_disconnect {
     ($($reason:ident),*) => {
         $(
             paste::paste! {
-                handshake_responder_side_unexpected!(
+                handshake_responder_side_unexpected_event!(
                     [<disconnect_ $reason:snake>],
                     EventOrBytes::Event(Event::Disconnect(Disconnect::from(DisconnectReason::$reason)))
                 );
@@ -114,3 +116,12 @@ handshake_responder_side_unexpected_disconnect!(
     InvalidChallengeResponse,
     OutdatedClientVersion
 );
+
+/* Other unexpected event types */
+
+handshake_responder_side_unexpected_event!(
+    unexpected_worker_ping,
+    EventOrBytes::Event(Event::WorkerPing(WorkerPing::new([].into())))
+);
+
+// TODO(nkls): other event types, can be done as a follow up.
