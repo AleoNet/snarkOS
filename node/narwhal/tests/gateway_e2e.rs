@@ -30,17 +30,16 @@ use std::{io, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 use bytes::Bytes;
 use deadline::deadline;
 use futures_util::SinkExt;
-use pea2pea::{protocols::Handshake, Connection, Pea2Pea};
+use pea2pea::{
+    protocols::{Handshake, Writing},
+    Connection,
+    Pea2Pea,
+};
 use snow::{params::NoiseParams, Builder};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
-const NOISE_HANDSHAKE_TYPE: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
-
-// The test peer connects to the gateway, completes the noise handshake but doesn't send any
-// further messages. The gateway's handshake should timeout.
-#[tokio::test(flavor = "multi_thread")]
-async fn handshake_responder_side_timeout() {
+async fn new_test_gateway() -> Gateway<CurrentNetwork> {
     const NUM_NODES: u16 = 4;
 
     // Set up the gateway instance.
@@ -51,67 +50,54 @@ async fn handshake_responder_side_timeout() {
     let gateway = Gateway::new(accounts.first().unwrap().clone(), ledger, addr, &trusted_validators, None).unwrap();
     gateway.run([].into()).await;
 
-    // Implement the test peer's handshake logic.
-    #[async_trait::async_trait]
-    impl Handshake for TestPeer {
-        // Set the timeout on the test peer to be longer than the gateway's timeout.
-        const TIMEOUT_MS: u64 = 10_000;
+    gateway
+}
 
-        async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
-            let stream = self.borrow_stream(&mut connection);
-
-            // Set up the noise codec.
-            let params: NoiseParams = NOISE_HANDSHAKE_TYPE.parse().unwrap();
-            let noise_builder = Builder::new(params);
-            let kp = noise_builder.generate_keypair().unwrap();
-            let initiator = noise_builder.local_private_key(&kp.private).build_initiator().unwrap();
-            let codec = NoiseCodec::<CurrentNetwork>::new(NoiseState::Handshake(Box::new(initiator)));
-
-            // Construct the stream.
-            let mut framed = Framed::new(stream, codec);
-
-            /* Noise handshake */
-
-            // -> e
-            framed.send(EventOrBytes::Bytes(Bytes::new())).await?;
-
-            // <- e, ee, s, es
-            framed.try_next().await?;
-
-            // -> s, se
-            framed.send(EventOrBytes::Bytes(Bytes::new())).await?;
-
-            // Set the codec to post-handshake mode.
-            let mut framed =
-                framed.map_codec(|c| NoiseCodec::<CurrentNetwork>::new(c.noise_state.into_post_handshake_state()));
-
-            // Send a disconnect event.
-            framed
-                .send(EventOrBytes::Event(Event::Disconnect(Disconnect::from(DisconnectReason::NoReasonGiven))))
-                .await?;
-
-            Ok(connection)
-        }
-    }
-
-    // Set up the test peer.
+// The test peer connects to the gateway, completes the noise handshake but doesn't send any
+// further messages. The gateway's handshake should timeout.
+#[tokio::test(flavor = "multi_thread")]
+async fn handshake_responder_side_timeout() {
+    let gateway = new_test_gateway().await;
     let test_peer = TestPeer::new().await;
-    test_peer.enable_handshake().await;
 
     // Initiate a connection with the gateway, this will only return once the handshake has
-    // completed on the test peer's side.
+    // completed on the test peer's side, which only includes the noise portion.
     assert!(test_peer.node().connect(gateway.local_ip()).await.is_ok());
+
+    /* Don't send any further messages and wait for the gateway to timeout. */
 
     // Check the test peer hasn't been added to the gateway's connected peers.
     assert!(gateway.connected_peers().read().is_empty());
-    // TODO: we might want this to be set earlier in the handshake, if so, we should check before
-    // and after the tcp assertion.
-    // assert!(gateway.connecting_peers().lock().is_empty());
 
     // Check the tcp stack's connection counts, wait longer than the gateway's timeout to ensure
     // connecting peers are cleared.
     deadline!(Duration::from_secs(5), move || gateway.tcp().num_connecting() == 0);
 }
 
-#[tokio::test]
-async fn handshake_responder_side() {}
+#[tokio::test(flavor = "multi_thread")]
+async fn handshake_responder_side_unexpected_disconnect() {
+    let gateway = new_test_gateway().await;
+    let test_peer = TestPeer::new().await;
+
+    // Initiate a connection with the gateway, this will only return once the handshake has
+    // completed on the test peer's side, which only includes the noise portion.
+    assert!(test_peer.node().connect(gateway.local_ip()).await.is_ok());
+
+    // Check the gateway is still handshaking with us.
+    assert_eq!(gateway.tcp().num_connecting(), 1);
+
+    // Send an unexpected disconnect.
+    let _ = test_peer.unicast(
+        gateway.local_ip(),
+        EventOrBytes::Event(Event::Disconnect(Disconnect::from(DisconnectReason::NoReasonGiven))),
+    );
+
+    // Check the test peer hasn't been added to the gateway's connected peers.
+    assert!(gateway.connected_peers().read().is_empty());
+
+    // Check the tcp stack's connection counts, make sure the disconnect interrupted handshaking,
+    // wait a short time to ensure the gateway has time to process the disconnect (note: this is
+    // shorter than the gateway's timeout, so we can ensure that's not the reason for the
+    // disconnect).
+    deadline!(Duration::from_secs(1), move || gateway.tcp().num_connecting() == 0);
+}
