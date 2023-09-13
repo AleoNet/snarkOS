@@ -251,7 +251,7 @@ impl TestNetwork {
 }
 
 // Initializes a new test committee.
-fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
+pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
     let mut accounts = Vec::with_capacity(n as usize);
     let mut members = IndexMap::with_capacity(n as usize);
     for i in 0..n {
