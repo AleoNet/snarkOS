@@ -109,6 +109,10 @@ version = "4.3"
 [dev-dependencies.deadline]
 version = "0.2"
 
+[dev-dependencies.futures-util]
+version = "0.3"
+features = [ "sink" ]
+
 [dev-dependencies.itertools]
 version = "0.11"
 
@@ -117,6 +121,9 @@ version = "4"
 
 [dev-dependencies.paste]
 version = "1"
+
+[dev-dependencies.pea2pea]
+version = "0.46"
 
 [dev-dependencies.proptest]
 version = "1.0.0"
