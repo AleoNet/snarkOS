@@ -59,30 +59,58 @@ async fn handshake_responder_side_timeout() {
     deadline!(Duration::from_secs(5), move || gateway.tcp().num_connecting() == 0);
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn handshake_responder_side_unexpected_disconnect() {
-    let gateway = new_test_gateway().await;
-    let test_peer = TestPeer::new().await;
+macro_rules! handshake_responder_side_unexpected {
+    ($test_name:ident, $payload:expr) => {
+        paste::paste! {
+            #[tokio::test(flavor = "multi_thread")]
+            async fn [<handshake_responder_side_unexpected_ $test_name>]() {
+                let gateway = new_test_gateway().await;
+                let test_peer = TestPeer::new().await;
 
-    // Initiate a connection with the gateway, this will only return once the handshake has
-    // completed on the test peer's side, which only includes the noise portion.
-    assert!(test_peer.node().connect(gateway.local_ip()).await.is_ok());
+                // Initiate a connection with the gateway, this will only return once the handshake has
+                // completed on the test peer's side, which only includes the noise portion.
+                assert!(test_peer.node().connect(gateway.local_ip()).await.is_ok());
 
-    // Check the gateway is still handshaking with us.
-    assert_eq!(gateway.tcp().num_connecting(), 1);
+                // Check the gateway is still handshaking with us.
+                assert_eq!(gateway.tcp().num_connecting(), 1);
 
-    // Send an unexpected disconnect.
-    let _ = test_peer.unicast(
-        gateway.local_ip(),
-        EventOrBytes::Event(Event::Disconnect(Disconnect::from(DisconnectReason::NoReasonGiven))),
-    );
+                // Send an unexpected disconnect.
+                let _ = test_peer.unicast(
+                    gateway.local_ip(),
+                    $payload
+                );
 
-    // Check the test peer hasn't been added to the gateway's connected peers.
-    assert!(gateway.connected_peers().read().is_empty());
+                // Check the test peer hasn't been added to the gateway's connected peers.
+                assert!(gateway.connected_peers().read().is_empty());
 
-    // Check the tcp stack's connection counts, make sure the disconnect interrupted handshaking,
-    // wait a short time to ensure the gateway has time to process the disconnect (note: this is
-    // shorter than the gateway's timeout, so we can ensure that's not the reason for the
-    // disconnect).
-    deadline!(Duration::from_secs(1), move || gateway.tcp().num_connecting() == 0);
+                // Check the tcp stack's connection counts, make sure the disconnect interrupted handshaking,
+                // wait a short time to ensure the gateway has time to process the disconnect (note: this is
+                // shorter than the gateway's timeout, so we can ensure that's not the reason for the
+                // disconnect).
+                deadline!(Duration::from_secs(1), move || gateway.tcp().num_connecting() == 0);
+            }
+        }
+    };
 }
+
+/* Unexpected disconnects. */
+
+macro_rules! handshake_responder_side_unexpected_disconnect {
+    ($($reason:ident),*) => {
+        $(
+            paste::paste! {
+                handshake_responder_side_unexpected!(
+                    [<disconnect_ $reason:snake>],
+                    EventOrBytes::Event(Event::Disconnect(Disconnect::from(DisconnectReason::$reason)))
+                );
+            }
+        )*
+    }
+}
+
+handshake_responder_side_unexpected_disconnect!(
+    ProtocolViolation,
+    NoReasonGiven,
+    InvalidChallengeResponse,
+    OutdatedClientVersion
+);
