@@ -41,6 +41,7 @@ impl<N: Network> Node<N> {
     pub async fn new_validator(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
+        narwhal_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
@@ -49,7 +50,8 @@ impl<N: Network> Node<N> {
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
-            Validator::new(node_ip, rest_ip, account, trusted_peers, trusted_validators, genesis, cdn, dev).await?,
+            Validator::new(node_ip, rest_ip, narwhal_ip, account, trusted_peers, trusted_validators, genesis, cdn, dev)
+                .await?,
         )))
     }
 

@@ -82,6 +82,10 @@ pub struct Start {
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
 
+    // Specify the IP address and port for narwhal.
+    #[clap(long = "narwhal")]
+    pub narwhal: Option<SocketAddr>,
+
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
     pub rest: SocketAddr,
@@ -243,15 +247,19 @@ impl Start {
             crate::commands::Clean::remove_ledger(N::ID, Some(dev))?;
 
             // To avoid ambiguity, we define the first few nodes to be the trusted validators to connect to.
-            for i in 0..DEVELOPMENT_MODE_NUM_VALIDATORS {
-                if i != dev {
-                    trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
+            if trusted_validators.is_empty() {
+                for i in 0..DEVELOPMENT_MODE_NUM_VALIDATORS {
+                    if i != dev {
+                        trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
+                    }
                 }
             }
             // Add the dev nodes to the trusted peers.
-            for i in 0..dev {
-                if i != dev {
-                    trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+            if trusted_peers.is_empty() {
+                for i in 0..dev {
+                    if i != dev {
+                        trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+                    }
                 }
             }
             // Set the node IP to `4130 + dev`.
@@ -381,7 +389,7 @@ impl Start {
 
         // Initialize the node.
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, self.narwhal, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, account, &trusted_peers, genesis, self.dev).await,
         }
