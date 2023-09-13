@@ -16,28 +16,13 @@
 mod common;
 
 use crate::common::{primary::new_test_committee, test_peer::TestPeer, CurrentNetwork, MockLedgerService};
-use snarkos_node_narwhal::{
-    helpers::{EventOrBytes, NoiseCodec, NoiseState},
-    Disconnect,
-    DisconnectReason,
-    Event,
-    Gateway,
-};
+use snarkos_node_narwhal::{helpers::EventOrBytes, Disconnect, DisconnectReason, Event, Gateway};
 use snarkos_node_tcp::P2P;
 
-use std::{io, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
-use bytes::Bytes;
 use deadline::deadline;
-use futures_util::SinkExt;
-use pea2pea::{
-    protocols::{Handshake, Writing},
-    Connection,
-    Pea2Pea,
-};
-use snow::{params::NoiseParams, Builder};
-use tokio_stream::StreamExt;
-use tokio_util::codec::Framed;
+use pea2pea::{protocols::Writing, Pea2Pea};
 
 async fn new_test_gateway() -> Gateway<CurrentNetwork> {
     const NUM_NODES: u16 = 4;

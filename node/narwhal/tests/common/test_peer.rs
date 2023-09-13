@@ -13,13 +13,12 @@
 // limitations under the License.
 
 use snarkos_node_narwhal::helpers::{EventOrBytes, NoiseCodec, NoiseState};
-use snarkvm::prelude::{block::Block, error, Address, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{block::Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
 use std::{
     collections::HashMap,
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    str::FromStr,
     sync::Arc,
 };
 
@@ -34,10 +33,9 @@ use pea2pea::{
     Node,
     Pea2Pea,
 };
-use rand::Rng;
+
 use snow::{params::NoiseParams, Builder};
 use tokio_util::codec::{Framed, FramedParts};
-use tracing::*;
 
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
