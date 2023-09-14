@@ -303,7 +303,8 @@ impl<N: Network> Primary<N> {
                     return Err(e);
                 }
             }
-            bail!("Primary is safely skipping (round {round} was already certified)");
+            debug!("Primary is safely skipping (round {round} was already certified)");
+            return Ok(());
         }
 
         // Compute the previous round.
