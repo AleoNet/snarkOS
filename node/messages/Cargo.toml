@@ -32,10 +32,6 @@ version = "1"
 [dependencies.indexmap]
 version = "2.0"
 
-[dependencies.kadmium]
-version = "0.6.0"
-features = [ "codec", "sync" ]
-
 [dependencies.rayon]
 version = "1"
 
