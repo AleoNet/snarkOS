@@ -51,12 +51,17 @@ async fn handshake_responder_side_timeout() {
 
     /* Don't send any further messages and wait for the gateway to timeout. */
 
-    // Check the test peer hasn't been added to the gateway's connected peers.
-    assert!(gateway.connected_peers().read().is_empty());
+    // Check the connection has been registered.
+    assert_eq!(gateway.tcp().num_connecting(), 1);
 
     // Check the tcp stack's connection counts, wait longer than the gateway's timeout to ensure
     // connecting peers are cleared.
-    deadline!(Duration::from_secs(5), move || gateway.tcp().num_connecting() == 0);
+    let gateway_clone = gateway.clone();
+    deadline!(Duration::from_secs(5), move || gateway_clone.tcp().num_connecting() == 0);
+
+    // Check the test peer hasn't been added to the gateway's connected peers.
+    assert!(gateway.connected_peers().read().is_empty());
+    assert_eq!(gateway.tcp().num_connected(), 0);
 }
 
 // The test peer connects to the gateway, completes the noise handshake and sends an unexpected
@@ -73,7 +78,7 @@ macro_rules! handshake_responder_side_unexpected_event {
                 // completed on the test peer's side, which only includes the noise portion.
                 assert!(test_peer.node().connect(gateway.local_ip()).await.is_ok());
 
-                // Check the gateway is still handshaking with us.
+                // Check the connection has been registered.
                 assert_eq!(gateway.tcp().num_connecting(), 1);
 
                 // Send an unexpected event.
@@ -82,14 +87,16 @@ macro_rules! handshake_responder_side_unexpected_event {
                     $payload
                 );
 
-                // Check the test peer hasn't been added to the gateway's connected peers.
-                assert!(gateway.connected_peers().read().is_empty());
-
                 // Check the tcp stack's connection counts, make sure the disconnect interrupted handshaking,
                 // wait a short time to ensure the gateway has time to process the disconnect (note: this is
                 // shorter than the gateway's timeout, so we can ensure that's not the reason for the
                 // disconnect).
-                deadline!(Duration::from_secs(1), move || gateway.tcp().num_connecting() == 0);
+                let gateway_clone = gateway.clone();
+                deadline!(Duration::from_secs(1), move || gateway_clone.tcp().num_connecting() == 0);
+
+                // Check the test peer hasn't been added to the gateway's connected peers.
+                assert!(gateway.connected_peers().read().is_empty());
+                assert_eq!(gateway.tcp().num_connected(), 0);
             }
         }
     };
