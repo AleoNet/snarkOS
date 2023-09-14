@@ -495,7 +495,10 @@ impl<N: Network> Primary<N> {
                     // Ensure the batch ID matches the currently proposed batch ID.
                     if proposal.batch_id() != batch_id {
                         match self.storage.contains_batch(batch_id) {
-                            true => bail!("This batch was already certified"),
+                            true => {
+                                debug!("This batch was already certified");
+                                return Ok(());
+                            }
                             false => bail!("Unknown batch ID '{batch_id}'"),
                         }
                     }
