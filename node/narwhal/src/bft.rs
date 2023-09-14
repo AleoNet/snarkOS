@@ -219,7 +219,10 @@ impl<N: Network> BFT<N> {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
-        ensure!(current_round == even_round, "BFT storage reference is out of sync with the current round");
+        ensure!(
+            current_round == even_round,
+            "BFT storage reference {current_round} is out of sync with the current even round {even_round}"
+        );
         // If the current round is odd, throw an error.
         if current_round % 2 != 0 {
             bail!("BFT cannot update the leader certificate in an odd round")
@@ -286,7 +289,10 @@ impl<N: Network> BFT<N> {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
-        ensure!(current_round == odd_round, "BFT storage reference is out of sync with the current round");
+        ensure!(
+            current_round == odd_round,
+            "BFT storage reference {current_round} is out of sync with the current odd round {odd_round}"
+        );
         // If the current round is even, throw an error.
         if current_round % 2 != 1 {
             bail!("BFT does not compute stakes for the leader certificate in an even round")
@@ -706,7 +712,10 @@ mod tests {
         // Ensure this call fails on an even round.
         let result = bft.is_leader_quorum_or_nonleaders_available(2);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "BFT storage reference is out of sync with the current round");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "BFT storage reference 1 is out of sync with the current odd round 2"
+        );
         Ok(())
     }
 
@@ -792,7 +801,10 @@ mod tests {
         // Ensure this call succeeds on an even round.
         let result = bft.update_leader_certificate_to_even_round(6);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "BFT storage reference is out of sync with the current round");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "BFT storage reference 1 is out of sync with the current even round 6"
+        );
         Ok(())
     }
 
