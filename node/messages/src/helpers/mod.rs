@@ -16,9 +16,6 @@ mod codec;
 pub use codec::MessageCodec;
 pub(crate) use codec::MAXIMUM_MESSAGE_SIZE;
 
-#[allow(unused)]
-mod noise_codec;
-
 mod data;
 pub use data::Data;
 
