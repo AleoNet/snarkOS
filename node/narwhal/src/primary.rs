@@ -299,7 +299,7 @@ impl<N: Network> Primary<N> {
             // If a BFT sender was provided, attempt to advance the current round.
             if let Some(bft_sender) = self.bft_sender.get() {
                 if let Err(e) = bft_sender.send_primary_round_to_bft(self.current_round()).await {
-                    warn!("Failed to update the BFT to the next round: {e}");
+                    warn!("propose_batch: Failed to update the BFT to the next round: {e}");
                     return Err(e);
                 }
             }
@@ -813,7 +813,7 @@ impl<N: Network> Primary<N> {
             // If a BFT sender was provided, send the current round to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
                 if let Err(e) = bft_sender.send_primary_round_to_bft(self.current_round()).await {
-                    warn!("Failed to update the BFT to the next round: {e}");
+                    warn!("update_committee_to_round: Failed to update the BFT to the next round: {e}");
                     return Err(e);
                 }
             }
