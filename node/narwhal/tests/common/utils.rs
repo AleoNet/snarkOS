@@ -50,6 +50,7 @@ pub fn initialize_logger(verbosity: u8) {
     // Filter out undesirable logs. (unfortunately EnvFilter cannot be cloned)
     let [filter] = std::array::from_fn(|_| {
         let filter = tracing_subscriber::EnvFilter::from_default_env()
+            .add_directive("pea2pea=off".parse().unwrap())
             .add_directive("mio=off".parse().unwrap())
             .add_directive("tokio_util=off".parse().unwrap())
             .add_directive("hyper=off".parse().unwrap())

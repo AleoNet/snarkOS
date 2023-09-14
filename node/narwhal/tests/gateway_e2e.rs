@@ -15,7 +15,13 @@
 #[allow(dead_code)]
 mod common;
 
-use crate::common::{primary::new_test_committee, test_peer::TestPeer, CurrentNetwork, MockLedgerService};
+use crate::common::{
+    primary::new_test_committee,
+    test_peer::TestPeer,
+    utils::initialize_logger,
+    CurrentNetwork,
+    MockLedgerService,
+};
 use snarkos_node_narwhal::{helpers::EventOrBytes, Disconnect, DisconnectReason, Event, Gateway, WorkerPing};
 use snarkos_node_tcp::P2P;
 
@@ -132,3 +138,25 @@ handshake_responder_side_unexpected_event!(
 );
 
 // TODO(nkls): other event types, can be done as a follow up.
+
+/* Simultaneous connect */
+
+#[tokio::test(flavor = "multi_thread")]
+async fn handshake_responder_side_simultaneous_connect() {
+    initialize_logger(2);
+
+    let gateway = new_test_gateway().await;
+    let test_peer_0 = TestPeer::new().await;
+    let test_peer_1 = TestPeer::new().await;
+
+    // Connect the two peers to the gateway at exactly the same moment.
+    let t1 = test_peer_0.node().connect(gateway.local_ip());
+    let t2 = test_peer_1.node().connect(gateway.local_ip());
+
+    let (res1, res2) = tokio::join!(t1, t2);
+
+    assert!(res1.is_ok());
+    assert!(res2.is_ok());
+
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+}
