@@ -904,7 +904,10 @@ impl<N: Network> Gateway<N> {
         framed.try_next().await?;
 
         // Set the codec to post-handshake mode.
-        let mut framed = framed.map_codec(|c| NoiseCodec::<N>::new(c.noise_state.into_post_handshake_state()));
+        let mut framed = framed.map_codec(|c| NoiseCodec::<N>::new(c.noise_state.into_post_handshake_state_fallible()));
+        if let NoiseState::Failed = framed.codec().noise_state {
+            return Err(error(format!("Noise handshake with '{peer_addr}' failed")));
+        }
 
         /* Post noise handshake */
         /* Step 1: Receive the challenge request. */

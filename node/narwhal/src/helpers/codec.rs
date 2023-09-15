@@ -115,6 +115,7 @@ pub struct PostHandshakeState {
 pub enum NoiseState {
     Handshake(Box<HandshakeState>),
     PostHandshake(PostHandshakeState),
+    Failed,
 }
 
 impl Clone for NoiseState {
@@ -122,6 +123,7 @@ impl Clone for NoiseState {
         match self {
             Self::Handshake(..) => unreachable!(),
             Self::PostHandshake(ph_state) => Self::PostHandshake(ph_state.clone()),
+            Self::Failed => unreachable!(),
         }
     }
 }
@@ -134,6 +136,24 @@ impl NoiseState {
         } else {
             unreachable!()
         }
+    }
+
+    // The function above actually might fail (for some handshakes on the responder side) - not clear why
+    pub fn into_post_handshake_state_fallible(self) -> Self {
+        if let Self::Handshake(noise_state) = self {
+            match noise_state.into_stateless_transport_mode() {
+                Ok(new_state) => {
+                    return Self::PostHandshake(PostHandshakeState { state: Arc::new(new_state), tx_nonce: 0, rx_nonce: 0 });
+                }
+                Err(error) => {
+                    warn!("Handshake not finished - {error}");
+                }
+            }
+        } else {
+            warn!("Handshake in wrong state");
+        }
+
+        NoiseState::Failed
     }
 }
 
@@ -210,6 +230,8 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
 
                 buffer
             }
+
+            NoiseState::Failed => unreachable!()
         };
 
         // Encode the resulting ciphertext using the length-delimited codec.
@@ -265,6 +287,8 @@ impl<N: Network> Decoder for NoiseCodec<N> {
                 // Decode with message codecs.
                 self.event_codec.decode(&mut plaintext)?.map(|msg| EventOrBytes::Event(msg))
             }
+
+            NoiseState::Failed => unreachable!()
         };
 
         Ok(msg)
