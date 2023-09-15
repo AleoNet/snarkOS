@@ -68,6 +68,23 @@ use tokio::{
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
 
+#[derive(thiserror::Error, Debug)]
+pub struct NoLoggingError(String);
+
+impl Display for NoLoggingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+macro_rules! bail_nolog {
+    ($($arg:tt)*) => {
+        return Err(NoLoggingError(format!($($arg)*)).into())
+    };
+    () => {
+    };
+}
+
 #[derive(Clone)]
 pub struct Primary<N: Network> {
     /// The sync module.
@@ -303,8 +320,7 @@ impl<N: Network> Primary<N> {
                     return Err(e);
                 }
             }
-            debug!("Primary is safely skipping (round {round} was already certified)");
-            return Ok(());
+            bail_nolog!("Primary is safely skipping (round {round} was already certified)");
         }
 
         // Compute the previous round.
@@ -496,8 +512,7 @@ impl<N: Network> Primary<N> {
                     if proposal.batch_id() != batch_id {
                         match self.storage.contains_batch(batch_id) {
                             true => {
-                                debug!("This batch was already certified");
-                                return Ok(());
+                                bail_nolog!("This batch was already certified");
                             }
                             false => bail!("Unknown batch ID '{batch_id}'"),
                         }
@@ -673,7 +688,10 @@ impl<N: Network> Primary<N> {
                 }
                 // If there is no proposed batch, attempt to propose a batch.
                 if let Err(e) = self_.propose_batch().await {
-                    warn!("Cannot propose a batch - {e}");
+                    match e.downcast_ref::<NoLoggingError>() {
+                        Some(e) => debug!("Cannot propose a batch - {e}"),
+                        None => warn!("Cannot propose a batch - {e}"),
+                    }
                 }
             }
         });
@@ -705,7 +723,10 @@ impl<N: Network> Primary<N> {
                 }
                 // Process the batch signature.
                 if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
-                    warn!("Cannot store a signature from '{peer_ip}' - {e}");
+                    match e.downcast_ref::<NoLoggingError>() {
+                        Some(e) => debug!("Cannot store a signature from peer '{peer_ip}' - {e}"),
+                        None => warn!("Cannot store a signature from peer '{peer_ip}' - {e}"),
+                    }
                 }
             }
         });

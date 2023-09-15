@@ -19,6 +19,9 @@ edition = "2021"
 [dependencies.anyhow]
 version = "1.0.70"
 
+[dependencies.thiserror]
+version = "1.0.48"
+
 [dependencies.async-recursion]
 version = "1.0"
 

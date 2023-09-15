@@ -3163,6 +3163,7 @@ dependencies = [
  "snarkvm",
  "snow",
  "test-strategy",
+ "thiserror",
  "time",
  "tokio",
  "tokio-stream",
