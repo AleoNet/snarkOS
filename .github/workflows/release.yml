@@ -2,7 +2,7 @@ name: snarkOS Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - '*.*.*'
 
 env:
   RUST_BACKTRACE: 1
@@ -10,7 +10,7 @@ env:
 jobs:
   ubuntu:
     name: Ubuntu
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v1
