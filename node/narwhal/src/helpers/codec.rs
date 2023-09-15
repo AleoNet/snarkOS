@@ -138,7 +138,7 @@ impl NoiseState {
         }
     }
 
-    // The function above actually might fail (for some handshakes on the responder side) - not clear why
+    // Initiator might fail (time out) the handshake at any stage, so responder shouldn't use the function above
     pub fn into_post_handshake_state_fallible(self) -> Self {
         if let Self::Handshake(noise_state) = self {
             match noise_state.into_stateless_transport_mode() {
