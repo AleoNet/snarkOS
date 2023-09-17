@@ -231,7 +231,7 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
                 buffer
             }
 
-            NoiseState::Failed => unreachable!()
+            NoiseState::Failed => unreachable!("Noise handshake failed to encode")
         };
 
         // Encode the resulting ciphertext using the length-delimited codec.
