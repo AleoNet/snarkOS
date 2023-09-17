@@ -288,7 +288,7 @@ impl<N: Network> Decoder for NoiseCodec<N> {
                 self.event_codec.decode(&mut plaintext)?.map(|msg| EventOrBytes::Event(msg))
             }
 
-            NoiseState::Failed => unreachable!()
+            NoiseState::Failed => unreachable!("Noise handshake failed to decode")
         };
 
         Ok(msg)
