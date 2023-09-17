@@ -123,7 +123,7 @@ impl Clone for NoiseState {
         match self {
             Self::Handshake(..) => unreachable!(),
             Self::PostHandshake(ph_state) => Self::PostHandshake(ph_state.clone()),
-            Self::Failed => unreachable!(),
+            Self::Failed => unreachable!("Forbidden: cloning noise handshake"),
         }
     }
 }
