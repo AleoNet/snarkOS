@@ -134,7 +134,7 @@ impl NoiseState {
             let noise_state = noise_state.into_stateless_transport_mode().expect("handshake isn't finished");
             Self::PostHandshake(PostHandshakeState { state: Arc::new(noise_state), tx_nonce: 0, rx_nonce: 0 })
         } else {
-            unreachable!()
+            NoiseState::Failed
         }
     }
 
