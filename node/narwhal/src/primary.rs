@@ -1072,7 +1072,10 @@ mod tests {
     use super::*;
     use crate::MAX_EXPIRATION_TIME_IN_SECS;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
-    use snarkvm::{ledger::committee::{Committee, MIN_VALIDATOR_STAKE}, prelude::{Address, Signature}};
+    use snarkvm::{
+        ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
+        prelude::{Address, Signature},
+    };
 
     use bytes::Bytes;
     use indexmap::IndexSet;
@@ -1158,7 +1161,7 @@ mod tests {
         author: &Account<CurrentNetwork>,
         current_committee: Committee<CurrentNetwork>,
         round: u64,
-        previous_certificate_ids: IndexSet::<Field<CurrentNetwork>>,
+        previous_certificate_ids: IndexSet<Field<CurrentNetwork>>,
         timestamp: i64,
         rng: &mut TestRng,
     ) -> Proposal<CurrentNetwork> {
@@ -1231,14 +1234,13 @@ mod tests {
         primary_address: Address<CurrentNetwork>,
         accounts: &[(SocketAddr, Account<CurrentNetwork>)],
         round: u64,
-        previous_certificate_ids: IndexSet::<Field<CurrentNetwork>>,
+        previous_certificate_ids: IndexSet<Field<CurrentNetwork>>,
         rng: &mut TestRng,
-    ) -> (BatchCertificate::<CurrentNetwork>, HashMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>>) {
+    ) -> (BatchCertificate<CurrentNetwork>, HashMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>>) {
         let timestamp = now();
 
-        let author = accounts.iter()
-            .find(|&(_, acct)| acct.address() == primary_address)
-            .map(|(_, acct)| acct.clone()).unwrap();
+        let author =
+            accounts.iter().find(|&(_, acct)| acct.address() == primary_address).map(|(_, acct)| acct.clone()).unwrap();
         let private_key = author.private_key();
 
         let (solution_commitment, solution) = sample_unconfirmed_solution(rng);
@@ -1247,7 +1249,8 @@ mod tests {
         let transmissions = [
             (solution_commitment.into(), Transmission::Solution(solution)),
             ((&transaction_id).into(), Transmission::Transaction(transaction)),
-        ].into();
+        ]
+        .into();
 
         let batch_header =
             BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
@@ -1262,12 +1265,18 @@ mod tests {
         accounts: &[(SocketAddr, Account<CurrentNetwork>)],
         round: u64,
         rng: &mut TestRng,
-    ) -> IndexSet::<Field<CurrentNetwork>> {
+    ) -> IndexSet<Field<CurrentNetwork>> {
         let mut previous_certificates = IndexSet::<Field<CurrentNetwork>>::new();
         let mut next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
         for cur_round in 1..round {
             for (_, account) in accounts.iter() {
-                let (certificate, transmissions) = create_batch_certificate(account.address(), &accounts, cur_round, previous_certificates.clone(), rng);
+                let (certificate, transmissions) = create_batch_certificate(
+                    account.address(),
+                    &accounts,
+                    cur_round,
+                    previous_certificates.clone(),
+                    rng,
+                );
                 next_certificates.insert(certificate.certificate_id());
                 assert!(primary.storage.insert_certificate(certificate, transmissions).is_ok());
             }
@@ -1282,10 +1291,7 @@ mod tests {
 
     // Insert the account socket addresses into the resolver so that
     // they are recognized as "connected".
-    fn map_account_addresses(
-        primary: &Primary<CurrentNetwork>,
-        accounts: &[(SocketAddr, Account<CurrentNetwork>)],
-    ) {
+    fn map_account_addresses(primary: &Primary<CurrentNetwork>, accounts: &[(SocketAddr, Account<CurrentNetwork>)]) {
         // First account is primary, which doesn't need to resolve.
         for (addr, acct) in accounts.iter().skip(1) {
             primary.gateway.resolver().insert_peer(*addr, *addr, acct.address());
