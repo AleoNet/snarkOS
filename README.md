@@ -181,24 +181,26 @@ USAGE:
     snarkos start [OPTIONS]
 
 OPTIONS:
-        --network <NETWORK_ID>           Specify the network ID of this node [default: 3]
+        --network <NETWORK_ID>                  Specify the network ID of this node [default: 3]
         
-        --validator <PRIVATE KEY>        Specify this node as a validator, with the account private key as an argument
-        --prover <PRIVATE KEY>           Specify this node as a prover, with the given account private key as an argument
-        --client <PRIVATE_KEY>           Specify this node as a client, with an optional account private key as an argument
+        --validator                             Specify this node as a validator
+        --prover                                Specify this node as a prover
+        --client                                Specify this node as a client
         
-        --node <IP:PORT>                 Specify the IP address and port for the node server [default: 0.0.0.0:4133]
-        --connect <IP:PORT>              Specify the IP address and port of a peer to connect to
+        --private-key <PRIVATE_KEY>             Specify the node's account private key
+        --private-key-file <PRIVATE_KEY_FILE>   Specify the path to a file containing the node's account private key
         
-        --rest <REST>                    Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
-        --norest                         If the flag is set, the node will not initialize the REST server
+        --node <IP:PORT>                        Specify the IP address and port for the node server [default: 0.0.0.0:4133]
+        --connect <IP:PORT>                     Specify the IP address and port of a peer to connect to
+ 
+        --rest <REST>                           Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
+        --norest                                If the flag is set, the node will not initialize the REST server
         
-        --nodisplay                      If the flag is set, the node will not render the display
-        --verbosity <VERBOSITY_LEVEL>    Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
-        --logfile <PATH>                 Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
+        --nodisplay                             If the flag is set, the node will not render the display
+        --verbosity <VERBOSITY_LEVEL>           Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
+        --logfile <PATH>                        Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
         
-        --dev <NODE_ID>                  Enables development mode, specify a unique ID for this node
-    -h, --help                           Print help information
+        --dev <NODE_ID>                         Enables development mode, specify a unique ID for this node
 ```
 
 ## 6. Development Guide

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use super::*;
-use snarkos_node_env::ENV_INFO;
 use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
 
 use indexmap::IndexMap;
@@ -241,11 +240,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Path(input_or_output_id): Path<Field<N>>,
     ) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.find_transition_id(&input_or_output_id)?))
-    }
-
-    // GET /testnet3/node/env
-    pub(crate) async fn get_env_info() -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(ENV_INFO.get()))
     }
 
     // POST /testnet3/transaction/broadcast
