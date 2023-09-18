@@ -115,6 +115,7 @@ pub struct PostHandshakeState {
 pub enum NoiseState {
     Handshake(Box<HandshakeState>),
     PostHandshake(PostHandshakeState),
+    Failed,
 }
 
 impl Clone for NoiseState {
@@ -122,6 +123,7 @@ impl Clone for NoiseState {
         match self {
             Self::Handshake(..) => unreachable!(),
             Self::PostHandshake(ph_state) => Self::PostHandshake(ph_state.clone()),
+            Self::Failed => unreachable!("Forbidden: cloning noise handshake"),
         }
     }
 }
@@ -129,11 +131,23 @@ impl Clone for NoiseState {
 impl NoiseState {
     pub fn into_post_handshake_state(self) -> Self {
         if let Self::Handshake(noise_state) = self {
-            let noise_state = noise_state.into_stateless_transport_mode().expect("handshake isn't finished");
-            Self::PostHandshake(PostHandshakeState { state: Arc::new(noise_state), tx_nonce: 0, rx_nonce: 0 })
+            match noise_state.into_stateless_transport_mode() {
+                Ok(new_state) => {
+                    return Self::PostHandshake(PostHandshakeState {
+                        state: Arc::new(new_state),
+                        tx_nonce: 0,
+                        rx_nonce: 0,
+                    });
+                }
+                Err(error) => {
+                    warn!("Handshake not finished - {error}");
+                }
+            }
         } else {
-            unreachable!()
+            warn!("Handshake in wrong state");
         }
+
+        NoiseState::Failed
     }
 }
 
@@ -210,6 +224,8 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
 
                 buffer
             }
+
+            NoiseState::Failed => unreachable!("Noise handshake failed to encode"),
         };
 
         // Encode the resulting ciphertext using the length-delimited codec.
@@ -265,6 +281,8 @@ impl<N: Network> Decoder for NoiseCodec<N> {
                 // Decode with message codecs.
                 self.event_codec.decode(&mut plaintext)?.map(|msg| EventOrBytes::Event(msg))
             }
+
+            NoiseState::Failed => unreachable!("Noise handshake failed to decode"),
         };
 
         Ok(msg)

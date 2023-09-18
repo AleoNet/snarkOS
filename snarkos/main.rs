@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use snarkos_cli::{commands::CLI, helpers::Updater};
-use snarkos_node_env::EnvInfo;
 
 use clap::Parser;
 #[cfg(feature = "jemalloc")]
@@ -24,9 +23,6 @@ use tikv_jemallocator::Jemalloc;
 static GLOBAL: Jemalloc = Jemalloc;
 
 fn main() -> anyhow::Result<()> {
-    // Register the environment information.
-    EnvInfo::register();
-
     // Parse the given arguments.
     let cli = CLI::parse();
     // Run the updater.

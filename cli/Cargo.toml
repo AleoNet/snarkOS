@@ -27,7 +27,7 @@ version = "1"
 version = "1.0.75"
 
 [dependencies.clap]
-version = "4.3"
+version = "4.4"
 features = [ "derive", "color", "unstable-styles" ]
 
 [dependencies.colored]
@@ -57,7 +57,7 @@ default-features = false
 version = "1"
 
 [dependencies.self_update]
-version = "0.37"
+version = "0.38"
 
 [dependencies.serde]
 version = "1"

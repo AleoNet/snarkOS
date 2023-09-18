@@ -25,7 +25,6 @@ members = [
   "node",
   "node/cdn",
   "node/consensus",
-  "node/env",
   "node/messages",
   "node/metrics",
   "node/narwhal",
@@ -55,7 +54,7 @@ jemalloc = [ "tikv-jemallocator" ]
 version = "1.0.75"
 
 [dependencies.clap]
-version = "4.3"
+version = "4.4"
 features = [ "derive" ]
 
 [dependencies.once_cell]
@@ -83,10 +82,6 @@ version = "=2.1.7"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-version = "=2.1.7"
-
-[dependencies.snarkos-node-env]
-path = "./node/env"
 version = "=2.1.7"
 
 [dependencies.snarkos-node-messages]
