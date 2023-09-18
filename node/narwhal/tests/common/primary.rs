@@ -133,8 +133,13 @@ impl TestNetwork {
                 (primary, None)
             };
 
-            let test_validator =
-                TestValidator { id: id as u16, primary, primary_sender: None, bft: OnceLock::new(), handles: Default::default() };
+            let test_validator = TestValidator {
+                id: id as u16,
+                primary,
+                primary_sender: None,
+                bft: OnceLock::new(),
+                handles: Default::default(),
+            };
             if let Some(bft) = bft {
                 assert!(test_validator.bft.set(bft).is_ok());
             }
