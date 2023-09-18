@@ -160,26 +160,23 @@ async fn test_leader_election_consistency() {
         // Get all validators in the network
         let validators = network.validators.values().collect_vec();
 
-        // Get all validators in sync with the current round
-        let validators_for_round =
-            validators.iter().filter(|validator| validator.primary.current_round() == target_round).collect_vec();
+        // Get leaders of all validators in the current round
+        let mut leaders = Vec::new();
+        for validator in validators.iter() {
+            if validator.primary.current_round() == target_round {
+                let bft = validator.bft.get().unwrap();
+                if let Some(leader) = bft.leader() {
+                    // Validator is a live object - just because it's
+                    // been on the current round above doesn't mean
+                    // that's still the case
+                    if validator.primary.current_round() == target_round {
+                        leaders.push(leader);
+                    }
+                }
+            }
+        }
 
-        // Get all leaders for the current round
-        let leaders = validators_for_round
-            .iter()
-            .flat_map(|v| v.bft.clone().map(|bft| bft.leader()))
-            .flatten()
-            .collect::<Vec<_>>();
-
-        println!(
-            "Found {} validators with a leader (out of {}, {} out of sync)",
-            leaders.len(),
-            validators_for_round.len(),
-            validators.len() - validators_for_round.len()
-        );
-
-        // Assert that we have x leaders for x validators that have reached the target round
-        assert_eq!(leaders.len(), validators_for_round.len());
+        println!("Found {} validators with a leader ({} out of sync)", leaders.len(), validators.len() - leaders.len());
 
         // Assert that all leaders are equal
         assert!(leaders.iter().all_equal());
