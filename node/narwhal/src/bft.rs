@@ -221,7 +221,7 @@ impl<N: Network> BFT<N> {
         // Ensure the current round matches the given round.
         ensure!(
             current_round == even_round,
-            "BFT storage reference {current_round} is out of sync with the current even round {even_round}"
+            "BFT storage (at round {current_round}) is out of sync with the current even round {even_round}"
         );
         // If the current round is odd, throw an error.
         if current_round % 2 != 0 {
@@ -291,7 +291,7 @@ impl<N: Network> BFT<N> {
         // Ensure the current round matches the given round.
         ensure!(
             current_round == odd_round,
-            "BFT storage reference {current_round} is out of sync with the current odd round {odd_round}"
+            "BFT storage (at round {current_round}) is out of sync with the current odd round {odd_round}"
         );
         // If the current round is even, throw an error.
         if current_round % 2 != 1 {
@@ -714,7 +714,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
-            "BFT storage reference 1 is out of sync with the current odd round 2"
+            "BFT storage (at round 1) is out of sync with the current odd round 2"
         );
         Ok(())
     }
@@ -803,7 +803,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
-            "BFT storage reference 1 is out of sync with the current even round 6"
+            "BFT storage (at round 1) is out of sync with the current even round 6"
         );
         Ok(())
     }
