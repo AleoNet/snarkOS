@@ -133,7 +133,11 @@ impl NoiseState {
         if let Self::Handshake(noise_state) = self {
             match noise_state.into_stateless_transport_mode() {
                 Ok(new_state) => {
-                    return Self::PostHandshake(PostHandshakeState { state: Arc::new(new_state), tx_nonce: 0, rx_nonce: 0 });
+                    return Self::PostHandshake(PostHandshakeState {
+                        state: Arc::new(new_state),
+                        tx_nonce: 0,
+                        rx_nonce: 0,
+                    });
                 }
                 Err(error) => {
                     warn!("Handshake not finished - {error}");
@@ -221,7 +225,7 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
                 buffer
             }
 
-            NoiseState::Failed => unreachable!("Noise handshake failed to encode")
+            NoiseState::Failed => unreachable!("Noise handshake failed to encode"),
         };
 
         // Encode the resulting ciphertext using the length-delimited codec.
@@ -278,7 +282,7 @@ impl<N: Network> Decoder for NoiseCodec<N> {
                 self.event_codec.decode(&mut plaintext)?.map(|msg| EventOrBytes::Event(msg))
             }
 
-            NoiseState::Failed => unreachable!("Noise handshake failed to decode")
+            NoiseState::Failed => unreachable!("Noise handshake failed to decode"),
         };
 
         Ok(msg)
