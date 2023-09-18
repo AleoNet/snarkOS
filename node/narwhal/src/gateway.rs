@@ -823,6 +823,9 @@ impl<N: Network> Gateway<N> {
 
         // Set the codec to post-handshake mode.
         let mut framed = framed.map_codec(|c| NoiseCodec::<N>::new(c.noise_state.into_post_handshake_state()));
+        if let NoiseState::Failed = framed.codec().noise_state {
+            return Err(error(format!("Noise initiator with '{peer_addr}' failed")));
+        }
 
         /* Post noise handshake */
 
@@ -904,9 +907,9 @@ impl<N: Network> Gateway<N> {
         framed.try_next().await?;
 
         // Set the codec to post-handshake mode.
-        let mut framed = framed.map_codec(|c| NoiseCodec::<N>::new(c.noise_state.into_post_handshake_state_fallible()));
+        let mut framed = framed.map_codec(|c| NoiseCodec::<N>::new(c.noise_state.into_post_handshake_state()));
         if let NoiseState::Failed = framed.codec().noise_state {
-            return Err(error(format!("Noise handshake with '{peer_addr}' failed")));
+            return Err(error(format!("Noise responder with '{peer_addr}' failed")));
         }
 
         /* Post noise handshake */

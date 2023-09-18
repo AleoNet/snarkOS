@@ -131,16 +131,6 @@ impl Clone for NoiseState {
 impl NoiseState {
     pub fn into_post_handshake_state(self) -> Self {
         if let Self::Handshake(noise_state) = self {
-            let noise_state = noise_state.into_stateless_transport_mode().expect("handshake isn't finished");
-            Self::PostHandshake(PostHandshakeState { state: Arc::new(noise_state), tx_nonce: 0, rx_nonce: 0 })
-        } else {
-            NoiseState::Failed
-        }
-    }
-
-    // Initiator might fail (time out) the handshake at any stage, so responder shouldn't use the function above
-    pub fn into_post_handshake_state_fallible(self) -> Self {
-        if let Self::Handshake(noise_state) = self {
             match noise_state.into_stateless_transport_mode() {
                 Ok(new_state) => {
                     return Self::PostHandshake(PostHandshakeState { state: Arc::new(new_state), tx_nonce: 0, rx_nonce: 0 });
