@@ -32,6 +32,7 @@ members = [
   "node/router",
   "node/router/messages",
   "node/sync",
+  "node/sync/ledger-service",
   "node/sync/locators",
   "node/tcp",
   ".integration"

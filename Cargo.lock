@@ -3277,8 +3277,19 @@ dependencies = [
  "parking_lot",
  "rand",
  "serde",
+ "snarkos-node-sync-ledger-service",
  "snarkos-node-sync-locators",
  "snarkvm",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-node-sync-ledger-service"
+version = "2.1.7"
+dependencies = [
+ "async-trait",
+ "snarkvm",
+ "tokio",
  "tracing",
 ]
 
