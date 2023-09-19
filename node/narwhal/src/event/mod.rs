@@ -36,6 +36,9 @@ pub use challenge_response::ChallengeResponse;
 mod disconnect;
 pub use disconnect::{Disconnect, DisconnectReason};
 
+mod primary_ping;
+pub use primary_ping::PrimaryPing;
+
 mod transmission_request;
 pub use transmission_request::TransmissionRequest;
 
@@ -45,6 +48,7 @@ pub use transmission_response::TransmissionResponse;
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
+use snarkos_node_narwhal_sync::locators::BlockLocators;
 use snarkvm::{
     console::prelude::{FromBytes, Network, Read, ToBytes, Write},
     ledger::narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
@@ -73,6 +77,7 @@ pub enum Event<N: Network> {
     ChallengeRequest(ChallengeRequest<N>),
     ChallengeResponse(ChallengeResponse<N>),
     Disconnect(Disconnect),
+    PrimaryPing(PrimaryPing<N>),
     TransmissionRequest(TransmissionRequest<N>),
     TransmissionResponse(TransmissionResponse<N>),
     WorkerPing(WorkerPing<N>),
@@ -100,6 +105,7 @@ impl<N: Network> Event<N> {
             Self::ChallengeRequest(event) => event.name(),
             Self::ChallengeResponse(event) => event.name(),
             Self::Disconnect(event) => event.name(),
+            Self::PrimaryPing(event) => event.name(),
             Self::TransmissionRequest(event) => event.name(),
             Self::TransmissionResponse(event) => event.name(),
             Self::WorkerPing(event) => event.name(),
@@ -118,9 +124,10 @@ impl<N: Network> Event<N> {
             Self::ChallengeRequest(..) => 5,
             Self::ChallengeResponse(..) => 6,
             Self::Disconnect(..) => 7,
-            Self::TransmissionRequest(..) => 8,
-            Self::TransmissionResponse(..) => 9,
-            Self::WorkerPing(..) => 10,
+            Self::PrimaryPing(..) => 8,
+            Self::TransmissionRequest(..) => 9,
+            Self::TransmissionResponse(..) => 10,
+            Self::WorkerPing(..) => 11,
         }
     }
 
@@ -138,6 +145,7 @@ impl<N: Network> Event<N> {
             Self::ChallengeRequest(event) => event.write_le(writer),
             Self::ChallengeResponse(event) => event.write_le(writer),
             Self::Disconnect(event) => event.write_le(writer),
+            Self::PrimaryPing(event) => event.write_le(writer),
             Self::TransmissionRequest(event) => event.write_le(writer),
             Self::TransmissionResponse(event) => event.write_le(writer),
             Self::WorkerPing(event) => event.write_le(writer),
@@ -168,9 +176,10 @@ impl<N: Network> Event<N> {
             5 => Self::ChallengeRequest(ChallengeRequest::read_le(reader)?),
             6 => Self::ChallengeResponse(ChallengeResponse::read_le(reader)?),
             7 => Self::Disconnect(Disconnect::read_le(reader)?),
-            8 => Self::TransmissionRequest(TransmissionRequest::read_le(reader)?),
-            9 => Self::TransmissionResponse(TransmissionResponse::read_le(reader)?),
-            10 => Self::WorkerPing(WorkerPing::read_le(reader)?),
+            8 => Self::PrimaryPing(PrimaryPing::read_le(reader)?),
+            9 => Self::TransmissionRequest(TransmissionRequest::read_le(reader)?),
+            10 => Self::TransmissionResponse(TransmissionResponse::read_le(reader)?),
+            11 => Self::WorkerPing(WorkerPing::read_le(reader)?),
             _ => bail!("Unknown event ID {id}"),
         };
 
