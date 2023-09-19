@@ -15,17 +15,12 @@
 #[allow(dead_code)]
 mod common;
 
-use crate::common::{
-    primary::new_test_committee,
-    test_peer::TestPeer,
-    utils::initialize_logger,
-    CurrentNetwork,
-    MockLedgerService,
-};
+use crate::common::{primary::new_test_committee, test_peer::TestPeer, CurrentNetwork, MockLedgerService};
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::EventOrBytes,
     ChallengeRequest,
+    ChallengeResponse,
     Disconnect,
     DisconnectReason,
     Event,
@@ -33,13 +28,16 @@ use snarkos_node_narwhal::{
     WorkerPing,
 };
 use snarkos_node_tcp::P2P;
-use snarkvm::ledger::committee::Committee;
+use snarkvm::{
+    ledger::{committee::Committee, narwhal::Data},
+    prelude::TestRng,
+};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use deadline::deadline;
-use pea2pea::{protocols::Writing, Pea2Pea};
-use rand::{thread_rng, Rng};
+use pea2pea::protocols::Writing;
+use rand::Rng;
 
 async fn new_test_gateway(
     accounts: &[Account<CurrentNetwork>],
@@ -158,6 +156,47 @@ handshake_responder_side_unexpected_event!(
 #[tokio::test(flavor = "multi_thread")]
 async fn handshake_responder_side_invalid_challenge_request() {
     const NUM_NODES: u16 = 4;
+
+    let mut rng = TestRng::default();
+    let (accounts, committee) = new_test_committee(NUM_NODES);
+    let gateway = new_test_gateway(&accounts, &committee).await;
+    let test_peer = TestPeer::new().await;
+
+    // Initiate a connection with the gateway, this will only return once the handshake has
+    // completed on the test peer's side, which only includes the noise portion.
+    assert!(test_peer.connect(gateway.local_ip()).await.is_ok());
+
+    // Check the connection has been registered.
+    assert_eq!(gateway.tcp().num_connecting(), 1);
+
+    // Use the address from the second peer in the list, the test peer will use the first.
+    let listener_port = test_peer.listening_addr().port();
+    let address = accounts.get(1).unwrap().address();
+    let nonce = rng.gen();
+    // Set the wrong version so the challenge request is invalid.
+    let challenge_request = ChallengeRequest { version: 0, listener_port, address, nonce };
+
+    // Send the message
+    let _ = test_peer.unicast(gateway.local_ip(), EventOrBytes::Event(Event::ChallengeRequest(challenge_request)));
+
+    // FIXME(nkls): currently we can't assert on the disconnect type, the message isn't always sent
+    // before the disconnect.
+
+    // Check the test peer has been removed from the gateway's connecting peers.
+    let gateway_clone = gateway.clone();
+    deadline!(Duration::from_secs(1), move || gateway_clone.tcp().num_connecting() == 0);
+    // Check the test peer hasn't been added to the gateway's connected peers.
+    assert!(gateway.connected_peers().read().is_empty());
+    assert_eq!(gateway.tcp().num_connected(), 0);
+}
+
+/* Invalid challenge response */
+
+#[tokio::test(flavor = "multi_thread")]
+async fn handshake_responder_side_invalid_challenge_response() {
+    const NUM_NODES: u16 = 4;
+
+    let mut rng = TestRng::default();
     let (accounts, committee) = new_test_committee(NUM_NODES);
     let gateway = new_test_gateway(&accounts, &committee).await;
     let mut test_peer = TestPeer::new().await;
@@ -172,12 +211,50 @@ async fn handshake_responder_side_invalid_challenge_request() {
     // Use the address from the second peer in the list, the test peer will use the first.
     let listener_port = test_peer.listening_addr().port();
     let address = accounts.get(1).unwrap().address();
-    let nonce = thread_rng().gen();
-    // Set the wrong version.
-    let challenge_request = ChallengeRequest { version: 0, listener_port, address, nonce };
+    let nonce = rng.gen();
+    let challenge_request = ChallengeRequest { version: 1, listener_port, address, nonce };
 
-    // Send the message
+    // Send the challenge request.
     let _ = test_peer.unicast(gateway.local_ip(), EventOrBytes::Event(Event::ChallengeRequest(challenge_request)));
+
+    // Receive the gateway's challenge response.
+    let (peer_addr, EventOrBytes::Event(Event::ChallengeResponse(ChallengeResponse { signature }))) =
+        test_peer.recv_timeout(Duration::from_secs(1)).await
+    else {
+        panic!("Expected challenge response")
+    };
+
+    // Check the sender is the gateway.
+    assert_eq!(peer_addr, gateway.local_ip());
+    // Check the nonce we sent is in the signature.
+    assert!(
+        signature
+            .deserialize_blocking()
+            .unwrap()
+            .verify_bytes(&accounts.first().unwrap().address(), &nonce.to_le_bytes())
+    );
+
+    // Receive the gateway's challenge request.
+    let (peer_addr, EventOrBytes::Event(Event::ChallengeRequest(challenge_request))) =
+        test_peer.recv_timeout(Duration::from_secs(1)).await
+    else {
+        panic!("Expected challenge request")
+    };
+    // Check the version, listener port and address are correct.
+    assert_eq!(peer_addr, gateway.local_ip());
+    assert_eq!(challenge_request.version, 1);
+    assert_eq!(challenge_request.listener_port, gateway.local_ip().port());
+    assert_eq!(challenge_request.address, accounts.first().unwrap().address());
+
+    // Send the challenge response with an invalid signature.
+    let _ = test_peer.unicast(
+        gateway.local_ip(),
+        EventOrBytes::Event(Event::ChallengeResponse(ChallengeResponse {
+            signature: Data::Object(
+                accounts.get(2).unwrap().sign_bytes(&challenge_request.nonce.to_le_bytes(), &mut rng).unwrap(),
+            ),
+        })),
+    );
 
     // FIXME(nkls): currently we can't assert on the disconnect type, the message isn't always sent
     // before the disconnect.
