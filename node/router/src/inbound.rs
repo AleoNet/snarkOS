@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Outbound, Peer};
-use snarkos_node_messages::{
-    BlockRequest,
-    DataBlocks,
-    Message,
-    PeerResponse,
-    Ping,
-    Pong,
-    UnconfirmedSolution,
-    UnconfirmedTransaction,
+use crate::{
+    messages::{
+        BlockRequest,
+        DataBlocks,
+        Message,
+        PeerResponse,
+        Ping,
+        Pong,
+        UnconfirmedSolution,
+        UnconfirmedTransaction,
+    },
+    Outbound,
+    Peer,
 };
 use snarkos_node_tcp::{is_bogon_address, protocols::Reading};
 use snarkvm::prelude::{

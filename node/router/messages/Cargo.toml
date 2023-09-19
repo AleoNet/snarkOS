@@ -1,5 +1,5 @@
 [package]
-name = "snarkos-node-messages"
+name = "snarkos-node-router-messages"
 version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Node messages for a decentralized operating system"
@@ -39,7 +39,7 @@ version = "1"
 version = "1"
 
 [dependencies.snarkos-node-narwhal-sync-locators]
-path = "../narwhal/sync/locators"
+path = "../../narwhal/sync/locators"
 version = "=2.1.7"
 
 [dependencies.snarkvm]

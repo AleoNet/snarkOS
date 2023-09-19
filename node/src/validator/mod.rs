@@ -17,17 +17,16 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_messages::{
-    BlockRequest,
-    Message,
-    NodeType,
-    PuzzleResponse,
-    UnconfirmedSolution,
-    UnconfirmedTransaction,
-};
 use snarkos_node_narwhal::helpers::init_primary_channels;
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
+use snarkos_node_router::{
+    messages::{BlockRequest, Message, NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
+    Heartbeat,
+    Inbound,
+    Outbound,
+    Router,
+    Routing,
+};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,

@@ -14,7 +14,7 @@
 
 use crate::{traits::NodeInterface, Client, Prover, Validator};
 use snarkos_account::Account;
-use snarkos_node_messages::NodeType;
+use snarkos_node_router::messages::NodeType;
 use snarkvm::prelude::{
     block::Block,
     store::helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},

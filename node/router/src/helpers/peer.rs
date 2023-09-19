@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_messages::{ChallengeRequest, NodeType};
+use crate::messages::{ChallengeRequest, NodeType};
 use snarkvm::prelude::{Address, Network};
 
 use std::{net::SocketAddr, time::Instant};

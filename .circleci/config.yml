@@ -226,15 +226,6 @@ jobs:
           workspace_member: node/consensus
           cache_key: snarkos-node-consensus-cache
 
-  node-messages:
-    docker:
-      - image: cimg/rust:1.72
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/messages
-          cache_key: snarkos-node-messages-cache
-
   node-narwhal:
     docker:
       - image: cimg/rust:1.72
@@ -288,6 +279,15 @@ jobs:
       - run_serial:
           workspace_member: node/router
           cache_key: snarkos-node-router-cache
+
+  node-router-messages:
+    docker:
+      - image: cimg/rust:1.72
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/router/messages
+          cache_key: snarkos-node-router-messages-cache
 
   node-tcp:
     docker:
@@ -356,13 +356,13 @@ workflows:
       - node
       - node-cdn
       - node-consensus
-      - node-messages
       - node-narwhal
       - node-narwhal-ledger-service
       - node-narwhal-sync
       - node-narwhal-sync-locators
       - node-rest
       - node-router
+      - node-router-messages
       - node-tcp
       - check-fmt
       - check-clippy

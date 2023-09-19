@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Heartbeat, Inbound, Outbound};
-use snarkos_node_messages::Message;
+use crate::{messages::Message, Heartbeat, Inbound, Outbound};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect},
     P2P,

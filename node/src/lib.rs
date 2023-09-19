@@ -23,7 +23,6 @@ extern crate tracing;
 
 pub use snarkos_node_cdn as cdn;
 pub use snarkos_node_consensus as consensus;
-pub use snarkos_node_messages as messages;
 pub use snarkos_node_narwhal as narwhal;
 pub use snarkos_node_rest as rest;
 pub use snarkos_node_router as router;

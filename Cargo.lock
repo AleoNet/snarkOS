@@ -648,9 +648,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.4.3"
+version = "4.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84ed82781cea27b43c9b106a979fe450a13a31aab0500595fb3fc06616de08e6"
+checksum = "b1d7b8d5ec32af0fadc644bf1fd509a688c2103b185644bb1e29d164e0703136"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -658,9 +658,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.4.2"
+version = "4.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bb9faaa7c2ef94b2743a21f5a29e6f0010dff4caa69ac8e9d6cf8b6fa74da08"
+checksum = "5179bb514e4d7c2051749d8fcefa2ed6d06a9f4e6d69faf3805f5d80b8cf8d56"
 dependencies = [
  "anstream",
  "anstyle",
@@ -882,9 +882,9 @@ dependencies = [
 
 [[package]]
 name = "curl-sys"
-version = "0.4.65+curl-8.2.1"
+version = "0.4.66+curl-8.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "961ba061c9ef2fe34bbd12b807152d96f0badd2bebe7b90ce6c8c8b7572a0986"
+checksum = "70c44a72e830f0e40ad90dda8a6ab6ed6314d39776599a58a2e5e37fbc6db5b9"
 dependencies = [
  "cc",
  "libc",
@@ -892,7 +892,7 @@ dependencies = [
  "openssl-sys",
  "pkg-config",
  "vcpkg",
- "winapi",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -2983,7 +2983,6 @@ dependencies = [
  "snarkos-node",
  "snarkos-node-cdn",
  "snarkos-node-consensus",
- "snarkos-node-messages",
  "snarkos-node-narwhal",
  "snarkos-node-rest",
  "snarkos-node-router",
@@ -3078,7 +3077,6 @@ dependencies = [
  "snarkos-account",
  "snarkos-node-cdn",
  "snarkos-node-consensus",
- "snarkos-node-messages",
  "snarkos-node-narwhal",
  "snarkos-node-rest",
  "snarkos-node-router",
@@ -3128,24 +3126,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-test 0.2.4",
-]
-
-[[package]]
-name = "snarkos-node-messages"
-version = "2.1.7"
-dependencies = [
- "anyhow",
- "bincode",
- "bytes",
- "indexmap 2.0.0",
- "rayon",
- "serde",
- "snarkos-node-narwhal-sync-locators",
- "snarkvm",
- "snow",
- "tokio",
- "tokio-util",
- "tracing",
 ]
 
 [[package]]
@@ -3254,7 +3234,6 @@ dependencies = [
  "rayon",
  "serde",
  "snarkos-node-consensus",
- "snarkos-node-messages",
  "snarkos-node-router",
  "snarkvm",
  "time",
@@ -3283,9 +3262,9 @@ dependencies = [
  "reqwest",
  "serde",
  "snarkos-account",
- "snarkos-node-messages",
  "snarkos-node-narwhal-sync",
  "snarkos-node-router",
+ "snarkos-node-router-messages",
  "snarkos-node-tcp",
  "snarkvm",
  "time",
@@ -3294,6 +3273,24 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber 0.3.17",
+]
+
+[[package]]
+name = "snarkos-node-router-messages"
+version = "2.1.7"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bytes",
+ "indexmap 2.0.0",
+ "rayon",
+ "serde",
+ "snarkos-node-narwhal-sync-locators",
+ "snarkvm",
+ "snow",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]

@@ -19,6 +19,8 @@ extern crate async_trait;
 #[macro_use]
 extern crate tracing;
 
+pub use snarkos_node_router_messages as messages;
+
 mod helpers;
 pub use helpers::*;
 
@@ -37,8 +39,8 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
+use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_messages::NodeType;
 use snarkos_node_narwhal_sync::BlockSync;
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
