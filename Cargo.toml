@@ -25,7 +25,6 @@ members = [
   "node",
   "node/cdn",
   "node/consensus",
-  "node/messages",
   "node/metrics",
   "node/narwhal",
   "node/narwhal/ledger-service",
@@ -33,6 +32,7 @@ members = [
   "node/narwhal/sync/locators",
   "node/rest",
   "node/router",
+  "node/router/messages",
   "node/tcp",
   ".integration"
 ]
@@ -82,10 +82,6 @@ version = "=2.1.7"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-version = "=2.1.7"
-
-[dependencies.snarkos-node-messages]
-path = "./node/messages"
 version = "=2.1.7"
 
 [dependencies.snarkos-node-narwhal]

@@ -14,7 +14,7 @@
 
 use super::*;
 
-use snarkos_node_messages::{
+use snarkos_node_router::messages::{
     BlockRequest,
     BlockResponse,
     Data,

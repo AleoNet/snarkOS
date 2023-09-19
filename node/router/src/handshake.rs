@@ -12,15 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Peer, Router};
-use snarkos_node_messages::{
-    ChallengeRequest,
-    ChallengeResponse,
-    Data,
-    DisconnectReason,
-    Message,
-    MessageCodec,
-    MessageTrait,
+use crate::{
+    messages::{ChallengeRequest, ChallengeResponse, Data, DisconnectReason, Message, MessageCodec, MessageTrait},
+    Peer,
+    Router,
 };
 use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
 use snarkvm::prelude::{block::Header, error, Address, Network};

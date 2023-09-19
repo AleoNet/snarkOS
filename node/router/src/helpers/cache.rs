@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_messages::BlockRequest;
+use crate::messages::BlockRequest;
 use snarkvm::prelude::{coinbase::PuzzleCommitment, Network};
 
 use core::hash::Hash;
