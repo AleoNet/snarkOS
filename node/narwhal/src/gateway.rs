@@ -425,8 +425,16 @@ impl<N: Network> Gateway<N> {
             Event::Disconnect(disconnect) => {
                 bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
             }
-            Event::PrimaryPing(_ping) => {
+            Event::PrimaryPing(ping) => {
+                // Ensure the event version is not outdated.
+                if ping.version < Event::<N>::VERSION {
+                    bail!("Dropping '{peer_ip}' on event version {} (outdated)", ping.version);
+                }
                 // TODO (howardwu): Send to the sync service.
+                // // Check the block locators are valid, and update the peer in the sync pool.
+                // if let Err(error) = self.sync().update_peer_locators(peer_ip, ping.block_locators) {
+                //     bail!("Peer '{peer_ip}' sent invalid block locators: {error}");
+                // }
                 Ok(())
             }
             Event::TransmissionRequest(request) => {

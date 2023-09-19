@@ -254,7 +254,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
         // Ensure the message protocol version is not outdated.
         if message.version < Message::<N>::VERSION {
-            warn!("Dropping '{peer_ip}' on version {} (outdated)", message.version);
+            warn!("Dropping '{peer_ip}' on message version {} (outdated)", message.version);
             return false;
         }
 
