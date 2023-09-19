@@ -36,7 +36,6 @@ use snarkvm::{
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use deadline::deadline;
-use pea2pea::protocols::Writing;
 use rand::Rng;
 
 async fn new_test_gateway(

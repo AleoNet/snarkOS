@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use snarkos_node_narwhal::helpers::{EventOrBytes, NoiseCodec, NoiseState};
-use snarkvm::prelude::{block::Block, FromBytes, Network, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::Testnet3 as CurrentNetwork;
 
 use std::{
     collections::HashMap,
@@ -41,13 +41,6 @@ use tokio::{
     time::timeout,
 };
 use tokio_util::codec::{Framed, FramedParts};
-
-const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
-
-/// Loads the current network's genesis block.
-pub fn sample_genesis_block() -> Block<CurrentNetwork> {
-    Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap()
-}
 
 pub struct TestPeer {
     inner_node: InnerNode,
