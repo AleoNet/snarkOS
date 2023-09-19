@@ -25,7 +25,6 @@ members = [
   "node",
   "node/cdn",
   "node/consensus",
-  "node/router/messages",
   "node/metrics",
   "node/narwhal",
   "node/narwhal/ledger-service",
@@ -33,6 +32,7 @@ members = [
   "node/narwhal/sync/locators",
   "node/rest",
   "node/router",
+  "node/router/messages",
   "node/tcp",
   ".integration"
 ]
