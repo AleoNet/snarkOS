@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Router;
-use snarkos_node_messages::{Message, Ping};
+use crate::{
+    messages::{Message, Ping},
+    Router,
+};
 use snarkos_node_narwhal_sync::locators::BlockLocators;
 use snarkos_node_tcp::protocols::Writing;
 use snarkvm::prelude::Network;

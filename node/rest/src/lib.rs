@@ -23,8 +23,10 @@ pub use helpers::*;
 mod routes;
 
 use snarkos_node_consensus::Consensus;
-use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
-use snarkos_node_router::Routing;
+use snarkos_node_router::{
+    messages::{Data, Message, UnconfirmedTransaction},
+    Routing,
+};
 use snarkvm::{
     console::{program::ProgramID, types::Field},
     prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},

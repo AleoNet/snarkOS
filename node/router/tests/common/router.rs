@@ -13,16 +13,22 @@
 // limitations under the License.
 
 use crate::common::sample_genesis_block;
-use snarkos_node_messages::{
-    BlockRequest,
-    DisconnectReason,
-    Message,
-    MessageCodec,
-    Pong,
-    UnconfirmedSolution,
-    UnconfirmedTransaction,
+use snarkos_node_router::{
+    messages::{
+        BlockRequest,
+        DisconnectReason,
+        Message,
+        MessageCodec,
+        Pong,
+        UnconfirmedSolution,
+        UnconfirmedTransaction,
+    },
+    Heartbeat,
+    Inbound,
+    Outbound,
+    Router,
+    Routing,
 };
-use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Connection,

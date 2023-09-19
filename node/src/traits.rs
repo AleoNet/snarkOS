@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_messages::NodeType;
-use snarkos_node_router::Routing;
+use snarkos_node_router::{messages::NodeType, Routing};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use once_cell::sync::OnceCell;

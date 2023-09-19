@@ -25,7 +25,6 @@ members = [
   "node",
   "node/cdn",
   "node/consensus",
-  "node/messages",
   "node/metrics",
   "node/narwhal",
   "node/narwhal/ledger-service",
@@ -33,13 +32,14 @@ members = [
   "node/narwhal/sync/locators",
   "node/rest",
   "node/router",
+  "node/router/messages",
   "node/tcp",
   ".integration"
 ]
 
 [workspace.dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "f2f16e1"
+rev = "6d29869"
 #version = "=0.14.1"
 features = [ "circuit", "console", "rocks" ]
 
@@ -82,10 +82,6 @@ version = "=2.1.7"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-version = "=2.1.7"
-
-[dependencies.snarkos-node-messages]
-path = "./node/messages"
 version = "=2.1.7"
 
 [dependencies.snarkos-node-narwhal]

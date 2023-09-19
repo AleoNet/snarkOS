@@ -14,7 +14,7 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{messages::NodeType, narwhal::MEMORY_POOL_PORT, Node};
+use snarkos_node::{narwhal::MEMORY_POOL_PORT, router::messages::NodeType, Node};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
