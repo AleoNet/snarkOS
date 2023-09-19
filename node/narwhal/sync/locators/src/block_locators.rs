@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::prelude::{has_duplicates, Network};
+use snarkvm::prelude::{error, has_duplicates, FromBytes, IoResult, Network, Read, ToBytes, Write};
 
 use anyhow::{bail, ensure, Result};
 use indexmap::{indexmap, IndexMap};
@@ -244,6 +244,53 @@ impl<N: Network> BlockLocators<N> {
         }
 
         Ok(last_height)
+    }
+}
+
+impl<N: Network> FromBytes for BlockLocators<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Read the number of recent block hashes.
+        let num_recents = u32::read_le(&mut reader)?;
+        // Read the recent block hashes.
+        let mut recents = IndexMap::with_capacity(num_recents as usize);
+        for _ in 0..num_recents {
+            let height = u32::read_le(&mut reader)?;
+            let hash = N::BlockHash::read_le(&mut reader)?;
+            recents.insert(height, hash);
+        }
+
+        // Read the number of checkpoints.
+        let num_checkpoints = u32::read_le(&mut reader)?;
+        // Read the checkpoints.
+        let mut checkpoints = IndexMap::with_capacity(num_checkpoints as usize);
+        for _ in 0..num_checkpoints {
+            let height = u32::read_le(&mut reader)?;
+            let hash = N::BlockHash::read_le(&mut reader)?;
+            checkpoints.insert(height, hash);
+        }
+
+        Ok(Self::new(recents, checkpoints))
+    }
+}
+
+impl<N: Network> ToBytes for BlockLocators<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Write the number of recent block hashes.
+        u32::try_from(self.recents.len()).map_err(error)?.write_le(&mut writer)?;
+        // Write the recent block hashes.
+        for (height, hash) in &self.recents {
+            height.write_le(&mut writer)?;
+            hash.write_le(&mut writer)?;
+        }
+
+        // Write the number of checkpoints.
+        u32::try_from(self.checkpoints.len()).map_err(error)?.write_le(&mut writer)?;
+        // Write the checkpoints.
+        for (height, hash) in &self.checkpoints {
+            height.write_le(&mut writer)?;
+            hash.write_le(&mut writer)?;
+        }
+        Ok(())
     }
 }
 

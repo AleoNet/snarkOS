@@ -425,6 +425,10 @@ impl<N: Network> Gateway<N> {
             Event::Disconnect(disconnect) => {
                 bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
             }
+            Event::PrimaryPing(_ping) => {
+                // TODO (howardwu): Send to the sync service.
+                Ok(())
+            }
             Event::TransmissionRequest(request) => {
                 // TODO (howardwu): Add rate limiting checks on this event, on a per-peer basis.
                 // Determine the worker ID.
