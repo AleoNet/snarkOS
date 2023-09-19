@@ -58,3 +58,33 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
 }
 
 // TODO: Add prop tests on this event, like all other events.
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::PrimaryPing;
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use snarkos_node_sync_locators::{test_helpers::sample_block_locators, BlockLocators};
+    use snarkvm::utilities::{FromBytes, ToBytes};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_block_locators() -> BoxedStrategy<BlockLocators<CurrentNetwork>> {
+        any::<u32>().prop_map(sample_block_locators).boxed()
+    }
+
+    pub fn any_primary_ping() -> BoxedStrategy<PrimaryPing<CurrentNetwork>> {
+        (any::<u32>(), any_block_locators())
+            .prop_map(|(version, block_locators)| PrimaryPing { version, block_locators })
+            .boxed()
+    }
+
+    #[proptest]
+    fn primary_ping_roundtrip(#[strategy(any_primary_ping())] primary_ping: PrimaryPing<CurrentNetwork>) {
+        let mut bytes = BytesMut::default().writer();
+        primary_ping.write_le(&mut bytes).unwrap();
+        let decoded = PrimaryPing::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq!(primary_ping, decoded);
+    }
+}
