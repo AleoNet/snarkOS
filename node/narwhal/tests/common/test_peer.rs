@@ -20,6 +20,7 @@ use std::{
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
+    time::Duration,
 };
 
 use bytes::Bytes;
@@ -35,6 +36,10 @@ use pea2pea::{
 };
 
 use snow::{params::NoiseParams, Builder};
+use tokio::{
+    sync::mpsc::{self, Receiver, Sender},
+    time::timeout,
+};
 use tokio_util::codec::{Framed, FramedParts};
 
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
@@ -44,43 +49,85 @@ pub fn sample_genesis_block() -> Block<CurrentNetwork> {
     Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap()
 }
 
-#[derive(Clone)]
 pub struct TestPeer {
-    node: Node,
-    noise_states: Arc<RwLock<HashMap<SocketAddr, NoiseState>>>,
+    inner_node: InnerNode,
+    inbound_rx: Receiver<(SocketAddr, EventOrBytes<CurrentNetwork>)>,
 }
 
-impl Pea2Pea for TestPeer {
-    fn node(&self) -> &Node {
-        &self.node
-    }
+#[derive(Clone)]
+struct InnerNode {
+    // The pea2pea node instance.
+    node: Node,
+    // The noise states for each connection.
+    noise_states: Arc<RwLock<HashMap<SocketAddr, NoiseState>>>,
+    // The inbound channel sender, used to consolidate inbound messages into a single queue so they
+    // can be read in order in tests.
+    inbound_tx: Sender<(SocketAddr, EventOrBytes<CurrentNetwork>)>,
 }
 
 impl TestPeer {
     pub async fn new() -> Self {
-        let peer = Self {
+        let (tx, rx) = mpsc::channel(100);
+        let inner_node = InnerNode {
             node: Node::new(Config {
                 listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
                 max_connections: 200,
                 ..Default::default()
             }),
             noise_states: Default::default(),
+            inbound_tx: tx,
         };
 
-        peer.enable_handshake().await;
-        peer.enable_reading().await;
-        peer.enable_writing().await;
-        peer.enable_disconnect().await;
-        peer.node().start_listening().await.unwrap();
+        inner_node.enable_handshake().await;
+        inner_node.enable_reading().await;
+        inner_node.enable_writing().await;
+        inner_node.enable_disconnect().await;
+        inner_node.node().start_listening().await.unwrap();
 
-        peer
+        Self { inner_node, inbound_rx: rx }
+    }
+
+    pub fn listening_addr(&self) -> SocketAddr {
+        self.inner_node.node().listening_addr().expect("addr should be present")
+    }
+
+    pub async fn connect(&self, target: SocketAddr) -> io::Result<()> {
+        self.inner_node.node().connect(target).await?;
+        Ok(())
+    }
+
+    // Note: the codec doesn't actually support sending bytes post-handshake, perhaps this should
+    // be relaxed by making a test-only codec in future.
+    pub fn unicast(&self, target: SocketAddr, message: EventOrBytes<CurrentNetwork>) -> io::Result<()> {
+        self.inner_node.unicast(target, message)?;
+        Ok(())
+    }
+
+    pub async fn recv(&mut self) -> (SocketAddr, EventOrBytes<CurrentNetwork>) {
+        match self.inbound_rx.recv().await {
+            Some(message) => message,
+            None => panic!("all senders dropped!"),
+        }
+    }
+
+    pub async fn recv_timeout(&mut self, duration: Duration) -> (SocketAddr, EventOrBytes<CurrentNetwork>) {
+        match timeout(duration, self.recv()).await {
+            Ok(message) => message,
+            _ => panic!("timed out waiting for message"),
+        }
+    }
+}
+
+impl Pea2Pea for InnerNode {
+    fn node(&self) -> &Node {
+        &self.node
     }
 }
 
 const NOISE_HANDSHAKE_TYPE: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
 
 #[async_trait::async_trait]
-impl Handshake for TestPeer {
+impl Handshake for InnerNode {
     // Set the timeout on the test peer to be longer than the gateway's timeout.
     const TIMEOUT_MS: u64 = 10_000;
 
@@ -122,7 +169,7 @@ impl Handshake for TestPeer {
 }
 
 #[async_trait::async_trait]
-impl Writing for TestPeer {
+impl Writing for InnerNode {
     type Codec = NoiseCodec<CurrentNetwork>;
     type Message = EventOrBytes<CurrentNetwork>;
 
@@ -133,7 +180,7 @@ impl Writing for TestPeer {
 }
 
 #[async_trait::async_trait]
-impl Reading for TestPeer {
+impl Reading for InnerNode {
     type Codec = NoiseCodec<CurrentNetwork>;
     type Message = EventOrBytes<CurrentNetwork>;
 
@@ -142,12 +189,14 @@ impl Reading for TestPeer {
         NoiseCodec::new(state)
     }
 
-    async fn process_message(&self, _peer_addr: SocketAddr, _message: Self::Message) -> io::Result<()> {
-        Ok(())
+    async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
+        self.inbound_tx.send((peer_addr, message)).await.map_err(|_| {
+            io::Error::new(io::ErrorKind::Other, "failed to send message to test peer, all receivers have been dropped")
+        })
     }
 }
 
 #[async_trait::async_trait]
-impl Disconnect for TestPeer {
+impl Disconnect for InnerNode {
     async fn handle_disconnect(&self, _peer_addr: SocketAddr) {}
 }
