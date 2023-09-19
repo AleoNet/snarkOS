@@ -22,19 +22,29 @@ use crate::common::{
     CurrentNetwork,
     MockLedgerService,
 };
-use snarkos_node_narwhal::{helpers::EventOrBytes, Disconnect, DisconnectReason, Event, Gateway, WorkerPing};
+use snarkos_account::Account;
+use snarkos_node_narwhal::{
+    helpers::EventOrBytes,
+    ChallengeRequest,
+    Disconnect,
+    DisconnectReason,
+    Event,
+    Gateway,
+    WorkerPing,
+};
 use snarkos_node_tcp::P2P;
+use snarkvm::ledger::committee::Committee;
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use deadline::deadline;
 use pea2pea::{protocols::Writing, Pea2Pea};
+use rand::{thread_rng, Rng};
 
-async fn new_test_gateway() -> Gateway<CurrentNetwork> {
-    const NUM_NODES: u16 = 4;
-
-    // Set up the gateway instance.
-    let (accounts, committee) = new_test_committee(NUM_NODES);
+async fn new_test_gateway(
+    accounts: &[Account<CurrentNetwork>],
+    committee: &Committee<CurrentNetwork>,
+) -> Gateway<CurrentNetwork> {
     let ledger = Arc::new(MockLedgerService::new(committee.clone()));
     let addr = SocketAddr::from_str("127.0.0.1:0").ok();
     let trusted_validators = [];
@@ -48,12 +58,14 @@ async fn new_test_gateway() -> Gateway<CurrentNetwork> {
 // further messages. The gateway's handshake should timeout.
 #[tokio::test(flavor = "multi_thread")]
 async fn handshake_responder_side_timeout() {
-    let gateway = new_test_gateway().await;
+    const NUM_NODES: u16 = 4;
+    let (accounts, committee) = new_test_committee(NUM_NODES);
+    let gateway = new_test_gateway(&accounts, &committee).await;
     let test_peer = TestPeer::new().await;
 
     // Initiate a connection with the gateway, this will only return once the handshake has
     // completed on the test peer's side, which only includes the noise portion.
-    assert!(test_peer.node().connect(gateway.local_ip()).await.is_ok());
+    assert!(test_peer.connect(gateway.local_ip()).await.is_ok());
 
     /* Don't send any further messages and wait for the gateway to timeout. */
 
@@ -77,12 +89,14 @@ macro_rules! handshake_responder_side_unexpected_event {
         paste::paste! {
             #[tokio::test(flavor = "multi_thread")]
             async fn [<handshake_responder_side_unexpected_ $test_name>]() {
-                let gateway = new_test_gateway().await;
+                const NUM_NODES: u16 = 4;
+                let (accounts, committee) = new_test_committee(NUM_NODES);
+                let gateway = new_test_gateway(&accounts, &committee).await;
                 let test_peer = TestPeer::new().await;
 
                 // Initiate a connection with the gateway, this will only return once the handshake has
                 // completed on the test peer's side, which only includes the noise portion.
-                assert!(test_peer.node().connect(gateway.local_ip()).await.is_ok());
+                assert!(test_peer.connect(gateway.local_ip()).await.is_ok());
 
                 // Check the connection has been registered.
                 assert_eq!(gateway.tcp().num_connecting(), 1);
@@ -133,30 +147,45 @@ handshake_responder_side_unexpected_disconnect!(
 /* Other unexpected event types */
 
 handshake_responder_side_unexpected_event!(
-    unexpected_worker_ping,
+    worker_ping,
     EventOrBytes::Event(Event::WorkerPing(WorkerPing::new([].into())))
 );
 
 // TODO(nkls): other event types, can be done as a follow up.
 
-/* Simultaneous connect */
+/* Invalid challenge request */
 
 #[tokio::test(flavor = "multi_thread")]
-async fn handshake_responder_side_simultaneous_connect() {
-    initialize_logger(2);
+async fn handshake_responder_side_invalid_challenge_request() {
+    const NUM_NODES: u16 = 4;
+    let (accounts, committee) = new_test_committee(NUM_NODES);
+    let gateway = new_test_gateway(&accounts, &committee).await;
+    let mut test_peer = TestPeer::new().await;
 
-    let gateway = new_test_gateway().await;
-    let test_peer_0 = TestPeer::new().await;
-    let test_peer_1 = TestPeer::new().await;
+    // Initiate a connection with the gateway, this will only return once the handshake has
+    // completed on the test peer's side, which only includes the noise portion.
+    assert!(test_peer.connect(gateway.local_ip()).await.is_ok());
 
-    // Connect the two peers to the gateway at exactly the same moment.
-    let t1 = test_peer_0.node().connect(gateway.local_ip());
-    let t2 = test_peer_1.node().connect(gateway.local_ip());
+    // Check the connection has been registered.
+    assert_eq!(gateway.tcp().num_connecting(), 1);
 
-    let (res1, res2) = tokio::join!(t1, t2);
+    // Use the address from the second peer in the list, the test peer will use the first.
+    let listener_port = test_peer.listening_addr().port();
+    let address = accounts.get(1).unwrap().address();
+    let nonce = thread_rng().gen();
+    // Set the wrong version.
+    let challenge_request = ChallengeRequest { version: 0, listener_port, address, nonce };
 
-    assert!(res1.is_ok());
-    assert!(res2.is_ok());
+    // Send the message
+    let _ = test_peer.unicast(gateway.local_ip(), EventOrBytes::Event(Event::ChallengeRequest(challenge_request)));
 
-    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    // FIXME(nkls): currently we can't assert on the disconnect type, the message isn't always sent
+    // before the disconnect.
+
+    // Check the test peer has been removed from the gateway's connecting peers.
+    let gateway_clone = gateway.clone();
+    deadline!(Duration::from_secs(1), move || gateway_clone.tcp().num_connecting() == 0);
+    // Check the test peer hasn't been added to the gateway's connected peers.
+    assert!(gateway.connected_peers().read().is_empty());
+    assert_eq!(gateway.tcp().num_connected(), 0);
 }
