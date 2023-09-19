@@ -17,7 +17,7 @@ use crate::{
     Outbound,
     Router,
 };
-use snarkos_node_narwhal_sync::REDUNDANCY_FACTOR;
+use snarkos_node_sync::REDUNDANCY_FACTOR;
 use snarkvm::prelude::Network;
 
 use colored::Colorize;

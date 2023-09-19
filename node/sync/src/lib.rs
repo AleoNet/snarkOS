@@ -17,7 +17,7 @@
 #[macro_use]
 extern crate tracing;
 
-pub use snarkos_node_narwhal_sync_locators as locators;
+pub use snarkos_node_sync_locators as locators;
 
 mod block_sync;
 pub use block_sync::*;

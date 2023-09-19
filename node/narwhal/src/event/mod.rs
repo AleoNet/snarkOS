@@ -48,7 +48,7 @@ pub use transmission_response::TransmissionResponse;
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
-use snarkos_node_narwhal_sync::locators::BlockLocators;
+use snarkos_node_sync::locators::BlockLocators;
 use snarkvm::{
     console::prelude::{FromBytes, Network, Read, ToBytes, Write},
     ledger::narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},

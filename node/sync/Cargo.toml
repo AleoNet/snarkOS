@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-node-narwhal-sync-locators"
+name = "snarkos-node-sync"
 version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "Locators to synchronize a decentralized operating system"
+description = "A synchronization module for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -18,20 +18,41 @@ edition = "2021"
 
 [features]
 default = [ ]
-test = [ ]
+test = [ "snarkos-node-sync-locators/test" ]
 
 [dependencies.anyhow]
 version = "1.0"
+
+[dependencies.colored]
+version = "2"
 
 [dependencies.indexmap]
 version = "2.0"
 features = [ "rayon" ]
 
+[dependencies.itertools]
+version = "0.11"
+
+[dependencies.once_cell]
+version = "1"
+
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.rand]
+version = "0.8"
+
 [dependencies.serde]
 version = "1"
+
+[dependencies.snarkos-node-sync-locators]
+path = "locators"
+version = "=2.1.7"
 
 [dependencies.snarkvm]
 workspace = true
 
 [dependencies.tracing]
 version = "0.1"
+
+

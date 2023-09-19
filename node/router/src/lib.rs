@@ -41,7 +41,7 @@ pub use routing::*;
 
 use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_narwhal_sync::BlockSync;
+use snarkos_node_sync::BlockSync;
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 

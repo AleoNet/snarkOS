@@ -16,7 +16,7 @@ use crate::{
     messages::{Message, Ping},
     Router,
 };
-use snarkos_node_narwhal_sync::locators::BlockLocators;
+use snarkos_node_sync::locators::BlockLocators;
 use snarkos_node_tcp::protocols::Writing;
 use snarkvm::prelude::Network;
 use std::io;

@@ -20,7 +20,7 @@ extern crate async_trait;
 #[macro_use]
 extern crate tracing;
 
-pub use snarkos_node_narwhal_sync as sync;
+pub use snarkos_node_sync as sync;
 
 pub mod helpers;
 

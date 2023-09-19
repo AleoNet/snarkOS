@@ -28,11 +28,11 @@ members = [
   "node/metrics",
   "node/narwhal",
   "node/narwhal/ledger-service",
-  "node/narwhal/sync",
-  "node/narwhal/sync/locators",
   "node/rest",
   "node/router",
   "node/router/messages",
+  "node/sync",
+  "node/sync/locators",
   "node/tcp",
   ".integration"
 ]

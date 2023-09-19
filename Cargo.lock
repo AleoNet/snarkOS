@@ -3166,7 +3166,7 @@ dependencies = [
  "sha2",
  "snarkos-account",
  "snarkos-node-narwhal-ledger-service",
- "snarkos-node-narwhal-sync",
+ "snarkos-node-sync",
  "snarkos-node-tcp",
  "snarkvm",
  "snow",
@@ -3187,34 +3187,6 @@ dependencies = [
  "async-trait",
  "snarkvm",
  "tokio",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-node-narwhal-sync"
-version = "2.1.7"
-dependencies = [
- "anyhow",
- "colored",
- "indexmap 2.0.0",
- "itertools 0.11.0",
- "once_cell",
- "parking_lot",
- "rand",
- "serde",
- "snarkos-node-narwhal-sync-locators",
- "snarkvm",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-node-narwhal-sync-locators"
-version = "2.1.7"
-dependencies = [
- "anyhow",
- "indexmap 2.0.0",
- "serde",
- "snarkvm",
  "tracing",
 ]
 
@@ -3262,9 +3234,9 @@ dependencies = [
  "reqwest",
  "serde",
  "snarkos-account",
- "snarkos-node-narwhal-sync",
  "snarkos-node-router",
  "snarkos-node-router-messages",
+ "snarkos-node-sync",
  "snarkos-node-tcp",
  "snarkvm",
  "time",
@@ -3285,11 +3257,39 @@ dependencies = [
  "indexmap 2.0.0",
  "rayon",
  "serde",
- "snarkos-node-narwhal-sync-locators",
+ "snarkos-node-sync-locators",
  "snarkvm",
  "snow",
  "tokio",
  "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-node-sync"
+version = "2.1.7"
+dependencies = [
+ "anyhow",
+ "colored",
+ "indexmap 2.0.0",
+ "itertools 0.11.0",
+ "once_cell",
+ "parking_lot",
+ "rand",
+ "serde",
+ "snarkos-node-sync-locators",
+ "snarkvm",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-node-sync-locators"
+version = "2.1.7"
+dependencies = [
+ "anyhow",
+ "indexmap 2.0.0",
+ "serde",
+ "snarkvm",
  "tracing",
 ]
 

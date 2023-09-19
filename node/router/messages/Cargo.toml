@@ -38,8 +38,8 @@ version = "1"
 [dependencies.serde]
 version = "1"
 
-[dependencies.snarkos-node-narwhal-sync-locators]
-path = "../../narwhal/sync/locators"
+[dependencies.snarkos-node-sync-locators]
+path = "../../sync/locators"
 version = "=2.1.7"
 
 [dependencies.snarkvm]
