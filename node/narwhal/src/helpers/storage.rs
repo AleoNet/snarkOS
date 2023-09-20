@@ -308,6 +308,10 @@ impl<N: Network> Storage<N> {
     /// Returns the median timestamp for the given `round`.
     pub fn median_timestamp_for_round(&self, round: u64) -> i64 {
         let previous_certificates = self.get_certificates_for_round(round);
+        if previous_certificates.is_empty() {
+            return 0;
+        }
+
         let mut timestamps = previous_certificates
             .into_iter()
             .map(|batch_certificate| batch_certificate.median_timestamp())
