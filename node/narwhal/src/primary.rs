@@ -541,7 +541,13 @@ impl<N: Network> Primary<N> {
                     // Retrieve the address of the peer.
                     match self.gateway.resolver().get_address(peer_ip) {
                         // Add the signature to the batch.
-                        Some(signer) => proposal.add_signature(signer, signature, timestamp, &previous_committee)?,
+                        Some(signer) => proposal.add_signature(
+                            signer,
+                            signature,
+                            timestamp,
+                            self.storage.median_timestamp_for_round(self.current_round() - 1),
+                            &previous_committee,
+                        )?,
                         None => bail!("Signature is from a disconnected peer"),
                     };
                     info!("Received a batch signature for round {} from '{peer_ip}'", proposal.round());

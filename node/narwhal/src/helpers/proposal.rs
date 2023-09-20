@@ -145,6 +145,7 @@ impl<N: Network> Proposal<N> {
         signer: Address<N>,
         signature: Signature<N>,
         timestamp: i64,
+        previous_timestamp: i64,
         committee: &Committee<N>,
     ) -> Result<()> {
         // Ensure the signer is in the committee.
@@ -161,7 +162,7 @@ impl<N: Network> Proposal<N> {
             bail!("Signature verification failed")
         }
         // Check the timestamp for liveness.
-        check_timestamp_for_liveness(timestamp)?;
+        check_timestamp_for_liveness(timestamp, previous_timestamp)?;
         // Insert the signature.
         self.signatures.insert(signature, timestamp);
         Ok(())

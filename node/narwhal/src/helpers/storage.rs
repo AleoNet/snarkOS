@@ -305,6 +305,17 @@ impl<N: Network> Storage<N> {
         }
     }
 
+    /// Returns the median timestamp for the given `round`.
+    pub fn median_timestamp_for_round(&self, round: u64) -> i64 {
+        let previous_certificates = self.get_certificates_for_round(round);
+        let mut timestamps = previous_certificates
+            .into_iter()
+            .map(|batch_certificate| batch_certificate.median_timestamp())
+            .collect::<Vec<_>>();
+        timestamps.sort_unstable();
+        timestamps[timestamps.len() / 2]
+    }
+
     /// Checks the given `batch_header` for validity, returning the missing transmissions from storage.
     ///
     /// This method ensures the following invariants:
@@ -344,7 +355,10 @@ impl<N: Network> Storage<N> {
         }
 
         // Check the timestamp for liveness.
-        check_timestamp_for_liveness(batch_header.timestamp())?;
+        check_timestamp_for_liveness(
+            batch_header.timestamp(),
+            self.median_timestamp_for_round(self.current_round() - 1),
+        )?;
 
         // Initialize a list for the missing transmissions from storage.
         let mut missing_transmissions = HashMap::new();
@@ -452,7 +466,7 @@ impl<N: Network> Storage<N> {
         // Iterate over the timestamps.
         for timestamp in certificate.timestamps() {
             // Check the timestamp for liveness.
-            check_timestamp_for_liveness(timestamp)?;
+            check_timestamp_for_liveness(timestamp, self.median_timestamp_for_round(self.current_round() - 1))?;
         }
 
         // Retrieve the previous committee for the batch round.
