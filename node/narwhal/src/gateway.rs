@@ -701,8 +701,8 @@ impl<N: Network> Reading for Gateway<N> {
                 warn!("{CONTEXT} Disconnecting from '{peer_ip}' - {error}");
                 let self_ = self.clone();
                 tokio::spawn(async move {
-                    let _ =
-                        Transport::send(&self_, peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()));
+                    Transport::send(&self_, peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()))
+                        .await;
                     // Disconnect from this peer.
                     self_.disconnect(peer_ip);
                 });
