@@ -24,7 +24,7 @@ use snarkos_node_messages::{
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
-use snarkos_node_tcp::{is_bogon_address, protocols::Reading};
+use snarkos_node_tcp::{is_bogon_address, is_unspecified_address, protocols::Reading};
 use snarkvm::prelude::{
     block::{Block, Header, Transaction},
     coinbase::{EpochChallenge, ProverSolution},
@@ -307,8 +307,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
     /// Handles a `PeerResponse` message.
     fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
-        // Filter out bogon addresses.
-        let peers = peers.iter().copied().filter(|addr| !is_bogon_address(addr.ip())).collect::<Vec<_>>();
+        // Filter out bogon and unspecified addresses.
+        let peers = peers
+            .iter()
+            .copied()
+            .filter(|addr| !is_bogon_address(addr.ip()) && !is_unspecified_address(addr.ip()))
+            .collect::<Vec<_>>();
         // Adds the given peer IPs to the list of candidate peers.
         self.router().insert_candidate_peers(&peers);
         true

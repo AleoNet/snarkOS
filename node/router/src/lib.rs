@@ -47,14 +47,7 @@ use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{
-    collections::HashSet,
-    future::Future,
-    net::{IpAddr, SocketAddr},
-    ops::Deref,
-    sync::Arc,
-    time::Instant,
-};
+use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -213,12 +206,9 @@ impl<N: Network> Router<N> {
         self.tcp.listening_addr().expect("The TCP listener is not enabled")
     }
 
-    /// Returns `true` if the IP provided by a peer is a valid candidate peer address.
-    pub fn is_peer_ip_valid(&self, ip: &SocketAddr) -> bool {
-        *ip != self.local_ip()
-            && !ip.ip().is_unspecified()
-            && !ip.ip().is_loopback()
-            && if let IpAddr::V4(ip) = ip.ip() { !ip.is_broadcast() } else { true }
+    /// Returns `true` if the given IP is this node.
+    pub fn is_local_ip(&self, ip: &SocketAddr) -> bool {
+        *ip == self.local_ip()
     }
 
     /// Returns the node type.
@@ -452,7 +442,8 @@ impl<N: Network> Router<N> {
             .iter()
             .filter(|peer_ip| {
                 // Ensure the peer is not itself, is not already connected, and is not restricted.
-                self.is_peer_ip_valid(peer_ip) && !self.is_connected(peer_ip) && !self.is_restricted(peer_ip)
+                // Initial address filtering had already been done at `Inbound::peer_response`.
+                !self.is_local_ip(peer_ip) && !self.is_connected(peer_ip) && !self.is_restricted(peer_ip)
             })
             .take(max_candidate_peers);
 

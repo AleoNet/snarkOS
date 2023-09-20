@@ -43,3 +43,11 @@ pub fn is_bogon_address(ip: IpAddr) -> bool {
         IpAddr::V6(ipv6) => ipv6.is_loopback(),
     }
 }
+
+/// Checks if the given IP address is unspecified or broadcast.
+pub fn is_unspecified_address(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ipv4) => ipv4.is_unspecified() || ipv4.is_broadcast(),
+        ipv6 => ipv6.is_unspecified(),
+    }
+}
