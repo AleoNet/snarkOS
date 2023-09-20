@@ -55,4 +55,8 @@ workspace = true
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.snarkos-node-sync-locators]
+path = "locators"
+version = "=2.1.7"
+features = [ "test" ]
 
