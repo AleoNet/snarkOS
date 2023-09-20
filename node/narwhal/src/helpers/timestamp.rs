@@ -53,15 +53,34 @@ mod prop_tests {
         (Just(now()), MAX_TIMESTAMP_DELTA_IN_SECS..).prop_map(|(now, delta)| now + delta).boxed()
     }
 
+    fn any_previous_timestamp() -> BoxedStrategy<i64> {
+        (0..now()).prop_map(|timestamp| timestamp).boxed()
+    }
+
     #[proptest]
-    fn test_check_timestamp_for_liveness(#[strategy(any_valid_timestamp())] timestamp: i64) {
-        let result = check_timestamp_for_liveness(timestamp);
+    fn test_check_timestamp_for_liveness(
+        #[strategy(any_valid_timestamp())] timestamp: i64,
+        #[strategy(any_previous_timestamp())] previous_timestamp: i64,
+    ) {
+        let result = check_timestamp_for_liveness(timestamp, previous_timestamp);
         assert!(result.is_ok());
     }
 
     #[proptest]
-    fn test_check_timestamp_for_liveness_too_far_in_future(#[strategy(any_invalid_timestamp())] timestamp: i64) {
-        let result = check_timestamp_for_liveness(timestamp);
+    fn test_check_timestamp_for_liveness_too_far_in_future(
+        #[strategy(any_invalid_timestamp())] timestamp: i64,
+        #[strategy(any_previous_timestamp())] previous_timestamp: i64,
+    ) {
+        let result = check_timestamp_for_liveness(timestamp, previous_timestamp);
+        assert!(result.is_err());
+    }
+
+    #[proptest]
+    fn test_check_timestamp_for_liveness_too_far_in_past(
+        #[strategy(any_previous_timestamp())] previous_timestamp: i64,
+        #[strategy(0..#previous_timestamp)] timestamp: i64,
+    ) {
+        let result = check_timestamp_for_liveness(timestamp, previous_timestamp);
         assert!(result.is_err());
     }
 }
