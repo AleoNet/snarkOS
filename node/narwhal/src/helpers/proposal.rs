@@ -153,7 +153,7 @@ impl<N: Network> Proposal<N> {
         }
         // Ensure the signer is new.
         if self.signers().contains(&signer) {
-            bail!("Signature is from a duplicate peer '{signer}'")
+            bail!("Proposal has already been signed by '{signer}'")
         }
         // Verify the signature.
         // Note: This check ensures the peer's address matches the address of the signature.
