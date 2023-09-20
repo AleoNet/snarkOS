@@ -260,10 +260,6 @@ impl<N: Network> Router<N> {
 
     /// Ensure the peer is allowed to connect.
     fn ensure_peer_is_allowed(&self, peer_ip: SocketAddr) -> Result<()> {
-        // Ensure the peer IP is not this node.
-        if self.is_local_ip(&peer_ip) {
-            bail!("Dropping connection request from '{peer_ip}' (attempted to self-connect)")
-        }
         // Ensure the node is not already connecting to this peer.
         if !self.connecting_peers.lock().insert(peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (already shaking hands as the initiator)")
