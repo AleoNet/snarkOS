@@ -30,7 +30,7 @@ pub fn check_timestamp_for_liveness(timestamp: i64, previous_timestamp: i64) -> 
     }
 
     // Ensure the timestamp is after the previous timestamp.
-    if timestamp <= previous_timestamp {
+    if timestamp < previous_timestamp {
         bail!(
             "Timestamp {timestamp} for the proposed batch must be after the previous round timestamp {previous_timestamp}"
         )

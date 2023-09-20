@@ -359,10 +359,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Check the timestamp for liveness.
-        check_timestamp_for_liveness(
-            batch_header.timestamp(),
-            self.median_timestamp_for_round(self.current_round() - 1),
-        )?;
+        check_timestamp_for_liveness(batch_header.timestamp(), self.median_timestamp_for_round(round - 1))?;
 
         // Initialize a list for the missing transmissions from storage.
         let mut missing_transmissions = HashMap::new();
@@ -470,7 +467,7 @@ impl<N: Network> Storage<N> {
         // Iterate over the timestamps.
         for timestamp in certificate.timestamps() {
             // Check the timestamp for liveness.
-            check_timestamp_for_liveness(timestamp, self.median_timestamp_for_round(self.current_round() - 1))?;
+            check_timestamp_for_liveness(timestamp, self.median_timestamp_for_round(round - 1))?;
         }
 
         // Retrieve the previous committee for the batch round.
