@@ -18,6 +18,7 @@ use snarkvm::prelude::{store::ConsensusStorage, Ledger, Network};
 use anyhow::Result;
 use indexmap::IndexMap;
 
+/// TODO (howardwu): Move this to sync crate.
 /// Returns the block locators for the given ledger.
 pub fn get_block_locators<N: Network, C: ConsensusStorage<N>>(ledger: &Ledger<N, C>) -> Result<BlockLocators<N>> {
     // Retrieve the latest height.
@@ -40,7 +41,7 @@ pub fn get_block_locators<N: Network, C: ConsensusStorage<N>>(ledger: &Ledger<N,
     }
 
     // Construct the block locators.
-    Ok(BlockLocators::new(recents, checkpoints))
+    BlockLocators::new(recents, checkpoints)
 }
 
 /// A helper to log instructions to recover.

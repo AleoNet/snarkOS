@@ -22,6 +22,7 @@ use snarkos_node_router::messages::{
     DisconnectReason,
     Message,
     MessageCodec,
+    Ping,
     Pong,
     UnconfirmedTransaction,
 };
@@ -83,6 +84,7 @@ impl<N: Network, C: ConsensusStorage<N>> Disconnect for Validator<N, C> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
         if let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) {
+            self.sync().remove_peer(&peer_ip);
             self.router.remove_connected_peer(peer_ip);
         }
     }
@@ -164,14 +166,30 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     fn block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> bool {
         // Insert the candidate blocks into the sync pool.
         for block in blocks {
-            if let Err(error) = self.router().sync().insert_block_response(peer_ip, block) {
+            if let Err(error) = self.sync().insert_block_response(peer_ip, block) {
                 warn!("{error}");
                 return false;
             }
         }
 
         // Tries to advance with blocks from the sync pool.
-        self.advance_with_sync_blocks();
+        self.sync().advance_with_sync_blocks();
+        true
+    }
+
+    /// Processes the block locators and sends back a `Pong` message.
+    fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
+        // If block locators were provided, then update the peer in the sync pool.
+        if let Some(block_locators) = message.block_locators {
+            // Check the block locators are valid, and update the peer in the sync pool.
+            if let Err(error) = self.sync().update_peer_locators(peer_ip, block_locators) {
+                warn!("Peer '{peer_ip}' sent invalid block locators: {error}");
+                return false;
+            }
+        }
+
+        // Send a `Pong` message to the peer.
+        self.send(peer_ip, Message::Pong(Pong { is_fork: Some(false) }));
         true
     }
 

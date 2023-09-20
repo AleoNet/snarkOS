@@ -86,6 +86,11 @@ version = "=2.1.7"
 path = "./router"
 version = "=2.1.7"
 
+[dependencies.snarkos-node-sync]
+path = "./sync"
+version = "=2.1.7"
+features = [ "ledger" ]
+
 [dependencies.snarkos-node-tcp]
 path = "./tcp"
 version = "=2.1.7"

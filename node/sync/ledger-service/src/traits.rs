@@ -13,43 +13,29 @@
 // limitations under the License.
 
 use snarkvm::{
-    ledger::{
-        block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
-        committee::Committee,
-        narwhal::Data,
-    },
-    prelude::{narwhal::TransmissionID, Field, Network, Result},
+    ledger::block::Block,
+    prelude::{Network, Result},
 };
 
 use std::fmt::Debug;
 
 #[async_trait]
 pub trait LedgerService<N: Network>: Debug + Send + Sync {
-    /// Returns the current committee.
-    fn current_committee(&self) -> Result<Committee<N>>;
+    /// Returns the latest block height in the canonical ledger.
+    fn latest_canon_height(&self) -> u32;
 
-    /// Returns the committee for the given round.
-    /// If the given round is in the future, then the current committee is returned.
-    fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
+    /// Returns `true` if the given block height exists in the canonical ledger.
+    fn contains_canon_height(&self, height: u32) -> bool;
 
-    /// Returns `true` if the ledger contains the given certificate ID.
-    fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
+    /// Returns the canonical block height for the given block hash, if it exists.
+    fn get_canon_height(&self, hash: &N::BlockHash) -> Option<u32>;
 
-    /// Returns `true` if the ledger contains the given transmission ID.
-    fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
+    /// Returns the canonical block hash for the given block height, if it exists.
+    fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash>;
 
-    /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        puzzle_commitment: PuzzleCommitment<N>,
-        solution: Data<ProverSolution<N>>,
-    ) -> Result<()>;
+    /// Checks the given block is valid next block.
+    fn check_next_block(&self, block: &Block<N>) -> Result<()>;
 
-    /// Checks the given transaction is well-formed and unique.
-    async fn check_transaction_basic(
-        &self,
-        transaction_id: N::TransactionID,
-        transaction: Data<Transaction<N>>,
-    ) -> Result<()>;
+    /// Adds the given block as the next block in the ledger.
+    fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
 }

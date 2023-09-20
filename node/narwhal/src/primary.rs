@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    event::{BatchPropose, BatchSignature, CertificateRequest, CertificateResponse, Event},
+    events::{BatchPropose, BatchSignature, CertificateRequest, CertificateResponse, Event},
     helpers::{
         assign_to_worker,
         assign_to_workers,
@@ -265,7 +265,11 @@ impl<N: Network> Primary<N> {
                     Some(peer_ip) => {
                         debug!("Resending batch proposal for round {} to peer '{peer_ip}'", proposal.round());
                         // Broadcast the event.
-                        self.gateway.send(peer_ip, event.clone());
+                        let self_ = self.clone();
+                        let event_ = event.clone();
+                        tokio::spawn(async move {
+                            let _ = self_.gateway.send(peer_ip, event_).await;
+                        });
                     }
                     None => continue,
                 }
@@ -396,8 +400,14 @@ impl<N: Network> Primary<N> {
         // Sign the batch ID.
         let signature = self.gateway.account().sign(&[batch_id, Field::from_u64(timestamp as u64)], rng)?;
         // Broadcast the signature back to the validator.
-        self.gateway.send(peer_ip, Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp)));
-        debug!("Signed a batch for round {batch_round} from peer '{peer_ip}'");
+        let self_ = self.clone();
+        tokio::spawn(async move {
+            let event = Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp));
+            // Send the batch signature to the peer.
+            if self_.gateway.send(peer_ip, event).await.is_some() {
+                debug!("Signed a batch for round {batch_round} from peer '{peer_ip}'");
+            }
+        });
         Ok(())
     }
 
@@ -1005,7 +1015,7 @@ impl<N: Network> Primary<N> {
         Ok(missing_previous_certificates)
     }
 
-    /// Sends an certificate request to the specified peer.
+    /// Sends a certificate request to the specified peer.
     async fn send_certificate_request(
         &self,
         peer_ip: SocketAddr,
@@ -1016,7 +1026,9 @@ impl<N: Network> Primary<N> {
         // Insert the certificate ID into the pending queue.
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
             // Send the certificate request to the peer.
-            self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
+            if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
+                bail!("Unable to fetch batch certificate - failed to send request")
+            }
         }
         // Wait for the certificate to be fetched.
         match timeout(Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
@@ -1046,7 +1058,10 @@ impl<N: Network> Primary<N> {
         // Attempt to retrieve the certificate.
         if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
             // Send the certificate response to the peer.
-            self.gateway.send(peer_ip, Event::CertificateResponse(certificate.into()));
+            let self_ = self.clone();
+            tokio::spawn(async move {
+                let _ = self_.gateway.send(peer_ip, Event::CertificateResponse(certificate.into())).await;
+            });
         }
     }
 

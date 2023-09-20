@@ -13,18 +13,23 @@
 // limitations under the License.
 
 use crate::{
-    event::{
+    events::{
+        BlockRequest,
         CertificateRequest,
         CertificateResponse,
         ChallengeRequest,
         ChallengeResponse,
         DisconnectReason,
         Event,
+        EventOrBytes,
         EventTrait,
+        NoiseCodec,
+        NoiseState,
         TransmissionRequest,
         TransmissionResponse,
+        NOISE_HANDSHAKE_TYPE,
     },
-    helpers::{assign_to_worker, Cache, EventOrBytes, NoiseCodec, NoiseState, PrimarySender, Resolver, WorkerSender},
+    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, WorkerSender},
     primary::Ledger,
     CONTEXT,
     MAX_BATCH_DELAY,
@@ -33,6 +38,7 @@ use crate::{
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
+use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
@@ -80,13 +86,11 @@ const MAX_CONNECTION_ATTEMPTS: usize = 10;
 /// The maximum interval to restrict a peer.
 const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DELAY / 1000) as i64; // seconds
 
-// The type of noise handshake to use for network encryption.
-pub(crate) const NOISE_HANDSHAKE_TYPE: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
-
 /// Part of the Gateway API that deals with networking.
 /// This is a separate trait to allow for easier testing/mocking.
+#[async_trait]
 pub trait Transport<N: Network>: Send + Sync {
-    fn send(&self, peer_ip: SocketAddr, event: Event<N>);
+    async fn send(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>>;
     fn broadcast(&self, event: Event<N>);
 }
 
@@ -176,7 +180,30 @@ impl<N: Network> Gateway<N> {
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
     }
+}
 
+#[async_trait]
+impl<N: Network> CommunicationService for Gateway<N> {
+    /// The message type.
+    type Message = Event<N>;
+
+    /// Prepares a block request to be sent.
+    fn prepare_block_request(start_height: u32, end_height: u32) -> Self::Message {
+        debug_assert!(start_height < end_height, "Invalid block request format");
+        Event::BlockRequest(BlockRequest { start_height, end_height })
+    }
+
+    /// Sends the given message to specified peer.
+    ///
+    /// This function returns as soon as the message is queued to be sent,
+    /// without waiting for the actual delivery; instead, the caller is provided with a [`oneshot::Receiver`]
+    /// which can be used to determine when and whether the message has been delivered.
+    async fn send(&self, peer_ip: SocketAddr, message: Self::Message) -> Option<oneshot::Receiver<io::Result<()>>> {
+        Transport::send(self, peer_ip, message).await
+    }
+}
+
+impl<N: Network> Gateway<N> {
     /// Returns the account of the node.
     pub const fn account(&self) -> &Account<N> {
         &self.account
@@ -408,6 +435,14 @@ impl<N: Network> Gateway<N> {
                 let _ = self.primary_sender().tx_batch_certified.send((peer_ip, batch_certified.certificate)).await;
                 Ok(())
             }
+            Event::BlockRequest(block_request) => {
+                // TODO (howardwu): Process block request.
+                Ok(())
+            }
+            Event::BlockResponse(block_response) => {
+                // TODO (howardwu): Process block response.
+                Ok(())
+            }
             Event::CertificateRequest(certificate_request) => {
                 // Send the certificate request to the primary.
                 let _ = self.primary_sender().tx_certificate_request.send((peer_ip, certificate_request)).await;
@@ -569,24 +604,26 @@ impl<N: Network> Gateway<N> {
     }
 }
 
+#[async_trait]
 impl<N: Network> Transport<N> for Gateway<N> {
     /// Sends the given event to specified peer.
     ///
     /// This method is rate limited to prevent spamming the peer.
-    fn send(&self, peer_ip: SocketAddr, event: Event<N>) {
+    ///
+    /// This function returns as soon as the event is queued to be sent,
+    /// without waiting for the actual delivery; instead, the caller is provided with a [`oneshot::Receiver`]
+    /// which can be used to determine when and whether the event has been delivered.
+    async fn send(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
         macro_rules! send {
-            ($self:ident, $cache_map:ident, $interval:expr, $freq:expr) => {
-                let self_ = $self.clone();
-                tokio::spawn(async move {
-                    // Rate limit the number of certificate requests sent to the peer.
-                    while self_.cache.$cache_map(peer_ip, $interval) > $freq {
-                        // Sleep for a short period of time to allow the cache to clear.
-                        tokio::time::sleep(Duration::from_millis(10)).await;
-                    }
-                    // Send the event to the peer.
-                    self_.send_inner(peer_ip, event);
-                });
-            };
+            ($self:ident, $cache_map:ident, $interval:expr, $freq:expr) => {{
+                // Rate limit the number of certificate requests sent to the peer.
+                while $self.cache.$cache_map(peer_ip, $interval) > $freq {
+                    // Sleep for a short period of time to allow the cache to clear.
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                // Send the event to the peer.
+                $self.send_inner(peer_ip, event)
+            }};
         }
 
         // If the event type is a certificate request, increment the cache.
@@ -594,19 +631,19 @@ impl<N: Network> Transport<N> for Gateway<N> {
             // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
             self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
             // Send the event to the peer.
-            send!(self, insert_outbound_certificate, CACHE_REQUESTS_INTERVAL, CACHE_CERTIFICATES);
+            send!(self, insert_outbound_certificate, CACHE_REQUESTS_INTERVAL, CACHE_CERTIFICATES)
         }
         // If the event type is a transmission request, increment the cache.
         else if matches!(event, Event::TransmissionRequest(_)) | matches!(event, Event::TransmissionResponse(_)) {
             // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
             self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
             // Send the event to the peer.
-            send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, CACHE_TRANSMISSIONS);
+            send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, CACHE_TRANSMISSIONS)
         }
         // Otherwise, employ a general rate limit.
         else {
             // Send the event to the peer.
-            send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, CACHE_EVENTS);
+            send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, CACHE_EVENTS)
         }
     }
 
@@ -616,11 +653,15 @@ impl<N: Network> Transport<N> for Gateway<N> {
     fn broadcast(&self, event: Event<N>) {
         // Ensure there are connected peers.
         if self.number_of_connected_peers() > 0 {
-            // Iterate through all connected peers.
-            for peer_ip in self.connected_peers.read().iter() {
-                // Send the event to the peer.
-                self.send(*peer_ip, event.clone());
-            }
+            let self_ = self.clone();
+            let connected_peers = self.connected_peers.read().clone();
+            tokio::spawn(async move {
+                // Iterate through all connected peers.
+                for peer_ip in connected_peers {
+                    // Send the event to the peer.
+                    let _ = Transport::send(&self_, peer_ip, event.clone()).await;
+                }
+            });
         }
     }
 }
@@ -658,9 +699,13 @@ impl<N: Network> Reading for Gateway<N> {
         if let Err(error) = self.inbound(peer_addr, event).await {
             if let Some(peer_ip) = self.resolver.get_listener(peer_addr) {
                 warn!("{CONTEXT} Disconnecting from '{peer_ip}' - {error}");
-                self.send(peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()));
-                // Disconnect from this peer.
-                self.disconnect(peer_ip);
+                let self_ = self.clone();
+                tokio::spawn(async move {
+                    let _ =
+                        Transport::send(&self_, peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()));
+                    // Disconnect from this peer.
+                    self_.disconnect(peer_ip);
+                });
             }
         }
         Ok(())

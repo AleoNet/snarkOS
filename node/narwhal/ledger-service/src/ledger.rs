@@ -27,7 +27,7 @@ use snarkvm::{
 
 use std::fmt;
 
-/// A core ledger service that always returns `false`.
+/// A core ledger service.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
 }

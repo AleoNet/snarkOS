@@ -15,7 +15,7 @@
 use super::*;
 
 use snarkos_node_router::{
-    messages::{BlockRequest, DisconnectReason, MessageCodec, Pong, UnconfirmedTransaction},
+    messages::{BlockRequest, DisconnectReason, MessageCodec, Ping, Pong, UnconfirmedTransaction},
     Routing,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
@@ -92,7 +92,7 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Client<N, C> {
     /// Creates a [`Decoder`] used to interpret messages from the network.
     /// The `side` param indicates the connection side **from the node's perspective**.
     fn codec(&self, _peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
-        Default::default()
+        self.router.codec(_peer_addr, _side)
     }
 
     /// Processes a message received from the network.
@@ -134,6 +134,13 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
+    }
+
+    /// Processes the block locators and sends back a `Pong` message.
+    fn ping(&self, peer_ip: SocketAddr, _message: Ping<N>) -> bool {
+        // Send a `Pong` message to the peer.
+        self.send(peer_ip, Message::Pong(Pong { is_fork: Some(false) }));
+        true
     }
 
     /// Sleeps for a period and then sends a `Ping` message to the peer.

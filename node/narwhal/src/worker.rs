@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    event::{Event, TransmissionRequest, TransmissionResponse},
+    events::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
     Ledger,
     ProposedBatch,
@@ -408,7 +408,9 @@ impl<N: Network> Worker<N> {
         // Insert the transmission ID into the pending queue.
         self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
         // Send the transmission request to the peer.
-        self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
+        if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
+            bail!("Unable to fetch transmission - failed to send request")
+        }
         // Wait for the transmission to be fetched.
         match timeout(Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
             // If the transmission was fetched, return it.
@@ -440,7 +442,10 @@ impl<N: Network> Worker<N> {
         // Attempt to retrieve the transmission.
         if let Some(transmission) = self.get_transmission(transmission_id) {
             // Send the transmission response to the peer.
-            self.gateway.send(peer_ip, Event::TransmissionResponse((transmission_id, transmission).into()));
+            let self_ = self.clone();
+            tokio::spawn(async move {
+                self_.gateway.send(peer_ip, Event::TransmissionResponse((transmission_id, transmission).into())).await;
+            });
         }
     }
 
@@ -468,14 +473,16 @@ mod tests {
 
     use bytes::Bytes;
     use mockall::mock;
+    use std::io;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     mock! {
         Gateway<N: Network> {}
+        #[async_trait]
         impl<N:Network> Transport<N> for Gateway<N> {
             fn broadcast(&self, event: Event<N>);
-            fn send(&self, peer_ip: SocketAddr, event: Event<N>);
+            async fn send(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>>;
         }
     }
 
@@ -541,7 +548,10 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
@@ -572,7 +582,10 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
@@ -607,7 +620,10 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
@@ -642,7 +658,10 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
@@ -677,7 +696,10 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));

@@ -235,6 +235,15 @@ jobs:
           workspace_member: node/narwhal
           cache_key: snarkos-node-narwhal-cache
 
+  node-narwhal-events:
+    docker:
+      - image: cimg/rust:1.72
+    resource_class: 2xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/narwhal/events
+          cache_key: snarkos-node-narwhal-events-cache
+
   node-narwhal-ledger-service:
     docker:
       - image: cimg/rust:1.72
@@ -279,6 +288,15 @@ jobs:
       - run_serial:
           workspace_member: node/sync
           cache_key: snarkos-node-sync-cache
+
+  node-sync-communication-service:
+    docker:
+      - image: cimg/rust:1.72
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/sync/communication-service
+          cache_key: snarkos-node-sync-communication-service-cache
 
   node-sync-ledger-service:
     docker:
@@ -366,11 +384,13 @@ workflows:
       - node-cdn
       - node-consensus
       - node-narwhal
+      - node-narwhal-events
       - node-narwhal-ledger-service
       - node-rest
       - node-router
       - node-router-messages
       - node-sync
+      - node-sync-communication-service
       - node-sync-ledger-service
       - node-sync-locators
       - node-tcp
