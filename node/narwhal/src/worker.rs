@@ -549,7 +549,7 @@ mod tests {
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
-            let (tx, rx) = oneshot::channel();
+            let (_tx, rx) = oneshot::channel();
             Some(rx)
         });
         let mut mock_ledger = MockLedger::default();
@@ -583,7 +583,7 @@ mod tests {
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
-            let (tx, rx) = oneshot::channel();
+            let (_tx, rx) = oneshot::channel();
             Some(rx)
         });
         let mut mock_ledger = MockLedger::default();
@@ -621,7 +621,7 @@ mod tests {
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
-            let (tx, rx) = oneshot::channel();
+            let (_tx, rx) = oneshot::channel();
             Some(rx)
         });
         let mut mock_ledger = MockLedger::default();
@@ -659,7 +659,7 @@ mod tests {
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
-            let (tx, rx) = oneshot::channel();
+            let (_tx, rx) = oneshot::channel();
             Some(rx)
         });
         let mut mock_ledger = MockLedger::default();
@@ -697,7 +697,7 @@ mod tests {
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
-            let (tx, rx) = oneshot::channel();
+            let (_tx, rx) = oneshot::channel();
             Some(rx)
         });
         let mut mock_ledger = MockLedger::default();
