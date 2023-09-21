@@ -14,7 +14,7 @@
 
 use snarkvm::{
     ledger::{
-        block::Transaction,
+        block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::Data,
@@ -26,6 +26,24 @@ use std::fmt::Debug;
 
 #[async_trait]
 pub trait LedgerService<N: Network>: Debug + Send + Sync {
+    /// Returns the latest block height in the canonical ledger.
+    fn latest_canon_height(&self) -> u32;
+
+    /// Returns `true` if the given block height exists in the canonical ledger.
+    fn contains_canon_height(&self, height: u32) -> bool;
+
+    /// Returns the canonical block height for the given block hash, if it exists.
+    fn get_canon_height(&self, hash: &N::BlockHash) -> Option<u32>;
+
+    /// Returns the canonical block hash for the given block height, if it exists.
+    fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash>;
+
+    /// Checks the given block is valid next block.
+    fn check_next_block(&self, block: &Block<N>) -> Result<()>;
+
+    /// Adds the given block as the next block in the ledger.
+    fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
+
     /// Returns the current committee.
     fn current_committee(&self) -> Result<Committee<N>>;
 

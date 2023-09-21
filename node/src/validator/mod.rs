@@ -17,7 +17,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_narwhal::helpers::init_primary_channels;
+use snarkos_node_narwhal::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
     messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
@@ -27,7 +27,7 @@ use snarkos_node_router::{
     Router,
     Routing,
 };
-use snarkos_node_sync::{ledger_service::CoreLedgerService, BlockSync};
+use snarkos_node_sync::BlockSync;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,

@@ -468,7 +468,7 @@ mod tests {
     use snarkos_node_narwhal_ledger_service::LedgerService;
     use snarkvm::{
         console::{network::Network, types::Field},
-        ledger::{committee::Committee, narwhal::TransmissionID},
+        ledger::{block::Block, committee::Committee, narwhal::TransmissionID},
     };
 
     use bytes::Bytes;
@@ -491,6 +491,13 @@ mod tests {
         Ledger<N: Network> {}
         #[async_trait]
         impl<N: Network> LedgerService<N> for Ledger<N> {
+            fn latest_canon_height(&self) -> u32;
+            fn contains_canon_height(&self, height: u32) -> bool;
+            fn get_canon_height(&self, hash: &N::BlockHash) -> Option<u32>;
+            fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash>;
+            fn check_next_block(&self, block: &Block<N>) -> Result<()>;
+            fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
+
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;

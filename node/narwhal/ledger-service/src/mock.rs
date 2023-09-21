@@ -15,31 +15,80 @@
 use crate::{fmt_id, LedgerService};
 use snarkvm::{
     ledger::{
-        block::Transaction,
+        block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{Data, TransmissionID},
     },
-    prelude::{Field, Network, Result},
+    prelude::{ensure, Field, Network, Result},
 };
 
+use parking_lot::Mutex;
+use std::collections::BTreeMap;
 use tracing::*;
 
 /// A mock ledger service that always returns `false`.
 #[derive(Debug)]
 pub struct MockLedgerService<N: Network> {
     committee: Committee<N>,
+    height_to_hash: Mutex<BTreeMap<u32, N::BlockHash>>,
 }
 
 impl<N: Network> MockLedgerService<N> {
     /// Initializes a new mock ledger service.
     pub fn new(committee: Committee<N>) -> Self {
-        Self { committee }
+        Self { committee, height_to_hash: Default::default() }
+    }
+
+    /// Initializes a new mock ledger service at the specified height.
+    pub fn new_at_height(committee: Committee<N>, height: u32) -> Self {
+        let mut height_to_hash = BTreeMap::new();
+        for i in 0..=height {
+            height_to_hash.insert(i, (Field::<N>::from_u32(i)).into());
+        }
+        Self { committee, height_to_hash: Mutex::new(height_to_hash) }
     }
 }
 
 #[async_trait]
 impl<N: Network> LedgerService<N> for MockLedgerService<N> {
+    /// Returns the latest block height in the canonical ledger.
+    fn latest_canon_height(&self) -> u32 {
+        self.height_to_hash.lock().last_key_value().map(|(height, _)| *height).unwrap_or(0)
+    }
+
+    /// Returns `true` if the given block height exists in the canonical ledger.
+    fn contains_canon_height(&self, height: u32) -> bool {
+        self.height_to_hash.lock().contains_key(&height)
+    }
+
+    /// Returns the canonical block height for the given block hash, if it exists.
+    fn get_canon_height(&self, hash: &N::BlockHash) -> Option<u32> {
+        self.height_to_hash.lock().iter().find_map(|(height, h)| if h == hash { Some(*height) } else { None })
+    }
+
+    /// Returns the canonical block hash for the given block height, if it exists.
+    fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash> {
+        self.height_to_hash.lock().get(&height).cloned()
+    }
+
+    /// Checks the given block is valid next block.
+    fn check_next_block(&self, _block: &Block<N>) -> Result<()> {
+        Ok(())
+    }
+
+    /// Adds the given block as the next block in the ledger.
+    fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
+        ensure!(
+            block.height() == self.latest_canon_height() + 1,
+            "Tried to advance to block {} from block {}",
+            block.height(),
+            self.latest_canon_height()
+        );
+        self.height_to_hash.lock().insert(block.height(), block.hash());
+        Ok(())
+    }
+
     /// Returns the current committee.
     fn current_committee(&self) -> Result<Committee<N>> {
         Ok(self.committee.clone())

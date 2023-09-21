@@ -15,7 +15,7 @@
 use crate::LedgerService;
 use snarkvm::{
     ledger::{
-        block::Transaction,
+        block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{Data, TransmissionID},
@@ -48,6 +48,36 @@ impl<N: Network, C: ConsensusStorage<N>> fmt::Debug for CoreLedgerService<N, C> 
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<N, C> {
+    /// Returns the latest block height in the canonical ledger.
+    fn latest_canon_height(&self) -> u32 {
+        self.ledger.latest_height()
+    }
+
+    /// Returns `true` if the given block height exists in the canonical ledger.
+    fn contains_canon_height(&self, height: u32) -> bool {
+        self.ledger.contains_block_height(height).unwrap_or(false)
+    }
+
+    /// Returns the canonical block height for the given block hash, if it exists.
+    fn get_canon_height(&self, hash: &N::BlockHash) -> Option<u32> {
+        self.ledger.get_height(hash).ok()
+    }
+
+    /// Returns the canonical block hash for the given block height, if it exists.
+    fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash> {
+        self.ledger.get_hash(height).ok()
+    }
+
+    /// Checks the given block is valid next block.
+    fn check_next_block(&self, block: &Block<N>) -> Result<()> {
+        self.ledger.check_next_block(block)
+    }
+
+    /// Adds the given block as the next block in the ledger.
+    fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
+        self.ledger.advance_to_next_block(block)
+    }
+
     /// Returns the current committee.
     fn current_committee(&self) -> Result<Committee<N>> {
         self.ledger.latest_committee()

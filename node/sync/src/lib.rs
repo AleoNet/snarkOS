@@ -18,7 +18,6 @@
 extern crate tracing;
 
 pub use snarkos_node_sync_communication_service as communication_service;
-pub use snarkos_node_sync_ledger_service as ledger_service;
 pub use snarkos_node_sync_locators as locators;
 
 mod block_sync;

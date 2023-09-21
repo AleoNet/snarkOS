@@ -3207,6 +3207,7 @@ name = "snarkos-node-narwhal-ledger-service"
 version = "2.1.7"
 dependencies = [
  "async-trait",
+ "parking_lot",
  "snarkvm",
  "tokio",
  "tracing",
@@ -3300,8 +3301,8 @@ dependencies = [
  "parking_lot",
  "rand",
  "serde",
+ "snarkos-node-narwhal-ledger-service",
  "snarkos-node-sync-communication-service",
- "snarkos-node-sync-ledger-service",
  "snarkos-node-sync-locators",
  "snarkvm",
  "tokio",
@@ -3314,15 +3315,6 @@ version = "2.1.7"
 dependencies = [
  "async-trait",
  "tokio",
-]
-
-[[package]]
-name = "snarkos-node-sync-ledger-service"
-version = "2.1.7"
-dependencies = [
- "async-trait",
- "parking_lot",
- "snarkvm",
 ]
 
 [[package]]

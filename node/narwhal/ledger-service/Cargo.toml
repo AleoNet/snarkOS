@@ -24,6 +24,9 @@ mock = [ "tracing" ]
 [dependencies.async-trait]
 version = "0.1"
 
+[dependencies.parking_lot]
+version = "0.12"
+
 [dependencies.snarkvm]
 workspace = true
 

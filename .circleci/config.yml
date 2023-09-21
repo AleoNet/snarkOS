@@ -298,15 +298,6 @@ jobs:
           workspace_member: node/sync/communication-service
           cache_key: snarkos-node-sync-communication-service-cache
 
-  node-sync-ledger-service:
-    docker:
-      - image: cimg/rust:1.72
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/sync/ledger-service
-          cache_key: snarkos-node-sync-ledger-service-cache
-
   node-sync-locators:
     docker:
       - image: cimg/rust:1.72
@@ -391,7 +382,6 @@ workflows:
       - node-router-messages
       - node-sync
       - node-sync-communication-service
-      - node-sync-ledger-service
       - node-sync-locators
       - node-tcp
       - check-fmt

@@ -16,8 +16,8 @@ use crate::{
     helpers::{PeerPair, SyncRequest},
     locators::BlockLocators,
 };
+use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkos_node_sync_communication_service::CommunicationService;
-use snarkos_node_sync_ledger_service::LedgerService;
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
@@ -721,10 +721,11 @@ mod tests {
         CHECKPOINT_INTERVAL,
         NUM_RECENT_BLOCKS,
     };
-    use snarkos_node_sync_ledger_service::MockLedgerService;
-    use snarkvm::prelude::Field;
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkvm::prelude::{Field, TestRng};
 
     use indexmap::indexset;
+    use snarkvm::ledger::committee::Committee;
     use std::net::{IpAddr, Ipv4Addr};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -740,9 +741,15 @@ mod tests {
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), id)
     }
 
+    /// Returns a sample committee.
+    fn sample_committee() -> Committee<CurrentNetwork> {
+        let rng = &mut TestRng::default();
+        snarkvm::ledger::committee::test_helpers::sample_committee(rng)
+    }
+
     /// Returns the ledger service, initialized to the given height.
     fn sample_ledger_service(height: u32) -> MockLedgerService<CurrentNetwork> {
-        MockLedgerService::new_at_height(height)
+        MockLedgerService::new_at_height(sample_committee(), height)
     }
 
     /// Returns the sync pool, with the canonical ledger initialized to the given height.
