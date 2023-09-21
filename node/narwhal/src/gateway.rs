@@ -269,6 +269,20 @@ impl<N: Network> Gateway<N> {
         self.connecting_peers.lock().contains(&ip)
     }
 
+    /// Returns `true` if the node is an authorized validator.
+    pub fn is_authorized_validator(&self, ip: SocketAddr) -> bool {
+        match self.ledger.current_committee() {
+            Ok(committee) => {
+                if let Some(validator_address) = self.resolver.get_address(ip) {
+                    committee.is_committee_member(validator_address)
+                } else {
+                    false
+                }
+            }
+            Err(_) => false,
+        }
+    }
+
     /// Returns the maximum number of connected peers.
     pub fn max_connected_peers(&self) -> usize {
         self.tcp.config().max_connections as usize
@@ -399,6 +413,10 @@ impl<N: Network> Gateway<N> {
         let Some(peer_ip) = self.resolver.get_listener(peer_addr) else {
             bail!("{CONTEXT} Unable to resolve the (ambiguous) peer address '{peer_addr}'")
         };
+        // Ensure that the peer is an authorized committee member.
+        if !self.is_authorized_validator(peer_ip) {
+            bail!("{CONTEXT} Dropping '{}' from '{peer_ip}' (not authorized)", event.name())
+        }
         // Drop the peer, if they have exceeded the rate limit (i.e. they are requesting too much from us).
         let num_events = self.cache.insert_inbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
         if num_events >= CACHE_EVENTS {
@@ -624,6 +642,8 @@ impl<N: Network> Gateway<N> {
         self.log_connected_validators();
         // Keep the trusted validators connected.
         self.handle_trusted_validators();
+        // Remove any validators that are no longer in the committee set.
+        self.handle_unauthorized_validators();
     }
 
     /// Logs the connected validators.
@@ -657,6 +677,26 @@ impl<N: Network> Gateway<N> {
                 self.connect(*validator_ip);
             }
         }
+    }
+
+    /// This function attempts to disconnect with any validators that are not in the committee set.
+    fn handle_unauthorized_validators(&self) {
+        // Log the connected validators.
+        let validators = self.connected_peers().read().clone();
+
+        let self_ = self.clone();
+        tokio::spawn(async move {
+            // Disconnect from the validators that are not in the committee set.
+            for peer_ip in validators {
+                if !self_.is_authorized_validator(peer_ip) {
+                    warn!("{CONTEXT} Disconnecting from '{peer_ip}' - Peer is not in the committee set");
+                    Transport::send(&self_, peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()))
+                        .await;
+                    // Disconnect from this peer.
+                    self_.disconnect(peer_ip);
+                }
+            }
+        });
     }
 }
 
