@@ -92,7 +92,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Perform the deferred non-blocking deserialization of the blocks.
                 let blocks = match message.blocks.deserialize().await {
                     Ok(blocks) => blocks,
-                    Err(error) => bail!("[PuzzleResponse] {error}"),
+                    Err(error) => bail!("[BlockResponse] {error}"),
                 };
 
                 // Ensure the blocks are not empty.

@@ -25,7 +25,7 @@ use snarkvm::{
 
 use indexmap::IndexMap;
 use parking_lot::Mutex;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::Range};
 use tracing::*;
 
 /// A mock ledger service that always returns `false`.
@@ -71,6 +71,17 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// Returns the canonical block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Option<N::BlockHash> {
         self.height_to_hash.lock().get(&height).cloned()
+    }
+
+    /// Returns the block for the given block height.
+    fn get_block(&self, _height: u32) -> Result<Block<N>> {
+        unreachable!("MockLedgerService does not support get_block")
+    }
+
+    /// Returns the blocks in the given block range.
+    /// The range is inclusive of the start and exclusive of the end.
+    fn get_blocks(&self, _heights: Range<u32>) -> Result<Vec<Block<N>>> {
+        unreachable!("MockLedgerService does not support get_blocks")
     }
 
     /// Returns the current committee.

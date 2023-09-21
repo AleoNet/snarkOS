@@ -68,8 +68,6 @@ pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
 pub struct Primary<N: Network> {
     /// The gateway.
     gateway: Gateway<N>,
-    /// The sync module.
-    sync: Arc<OnceCell<BlockSync<N>>>,
     /// The storage.
     storage: Storage<N>,
     /// The ledger service.
@@ -98,7 +96,6 @@ impl<N: Network> Primary<N> {
     ) -> Result<Self> {
         Ok(Self {
             gateway: Gateway::new(account, ledger.clone(), ip, trusted_validators, dev)?,
-            sync: Default::default(),
             storage,
             ledger,
             workers: Arc::from(vec![]),
@@ -118,9 +115,6 @@ impl<N: Network> Primary<N> {
         bft_sender: Option<BFTSender<N>>,
     ) -> Result<()> {
         info!("Starting the primary instance of the memory pool...");
-
-        // Set the sync module.
-        self.sync.set(sync).expect("Sync module already set");
 
         // Set the primary sender.
         self.gateway.set_primary_sender(primary_sender);
@@ -156,7 +150,7 @@ impl<N: Network> Primary<N> {
         self.workers = Arc::from(workers);
 
         // Initialize the gateway.
-        self.gateway.run(tx_workers).await;
+        self.gateway.run(sync, tx_workers).await;
 
         // Start the primary handlers.
         self.start_handlers(primary_receiver);
@@ -172,11 +166,6 @@ impl<N: Network> Primary<N> {
     /// Returns the gateway.
     pub const fn gateway(&self) -> &Gateway<N> {
         &self.gateway
-    }
-
-    /// Returns the sync module.
-    pub fn sync(&self) -> &BlockSync<N> {
-        self.sync.get().expect("Sync module not set")
     }
 
     /// Returns the storage.

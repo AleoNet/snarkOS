@@ -23,10 +23,12 @@ use crate::{
 use snarkos_account::Account;
 use snarkos_node_narwhal_events::{
     BlockRequest,
+    BlockResponse,
     CertificateRequest,
     CertificateResponse,
     ChallengeRequest,
     ChallengeResponse,
+    DataBlocks,
     DisconnectReason,
     Event,
     EventOrBytes,
@@ -38,7 +40,7 @@ use snarkos_node_narwhal_events::{
     NOISE_HANDSHAKE_TYPE,
 };
 use snarkos_node_narwhal_ledger_service::LedgerService;
-use snarkos_node_sync::communication_service::CommunicationService;
+use snarkos_node_sync::{communication_service::CommunicationService, BlockSync};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
@@ -100,6 +102,8 @@ pub struct Gateway<N: Network> {
     account: Account<N>,
     /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
+    /// The sync module.
+    sync: Arc<OnceCell<BlockSync<N>>>,
     /// The TCP stack.
     tcp: Tcp,
     /// The cache.
@@ -146,6 +150,7 @@ impl<N: Network> Gateway<N> {
         Ok(Self {
             account,
             ledger,
+            sync: Default::default(),
             tcp,
             cache: Default::default(),
             resolver: Default::default(),
@@ -160,8 +165,11 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Run the gateway.
-    pub async fn run(&self, worker_senders: IndexMap<u8, WorkerSender<N>>) {
+    pub async fn run(&self, sync: BlockSync<N>, worker_senders: IndexMap<u8, WorkerSender<N>>) {
         debug!("Starting the gateway for the memory pool...");
+
+        // Set the sync module.
+        self.sync.set(sync).expect("Sync module already set");
 
         // Set the worker senders.
         self.worker_senders.set(worker_senders).expect("The worker senders are already set");
@@ -179,6 +187,11 @@ impl<N: Network> Gateway<N> {
         self.initialize_heartbeat();
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
+    }
+
+    /// Returns the sync module.
+    pub fn sync(&self) -> &BlockSync<N> {
+        self.sync.get().expect("Sync module not set")
     }
 }
 
@@ -347,6 +360,8 @@ impl<N: Network> Gateway<N> {
 
     /// Removes the connected peer and adds them to the candidate peers.
     fn remove_connected_peer(&self, peer_ip: SocketAddr) {
+        // Removes the peer from the sync module.
+        self.sync().remove_peer(&peer_ip);
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(peer_ip);
         // Remove this peer from the connected peers, if it exists.
@@ -436,12 +451,78 @@ impl<N: Network> Gateway<N> {
                 Ok(())
             }
             Event::BlockRequest(block_request) => {
-                // TODO (howardwu): Process block request.
-                Ok(())
+                let BlockRequest { start_height, end_height } = block_request;
+
+                // Ensure the block request is well-formed.
+                if start_height >= end_height {
+                    bail!("Block request from '{peer_ip}' has an invalid range ({start_height}..{end_height})")
+                }
+                // Ensure that the block request is within the allowed bounds.
+                if end_height - start_height > DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32 {
+                    bail!("Block request from '{peer_ip}' has an excessive range ({start_height}..{end_height})")
+                }
+
+                let self_ = self.clone();
+                match tokio::task::spawn_blocking(move || {
+                    // Retrieve the blocks within the requested range.
+                    let blocks = match self_.ledger.get_blocks(start_height..end_height) {
+                        Ok(blocks) => Data::Object(DataBlocks(blocks)),
+                        Err(error) => bail!("Missing blocks {start_height} to {end_height} from ledger - {error}"),
+                    };
+                    // Send the `BlockResponse` message to the peer.
+                    let event = Event::BlockResponse(BlockResponse { request: block_request, blocks });
+                    Transport::send(&self_, peer_ip, event);
+                    Ok(())
+                })
+                .await
+                .map_err(|error| anyhow!("[BlockRequest] {error}"))
+                {
+                    Ok(Ok(())) => Ok(()),
+                    Ok(Err(error)) => Err(error),
+                    Err(error) => Err(anyhow!("[BlockRequest] {error}")),
+                }
             }
             Event::BlockResponse(block_response) => {
-                // TODO (howardwu): Process block response.
-                Ok(())
+                let BlockResponse { request, blocks } = block_response;
+
+                // Perform the deferred non-blocking deserialization of the blocks.
+                let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+
+                // Ensure the blocks are not empty.
+                ensure!(!blocks.is_empty(), "Validator '{peer_ip}' sent an empty block response ({request:?})");
+                // Check that the blocks are sequentially ordered.
+                if !blocks.windows(2).all(|w| w[0].height() + 1 == w[1].height()) {
+                    bail!("Validator '{peer_ip}' sent an invalid block response (blocks are not sequentially ordered)")
+                }
+
+                // Retrieve the start (inclusive) and end (exclusive) block height.
+                let start_height = blocks.first().map(|b| b.height()).unwrap_or(0);
+                let end_height = 1 + blocks.last().map(|b| b.height()).unwrap_or(0);
+                // Check that the range matches the block request.
+                if start_height != request.start_height || end_height != request.end_height {
+                    bail!("Validator '{peer_ip}' sent an invalid block response (range does not match block request)")
+                }
+
+                // Process the block response.
+                let self_ = self.clone();
+                match tokio::task::spawn_blocking(move || {
+                    // Insert the candidate blocks into the sync pool.
+                    for block in blocks.0 {
+                        if let Err(error) = self_.sync().insert_block_response(peer_ip, block) {
+                            bail!("{error}");
+                        }
+                    }
+                    // Tries to advance with blocks from the sync pool.
+                    self_.sync().advance_with_sync_blocks();
+                    Ok(())
+                })
+                .await
+                .map_err(|error| anyhow!("[BlockResponse] {error}"))
+                {
+                    Ok(Ok(())) => Ok(()),
+                    Ok(Err(error)) => Err(error),
+                    Err(error) => Err(anyhow!("[BlockResponse] {error}")),
+                }
             }
             Event::CertificateRequest(certificate_request) => {
                 // Send the certificate request to the primary.
@@ -465,11 +546,10 @@ impl<N: Network> Gateway<N> {
                 if ping.version < Event::<N>::VERSION {
                     bail!("Dropping '{peer_ip}' on event version {} (outdated)", ping.version);
                 }
-                // TODO (howardwu): Send to the sync service.
-                // // Check the block locators are valid, and update the peer in the sync pool.
-                // if let Err(error) = self.sync().update_peer_locators(peer_ip, ping.block_locators) {
-                //     bail!("Peer '{peer_ip}' sent invalid block locators: {error}");
-                // }
+                // Check the block locators are valid, and update the validators in the sync module.
+                if let Err(error) = self.sync().update_peer_locators(peer_ip, ping.block_locators) {
+                    bail!("Validator '{peer_ip}' sent invalid block locators - {error}");
+                }
                 Ok(())
             }
             Event::TransmissionRequest(request) => {
@@ -1081,9 +1161,9 @@ mod prop_tests {
         MAX_WORKERS,
         MEMORY_POOL_PORT,
     };
-
     use snarkos_account::Account;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_sync::BlockSync;
     use snarkos_node_tcp::P2P;
     use snarkvm::{
         ledger::committee::prop_tests::{CommitteeContext, ValidatorSet},
@@ -1229,6 +1309,7 @@ mod prop_tests {
         let committee = committee.0;
         let worker_storage = storage.clone();
         let account = Account::try_from(private_key).unwrap();
+        let sync = BlockSync::new(storage.ledger().clone());
 
         let gateway = Gateway::new(account, storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
 
@@ -1255,7 +1336,7 @@ mod prop_tests {
             }
             (workers, tx_workers)
         };
-        gateway.run(worker_senders).await;
+        gateway.run(sync, worker_senders).await;
         assert_eq!(
             gateway.local_ip(),
             SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + dev.port().unwrap())

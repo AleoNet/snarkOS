@@ -26,7 +26,7 @@ use snarkvm::{
 };
 
 use indexmap::IndexMap;
-use std::fmt;
+use std::{fmt, ops::Range};
 
 /// A core ledger service.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
@@ -67,6 +67,17 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Returns the block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Option<N::BlockHash> {
         self.ledger.get_hash(height).ok()
+    }
+
+    /// Returns the block for the given block height.
+    fn get_block(&self, height: u32) -> Result<Block<N>> {
+        self.ledger.get_block(height)
+    }
+
+    /// Returns the blocks in the given block range.
+    /// The range is inclusive of the start and exclusive of the end.
+    fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>> {
+        self.ledger.get_blocks(heights)
     }
 
     /// Returns the current committee.

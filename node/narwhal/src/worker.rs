@@ -478,7 +478,7 @@ mod tests {
     use bytes::Bytes;
     use indexmap::IndexMap;
     use mockall::mock;
-    use std::io;
+    use std::{io, ops::Range};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -500,6 +500,8 @@ mod tests {
             fn contains_block_height(&self, height: u32) -> bool;
             fn get_block_height(&self, hash: &N::BlockHash) -> Option<u32>;
             fn get_block_hash(&self, height: u32) -> Option<N::BlockHash>;
+            fn get_block(&self, height: u32) -> Result<Block<N>>;
+            fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;

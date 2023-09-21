@@ -27,7 +27,7 @@ mod block_request;
 pub use block_request::BlockRequest;
 
 mod block_response;
-pub use block_response::BlockResponse;
+pub use block_response::{BlockResponse, DataBlocks};
 
 mod certificate_request;
 pub use certificate_request::CertificateRequest;
