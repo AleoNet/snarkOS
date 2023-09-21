@@ -69,5 +69,6 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     fn check_next_block(&self, block: &Block<N>) -> Result<()>;
 
     /// Adds the given block as the next block in the ledger.
+    #[cfg(feature = "ledger-write")]
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
 }

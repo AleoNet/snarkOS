@@ -28,12 +28,12 @@ version = "2.0"
 [dependencies.rayon]
 version = "1"
 
+[dependencies.serde]
+version = "1"
+
 [dependencies.snarkos-node-sync-locators]
 path = "../../sync/locators"
 version = "=2.1.7"
-
-[dependencies.serde]
-version = "1"
 
 [dependencies.snarkvm]
 workspace = true

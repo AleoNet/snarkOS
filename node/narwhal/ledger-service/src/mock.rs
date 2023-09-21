@@ -121,6 +121,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Adds the given block as the next block in the ledger.
+    #[cfg(feature = "ledger-write")]
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
         ensure!(
             block.height() == self.latest_block_height() + 1,

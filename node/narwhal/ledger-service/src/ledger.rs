@@ -157,6 +157,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Adds the given block as the next block in the ledger.
+    #[cfg(feature = "ledger-write")]
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
         self.ledger.advance_to_next_block(block)
     }

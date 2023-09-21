@@ -19,13 +19,16 @@ edition = "2021"
 [features]
 default = [ ]
 ledger = [ "tokio", "tracing" ]
-mock = [ "tracing" ]
+ledger-write = [ ]
+mock = [ "parking_lot", "tracing" ]
+test = [ "mock" ]
 
 [dependencies.async-trait]
 version = "0.1"
 
 [dependencies.parking_lot]
 version = "0.12"
+optional = true
 
 [dependencies.snarkvm]
 workspace = true

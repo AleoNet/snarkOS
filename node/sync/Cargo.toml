@@ -45,6 +45,7 @@ version = "1"
 [dependencies.snarkos-node-narwhal-ledger-service]
 path = "../narwhal/ledger-service"
 version = "=2.1.7"
+features = [ "ledger-write" ]
 
 [dependencies.snarkos-node-sync-communication-service]
 path = "communication-service"
@@ -64,6 +65,15 @@ features = [ "rt", "signal" ]
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.snarkos-node-narwhal-ledger-service]
+path = "../narwhal/ledger-service"
+version = "=2.1.7"
+features = [ "test" ]
+
 [dev-dependencies.snarkos-node-sync-locators]
 path = "locators"
 features = [ "test" ]
+
+[dev-dependencies.snarkvm]
+workspace = true
+features = [ "test-helpers" ]
