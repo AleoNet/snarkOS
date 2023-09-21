@@ -192,10 +192,10 @@ impl<N: Network> Router<N> {
             if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
                 // Disconnect from this peer.
                 let disconnected = router.tcp.disconnect(peer_addr).await;
-                // FIXME: this shouldn't be necessary; it's a double-check
-                // that the higher-level collection is cleaned up after the
-                // lower-level disconnect.
+                // FIXME (ljedrz): this shouldn't be necessary; it's a double-check
+                //  that the higher-level collection is cleaned up after the lower-level disconnect.
                 if router.is_connected(&peer_ip) && !router.tcp.is_connected(peer_addr) {
+                    warn!("Disconnecting with fallback safety (report this to @ljedrz)");
                     router.remove_connected_peer(peer_ip);
                 }
                 disconnected
