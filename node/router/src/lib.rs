@@ -39,18 +39,17 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
-use crate::messages::{BlockRequest, Message, MessageCodec, NodeType};
+use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_sync_communication_service::CommunicationService;
-use snarkos_node_tcp::{protocols::Writing, Config, ConnectionSide, Tcp};
+use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, io, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
-use tokio::{sync::oneshot, task::JoinHandle};
+use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use tokio::task::JoinHandle;
 
 #[derive(Clone)]
 pub struct Router<N: Network>(Arc<InnerRouter<N>>);
@@ -130,46 +129,6 @@ impl<N: Network> Router<N> {
             handles: Default::default(),
             is_dev,
         })))
-    }
-}
-
-#[async_trait]
-impl<N: Network> CommunicationService for Router<N> {
-    /// The message type.
-    type Message = Message<N>;
-
-    /// Prepares a block request to be sent.
-    fn prepare_block_request(start_height: u32, end_height: u32) -> Self::Message {
-        debug_assert!(start_height < end_height, "Invalid block request format");
-        Message::BlockRequest(BlockRequest { start_height, end_height })
-    }
-
-    /// Sends the given message to specified peer.
-    ///
-    /// This function returns as soon as the message is queued to be sent,
-    /// without waiting for the actual delivery; instead, the caller is provided with a [`oneshot::Receiver`]
-    /// which can be used to determine when and whether the message has been delivered.
-    async fn send(&self, peer_ip: SocketAddr, message: Self::Message) -> Option<oneshot::Receiver<io::Result<()>>> {
-        Outbound::send(self, peer_ip, message)
-    }
-}
-
-impl<N: Network> Outbound<N> for Router<N> {
-    /// Returns a reference to the router.
-    fn router(&self) -> &Router<N> {
-        self
-    }
-}
-
-#[async_trait]
-impl<N: Network> Writing for Router<N> {
-    type Codec = MessageCodec<N>;
-    type Message = Message<N>;
-
-    /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
-    /// The `side` parameter indicates the connection side **from the node's perspective**.
-    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
-        Default::default()
     }
 }
 

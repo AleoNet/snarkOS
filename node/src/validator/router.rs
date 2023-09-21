@@ -119,7 +119,7 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Validator<N, C> {
         if let Err(error) = self.inbound(peer_addr, message).await {
             if let Some(peer_ip) = self.router().resolve_to_listener(&peer_addr) {
                 warn!("Disconnecting from '{peer_ip}' - {error}");
-                self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+                Outbound::send(self, peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
                 // Disconnect from this peer.
                 self.router().disconnect(peer_ip);
             }
@@ -158,7 +158,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
             }
         };
         // Send the `BlockResponse` message to the peer.
-        self.send(peer_ip, Message::BlockResponse(BlockResponse { request: message, blocks }));
+        Outbound::send(self, peer_ip, Message::BlockResponse(BlockResponse { request: message, blocks }));
         true
     }
 
