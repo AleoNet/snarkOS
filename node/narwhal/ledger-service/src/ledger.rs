@@ -60,13 +60,13 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Returns the block height for the given block hash, if it exists.
-    fn get_block_height(&self, hash: &N::BlockHash) -> Option<u32> {
-        self.ledger.get_height(hash).ok()
+    fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32> {
+        self.ledger.get_height(hash)
     }
 
     /// Returns the block hash for the given block height, if it exists.
-    fn get_block_hash(&self, height: u32) -> Option<N::BlockHash> {
-        self.ledger.get_hash(height).ok()
+    fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
+        self.ledger.get_hash(height)
     }
 
     /// Returns the block for the given block height.

@@ -90,7 +90,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
             if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
-                crate::helpers::log_clean_error(dev);
+                crate::log_clean_error(dev);
                 return Err(error);
             }
         }

@@ -57,12 +57,8 @@ where
     Self: Outbound<N>,
 {
     async fn on_connect(&self, peer_addr: SocketAddr) {
-        let peer_ip = if let Some(ip) = self.router.resolve_to_listener(&peer_addr) {
-            ip
-        } else {
-            return;
-        };
-
+        // Resolve the peer address to the listener address.
+        let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) else { return };
         // Send the first `Ping` message to the peer.
         self.send_ping(peer_ip, None);
     }

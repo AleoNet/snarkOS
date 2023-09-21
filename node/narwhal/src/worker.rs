@@ -498,8 +498,8 @@ mod tests {
         impl<N: Network> LedgerService<N> for Ledger<N> {
             fn latest_block_height(&self) -> u32;
             fn contains_block_height(&self, height: u32) -> bool;
-            fn get_block_height(&self, hash: &N::BlockHash) -> Option<u32>;
-            fn get_block_hash(&self, height: u32) -> Option<N::BlockHash>;
+            fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32>;
+            fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
             fn get_block(&self, height: u32) -> Result<Block<N>>;
             fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
             fn current_committee(&self) -> Result<Committee<N>>;

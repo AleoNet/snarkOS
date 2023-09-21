@@ -52,13 +52,13 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Returns the block height for the given block hash, if it exists.
-    fn get_block_height(&self, _hash: &N::BlockHash) -> Option<u32> {
-        None
+    fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32> {
+        bail!("Block hash '{hash}' does not exist in prover")
     }
 
     /// Returns the block hash for the given block height, if it exists.
-    fn get_block_hash(&self, _height: u32) -> Option<N::BlockHash> {
-        None
+    fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
+        bail!("Block {height} does not exist in prover")
     }
 
     /// Returns the block for the given block height.
@@ -84,13 +84,13 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Returns `true` if the ledger contains the given certificate ID in block history.
-    fn contains_certificate(&self, _certificate_id: &Field<N>) -> Result<bool> {
-        bail!("Certificate does not exist in prover")
+    fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
+        bail!("Certificate '{certificate_id}' does not exist in prover")
     }
 
     /// Returns `true` if the transmission exists in the ledger.
-    fn contains_transmission(&self, _transmission_id: &TransmissionID<N>) -> Result<bool> {
-        bail!("Transmission does not exist in prover")
+    fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
+        bail!("Transmission '{transmission_id}' does not exist in prover")
     }
 
     /// Checks the given solution is well-formed.
@@ -129,6 +129,6 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     /// Adds the given block as the next block in the ledger.
     #[cfg(feature = "ledger-write")]
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
-        bail!("Cannot advance to next block in prover: {block}")
+        bail!("Cannot advance to next block in prover - {block}")
     }
 }

@@ -22,7 +22,6 @@ extern crate tracing;
 
 pub use snarkos_node_narwhal_events as events;
 pub use snarkos_node_narwhal_ledger_service as ledger_service;
-pub use snarkos_node_sync as sync;
 
 pub mod helpers;
 

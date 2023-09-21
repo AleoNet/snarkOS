@@ -20,7 +20,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{ensure, Field, Network, Result},
+    prelude::{bail, ensure, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
@@ -64,13 +64,19 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Returns the canonical block height for the given block hash, if it exists.
-    fn get_block_height(&self, hash: &N::BlockHash) -> Option<u32> {
-        self.height_to_hash.lock().iter().find_map(|(height, h)| if h == hash { Some(*height) } else { None })
+    fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32> {
+        match self.height_to_hash.lock().iter().find_map(|(height, h)| if h == hash { Some(*height) } else { None }) {
+            Some(height) => Ok(height),
+            None => bail!("Missing block {hash}"),
+        }
     }
 
     /// Returns the canonical block hash for the given block height, if it exists.
-    fn get_block_hash(&self, height: u32) -> Option<N::BlockHash> {
-        self.height_to_hash.lock().get(&height).cloned()
+    fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
+        match self.height_to_hash.lock().get(&height).cloned() {
+            Some(hash) => Ok(hash),
+            None => bail!("Missing block {height}"),
+        }
     }
 
     /// Returns the block for the given block height.

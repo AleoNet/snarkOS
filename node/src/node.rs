@@ -33,7 +33,7 @@ pub enum Node<N: Network> {
     /// A prover is a full node, capable of producing proofs for consensus.
     Prover(Arc<Prover<N, ConsensusMemory<N>>>),
     /// A client node is a full node, capable of querying with the network.
-    Client(Arc<Client<N, ConsensusMemory<N>>>),
+    Client(Arc<Client<N, ConsensusDB<N>>>),
 }
 
 impl<N: Network> Node<N> {
