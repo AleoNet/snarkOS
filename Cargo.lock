@@ -3284,6 +3284,7 @@ dependencies = [
  "indexmap 2.0.0",
  "rayon",
  "serde",
+ "snarkos-node-narwhal-events",
  "snarkos-node-sync-locators",
  "snarkvm",
  "snow",

@@ -65,6 +65,30 @@ pub struct DataBlocks<N: Network>(pub Vec<Block<N>>);
 impl<N: Network> DataBlocks<N> {
     /// The maximum number of blocks that can be sent in a single message.
     pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 1;
+
+    /// Ensures that the blocks are well-formed in a block response.
+    pub fn ensure_response_is_well_formed(
+        &self,
+        peer_ip: SocketAddr,
+        start_height: u32,
+        end_height: u32,
+    ) -> Result<()> {
+        // Ensure the blocks are not empty.
+        ensure!(!self.0.is_empty(), "Peer '{peer_ip}' sent an empty block response ({start_height}..{end_height})");
+        // Check that the blocks are sequentially ordered.
+        if !self.0.windows(2).all(|w| w[0].height() + 1 == w[1].height()) {
+            bail!("Peer '{peer_ip}' sent an invalid block response (blocks are not sequentially ordered)")
+        }
+
+        // Retrieve the start (inclusive) and end (exclusive) block height.
+        let candidate_start_height = self.first().map(|b| b.height()).unwrap_or(0);
+        let candidate_end_height = 1 + self.last().map(|b| b.height()).unwrap_or(0);
+        // Check that the range matches the block request.
+        if start_height != candidate_start_height || end_height != candidate_end_height {
+            bail!("Peer '{peer_ip}' sent an invalid block response (range does not match block request)")
+        }
+        Ok(())
+    }
 }
 
 impl<N: Network> std::ops::Deref for DataBlocks<N> {

@@ -172,7 +172,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 // Sleep briefly to avoid triggering spam detection.
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 // Perform the sync routine.
-                if let Err(error) = node.sync.try_block_sync(&node.router).await {
+                let communication = node.consensus.bft().primary().gateway();
+                // let communication = &node.router;
+                if let Err(error) = node.sync.try_block_sync(communication).await {
                     warn!("Sync error - {error}");
                 }
             }

@@ -70,11 +70,11 @@ use snarkvm::{
 };
 
 use ::bytes::{Buf, BytesMut};
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 pub use std::io::Result as IoResult;
+use std::{borrow::Cow, net::SocketAddr};
 
 pub trait EventTrait: ToBytes + FromBytes {
     /// Returns the event name.

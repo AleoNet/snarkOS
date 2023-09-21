@@ -173,7 +173,14 @@ impl<N: Network> BlockSync<N> {
     }
 
     /// Attempts to advance with blocks from the sync pool.
-    pub fn advance_with_sync_blocks(&self) {
+    pub fn advance_with_sync_blocks(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> Result<()> {
+        // Insert the candidate blocks into the sync pool.
+        for block in blocks {
+            if let Err(error) = self.insert_block_response(peer_ip, block) {
+                bail!("{error}");
+            }
+        }
+
         // Retrieve the latest block height.
         let mut current_height = self.canon.latest_block_height();
         // Try to advance the ledger with the sync pool.
@@ -196,6 +203,7 @@ impl<N: Network> BlockSync<N> {
             // Increment the latest height.
             current_height += 1;
         }
+        Ok(())
     }
 }
 

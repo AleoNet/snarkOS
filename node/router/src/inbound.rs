@@ -15,6 +15,7 @@
 use crate::{
     messages::{
         BlockRequest,
+        BlockResponse,
         DataBlocks,
         Message,
         PeerResponse,
@@ -33,7 +34,7 @@ use snarkvm::prelude::{
     Network,
 };
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{anyhow, bail, Result};
 use std::{net::SocketAddr, time::Instant};
 use tokio::task::spawn_blocking;
 
@@ -82,33 +83,16 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::BlockResponse(message) => {
-                let request = message.request;
+                let BlockResponse { request, blocks } = message;
 
                 // Remove the block request, checking if this node previously sent a block request to this peer.
                 if !self.router().cache.remove_outbound_block_request(peer_ip, &request) {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
                 }
-
                 // Perform the deferred non-blocking deserialization of the blocks.
-                let blocks = match message.blocks.deserialize().await {
-                    Ok(blocks) => blocks,
-                    Err(error) => bail!("[BlockResponse] {error}"),
-                };
-
-                // Ensure the blocks are not empty.
-                ensure!(!blocks.is_empty(), "Peer '{peer_ip}' sent an empty block response (request = {request})");
-                // Check that the blocks are sequentially ordered.
-                if !blocks.windows(2).all(|w| w[0].height() + 1 == w[1].height()) {
-                    bail!("Peer '{peer_ip}' sent an invalid block response (blocks are not sequentially ordered)")
-                }
-
-                // Retrieve the start (inclusive) and end (exclusive) block height.
-                let start_height = blocks.first().map(|b| b.height()).unwrap_or(0);
-                let end_height = 1 + blocks.last().map(|b| b.height()).unwrap_or(0);
-                // Check that the range matches the block request.
-                if start_height != request.start_height || end_height != request.end_height {
-                    bail!("Peer '{peer_ip}' sent an invalid block response (range does not match the block request)")
-                }
+                let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+                // Ensure the block response is well-formed.
+                blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
 
                 // Process the block response.
                 let node = self.clone();

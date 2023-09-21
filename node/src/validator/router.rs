@@ -164,16 +164,14 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
 
     /// Handles a `BlockResponse` message.
     fn block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> bool {
-        // Insert the candidate blocks into the sync pool.
-        for block in blocks {
-            if let Err(error) = self.sync.insert_block_response(peer_ip, block) {
+        // Tries to advance with blocks from the sync module.
+        match self.sync.advance_with_sync_blocks(peer_ip, blocks) {
+            Ok(()) => true,
+            Err(error) => {
                 warn!("{error}");
-                return false;
+                false
             }
         }
-        // Tries to advance with blocks from the sync pool.
-        self.sync.advance_with_sync_blocks();
-        true
     }
 
     /// Processes the block locators and sends back a `Pong` message.

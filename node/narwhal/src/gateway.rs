@@ -463,62 +463,38 @@ impl<N: Network> Gateway<N> {
                 }
 
                 let self_ = self.clone();
-                match tokio::task::spawn_blocking(move || {
+                match task::spawn_blocking(move || {
                     // Retrieve the blocks within the requested range.
-                    let blocks = match self_.ledger.get_blocks(start_height..end_height) {
-                        Ok(blocks) => Data::Object(DataBlocks(blocks)),
+                    match self_.ledger.get_blocks(start_height..end_height) {
+                        Ok(blocks) => Ok(Data::Object(DataBlocks(blocks))),
                         Err(error) => bail!("Missing blocks {start_height} to {end_height} from ledger - {error}"),
-                    };
-                    // Send the `BlockResponse` message to the peer.
-                    let event = Event::BlockResponse(BlockResponse { request: block_request, blocks });
-                    Transport::send(&self_, peer_ip, event);
-                    Ok(())
+                    }
                 })
                 .await
-                .map_err(|error| anyhow!("[BlockRequest] {error}"))
                 {
-                    Ok(Ok(())) => Ok(()),
+                    Ok(Ok(blocks)) => {
+                        let self_ = self.clone();
+                        tokio::spawn(async move {
+                            // Send the `BlockResponse` message to the peer.
+                            let event = Event::BlockResponse(BlockResponse { request: block_request, blocks });
+                            Transport::send(&self_, peer_ip, event).await;
+                        });
+                        Ok(())
+                    }
                     Ok(Err(error)) => Err(error),
                     Err(error) => Err(anyhow!("[BlockRequest] {error}")),
                 }
             }
             Event::BlockResponse(block_response) => {
                 let BlockResponse { request, blocks } = block_response;
-
                 // Perform the deferred non-blocking deserialization of the blocks.
                 let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+                // Ensure the block response is well-formed.
+                blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
 
-                // Ensure the blocks are not empty.
-                ensure!(!blocks.is_empty(), "Validator '{peer_ip}' sent an empty block response ({request:?})");
-                // Check that the blocks are sequentially ordered.
-                if !blocks.windows(2).all(|w| w[0].height() + 1 == w[1].height()) {
-                    bail!("Validator '{peer_ip}' sent an invalid block response (blocks are not sequentially ordered)")
-                }
-
-                // Retrieve the start (inclusive) and end (exclusive) block height.
-                let start_height = blocks.first().map(|b| b.height()).unwrap_or(0);
-                let end_height = 1 + blocks.last().map(|b| b.height()).unwrap_or(0);
-                // Check that the range matches the block request.
-                if start_height != request.start_height || end_height != request.end_height {
-                    bail!("Validator '{peer_ip}' sent an invalid block response (range does not match block request)")
-                }
-
-                // Process the block response.
+                // Tries to advance with blocks from the sync module.
                 let self_ = self.clone();
-                match tokio::task::spawn_blocking(move || {
-                    // Insert the candidate blocks into the sync pool.
-                    for block in blocks.0 {
-                        if let Err(error) = self_.sync().insert_block_response(peer_ip, block) {
-                            bail!("{error}");
-                        }
-                    }
-                    // Tries to advance with blocks from the sync pool.
-                    self_.sync().advance_with_sync_blocks();
-                    Ok(())
-                })
-                .await
-                .map_err(|error| anyhow!("[BlockResponse] {error}"))
-                {
+                match task::spawn_blocking(move || self_.sync().advance_with_sync_blocks(peer_ip, blocks.0)).await {
                     Ok(Ok(())) => Ok(()),
                     Ok(Err(error)) => Err(error),
                     Err(error) => Err(anyhow!("[BlockResponse] {error}")),
