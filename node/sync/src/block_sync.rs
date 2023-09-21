@@ -168,7 +168,7 @@ impl<N: Network> BlockSync<N> {
     /// Attempts to advance with blocks from the sync pool.
     pub fn advance_with_sync_blocks(&self) {
         // Retrieve the latest block height.
-        let mut current_height = self.canon.latest_canon_height();
+        let mut current_height = self.canon.latest_block_height();
         // Try to advance the ledger with the sync pool.
         while let Some(block) = self.remove_block_response(current_height + 1) {
             // Ensure the block height matches.
@@ -288,7 +288,7 @@ impl<N: Network> BlockSync<N> {
         // Compute the common ancestor with this node.
         let mut ancestor = 0;
         for (height, hash) in locators.clone().into_iter() {
-            if let Some(canon_hash) = self.canon.get_canon_hash(height) {
+            if let Some(canon_hash) = self.canon.get_block_hash(height) {
                 match canon_hash == hash {
                     true => ancestor = height,
                     false => break, // fork
@@ -364,7 +364,7 @@ impl<N: Network> BlockSync<N> {
     /// Checks that a block request for the given height does not already exist.
     fn check_block_request(&self, height: u32) -> Result<()> {
         // Ensure the block height is not already canon.
-        if self.canon.contains_canon_height(height) {
+        if self.canon.contains_block_height(height) {
             bail!("Failed to add block request, as block {height} exists in the canonical ledger");
         }
         // Ensure the block height is not already requested.
@@ -509,7 +509,7 @@ impl<N: Network> BlockSync<N> {
     /// Returns the sync peers and their minimum common ancestor, if the node needs to sync.
     fn find_sync_peers_inner(&self) -> Option<(IndexMap<SocketAddr, BlockLocators<N>>, u32)> {
         // Retrieve the latest canon height.
-        let latest_canon_height = self.canon.latest_canon_height();
+        let latest_canon_height = self.canon.latest_block_height();
 
         // Compute the timeout frequency of each peer.
         let timeouts = self
@@ -597,7 +597,7 @@ impl<N: Network> BlockSync<N> {
         rng: &mut R,
     ) -> Vec<(u32, SyncRequest<N>)> {
         // Retrieve the latest canon height.
-        let latest_canon_height = self.canon.latest_canon_height();
+        let latest_canon_height = self.canon.latest_block_height();
 
         // If the minimum common ancestor is at or below the latest canon height, then return early.
         if min_common_ancestor <= latest_canon_height {
@@ -764,7 +764,7 @@ mod tests {
         peers: IndexSet<SocketAddr>,
     ) {
         // Check test assumptions are met.
-        assert_eq!(sync.canon.latest_canon_height(), 0, "This test assumes the sync pool is at genesis");
+        assert_eq!(sync.canon.latest_block_height(), 0, "This test assumes the sync pool is at genesis");
 
         // Determine the number of peers within range of this sync pool.
         let num_peers_within_recent_range_of_canon = {
@@ -809,7 +809,7 @@ mod tests {
     fn test_latest_canon_height() {
         for height in 0..100_002u32 {
             let sync = sample_sync_at_height(height);
-            assert_eq!(sync.canon.latest_canon_height(), height);
+            assert_eq!(sync.canon.latest_block_height(), height);
         }
     }
 
@@ -817,8 +817,8 @@ mod tests {
     fn test_get_canon_height() {
         for height in 0..100_002u32 {
             let sync = sample_sync_at_height(height);
-            assert_eq!(sync.canon.get_canon_height(&(Field::<CurrentNetwork>::from_u32(0)).into()), Some(0));
-            assert_eq!(sync.canon.get_canon_height(&(Field::<CurrentNetwork>::from_u32(height)).into()), Some(height));
+            assert_eq!(sync.canon.get_block_height(&(Field::<CurrentNetwork>::from_u32(0)).into()), Some(0));
+            assert_eq!(sync.canon.get_block_height(&(Field::<CurrentNetwork>::from_u32(height)).into()), Some(height));
         }
     }
 
@@ -826,8 +826,8 @@ mod tests {
     fn test_get_canon_hash() {
         for height in 0..100_002u32 {
             let sync = sample_sync_at_height(height);
-            assert_eq!(sync.canon.get_canon_hash(0), Some((Field::<CurrentNetwork>::from_u32(0)).into()));
-            assert_eq!(sync.canon.get_canon_hash(height), Some((Field::<CurrentNetwork>::from_u32(height)).into()));
+            assert_eq!(sync.canon.get_block_hash(0), Some((Field::<CurrentNetwork>::from_u32(0)).into()));
+            assert_eq!(sync.canon.get_block_hash(height), Some((Field::<CurrentNetwork>::from_u32(height)).into()));
         }
     }
 

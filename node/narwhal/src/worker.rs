@@ -491,13 +491,10 @@ mod tests {
         Ledger<N: Network> {}
         #[async_trait]
         impl<N: Network> LedgerService<N> for Ledger<N> {
-            fn latest_canon_height(&self) -> u32;
-            fn contains_canon_height(&self, height: u32) -> bool;
-            fn get_canon_height(&self, hash: &N::BlockHash) -> Option<u32>;
-            fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash>;
-            fn check_next_block(&self, block: &Block<N>) -> Result<()>;
-            fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
-
+            fn latest_block_height(&self) -> u32;
+            fn contains_block_height(&self, height: u32) -> bool;
+            fn get_block_height(&self, hash: &N::BlockHash) -> Option<u32>;
+            fn get_block_hash(&self, height: u32) -> Option<N::BlockHash>;
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
@@ -512,6 +509,8 @@ mod tests {
                 transaction_id: N::TransactionID,
                 transaction: Data<Transaction<N>>,
             ) -> Result<()>;
+            fn check_next_block(&self, block: &Block<N>) -> Result<()>;
+            fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
         }
     }
 
