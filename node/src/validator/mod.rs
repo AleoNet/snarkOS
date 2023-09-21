@@ -78,6 +78,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
+        generate_transactions: bool,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -122,7 +123,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             shutdown: Default::default(),
         };
         // Initialize the transaction pool.
-        node.initialize_transaction_pool(dev)?;
+        node.initialize_transaction_pool(dev, generate_transactions)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
@@ -405,7 +406,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     // }
 
     /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self, dev: Option<u16>) -> Result<()> {
+    fn initialize_transaction_pool(&self, dev: Option<u16>, should_generate: bool) -> Result<()> {
         use snarkvm::console::{
             program::{Identifier, Literal, ProgramID, Value},
             types::U64,
@@ -427,6 +428,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     if dev != 0 {
                         continue;
                     }
+                }
+
+                if !should_generate {
+                    continue;
                 }
 
                 // Prepare the inputs.

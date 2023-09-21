@@ -89,6 +89,10 @@ pub struct Start {
     #[clap(long)]
     pub norest: bool,
 
+    /// If the flag is set, the validator node will
+    #[clap(long, requires = "validator")]
+    pub generate_transactions: bool,
+
     /// If the flag is set, the node will not render the display
     #[clap(long)]
     pub nodisplay: bool,
@@ -381,7 +385,7 @@ impl Start {
 
         // Initialize the node.
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, self.generate_transactions, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, account, &trusted_peers, genesis, self.dev).await,
         }

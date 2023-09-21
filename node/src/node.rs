@@ -45,11 +45,23 @@ impl<N: Network> Node<N> {
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
+        generate_transactions: bool,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
-            Validator::new(node_ip, rest_ip, account, trusted_peers, trusted_validators, genesis, cdn, dev).await?,
+            Validator::new(
+                node_ip,
+                rest_ip,
+                account,
+                trusted_peers,
+                trusted_validators,
+                genesis,
+                generate_transactions,
+                cdn,
+                dev,
+            )
+            .await?,
         )))
     }
 
