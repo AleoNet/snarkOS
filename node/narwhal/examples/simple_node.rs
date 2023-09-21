@@ -192,7 +192,7 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<Curr
     println!();
 
     // Initialize the committee.
-    let committee = Committee::<CurrentNetwork>::new_genesis(members)?;
+    let committee = Committee::<CurrentNetwork>::new(0u64, members)?;
     // Return the committee and account.
     Ok((committee, account))
 }
