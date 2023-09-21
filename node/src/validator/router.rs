@@ -66,7 +66,7 @@ where
         };
 
         // Retrieve the block locators.
-        let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
+        let block_locators = match snarkos_node_sync::get_block_locators(&self.ledger) {
             Ok(block_locators) => Some(block_locators),
             Err(e) => {
                 error!("Failed to get block locators: {e}");
@@ -200,7 +200,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
             // Check that the peer is still connected.
             if self_clone.router().is_connected(&peer_ip) {
                 // Retrieve the block locators.
-                match crate::helpers::get_block_locators(&self_clone.ledger) {
+                match snarkos_node_sync::get_block_locators(&self_clone.ledger) {
                     // Send a `Ping` message to the peer.
                     Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
                     Err(e) => error!("Failed to get block locators: {e}"),

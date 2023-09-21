@@ -12,38 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_narwhal::sync::locators::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
-use snarkvm::prelude::{store::ConsensusStorage, Ledger, Network};
-
-use anyhow::Result;
-use indexmap::IndexMap;
-
-/// TODO (howardwu): Move this to sync crate.
-/// Returns the block locators for the given ledger.
-pub fn get_block_locators<N: Network, C: ConsensusStorage<N>>(ledger: &Ledger<N, C>) -> Result<BlockLocators<N>> {
-    // Retrieve the latest height.
-    let latest_height = ledger.latest_height();
-
-    // Initialize the recents map.
-    let mut recents = IndexMap::with_capacity(NUM_RECENT_BLOCKS);
-
-    // Retrieve the recent block hashes.
-    for height in latest_height.saturating_sub((NUM_RECENT_BLOCKS - 1) as u32)..=latest_height {
-        recents.insert(height, ledger.get_hash(height)?);
-    }
-
-    // Initialize the checkpoints map.
-    let mut checkpoints = IndexMap::with_capacity((latest_height / CHECKPOINT_INTERVAL + 1).try_into()?);
-
-    // Retrieve the checkpoint block hashes.
-    for height in (0..=latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
-        checkpoints.insert(height, ledger.get_hash(height)?);
-    }
-
-    // Construct the block locators.
-    BlockLocators::new(recents, checkpoints)
-}
-
 /// A helper to log instructions to recover.
 pub fn log_clean_error(dev: Option<u16>) {
     match dev {
