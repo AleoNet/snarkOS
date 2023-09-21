@@ -31,6 +31,7 @@ version = "1"
 
 [dependencies.indexmap]
 version = "2.0"
+features = [ "serde", "rayon" ]
 
 [dependencies.rayon]
 version = "1"

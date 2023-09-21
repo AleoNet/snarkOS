@@ -35,14 +35,14 @@ use crate::{
 };
 use snarkos_account::Account;
 use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_sync::BlockSync;
 use snarkvm::{
-    console::prelude::*,
+    console::{prelude::*, types::Field},
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     },
-    prelude::Field,
 };
 
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -63,17 +63,17 @@ use tokio::{
 
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
-/// A helper type for the ledger service.
-pub type Ledger<N> = Arc<dyn LedgerService<N>>;
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
     /// The gateway.
     gateway: Gateway<N>,
+    /// The sync module.
+    sync: Arc<OnceCell<BlockSync<N>>>,
     /// The storage.
     storage: Storage<N>,
     /// The ledger service.
-    ledger: Ledger<N>,
+    ledger: Arc<dyn LedgerService<N>>,
     /// The workers.
     workers: Arc<[Worker<N>]>,
     /// The BFT sender.
@@ -91,13 +91,14 @@ impl<N: Network> Primary<N> {
     pub fn new(
         account: Account<N>,
         storage: Storage<N>,
-        ledger: Ledger<N>,
+        ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self {
             gateway: Gateway::new(account, ledger.clone(), ip, trusted_validators, dev)?,
+            sync: Default::default(),
             storage,
             ledger,
             workers: Arc::from(vec![]),
@@ -111,11 +112,15 @@ impl<N: Network> Primary<N> {
     /// Run the primary instance.
     pub async fn run(
         &mut self,
+        sync: BlockSync<N>,
         primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
         bft_sender: Option<BFTSender<N>>,
     ) -> Result<()> {
         info!("Starting the primary instance of the memory pool...");
+
+        // Set the sync module.
+        self.sync.set(sync).expect("Sync module already set");
 
         // Set the primary sender.
         self.gateway.set_primary_sender(primary_sender);
@@ -169,13 +174,18 @@ impl<N: Network> Primary<N> {
         &self.gateway
     }
 
+    /// Returns the sync module.
+    pub fn sync(&self) -> &BlockSync<N> {
+        self.sync.get().expect("Sync module not set")
+    }
+
     /// Returns the storage.
     pub const fn storage(&self) -> &Storage<N> {
         &self.storage
     }
 
     /// Returns the ledger.
-    pub const fn ledger(&self) -> &Ledger<N> {
+    pub const fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
         &self.ledger
     }
 

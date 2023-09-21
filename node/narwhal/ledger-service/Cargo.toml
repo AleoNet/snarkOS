@@ -26,6 +26,10 @@ test = [ "mock" ]
 [dependencies.async-trait]
 version = "0.1"
 
+[dependencies.indexmap]
+version = "2.0"
+features = [ "serde", "rayon" ]
+
 [dependencies.parking_lot]
 version = "0.12"
 optional = true

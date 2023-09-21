@@ -17,11 +17,12 @@ use snarkvm::{
         block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::Data,
+        narwhal::{Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{narwhal::TransmissionID, Field, Network, Result},
+    prelude::{Field, Network, Result},
 };
 
+use indexmap::IndexMap;
 use std::fmt::Debug;
 
 #[async_trait]
@@ -67,6 +68,14 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
 
     /// Checks the given block is valid next block.
     fn check_next_block(&self, block: &Block<N>) -> Result<()>;
+
+    /// Returns a candidate for the next block in the ledger, using a committed subdag and its transmissions.
+    #[cfg(feature = "ledger-write")]
+    fn prepare_advance_to_next_quorum_block(
+        &self,
+        subdag: Subdag<N>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<Block<N>>;
 
     /// Adds the given block as the next block in the ledger.
     #[cfg(feature = "ledger-write")]

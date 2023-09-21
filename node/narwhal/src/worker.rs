@@ -15,7 +15,6 @@
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
-    Ledger,
     ProposedBatch,
     Transport,
     MAX_BATCH_DELAY,
@@ -23,6 +22,7 @@ use crate::{
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
 };
+use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
     ledger::narwhal::{Data, Transmission, TransmissionID},
@@ -49,7 +49,7 @@ pub struct Worker<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// The ledger service.
-    ledger: Ledger<N>,
+    ledger: Arc<dyn LedgerService<N>>,
     /// The proposed batch.
     proposed_batch: Arc<ProposedBatch<N>>,
     /// The ready queue.
@@ -66,7 +66,7 @@ impl<N: Network> Worker<N> {
         id: u8,
         gateway: Arc<dyn Transport<N>>,
         storage: Storage<N>,
-        ledger: Ledger<N>,
+        ledger: Arc<dyn LedgerService<N>>,
         proposed_batch: Arc<ProposedBatch<N>>,
     ) -> Result<Self> {
         // Ensure the worker ID is valid.
@@ -468,10 +468,15 @@ mod tests {
     use snarkos_node_narwhal_ledger_service::LedgerService;
     use snarkvm::{
         console::{network::Network, types::Field},
-        ledger::{block::Block, committee::Committee, narwhal::TransmissionID},
+        ledger::{
+            block::Block,
+            committee::Committee,
+            narwhal::{Subdag, Transmission, TransmissionID},
+        },
     };
 
     use bytes::Bytes;
+    use indexmap::IndexMap;
     use mockall::mock;
     use std::io;
 
@@ -510,6 +515,11 @@ mod tests {
                 transaction: Data<Transaction<N>>,
             ) -> Result<()>;
             fn check_next_block(&self, block: &Block<N>) -> Result<()>;
+            fn prepare_advance_to_next_quorum_block(
+                &self,
+                subdag: Subdag<N>,
+                transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+            ) -> Result<Block<N>>;
             fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
         }
     }
@@ -525,7 +535,7 @@ mod tests {
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -560,7 +570,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -596,7 +606,7 @@ mod tests {
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -634,7 +644,7 @@ mod tests {
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -672,7 +682,7 @@ mod tests {
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -710,7 +720,7 @@ mod tests {
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -769,7 +779,7 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let committee = new_test_committee(4);
-        let ledger: Ledger<CurrentNetwork> = Arc::new(MockLedgerService::new(committee));
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(MockLedgerService::new(committee));
         let worker = Worker::new(id, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         assert_eq!(worker.id(), id);
     }
@@ -781,7 +791,7 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let committee = new_test_committee(4);
-        let ledger: Ledger<CurrentNetwork> = Arc::new(MockLedgerService::new(committee));
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(MockLedgerService::new(committee));
         let worker = Worker::new(id, Arc::new(gateway), storage, ledger, Default::default());
         // TODO once Worker implements Debug, simplify this with `unwrap_err`
         if let Err(error) = worker {

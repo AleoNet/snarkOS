@@ -3124,6 +3124,7 @@ dependencies = [
  "snarkos-account",
  "snarkos-node-narwhal",
  "snarkos-node-narwhal-ledger-service",
+ "snarkos-node-sync",
  "snarkvm",
  "tokio",
  "tracing",
@@ -3207,6 +3208,7 @@ name = "snarkos-node-narwhal-ledger-service"
 version = "2.1.7"
 dependencies = [
  "async-trait",
+ "indexmap 2.0.0",
  "parking_lot",
  "snarkvm",
  "tokio",

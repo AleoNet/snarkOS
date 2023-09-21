@@ -42,14 +42,10 @@ use snarkvm::prelude::{
 
 use anyhow::Result;
 use core::future::Future;
-use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
 use tokio::task::JoinHandle;
@@ -60,13 +56,13 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     /// The ledger of the node.
     ledger: Ledger<N, C>,
     /// The consensus module of the node.
-    consensus: Consensus<N, C>,
+    consensus: Consensus<N>,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
     rest: Option<Rest<N, C, Self>>,
     /// The sync module.
-    sync: Arc<OnceCell<BlockSync<N>>>,
+    sync: BlockSync<N>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -98,12 +94,18 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 return Err(error);
             }
         }
+
+        // Initialize the ledger service.
+        let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone()));
+        // Initialize the sync module.
+        let sync = BlockSync::new(ledger_service.clone());
+
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger.clone(), None, trusted_validators, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger_service, None, trusted_validators, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
-        consensus.run(primary_sender, primary_receiver).await?;
+        consensus.run(sync.clone(), primary_sender, primary_receiver).await?;
 
         // Initialize the node router.
         let router = Router::new(
@@ -122,7 +124,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             consensus: consensus.clone(),
             router,
             rest: None,
-            sync: Default::default(),
+            sync,
             handles: Default::default(),
             shutdown: Default::default(),
         };
@@ -133,16 +135,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         if let Some(rest_ip) = rest_ip {
             node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger.clone(), Arc::new(node.clone()))?);
         }
-
         // Initialize the routing.
         node.initialize_routing().await;
-
         // Initialize the sync module.
-        let local_ip = node.router.local_ip();
-        let ledger_service = Arc::new(CoreLedgerService::new(ledger));
-        node.sync.set(BlockSync::new(local_ip, ledger_service)).expect("Failed to set the sync module");
-        node.initialize_sync()?;
-
+        node.initialize_sync();
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.
@@ -158,22 +154,17 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     pub fn rest(&self) -> &Option<Rest<N, C, Self>> {
         &self.rest
     }
-
-    /// Returns the sync module.
-    pub fn sync(&self) -> &BlockSync<N> {
-        self.sync.get().expect("Sync module is not set!")
-    }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes the sync pool.
-    fn initialize_sync(&self) -> Result<()> {
+    fn initialize_sync(&self) {
         // Start the sync loop.
         let node = self.clone();
         self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
-                if node.shutdown.load(Ordering::Relaxed) {
+                if node.shutdown.load(std::sync::atomic::Ordering::Relaxed) {
                     info!("Shutting down block production");
                     break;
                 }
@@ -181,12 +172,11 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 // Sleep briefly to avoid triggering spam detection.
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 // Perform the sync routine.
-                if let Err(error) = node.sync().try_block_sync(&node.router).await {
+                if let Err(error) = node.sync.try_block_sync(&node.router).await {
                     warn!("Sync error - {error}");
                 }
             }
         }));
-        Ok(())
     }
 
     // /// Initialize the transaction pool.
@@ -430,9 +420,9 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     async fn shut_down(&self) {
         info!("Shutting down...");
 
-        // Shut down the sync pool.
-        trace!("Shutting down the sync pool...");
-        self.shutdown.store(true, Ordering::Relaxed);
+        // Shut down the node.
+        trace!("Shutting down the node...");
+        self.shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the validator...");

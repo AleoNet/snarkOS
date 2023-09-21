@@ -18,13 +18,14 @@ use snarkvm::{
         block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, TransmissionID},
+        narwhal::{Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
         Ledger,
     },
     prelude::{bail, Field, Network, Result},
 };
 
+use indexmap::IndexMap;
 use std::fmt;
 
 /// A core ledger service.
@@ -154,6 +155,15 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Checks the given block is valid next block.
     fn check_next_block(&self, block: &Block<N>) -> Result<()> {
         self.ledger.check_next_block(block)
+    }
+
+    /// Returns a candidate for the next block in the ledger, using a committed subdag and its transmissions.
+    fn prepare_advance_to_next_quorum_block(
+        &self,
+        subdag: Subdag<N>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<Block<N>> {
+        self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)
     }
 
     /// Adds the given block as the next block in the ledger.

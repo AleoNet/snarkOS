@@ -16,6 +16,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
+use snarkos_node_narwhal::ledger_service::CoreLedgerService;
 use snarkos_node_router::{
     messages::{Message, NodeType, UnconfirmedSolution},
     Heartbeat,
@@ -24,27 +25,37 @@ use snarkos_node_router::{
     Router,
     Routing,
 };
+use snarkos_node_sync::BlockSync;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
 };
-use snarkvm::prelude::{
-    block::{Block, Header},
-    coinbase::{CoinbasePuzzle, EpochChallenge, ProverSolution},
-    store::ConsensusStorage,
-    Network,
+use snarkvm::{
+    console::network::Network,
+    ledger::{
+        block::{Block, Header},
+        coinbase::{CoinbasePuzzle, EpochChallenge, ProverSolution},
+        store::ConsensusStorage,
+        Ledger,
+    },
 };
 
 use anyhow::Result;
-use core::marker::PhantomData;
-use parking_lot::RwLock;
-use std::{net::SocketAddr, sync::Arc};
+use core::{future::Future, marker::PhantomData};
+use parking_lot::{Mutex, RwLock};
+use std::{
+    net::SocketAddr,
+    sync::{atomic::AtomicBool, Arc},
+};
+use tokio::task::JoinHandle;
 
 /// A client node is a full node, capable of querying with the network.
 #[derive(Clone)]
 pub struct Client<N: Network, C: ConsensusStorage<N>> {
     /// The router of the node.
     router: Router<N>,
+    /// The sync module.
+    sync: Arc<BlockSync<N>>,
     /// The genesis block.
     genesis: Block<N>,
     /// The coinbase puzzle.
@@ -53,6 +64,10 @@ pub struct Client<N: Network, C: ConsensusStorage<N>> {
     latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
     /// The latest block header.
     latest_block_header: Arc<RwLock<Option<Header<N>>>>,
+    /// The spawned handles.
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// The shutdown signal.
+    shutdown: Arc<AtomicBool>,
     /// PhantomData.
     _phantom: PhantomData<C>,
 }
@@ -69,6 +84,22 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         // Initialize the signal handler.
         let signal_node = Self::handle_signals();
 
+        // Initialize the ledger.
+        let ledger = Ledger::<N, C>::load(genesis.clone(), dev)?;
+        // // Initialize the CDN.
+        // if let Some(base_url) = cdn {
+        //     // Sync the ledger with the CDN.
+        //     if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+        //         crate::helpers::log_clean_error(dev);
+        //         return Err(error);
+        //     }
+        // }
+
+        // Initialize the ledger service.
+        let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger));
+        // Initialize the sync module.
+        let sync = BlockSync::new(ledger_service.clone());
+
         // Initialize the node router.
         let router = Router::new(
             node_ip,
@@ -84,18 +115,50 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         // Initialize the node.
         let node = Self {
             router,
+            sync: Arc::new(sync),
             genesis,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block_header: Default::default(),
+            handles: Default::default(),
+            shutdown: Default::default(),
             _phantom: PhantomData,
         };
         // Initialize the routing.
         node.initialize_routing().await;
+        // Initialize the sync module.
+        node.initialize_sync();
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.
         Ok(node)
+    }
+
+    /// Initializes the sync pool.
+    fn initialize_sync(&self) {
+        // Start the sync loop.
+        let node = self.clone();
+        self.handles.lock().push(tokio::spawn(async move {
+            loop {
+                // If the Ctrl-C handler registered the signal, stop the node.
+                if node.shutdown.load(std::sync::atomic::Ordering::Relaxed) {
+                    info!("Shutting down block production");
+                    break;
+                }
+
+                // Sleep briefly to avoid triggering spam detection.
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                // Perform the sync routine.
+                if let Err(error) = node.sync.try_block_sync(&node.router).await {
+                    warn!("Sync error - {error}");
+                }
+            }
+        }));
+    }
+
+    /// Spawns a task with the given future; it should only be used for long-running tasks.
+    pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
+        self.handles.lock().push(tokio::spawn(future));
     }
 }
 
@@ -104,6 +167,14 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Client<N, C> {
     /// Shuts down the node.
     async fn shut_down(&self) {
         info!("Shutting down...");
+
+        // Shut down the node.
+        trace!("Shutting down the node...");
+        self.shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+        // Abort the tasks.
+        trace!("Shutting down the validator...");
+        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         self.router.shut_down().await;

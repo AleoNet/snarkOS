@@ -25,6 +25,7 @@ use snarkos_node_narwhal::{
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
 };
+use snarkos_node_sync::BlockSync;
 use snarkvm::{
     ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
     prelude::TestRng,
@@ -154,12 +155,16 @@ impl TestNetwork {
         for validator in self.validators.values_mut() {
             let (primary_sender, primary_receiver) = init_primary_channels();
             validator.primary_sender = Some(primary_sender.clone());
+
+            let ledger_service = validator.primary.ledger().clone();
+            let sync = BlockSync::new(ledger_service);
+
             if let Some(bft) = validator.bft.get_mut() {
                 // Setup the channels and start the bft.
-                bft.run(primary_sender, primary_receiver, None).await.unwrap();
+                bft.run(sync, primary_sender, primary_receiver, None).await.unwrap();
             } else {
                 // Setup the channels and start the primary.
-                validator.primary.run(primary_sender, primary_receiver, None).await.unwrap();
+                validator.primary.run(sync, primary_sender, primary_receiver, None).await.unwrap();
             }
 
             if let Some(interval_ms) = self.config.fire_transmissions {

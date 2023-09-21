@@ -13,24 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    events::{
-        BlockRequest,
-        CertificateRequest,
-        CertificateResponse,
-        ChallengeRequest,
-        ChallengeResponse,
-        DisconnectReason,
-        Event,
-        EventOrBytes,
-        EventTrait,
-        NoiseCodec,
-        NoiseState,
-        TransmissionRequest,
-        TransmissionResponse,
-        NOISE_HANDSHAKE_TYPE,
-    },
     helpers::{assign_to_worker, Cache, PrimarySender, Resolver, WorkerSender},
-    primary::Ledger,
     CONTEXT,
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
@@ -38,6 +21,23 @@ use crate::{
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_events::{
+    BlockRequest,
+    CertificateRequest,
+    CertificateResponse,
+    ChallengeRequest,
+    ChallengeResponse,
+    DisconnectReason,
+    Event,
+    EventOrBytes,
+    EventTrait,
+    NoiseCodec,
+    NoiseState,
+    TransmissionRequest,
+    TransmissionResponse,
+    NOISE_HANDSHAKE_TYPE,
+};
+use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
@@ -99,7 +99,7 @@ pub struct Gateway<N: Network> {
     /// The account of the node.
     account: Account<N>,
     /// The ledger service.
-    ledger: Ledger<N>,
+    ledger: Arc<dyn LedgerService<N>>,
     /// The TCP stack.
     tcp: Tcp,
     /// The cache.
@@ -129,7 +129,7 @@ impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
     pub fn new(
         account: Account<N>,
-        ledger: Ledger<N>,
+        ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
         dev: Option<u16>,

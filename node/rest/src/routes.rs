@@ -185,7 +185,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // GET /testnet3/committee/latest
     pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(consensus.ledger().latest_committee()?)),
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.ledger().current_committee()?)),
             None => Err(RestError("route isn't available for this node type".to_string())),
         }
     }

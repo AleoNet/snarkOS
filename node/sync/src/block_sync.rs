@@ -25,7 +25,12 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use parking_lot::RwLock;
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
-use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Instant};
+use std::{
+    collections::BTreeMap,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::Arc,
+    time::Instant,
+};
 
 pub const REDUNDANCY_FACTOR: usize = 3;
 const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
@@ -34,6 +39,10 @@ const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
+
+/// This is a dummy IP address that is used to represent the local node.
+/// Note: This here does not need to be a real IP address, but it must be unique/distinct from all other connections.
+const DUMMY_SELF_IP: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
 
 /// A struct that keeps track of the current block sync state.
 ///
@@ -44,38 +53,36 @@ const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 /// - the `request_timestamps` map remains unchanged.
 /// - When a response is removed/completed, the `requests` map and `request_timestamps` map also remove the entry for the request height.
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BlockSync<N: Network> {
-    local_ip: SocketAddr,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
     canon: Arc<dyn LedgerService<N>>,
     /// The map of peer IP to their block locators.
     /// The block locators are consistent with the canonical map and every other peer's block locators.
-    locators: RwLock<IndexMap<SocketAddr, BlockLocators<N>>>,
+    locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
     /// The map of peer-to-peer to their common ancestor.
     /// This map is used to determine which peers to request blocks from.
-    common_ancestors: RwLock<IndexMap<PeerPair, u32>>,
+    common_ancestors: Arc<RwLock<IndexMap<PeerPair, u32>>>,
     /// The map of block height to the expected block hash and peer IPs.
     /// Each entry is removed when its corresponding entry in the responses map is removed.
-    requests: RwLock<BTreeMap<u32, SyncRequest<N>>>,
+    requests: Arc<RwLock<BTreeMap<u32, SyncRequest<N>>>>,
     /// The map of block height to the received blocks.
     /// Removing an entry from this map must remove the corresponding entry from the requests map.
-    responses: RwLock<BTreeMap<u32, Block<N>>>,
+    responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
     /// The map of block height to the timestamp of the last time the block was requested.
     /// This map is used to determine which requests to remove if they have been pending for too long.
-    request_timestamps: RwLock<BTreeMap<u32, Instant>>,
+    request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
     /// The map of (timed out) peer IPs to their request timestamps.
     /// This map is used to determine which peers to remove if they have timed out too many times.
-    request_timeouts: RwLock<IndexMap<SocketAddr, Vec<Instant>>>,
+    request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
 }
 
 impl<N: Network> BlockSync<N> {
     /// Initializes a new block sync module.
-    pub fn new(local_ip: SocketAddr, ledger: Arc<dyn LedgerService<N>>) -> Self {
+    pub fn new(ledger: Arc<dyn LedgerService<N>>) -> Self {
         Self {
-            local_ip,
             canon: ledger,
             locators: Default::default(),
             common_ancestors: Default::default(),
@@ -296,7 +303,7 @@ impl<N: Network> BlockSync<N> {
             }
         }
         // Update the common ancestor entry for this node.
-        self.common_ancestors.write().insert(PeerPair(self.local_ip, peer_ip), ancestor);
+        self.common_ancestors.write().insert(PeerPair(DUMMY_SELF_IP, peer_ip), ancestor);
 
         // Compute the common ancestor with every other peer.
         let mut common_ancestors = self.common_ancestors.write();
@@ -730,11 +737,6 @@ mod tests {
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    /// Returns the local IP for the sync pool.
-    fn sample_local_ip() -> SocketAddr {
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0)
-    }
-
     /// Returns the peer IP for the sync pool.
     fn sample_peer_ip(id: u16) -> SocketAddr {
         assert_ne!(id, 0, "The peer ID must not be 0 (reserved for local IP in testing)");
@@ -754,7 +756,7 @@ mod tests {
 
     /// Returns the sync pool, with the canonical ledger initialized to the given height.
     fn sample_sync_at_height(height: u32) -> BlockSync<CurrentNetwork> {
-        BlockSync::<CurrentNetwork>::new(sample_local_ip(), Arc::new(sample_ledger_service(height)))
+        BlockSync::<CurrentNetwork>::new(Arc::new(sample_ledger_service(height)))
     }
 
     /// Checks that the sync pool (starting at genesis) returns the correct requests.

@@ -18,11 +18,12 @@ use snarkvm::{
         block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, TransmissionID},
+        narwhal::{Data, Subdag, Transmission, TransmissionID},
     },
     prelude::{ensure, Field, Network, Result},
 };
 
+use indexmap::IndexMap;
 use parking_lot::Mutex;
 use std::collections::BTreeMap;
 use tracing::*;
@@ -118,6 +119,15 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// Checks the given block is valid next block.
     fn check_next_block(&self, _block: &Block<N>) -> Result<()> {
         Ok(())
+    }
+
+    /// Returns a candidate for the next block in the ledger, using a committed subdag and its transmissions.
+    fn prepare_advance_to_next_quorum_block(
+        &self,
+        _subdag: Subdag<N>,
+        _transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<Block<N>> {
+        unreachable!("MockLedgerService does not support prepare_advance_to_next_quorum_block")
     }
 
     /// Adds the given block as the next block in the ledger.
