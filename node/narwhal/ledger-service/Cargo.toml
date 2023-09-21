@@ -21,6 +21,7 @@ default = [ ]
 ledger = [ "tokio", "tracing" ]
 ledger-write = [ ]
 mock = [ "parking_lot", "tracing" ]
+prover = [ ]
 test = [ "mock" ]
 
 [dependencies.async-trait]

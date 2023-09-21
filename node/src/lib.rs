@@ -41,8 +41,13 @@ pub use validator::*;
 mod node;
 pub use node::*;
 
-mod helpers;
-pub use helpers::*;
-
 mod traits;
 pub use traits::*;
+
+/// A helper to log instructions to recover.
+pub fn log_clean_error(dev: Option<u16>) {
+    match dev {
+        Some(id) => error!("Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage"),
+        None => error!("Storage corruption detected! Run `snarkos clean` to reset storage"),
+    }
+}

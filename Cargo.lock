@@ -3262,7 +3262,6 @@ dependencies = [
  "snarkos-node-router",
  "snarkos-node-router-messages",
  "snarkos-node-sync",
- "snarkos-node-sync-communication-service",
  "snarkos-node-sync-locators",
  "snarkos-node-tcp",
  "snarkvm",
