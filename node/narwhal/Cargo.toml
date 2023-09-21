@@ -66,7 +66,7 @@ version = "=2.1.7"
 [dependencies.snarkos-node-narwhal-ledger-service]
 path = "./ledger-service"
 version = "=2.1.7"
-default-features = false
+features = [ "ledger", "prover" ]
 
 [dependencies.snarkos-node-sync]
 path = "../sync"

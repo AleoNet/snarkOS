@@ -169,6 +169,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Returns a candidate for the next block in the ledger, using a committed subdag and its transmissions.
+    #[cfg(feature = "ledger-write")]
     fn prepare_advance_to_next_quorum_block(
         &self,
         subdag: Subdag<N>,

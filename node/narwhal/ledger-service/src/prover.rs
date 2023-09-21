@@ -1,0 +1,134 @@
+// Copyright (C) 2019-2023 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::LedgerService;
+use snarkvm::{
+    ledger::{
+        block::{Block, Transaction},
+        coinbase::{ProverSolution, PuzzleCommitment},
+        committee::Committee,
+        narwhal::{Data, Subdag, Transmission, TransmissionID},
+    },
+    prelude::{bail, Field, Network, Result},
+};
+
+use indexmap::IndexMap;
+use std::ops::Range;
+
+/// A ledger service for a prover.
+#[derive(Clone, Debug, Default)]
+pub struct ProverLedgerService<N: Network> {
+    _network: std::marker::PhantomData<N>,
+}
+
+impl<N: Network> ProverLedgerService<N> {
+    /// Initializes a new prover ledger service.
+    pub fn new() -> Self {
+        Self { _network: Default::default() }
+    }
+}
+
+#[async_trait]
+impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
+    /// Returns the latest block height in the ledger.
+    fn latest_block_height(&self) -> u32 {
+        0u32
+    }
+
+    /// Returns `true` if the given block height exists in the ledger.
+    fn contains_block_height(&self, _height: u32) -> bool {
+        false
+    }
+
+    /// Returns the block height for the given block hash, if it exists.
+    fn get_block_height(&self, _hash: &N::BlockHash) -> Option<u32> {
+        None
+    }
+
+    /// Returns the block hash for the given block height, if it exists.
+    fn get_block_hash(&self, _height: u32) -> Option<N::BlockHash> {
+        None
+    }
+
+    /// Returns the block for the given block height.
+    fn get_block(&self, height: u32) -> Result<Block<N>> {
+        bail!("Block {height} does not exist in prover")
+    }
+
+    /// Returns the blocks in the given block range.
+    /// The range is inclusive of the start and exclusive of the end.
+    fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>> {
+        bail!("Blocks {heights:?} do not exist in prover")
+    }
+
+    /// Returns the current committee.
+    fn current_committee(&self) -> Result<Committee<N>> {
+        bail!("Committee does not exist in prover")
+    }
+
+    /// Returns the committee for the given round.
+    /// If the given round is in the future, then the current committee is returned.
+    fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
+        bail!("Committee for round {round} does not exist in prover")
+    }
+
+    /// Returns `true` if the ledger contains the given certificate ID in block history.
+    fn contains_certificate(&self, _certificate_id: &Field<N>) -> Result<bool> {
+        bail!("Certificate does not exist in prover")
+    }
+
+    /// Returns `true` if the transmission exists in the ledger.
+    fn contains_transmission(&self, _transmission_id: &TransmissionID<N>) -> Result<bool> {
+        bail!("Transmission does not exist in prover")
+    }
+
+    /// Checks the given solution is well-formed.
+    async fn check_solution_basic(
+        &self,
+        _puzzle_commitment: PuzzleCommitment<N>,
+        _solution: Data<ProverSolution<N>>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    /// Checks the given transaction is well-formed and unique.
+    async fn check_transaction_basic(
+        &self,
+        _transaction_id: N::TransactionID,
+        _transaction: Data<Transaction<N>>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    /// Checks the given block is valid next block.
+    fn check_next_block(&self, _block: &Block<N>) -> Result<()> {
+        Ok(())
+    }
+
+    /// Returns a candidate for the next block in the ledger, using a committed subdag and its transmissions.
+    #[cfg(feature = "ledger-write")]
+    fn prepare_advance_to_next_quorum_block(
+        &self,
+        _subdag: Subdag<N>,
+        _transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<Block<N>> {
+        bail!("Cannot prepare advance to next quorum block in prover")
+    }
+
+    /// Adds the given block as the next block in the ledger.
+    #[cfg(feature = "ledger-write")]
+    fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
+        bail!("Cannot advance to next block in prover: {block}")
+    }
+}
