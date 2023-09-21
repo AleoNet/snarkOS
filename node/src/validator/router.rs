@@ -186,7 +186,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         }
 
         // Send a `Pong` message to the peer.
-        self.send(peer_ip, Message::Pong(Pong { is_fork: Some(false) }));
+        Outbound::send(self, peer_ip, Message::Pong(Pong { is_fork: Some(false) }));
         true
     }
 
