@@ -175,12 +175,15 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
 
     /// Processes the block locators and sends back a `Pong` message.
     fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
-        // If block locators were provided, then update the peer in the sync pool.
-        if let Some(block_locators) = message.block_locators {
-            // Check the block locators are valid, and update the peer in the sync pool.
-            if let Err(error) = self.sync.update_peer_locators(peer_ip, block_locators) {
-                warn!("Peer '{peer_ip}' sent invalid block locators: {error}");
-                return false;
+        // Check if the sync module is in router mode.
+        if self.sync.mode().is_router() {
+            // If block locators were provided, then update the peer in the sync pool.
+            if let Some(block_locators) = message.block_locators {
+                // Check the block locators are valid, and update the peer in the sync pool.
+                if let Err(error) = self.sync.update_peer_locators(peer_ip, block_locators) {
+                    warn!("Peer '{peer_ip}' sent invalid block locators: {error}");
+                    return false;
+                }
             }
         }
 

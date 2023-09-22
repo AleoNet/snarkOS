@@ -30,10 +30,12 @@ use crate::{
     Transport,
     Worker,
     MAX_BATCH_DELAY,
+    MAX_PRIMARY_PING_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_events::PrimaryPing;
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkos_node_sync::BlockSync;
 use snarkvm::{
@@ -510,6 +512,26 @@ impl<N: Network> Primary<N> {
             mut rx_unconfirmed_solution,
             mut rx_unconfirmed_transaction,
         } = primary_receiver;
+
+        // Start the primary ping.
+        if self.gateway.sync().mode().is_gateway() {
+            let self_ = self.clone();
+            self.spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(MAX_PRIMARY_PING_DELAY)).await;
+                    // Construct the primary ping.
+                    let primary_ping = match self_.gateway.sync().get_block_locators() {
+                        Ok(block_locators) => PrimaryPing::new(<Event<N>>::VERSION, block_locators),
+                        Err(e) => {
+                            warn!("Failed to retrieve block locators - {e}");
+                            continue;
+                        }
+                    };
+                    // Broadcast the event.
+                    self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
+                }
+            });
+        }
 
         // Start the batch proposer.
         let self_ = self.clone();

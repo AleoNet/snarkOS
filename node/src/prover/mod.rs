@@ -25,7 +25,7 @@ use snarkos_node_router::{
     Router,
     Routing,
 };
-use snarkos_node_sync::BlockSync;
+use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
@@ -93,7 +93,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Initialize the ledger service.
         let ledger_service = Arc::new(ProverLedgerService::new());
         // Initialize the sync module.
-        let sync = BlockSync::new(ledger_service.clone());
+        let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
 
         // Initialize the node router.
         let router = Router::new(

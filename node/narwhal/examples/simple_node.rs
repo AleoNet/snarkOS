@@ -24,7 +24,7 @@ use snarkos_node_narwhal::{
     MEMORY_POOL_PORT,
 };
 use snarkos_node_narwhal_ledger_service::MockLedgerService;
-use snarkos_node_sync::BlockSync;
+use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkvm::{
     ledger::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
@@ -116,7 +116,7 @@ pub async fn start_bft(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the sync module.
-    let sync = BlockSync::new(ledger.clone());
+    let sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
     // Initialize the storage.
     let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
@@ -155,7 +155,7 @@ pub async fn start_primary(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the sync module.
-    let sync = BlockSync::new(ledger.clone());
+    let sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
     // Initialize the storage.
     let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
