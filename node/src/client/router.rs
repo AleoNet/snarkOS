@@ -52,14 +52,18 @@ where
     Self: Outbound<N>,
 {
     async fn on_connect(&self, peer_addr: SocketAddr) {
-        let peer_ip = if let Some(ip) = self.router.resolve_to_listener(&peer_addr) {
-            ip
-        } else {
-            return;
+        // Resolve the peer address to the listener address.
+        let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) else { return };
+        // Retrieve the block locators.
+        let block_locators = match self.sync.get_block_locators() {
+            Ok(block_locators) => Some(block_locators),
+            Err(e) => {
+                error!("Failed to get block locators: {e}");
+                return;
+            }
         };
-
         // Send the first `Ping` message to the peer.
-        self.send_ping(peer_ip, None);
+        self.send_ping(peer_ip, block_locators);
     }
 }
 
@@ -188,14 +192,18 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     /// Sleeps for a period and then sends a `Ping` message to the peer.
     fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
         // Spawn an asynchronous task for the `Ping` request.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
             // Check that the peer is still connected.
-            if self_clone.router().is_connected(&peer_ip) {
-                // Send a `Ping` message to the peer.
-                self_clone.send_ping(peer_ip, None);
+            if self_.router().is_connected(&peer_ip) {
+                // Retrieve the block locators.
+                match self_.sync.get_block_locators() {
+                    // Send a `Ping` message to the peer.
+                    Ok(block_locators) => self_.send_ping(peer_ip, Some(block_locators)),
+                    Err(e) => error!("Failed to get block locators - {e}"),
+                }
             }
         });
         true

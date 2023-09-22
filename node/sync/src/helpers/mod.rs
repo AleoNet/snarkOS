@@ -12,15 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::locators::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
-use snarkvm::{
-    ledger::{store::ConsensusStorage, Ledger},
-    prelude::Network,
-};
+use snarkvm::prelude::Network;
 
-use anyhow::Result;
 use core::hash::Hash;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 use std::net::SocketAddr;
 
 /// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
@@ -43,29 +38,4 @@ impl Hash for PeerPair {
         a.hash(state);
         b.hash(state);
     }
-}
-
-/// Returns the block locators for the given ledger.
-pub fn get_block_locators<N: Network, C: ConsensusStorage<N>>(ledger: &Ledger<N, C>) -> Result<BlockLocators<N>> {
-    // Retrieve the latest height.
-    let latest_height = ledger.latest_height();
-
-    // Initialize the recents map.
-    let mut recents = IndexMap::with_capacity(NUM_RECENT_BLOCKS);
-
-    // Retrieve the recent block hashes.
-    for height in latest_height.saturating_sub((NUM_RECENT_BLOCKS - 1) as u32)..=latest_height {
-        recents.insert(height, ledger.get_hash(height)?);
-    }
-
-    // Initialize the checkpoints map.
-    let mut checkpoints = IndexMap::with_capacity((latest_height / CHECKPOINT_INTERVAL + 1).try_into()?);
-
-    // Retrieve the checkpoint block hashes.
-    for height in (0..=latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
-        checkpoints.insert(height, ledger.get_hash(height)?);
-    }
-
-    // Construct the block locators.
-    BlockLocators::new(recents, checkpoints)
 }

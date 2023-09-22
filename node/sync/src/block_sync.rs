@@ -18,6 +18,7 @@ use crate::{
 };
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkos_node_sync_communication_service::CommunicationService;
+use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
@@ -140,7 +141,32 @@ impl<N: Network> BlockSync<N> {
 }
 
 impl<N: Network> BlockSync<N> {
+    /// Returns the block locators.
+    #[inline]
+    pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
+        // Retrieve the latest block height.
+        let latest_height = self.canon.latest_block_height();
+
+        // Initialize the recents map.
+        let mut recents = IndexMap::with_capacity(NUM_RECENT_BLOCKS);
+        // Retrieve the recent block hashes.
+        for height in latest_height.saturating_sub((NUM_RECENT_BLOCKS - 1) as u32)..=latest_height {
+            recents.insert(height, self.canon.get_block_hash(height)?);
+        }
+
+        // Initialize the checkpoints map.
+        let mut checkpoints = IndexMap::with_capacity((latest_height / CHECKPOINT_INTERVAL + 1).try_into()?);
+        // Retrieve the checkpoint block hashes.
+        for height in (0..=latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
+            checkpoints.insert(height, self.canon.get_block_hash(height)?);
+        }
+
+        // Construct the block locators.
+        BlockLocators::new(recents, checkpoints)
+    }
+
     /// Performs one iteration of the block sync.
+    #[inline]
     pub async fn try_block_sync<C: CommunicationService>(&self, communication: &C) -> Result<()> {
         // Prepare the block requests, if any.
         let block_requests = self.prepare_block_requests();
@@ -173,6 +199,7 @@ impl<N: Network> BlockSync<N> {
     }
 
     /// Attempts to advance with blocks from the sync pool.
+    #[inline]
     pub fn advance_with_sync_blocks(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> Result<()> {
         // Insert the candidate blocks into the sync pool.
         for block in blocks {
@@ -303,7 +330,7 @@ impl<N: Network> BlockSync<N> {
         // Compute the common ancestor with this node.
         let mut ancestor = 0;
         for (height, hash) in locators.clone().into_iter() {
-            if let Some(canon_hash) = self.canon.get_block_hash(height) {
+            if let Ok(canon_hash) = self.canon.get_block_hash(height) {
                 match canon_hash == hash {
                     true => ancestor = height,
                     false => break, // fork
@@ -816,7 +843,7 @@ mod tests {
     }
 
     #[test]
-    fn test_latest_canon_height() {
+    fn test_latest_block_height() {
         for height in 0..100_002u32 {
             let sync = sample_sync_at_height(height);
             assert_eq!(sync.canon.latest_block_height(), height);
@@ -824,20 +851,23 @@ mod tests {
     }
 
     #[test]
-    fn test_get_canon_height() {
+    fn test_get_block_height() {
         for height in 0..100_002u32 {
             let sync = sample_sync_at_height(height);
-            assert_eq!(sync.canon.get_block_height(&(Field::<CurrentNetwork>::from_u32(0)).into()), Some(0));
-            assert_eq!(sync.canon.get_block_height(&(Field::<CurrentNetwork>::from_u32(height)).into()), Some(height));
+            assert_eq!(sync.canon.get_block_height(&(Field::<CurrentNetwork>::from_u32(0)).into()).unwrap(), 0);
+            assert_eq!(
+                sync.canon.get_block_height(&(Field::<CurrentNetwork>::from_u32(height)).into()).unwrap(),
+                height
+            );
         }
     }
 
     #[test]
-    fn test_get_canon_hash() {
+    fn test_get_block_hash() {
         for height in 0..100_002u32 {
             let sync = sample_sync_at_height(height);
-            assert_eq!(sync.canon.get_block_hash(0), Some((Field::<CurrentNetwork>::from_u32(0)).into()));
-            assert_eq!(sync.canon.get_block_hash(height), Some((Field::<CurrentNetwork>::from_u32(height)).into()));
+            assert_eq!(sync.canon.get_block_hash(0).unwrap(), (Field::<CurrentNetwork>::from_u32(0)).into());
+            assert_eq!(sync.canon.get_block_hash(height).unwrap(), (Field::<CurrentNetwork>::from_u32(height)).into());
         }
     }
 

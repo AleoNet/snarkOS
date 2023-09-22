@@ -34,10 +34,10 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     fn contains_block_height(&self, height: u32) -> bool;
 
     /// Returns the block height for the given block hash, if it exists.
-    fn get_block_height(&self, hash: &N::BlockHash) -> Option<u32>;
+    fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32>;
 
     /// Returns the block hash for the given block height, if it exists.
-    fn get_block_hash(&self, height: u32) -> Option<N::BlockHash>;
+    fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
 
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>>;

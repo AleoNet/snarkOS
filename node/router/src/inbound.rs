@@ -122,13 +122,13 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Dropping '{peer_ip}' on message version {} (outdated)", message.version);
                 }
 
-                // If the peer is a validator, ensure there are block locators.
-                if message.node_type.is_validator() && message.block_locators.is_none() {
-                    bail!("Peer '{peer_ip}' is a validator, but no block locators were provided");
+                // If the peer is a client or validator, ensure there are block locators.
+                let is_client_or_validator = message.node_type.is_client() || message.node_type.is_validator();
+                if is_client_or_validator && message.block_locators.is_none() {
+                    bail!("Peer '{peer_ip}' is a {}, but no block locators were provided", message.node_type);
                 }
-                // If the peer is a prover or client, ensure there are no block locators.
-                if (message.node_type.is_prover() || message.node_type.is_client()) && message.block_locators.is_some()
-                {
+                // If the peer is a prover, ensure there are no block locators.
+                else if message.node_type.is_prover() && message.block_locators.is_some() {
                     bail!("Peer '{peer_ip}' is a prover or client, but block locators were provided");
                 }
 
