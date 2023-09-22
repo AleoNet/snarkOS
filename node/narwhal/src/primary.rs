@@ -31,6 +31,7 @@ use crate::{
     Worker,
     MAX_BATCH_DELAY,
     MAX_PRIMARY_PING_DELAY,
+    MAX_SYNC_STORAGE_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
 };
@@ -535,6 +536,21 @@ impl<N: Network> Primary<N> {
             });
         }
 
+        // TODO (raychu86): Consider making this task run when the primary becomes synced.
+        // Start the storage syncer.
+        let self_ = self.clone();
+        self.spawn(async move {
+            loop {
+                // Sync the storage state with the ledger state.
+                if let Err(e) = self_.sync_storage_with_ledger().await {
+                    warn!("Cannot sync storage with ledger - {e}");
+                }
+
+                // Sleep.
+                tokio::time::sleep(Duration::from_millis(MAX_SYNC_STORAGE_DELAY)).await;
+            }
+        });
+
         // Start the batch proposer.
         let self_ = self.clone();
         self.spawn(async move {
@@ -865,7 +881,8 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    /// Insert the block and its certificates into storage.
+    /// Insert the block's certificates into storage.
+    /// This method will request the missing transmissions from a random peer that *should* have them.
     pub async fn insert_block_certificates(&self, block: &Block<N>) -> Result<()> {
         // Select a random peer to fetch the transmissions from.
         let peer_ip = match self

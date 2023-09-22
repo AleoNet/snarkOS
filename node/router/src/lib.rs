@@ -366,6 +366,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of bootstrap peers.
+    #[allow(clippy::if_same_then_else)]
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
         if cfg!(feature = "test") || self.is_dev {
             vec![]
