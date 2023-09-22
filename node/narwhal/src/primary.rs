@@ -31,6 +31,7 @@ use crate::{
     Worker,
     MAX_BATCH_DELAY,
     MAX_PRIMARY_PING_DELAY,
+    MAX_SYNC_DIFFERENCE,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
 };
@@ -539,6 +540,13 @@ impl<N: Network> Primary<N> {
             loop {
                 // Sleep briefly, but longer than if there were no batch.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
+
+                // If the primary is not synced, then do not propose a batch.
+                if let Err(e) = self_.check_primary_synced() {
+                    warn!("Cannot propose a batch - {e}");
+                    continue;
+                }
+
                 // If there is no proposed batch, attempt to propose a batch.
                 if let Err(e) = self_.propose_batch().await {
                     warn!("Cannot propose a batch - {e}");
@@ -550,6 +558,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
+                // If the primary is not synced, then do not sign the batch.
+                if let Err(e) = self_.check_primary_synced() {
+                    warn!("Cannot sign a batch from peer '{peer_ip}' - {e}");
+                    continue;
+                }
+
                 if let Err(e) = self_.process_batch_propose_from_peer(peer_ip, batch_propose).await {
                     warn!("Cannot sign a batch from peer '{peer_ip}' - {e}");
                 }
@@ -560,6 +574,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
+                // If the primary is not synced, then do not store the signature.
+                if let Err(e) = self_.check_primary_synced() {
+                    warn!("Cannot store a signature from peer '{peer_ip}' - {e}");
+                    continue;
+                }
+
                 if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
                     warn!("Cannot store a signature from peer '{peer_ip}' - {e}");
                 }
@@ -570,6 +590,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
+                // If the primary is not synced, then do not store the certificate.
+                if let Err(e) = self_.check_primary_synced() {
+                    warn!("Cannot store a certificate from peer '{peer_ip}' - {e}");
+                    continue;
+                }
+
                 // Deserialize the batch certificate.
                 let Ok(Ok(batch_certificate)) =
                     task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
@@ -1083,6 +1109,24 @@ impl<N: Network> Primary<N> {
             tokio::spawn(async move {
                 let _ = self_.gateway.send(peer_ip, Event::CertificateResponse(certificate.into())).await;
             });
+        }
+    }
+
+    /// Checks if the primary is synced with the network. Otherwise, returns an error.
+    pub fn check_primary_synced(&self) -> Result<()> {
+        // Retrieve the peer heights.
+        let peer_heights = self.gateway.sync().get_peer_heights();
+        // Retrieve the max peer height.
+        let max_peer_height = peer_heights.keys().max().unwrap_or(&0);
+
+        // Calculate the number of blocks behind the primary is.
+        let num_blocks_behind = max_peer_height.saturating_sub(self.ledger.latest_block_height());
+
+        // Check if the primary is synced.
+        // The primary is considered synced if its height is within `MAX_SYNC_DIFFERENCE` of the max peer height.
+        match num_blocks_behind <= MAX_SYNC_DIFFERENCE {
+            true => Ok(()),
+            false => bail!("Primary is not synced with the network - {num_blocks_behind} blocks behind",),
         }
     }
 
