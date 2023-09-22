@@ -1139,7 +1139,7 @@ mod prop_tests {
     };
     use snarkos_account::Account;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
-    use snarkos_node_sync::BlockSync;
+    use snarkos_node_sync::{BlockSync, BlockSyncMode};
     use snarkos_node_tcp::P2P;
     use snarkvm::{
         ledger::committee::prop_tests::{CommitteeContext, ValidatorSet},
@@ -1285,7 +1285,7 @@ mod prop_tests {
         let committee = committee.0;
         let worker_storage = storage.clone();
         let account = Account::try_from(private_key).unwrap();
-        let sync = BlockSync::new(storage.ledger().clone());
+        let sync = BlockSync::new(BlockSyncMode::Gateway, storage.ledger().clone());
 
         let gateway = Gateway::new(account, storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
 

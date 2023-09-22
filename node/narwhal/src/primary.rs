@@ -241,19 +241,6 @@ impl<N: Network> Primary<N> {
 }
 
 impl<N: Network> Primary<N> {
-    /// Broadcast a primary ping to all validators.
-    pub async fn send_primary_pings(&self) -> Result<()> {
-        // Retrieve the block locators.
-        let block_locators = self.gateway.sync().get_block_locators()?;
-
-        // Construct a primary ping.
-        let primary_ping = PrimaryPing::new(<Event<N>>::VERSION, block_locators);
-        // Broadcast the primary ping to all validators.
-        self.gateway.broadcast(Event::PrimaryPing(primary_ping));
-
-        Ok(())
-    }
-
     /// Proposes the batch for the current round.
     ///
     /// This method performs the following steps:
@@ -526,16 +513,25 @@ impl<N: Network> Primary<N> {
             mut rx_unconfirmed_transaction,
         } = primary_receiver;
 
-        // Start the primary pings
-        let self_ = self.clone();
-        self.spawn(async move {
-            loop {
-                tokio::time::sleep(Duration::from_millis(MAX_PRIMARY_PING_DELAY)).await;
-                if let Err(e) = self_.send_primary_pings().await {
-                    warn!("Failed to send primary pings - {e}");
+        // Start the primary ping.
+        if self.gateway.sync().mode().is_gateway() {
+            let self_ = self.clone();
+            self.spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(MAX_PRIMARY_PING_DELAY)).await;
+                    // Construct the primary ping.
+                    let primary_ping = match self_.gateway.sync().get_block_locators() {
+                        Ok(block_locators) => PrimaryPing::new(<Event<N>>::VERSION, block_locators),
+                        Err(e) => {
+                            warn!("Failed to retrieve block locators - {e}");
+                            continue;
+                        }
+                    };
+                    // Broadcast the event.
+                    self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
                 }
-            }
-        });
+            });
+        }
 
         // Start the batch proposer.
         let self_ = self.clone();

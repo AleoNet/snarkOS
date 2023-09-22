@@ -45,6 +45,24 @@ const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 /// Note: This here does not need to be a real IP address, but it must be unique/distinct from all other connections.
 const DUMMY_SELF_IP: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum BlockSyncMode {
+    Router,
+    Gateway,
+}
+
+impl BlockSyncMode {
+    /// Returns `true` if the node is in router moder.
+    pub const fn is_router(&self) -> bool {
+        matches!(self, Self::Router)
+    }
+
+    /// Returns `true` if the node is in gateway mode.
+    pub const fn is_gateway(&self) -> bool {
+        matches!(self, Self::Gateway)
+    }
+}
+
 /// A struct that keeps track of the current block sync state.
 ///
 /// # State
@@ -56,6 +74,8 @@ const DUMMY_SELF_IP: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
 #[derive(Clone, Debug)]
 pub struct BlockSync<N: Network> {
+    /// The block sync mode.
+    mode: BlockSyncMode,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
@@ -82,8 +102,9 @@ pub struct BlockSync<N: Network> {
 
 impl<N: Network> BlockSync<N> {
     /// Initializes a new block sync module.
-    pub fn new(ledger: Arc<dyn LedgerService<N>>) -> Self {
+    pub fn new(mode: BlockSyncMode, ledger: Arc<dyn LedgerService<N>>) -> Self {
         Self {
+            mode,
             canon: ledger,
             locators: Default::default(),
             common_ancestors: Default::default(),
@@ -92,6 +113,12 @@ impl<N: Network> BlockSync<N> {
             request_timestamps: Default::default(),
             request_timeouts: Default::default(),
         }
+    }
+
+    /// Returns the block sync mode.
+    #[inline]
+    pub const fn mode(&self) -> BlockSyncMode {
+        self.mode
     }
 }
 
@@ -791,7 +818,7 @@ mod tests {
 
     /// Returns the sync pool, with the canonical ledger initialized to the given height.
     fn sample_sync_at_height(height: u32) -> BlockSync<CurrentNetwork> {
-        BlockSync::<CurrentNetwork>::new(Arc::new(sample_ledger_service(height)))
+        BlockSync::<CurrentNetwork>::new(BlockSyncMode::Router, Arc::new(sample_ledger_service(height)))
     }
 
     /// Checks that the sync pool (starting at genesis) returns the correct requests.

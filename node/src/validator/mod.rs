@@ -27,7 +27,7 @@ use snarkos_node_router::{
     Router,
     Routing,
 };
-use snarkos_node_sync::BlockSync;
+use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
@@ -98,7 +98,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Initialize the ledger service.
         let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone()));
         // Initialize the sync module.
-        let sync = BlockSync::new(ledger_service.clone());
+        let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service.clone());
 
         // Initialize the consensus.
         let mut consensus = Consensus::new(account.clone(), ledger_service, None, trusted_validators, dev)?;
