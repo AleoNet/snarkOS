@@ -25,19 +25,3 @@ pub use block_sync::*;
 
 mod helpers;
 pub use helpers::*;
-
-// use snarkos_node_sync_communication_service::CommunicationService;
-// use snarkvm::console::network::Network;
-
-// /// The synchronization module for the node.
-// pub struct Sync<N: Network> {
-//     /// The block sync module.
-//     block_sync: BlockSync<N>,
-// }
-//
-// impl<N: Network> Sync<N> {
-//     /// Initializes a new instance of the sync module.
-//     pub fn new(block_sync: BlockSync<N>) -> Self {
-//         Self { block_sync }
-//     }
-// }
