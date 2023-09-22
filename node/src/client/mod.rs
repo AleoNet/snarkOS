@@ -42,8 +42,8 @@ use snarkvm::{
 };
 
 use anyhow::Result;
-use core::{future::Future, marker::PhantomData};
-use parking_lot::{Mutex, RwLock};
+use core::future::Future;
+use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
