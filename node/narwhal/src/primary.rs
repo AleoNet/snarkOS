@@ -30,6 +30,7 @@ use crate::{
     Transport,
     Worker,
     MAX_BATCH_DELAY,
+    MAX_PRIMARY_PING_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
 };
@@ -48,6 +49,7 @@ use snarkvm::{
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
+use snarkos_node_narwhal_events::PrimaryPing;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
@@ -239,6 +241,19 @@ impl<N: Network> Primary<N> {
 }
 
 impl<N: Network> Primary<N> {
+    /// Broadcast a primary ping to all validators.
+    pub async fn send_primary_pings(&self) -> Result<()> {
+        // Retrieve the block locators.
+        let block_locators = self.gateway.sync().get_block_locators()?;
+
+        // Construct a primary ping.
+        let primary_ping = PrimaryPing::new(<Event<N>>::VERSION, block_locators);
+        // Broadcast the primary ping to all validators.
+        self.gateway.broadcast(Event::PrimaryPing(primary_ping));
+
+        Ok(())
+    }
+
     /// Proposes the batch for the current round.
     ///
     /// This method performs the following steps:
@@ -510,6 +525,17 @@ impl<N: Network> Primary<N> {
             mut rx_unconfirmed_solution,
             mut rx_unconfirmed_transaction,
         } = primary_receiver;
+
+        // Start the primary pings
+        let self_ = self.clone();
+        self.spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_millis(MAX_PRIMARY_PING_DELAY)).await;
+                if let Err(e) = self_.send_primary_pings().await {
+                    warn!("Failed to send primary pings - {e}");
+                }
+            }
+        });
 
         // Start the batch proposer.
         let self_ = self.clone();
