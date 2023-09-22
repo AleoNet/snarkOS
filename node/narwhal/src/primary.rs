@@ -440,6 +440,11 @@ impl<N: Network> Primary<N> {
         // Retrieve the signature and timestamp.
         let BatchSignature { batch_id, signature, timestamp } = batch_signature;
 
+        // Ensure the batch signature is not from the current primary.
+        if self.gateway.account().address() == signature.to_address() {
+            bail!("Malicious peer - received a batch signature from myself ({})", signature.to_address());
+        }
+
         let proposal = {
             // Acquire the write lock.
             let mut proposed_batch = self.proposed_batch.write();
