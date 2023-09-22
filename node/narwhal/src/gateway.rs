@@ -629,23 +629,40 @@ impl<N: Network> Gateway<N> {
                 let ValidatorsResponse { validators } = response;
                 // Ensure the number of validators is not too large.
                 ensure!(validators.len() <= MAX_VALIDATORS_TO_SEND, "{CONTEXT} Received too many validators");
+                // Ensure the cache contains a validators request for this peer.
+                if !self.cache.contains_outbound_validators_request(peer_ip) {
+                    bail!("{CONTEXT} Received validators response from '{peer_ip}' without a validators request")
+                }
+                // Decrement the number of validators requests for this peer.
+                self.cache.decrement_outbound_validators_requests(peer_ip);
 
-                // Attempt to connect to any validators that are not already connected.
-                let self_ = self.clone();
-                tokio::spawn(async move {
-                    for (validator_ip, validator_address) in validators {
-                        // Ensure the validator IP is not already connected or connecting.
-                        if self_.is_connected_ip(validator_ip) || self_.is_connecting_ip(validator_ip) {
-                            continue;
+                // If the number of connected validators is less than the minimum, connect to more validators.
+                if self.number_of_connected_peers() < MIN_CONNECTED_VALIDATORS {
+                    // Attempt to connect to any validators that are not already connected.
+                    let self_ = self.clone();
+                    tokio::spawn(async move {
+                        for (validator_ip, validator_address) in validators {
+                            // Ensure the validator IP is not this node.
+                            if self_.is_local_ip(validator_ip) {
+                                continue;
+                            }
+                            // Ensure the validator IP is not already connected or connecting.
+                            if self_.is_connected_ip(validator_ip) || self_.is_connecting_ip(validator_ip) {
+                                continue;
+                            }
+                            // Ensure the validator address is not already connected.
+                            if self_.is_connected_address(validator_address) {
+                                continue;
+                            }
+                            // Ensure the validator address is an authorized validator.
+                            if !self_.is_authorized_validator_address(validator_address) {
+                                continue;
+                            }
+                            // Attempt to connect to the validator.
+                            self_.connect(validator_ip);
                         }
-                        // Ensure the validator address is not already connected.
-                        if self_.is_connected_address(validator_address) {
-                            continue;
-                        }
-                        // Attempt to connect to the validator.
-                        self_.connect(validator_ip);
-                    }
-                });
+                    });
+                }
                 Ok(())
             }
             Event::WorkerPing(ping) => {
@@ -790,6 +807,8 @@ impl<N: Network> Gateway<N> {
             if let Some(validator_ip) = validators.into_iter().choose(&mut rand::thread_rng()) {
                 let self_ = self.clone();
                 tokio::spawn(async move {
+                    // Increment the number of outbound validators requests for this validator.
+                    self_.cache.increment_outbound_validators_requests(validator_ip);
                     // Send a `ValidatorsRequest` to the validator.
                     let _ = Transport::send(&self_, validator_ip, Event::ValidatorsRequest(ValidatorsRequest)).await;
                 });
