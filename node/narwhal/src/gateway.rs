@@ -57,7 +57,17 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use snow::{params::NoiseParams, Builder};
-use std::{future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::{
+        hash_map::Entry::{Occupied, Vacant},
+        HashMap,
+    },
+    future::Future,
+    io,
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
@@ -124,7 +134,7 @@ pub struct Gateway<N: Network> {
     /// The worker senders.
     worker_senders: Arc<OnceCell<IndexMap<u8, WorkerSender<N>>>>,
     /// A map of peer IPs to their noise states.
-    noise_states: Arc<RwLock<IndexMap<SocketAddr, NoiseState>>>,
+    noise_states: Arc<RwLock<HashMap<SocketAddr, NoiseState>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -861,22 +871,41 @@ impl<N: Network> Handshake for Gateway<N> {
         };
 
         // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
-        let handshake_result = if peer_side == ConnectionSide::Responder {
+        let (ref peer_ip, framed) = if peer_side == ConnectionSide::Responder {
             self.handshake_inner_initiator(peer_addr, peer_ip, stream).await
         } else {
             self.handshake_inner_responder(peer_addr, &mut peer_ip, stream).await
-        };
+        }
+        .map_err(|error| {
+            // If the handshake failed, remove the connecting peer.
+            if let Some(ip) = peer_ip {
+                self.connecting_peers.lock().shift_remove(&ip);
+            }
 
-        // Remove the address from the collection of connecting peers (if the handshake got to the point where it's known).
-        if let Some(ip) = peer_ip {
-            self.connecting_peers.lock().shift_remove(&ip);
+            error
+        })?;
+
+        // Check for double connects.
+        match self.noise_states.write().entry(*peer_ip) {
+            Occupied(_) => {
+                // If the entry already exists, the handshake was already performed. This can
+                // happen if there is a poorly timed double-connect attempt. In this case, we
+                // simply drop the connection and cancel the handshake.
+                self.connecting_peers.lock().shift_remove(peer_ip);
+                warn!("{CONTEXT} Handshake with '{peer_ip}' failed: noise state already exists");
+                return Err(io::ErrorKind::AlreadyExists.into());
+            }
+            Vacant(entry) => {
+                // Otherwise, we store the noise state for reuse by the Reading and Writing impls
+                // and proceed.
+                let FramedParts { codec, .. } = framed.into_parts();
+                let NoiseCodec { noise_state, .. } = codec;
+                entry.insert(noise_state);
+            }
         }
 
-        // If the handshake succeeded, announce it.
-        let (ref peer_ip, framed) = handshake_result?;
-        let FramedParts { codec, .. } = framed.into_parts();
-        let NoiseCodec { noise_state, .. } = codec;
-        self.noise_states.write().insert(*peer_ip, noise_state);
+        // Remove the address from the collection of connecting peers if the handshake has completed succesfully.
+        self.connecting_peers.lock().shift_remove(peer_ip);
 
         info!("{CONTEXT} Gateway is connected to '{peer_ip}'");
 
