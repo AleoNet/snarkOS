@@ -377,6 +377,11 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
+        // Ensure the batch author is a current committee member.
+        if self.gateway.is_authorized_validator_address(batch_header.author()) {
+            bail!("Malicious peer - proposed batch from a non-committee member {}", batch_header.author());
+        }
+
         // If the peer is ahead, use the batch header to sync up to the peer.
         let transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
 
@@ -492,6 +497,10 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        // Ensure the batch certificate is authored by a current committee member.
+        if self.gateway.is_authorized_validator_address(certificate.author()) {
+            bail!("Received a batch certificate from a non-committee member {}", certificate.author());
+        }
         // Store the certificate, after ensuring it is valid.
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
         // If there are enough certificates to reach quorum threshold for the current round,
