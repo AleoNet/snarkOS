@@ -24,11 +24,12 @@ use crate::{
         Storage,
         DAG,
     },
-    Ledger,
     Primary,
     MAX_LEADER_CERTIFICATE_DELAY,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_sync::BlockSync;
 use snarkvm::{
     console::account::Address,
     ledger::{
@@ -77,7 +78,7 @@ impl<N: Network> BFT<N> {
     pub fn new(
         account: Account<N>,
         storage: Storage<N>,
-        ledger: Ledger<N>,
+        ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
         dev: Option<u16>,
@@ -95,6 +96,7 @@ impl<N: Network> BFT<N> {
     /// Run the BFT instance.
     pub async fn run(
         &mut self,
+        sync: BlockSync<N>,
         primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
         consensus_sender: Option<ConsensusSender<N>>,
@@ -107,7 +109,7 @@ impl<N: Network> BFT<N> {
         // Initialize the BFT channels.
         let (bft_sender, bft_receiver) = init_bft_channels::<N>();
         // Run the primary instance.
-        self.primary.run(primary_sender, primary_receiver, Some(bft_sender)).await?;
+        self.primary.run(sync, primary_sender, primary_receiver, Some(bft_sender)).await?;
         // Start the BFT handlers.
         self.start_handlers(bft_receiver);
         Ok(())
@@ -124,7 +126,7 @@ impl<N: Network> BFT<N> {
     }
 
     /// Returns the ledger.
-    pub fn ledger(&self) -> &Ledger<N> {
+    pub fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
         self.primary.ledger()
     }
 

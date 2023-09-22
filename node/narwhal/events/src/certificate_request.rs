@@ -58,10 +58,10 @@ impl<N: Network> FromBytes for CertificateRequest<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{helpers::storage::prop_tests::CryptoTestRng, CertificateRequest};
+    use crate::CertificateRequest;
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
-        prelude::{Field, Uniform},
+        prelude::{Field, TestRng, Uniform},
     };
 
     use bytes::{Buf, BufMut, BytesMut};
@@ -71,7 +71,7 @@ pub mod prop_tests {
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     pub fn any_field() -> BoxedStrategy<Field<CurrentNetwork>> {
-        any::<CryptoTestRng>().prop_map(|mut rng| Field::rand(&mut rng)).boxed()
+        any::<u8>().prop_map(|_| Field::rand(&mut TestRng::default())).boxed()
     }
 
     pub fn any_certificate_request() -> BoxedStrategy<CertificateRequest<CurrentNetwork>> {

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    event::{BatchPropose, BatchSignature, CertificateRequest, CertificateResponse, Event},
+    events::{BatchPropose, BatchSignature, CertificateRequest, CertificateResponse, Event},
     helpers::{
         assign_to_worker,
         assign_to_workers,
@@ -30,19 +30,21 @@ use crate::{
     Transport,
     Worker,
     MAX_BATCH_DELAY,
+    MAX_PRIMARY_PING_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_events::PrimaryPing;
 use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_sync::BlockSync;
 use snarkvm::{
-    console::prelude::*,
+    console::{prelude::*, types::Field},
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     },
-    prelude::Field,
 };
 
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -63,8 +65,6 @@ use tokio::{
 
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
-/// A helper type for the ledger service.
-pub type Ledger<N> = Arc<dyn LedgerService<N>>;
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
@@ -73,7 +73,7 @@ pub struct Primary<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// The ledger service.
-    ledger: Ledger<N>,
+    ledger: Arc<dyn LedgerService<N>>,
     /// The workers.
     workers: Arc<[Worker<N>]>,
     /// The BFT sender.
@@ -91,7 +91,7 @@ impl<N: Network> Primary<N> {
     pub fn new(
         account: Account<N>,
         storage: Storage<N>,
-        ledger: Ledger<N>,
+        ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
         dev: Option<u16>,
@@ -111,6 +111,7 @@ impl<N: Network> Primary<N> {
     /// Run the primary instance.
     pub async fn run(
         &mut self,
+        sync: BlockSync<N>,
         primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
         bft_sender: Option<BFTSender<N>>,
@@ -151,7 +152,7 @@ impl<N: Network> Primary<N> {
         self.workers = Arc::from(workers);
 
         // Initialize the gateway.
-        self.gateway.run(tx_workers).await;
+        self.gateway.run(sync, tx_workers).await;
 
         // Start the primary handlers.
         self.start_handlers(primary_receiver);
@@ -175,7 +176,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Returns the ledger.
-    pub const fn ledger(&self) -> &Ledger<N> {
+    pub const fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
         &self.ledger
     }
 
@@ -265,7 +266,11 @@ impl<N: Network> Primary<N> {
                     Some(peer_ip) => {
                         debug!("Resending batch proposal for round {} to peer '{peer_ip}'", proposal.round());
                         // Broadcast the event.
-                        self.gateway.send(peer_ip, event.clone());
+                        let self_ = self.clone();
+                        let event_ = event.clone();
+                        tokio::spawn(async move {
+                            let _ = self_.gateway.send(peer_ip, event_).await;
+                        });
                     }
                     None => continue,
                 }
@@ -396,8 +401,14 @@ impl<N: Network> Primary<N> {
         // Sign the batch ID.
         let signature = self.gateway.account().sign(&[batch_id, Field::from_u64(timestamp as u64)], rng)?;
         // Broadcast the signature back to the validator.
-        self.gateway.send(peer_ip, Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp)));
-        debug!("Signed a batch for round {batch_round} from peer '{peer_ip}'");
+        let self_ = self.clone();
+        tokio::spawn(async move {
+            let event = Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp));
+            // Send the batch signature to the peer.
+            if self_.gateway.send(peer_ip, event).await.is_some() {
+                debug!("Signed a batch for round {batch_round} from peer '{peer_ip}'");
+            }
+        });
         Ok(())
     }
 
@@ -501,6 +512,26 @@ impl<N: Network> Primary<N> {
             mut rx_unconfirmed_solution,
             mut rx_unconfirmed_transaction,
         } = primary_receiver;
+
+        // Start the primary ping.
+        if self.gateway.sync().mode().is_gateway() {
+            let self_ = self.clone();
+            self.spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(MAX_PRIMARY_PING_DELAY)).await;
+                    // Construct the primary ping.
+                    let primary_ping = match self_.gateway.sync().get_block_locators() {
+                        Ok(block_locators) => PrimaryPing::new(<Event<N>>::VERSION, block_locators),
+                        Err(e) => {
+                            warn!("Failed to retrieve block locators - {e}");
+                            continue;
+                        }
+                    };
+                    // Broadcast the event.
+                    self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
+                }
+            });
+        }
 
         // Start the batch proposer.
         let self_ = self.clone();
@@ -1005,7 +1036,7 @@ impl<N: Network> Primary<N> {
         Ok(missing_previous_certificates)
     }
 
-    /// Sends an certificate request to the specified peer.
+    /// Sends a certificate request to the specified peer.
     async fn send_certificate_request(
         &self,
         peer_ip: SocketAddr,
@@ -1016,7 +1047,9 @@ impl<N: Network> Primary<N> {
         // Insert the certificate ID into the pending queue.
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
             // Send the certificate request to the peer.
-            self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
+            if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
+                bail!("Unable to fetch batch certificate - failed to send request")
+            }
         }
         // Wait for the certificate to be fetched.
         match timeout(Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
@@ -1046,7 +1079,10 @@ impl<N: Network> Primary<N> {
         // Attempt to retrieve the certificate.
         if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
             // Send the certificate response to the peer.
-            self.gateway.send(peer_ip, Event::CertificateResponse(certificate.into()));
+            let self_ = self.clone();
+            tokio::spawn(async move {
+                let _ = self_.gateway.send(peer_ip, Event::CertificateResponse(certificate.into())).await;
+            });
         }
     }
 

@@ -37,7 +37,8 @@ version = "2"
 version = "0.27"
 
 [dependencies.indexmap]
-version = "2"
+version = "2.0"
+features = [ "serde", "rayon" ]
 
 [dependencies.num_cpus]
 version = "1"
@@ -101,6 +102,3 @@ version = "2.7"
 
 [target."cfg(target_family = \"unix\")".dependencies.nix]
 version = "0.26"
-
-[dev-dependencies.indexmap]
-version = "2.0"

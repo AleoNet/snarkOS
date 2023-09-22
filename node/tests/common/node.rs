@@ -22,9 +22,11 @@ use std::str::FromStr;
 pub async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
     Client::new(
         "127.0.0.1:0".parse().unwrap(),
+        None,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         sample_genesis_block(),
+        None, // No CDN.
         None,
     )
     .await

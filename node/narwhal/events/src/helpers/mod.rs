@@ -12,16 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![forbid(unsafe_code)]
-
-#[macro_use]
-extern crate tracing;
-
-pub use snarkos_node_sync_communication_service as communication_service;
-pub use snarkos_node_sync_locators as locators;
-
-mod block_sync;
-pub use block_sync::*;
-
-mod helpers;
-pub use helpers::*;
+mod codec;
+pub use codec::*;

@@ -15,19 +15,20 @@
 use crate::LedgerService;
 use snarkvm::{
     ledger::{
-        block::Transaction,
+        block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, TransmissionID},
+        narwhal::{Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
         Ledger,
     },
     prelude::{bail, Field, Network, Result},
 };
 
-use std::fmt;
+use indexmap::IndexMap;
+use std::{fmt, ops::Range};
 
-/// A core ledger service that always returns `false`.
+/// A core ledger service.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
 }
@@ -48,6 +49,37 @@ impl<N: Network, C: ConsensusStorage<N>> fmt::Debug for CoreLedgerService<N, C> 
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<N, C> {
+    /// Returns the latest block height in the ledger.
+    fn latest_block_height(&self) -> u32 {
+        self.ledger.latest_height()
+    }
+
+    /// Returns `true` if the given block height exists in the ledger.
+    fn contains_block_height(&self, height: u32) -> bool {
+        self.ledger.contains_block_height(height).unwrap_or(false)
+    }
+
+    /// Returns the block height for the given block hash, if it exists.
+    fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32> {
+        self.ledger.get_height(hash)
+    }
+
+    /// Returns the block hash for the given block height, if it exists.
+    fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
+        self.ledger.get_hash(height)
+    }
+
+    /// Returns the block for the given block height.
+    fn get_block(&self, height: u32) -> Result<Block<N>> {
+        self.ledger.get_block(height)
+    }
+
+    /// Returns the blocks in the given block range.
+    /// The range is inclusive of the start and exclusive of the end.
+    fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>> {
+        self.ledger.get_blocks(heights)
+    }
+
     /// Returns the current committee.
     fn current_committee(&self) -> Result<Committee<N>> {
         self.ledger.latest_committee()
@@ -129,5 +161,26 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         // Check the transaction is well-formed.
         // TODO(ljedrz): check if this operation requires a blocking task.
         self.ledger.check_transaction_basic(&transaction, None)
+    }
+
+    /// Checks the given block is valid next block.
+    fn check_next_block(&self, block: &Block<N>) -> Result<()> {
+        self.ledger.check_next_block(block)
+    }
+
+    /// Returns a candidate for the next block in the ledger, using a committed subdag and its transmissions.
+    #[cfg(feature = "ledger-write")]
+    fn prepare_advance_to_next_quorum_block(
+        &self,
+        subdag: Subdag<N>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<Block<N>> {
+        self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)
+    }
+
+    /// Adds the given block as the next block in the ledger.
+    #[cfg(feature = "ledger-write")]
+    fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
+        self.ledger.advance_to_next_block(block)
     }
 }

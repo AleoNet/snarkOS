@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use super::*;
-
 use snarkos_node_router::messages::{
     BlockRequest,
     BlockResponse,
@@ -22,6 +21,7 @@ use snarkos_node_router::messages::{
     DisconnectReason,
     Message,
     MessageCodec,
+    Ping,
     Pong,
     UnconfirmedTransaction,
 };
@@ -58,21 +58,16 @@ where
     Self: Outbound<N>,
 {
     async fn on_connect(&self, peer_addr: SocketAddr) {
-        let peer_ip = if let Some(ip) = self.router.resolve_to_listener(&peer_addr) {
-            ip
-        } else {
-            return;
-        };
-
+        // Resolve the peer address to the listener address.
+        let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) else { return };
         // Retrieve the block locators.
-        let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
+        let block_locators = match self.sync.get_block_locators() {
             Ok(block_locators) => Some(block_locators),
             Err(e) => {
                 error!("Failed to get block locators: {e}");
                 return;
             }
         };
-
         // Send the first `Ping` message to the peer.
         self.send_ping(peer_ip, block_locators);
     }
@@ -83,6 +78,7 @@ impl<N: Network, C: ConsensusStorage<N>> Disconnect for Validator<N, C> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
         if let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) {
+            self.sync.remove_peer(&peer_ip);
             self.router.remove_connected_peer(peer_ip);
         }
     }
@@ -117,7 +113,7 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Validator<N, C> {
         if let Err(error) = self.inbound(peer_addr, message).await {
             if let Some(peer_ip) = self.router().resolve_to_listener(&peer_addr) {
                 warn!("Disconnecting from '{peer_ip}' - {error}");
-                self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+                Outbound::send(self, peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
                 // Disconnect from this peer.
                 self.router().disconnect(peer_ip);
             }
@@ -156,39 +152,55 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
             }
         };
         // Send the `BlockResponse` message to the peer.
-        self.send(peer_ip, Message::BlockResponse(BlockResponse { request: message, blocks }));
+        Outbound::send(self, peer_ip, Message::BlockResponse(BlockResponse { request: message, blocks }));
         true
     }
 
     /// Handles a `BlockResponse` message.
     fn block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> bool {
-        // Insert the candidate blocks into the sync pool.
-        for block in blocks {
-            if let Err(error) = self.router().sync().insert_block_response(peer_ip, block) {
+        // Tries to advance with blocks from the sync module.
+        match self.sync.advance_with_sync_blocks(peer_ip, blocks) {
+            Ok(()) => true,
+            Err(error) => {
                 warn!("{error}");
-                return false;
+                false
+            }
+        }
+    }
+
+    /// Processes the block locators and sends back a `Pong` message.
+    fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
+        // Check if the sync module is in router mode.
+        if self.sync.mode().is_router() {
+            // If block locators were provided, then update the peer in the sync pool.
+            if let Some(block_locators) = message.block_locators {
+                // Check the block locators are valid, and update the peer in the sync pool.
+                if let Err(error) = self.sync.update_peer_locators(peer_ip, block_locators) {
+                    warn!("Peer '{peer_ip}' sent invalid block locators: {error}");
+                    return false;
+                }
             }
         }
 
-        // Tries to advance with blocks from the sync pool.
-        self.advance_with_sync_blocks();
+        // Send a `Pong` message to the peer.
+        Outbound::send(self, peer_ip, Message::Pong(Pong { is_fork: Some(false) }));
         true
     }
 
     /// Sleeps for a period and then sends a `Ping` message to the peer.
     fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
         // Spawn an asynchronous task for the `Ping` request.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
             // Check that the peer is still connected.
-            if self_clone.router().is_connected(&peer_ip) {
+            if self_.router().is_connected(&peer_ip) {
                 // Retrieve the block locators.
-                match crate::helpers::get_block_locators(&self_clone.ledger) {
+                match self_.sync.get_block_locators() {
                     // Send a `Ping` message to the peer.
-                    Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
-                    Err(e) => error!("Failed to get block locators: {e}"),
+                    Ok(block_locators) => self_.send_ping(peer_ip, Some(block_locators)),
+                    Err(e) => error!("Failed to get block locators - {e}"),
                 }
             }
         });
@@ -208,7 +220,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         // Retrieve the latest block header.
         let block_header = Data::Object(self.ledger.latest_header());
         // Send the `PuzzleResponse` message to the peer.
-        self.send(peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
+        Outbound::send(self, peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
         true
     }
 

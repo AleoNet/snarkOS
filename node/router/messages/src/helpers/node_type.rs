@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 pub enum NodeType {
     /// A client node is a full node, capable of syncing with the network.
     Client = 0,
-    /// A prover is a full node, capable of producing proofs for consensus.
+    /// A prover is a light node, capable of producing proofs for consensus.
     Prover,
     /// A validator is a full node, capable of validating blocks.
     Validator,

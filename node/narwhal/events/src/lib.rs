@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![forbid(unsafe_code)]
+
 mod batch_certified;
 pub use batch_certified::BatchCertified;
 
@@ -20,6 +22,12 @@ pub use batch_propose::BatchPropose;
 
 mod batch_signature;
 pub use batch_signature::BatchSignature;
+
+mod block_request;
+pub use block_request::BlockRequest;
+
+mod block_response;
+pub use block_response::{BlockResponse, DataBlocks};
 
 mod certificate_request;
 pub use certificate_request::CertificateRequest;
@@ -36,6 +44,9 @@ pub use challenge_response::ChallengeResponse;
 mod disconnect;
 pub use disconnect::{Disconnect, DisconnectReason};
 
+mod helpers;
+pub use helpers::*;
+
 mod primary_ping;
 pub use primary_ping::PrimaryPing;
 
@@ -48,19 +59,22 @@ pub use transmission_response::TransmissionResponse;
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
-use snarkos_node_sync::locators::BlockLocators;
+use snarkos_node_sync_locators::BlockLocators;
 use snarkvm::{
-    console::prelude::{FromBytes, Network, Read, ToBytes, Write},
-    ledger::narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
+    console::prelude::{error, FromBytes, Network, Read, ToBytes, Write},
+    ledger::{
+        block::Block,
+        narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
+    },
     prelude::{Address, Field, Signature},
 };
 
 use ::bytes::{Buf, BytesMut};
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 pub use std::io::Result as IoResult;
+use std::{borrow::Cow, net::SocketAddr};
 
 pub trait EventTrait: ToBytes + FromBytes {
     /// Returns the event name.
@@ -72,6 +86,8 @@ pub enum Event<N: Network> {
     BatchPropose(BatchPropose<N>),
     BatchSignature(BatchSignature<N>),
     BatchCertified(BatchCertified<N>),
+    BlockRequest(BlockRequest),
+    BlockResponse(BlockResponse<N>),
     CertificateRequest(CertificateRequest<N>),
     CertificateResponse(CertificateResponse<N>),
     ChallengeRequest(ChallengeRequest<N>),
@@ -100,6 +116,8 @@ impl<N: Network> Event<N> {
             Self::BatchPropose(event) => event.name(),
             Self::BatchSignature(event) => event.name(),
             Self::BatchCertified(event) => event.name(),
+            Self::BlockRequest(event) => event.name(),
+            Self::BlockResponse(event) => event.name(),
             Self::CertificateRequest(event) => event.name(),
             Self::CertificateResponse(event) => event.name(),
             Self::ChallengeRequest(event) => event.name(),
@@ -119,15 +137,17 @@ impl<N: Network> Event<N> {
             Self::BatchPropose(..) => 0,
             Self::BatchSignature(..) => 1,
             Self::BatchCertified(..) => 2,
-            Self::CertificateRequest(..) => 3,
-            Self::CertificateResponse(..) => 4,
-            Self::ChallengeRequest(..) => 5,
-            Self::ChallengeResponse(..) => 6,
-            Self::Disconnect(..) => 7,
-            Self::PrimaryPing(..) => 8,
-            Self::TransmissionRequest(..) => 9,
-            Self::TransmissionResponse(..) => 10,
-            Self::WorkerPing(..) => 11,
+            Self::BlockRequest(..) => 3,
+            Self::BlockResponse(..) => 4,
+            Self::CertificateRequest(..) => 5,
+            Self::CertificateResponse(..) => 6,
+            Self::ChallengeRequest(..) => 7,
+            Self::ChallengeResponse(..) => 8,
+            Self::Disconnect(..) => 9,
+            Self::PrimaryPing(..) => 10,
+            Self::TransmissionRequest(..) => 11,
+            Self::TransmissionResponse(..) => 12,
+            Self::WorkerPing(..) => 13,
         }
     }
 
@@ -140,6 +160,8 @@ impl<N: Network> Event<N> {
             Self::BatchPropose(event) => event.write_le(writer),
             Self::BatchSignature(event) => event.write_le(writer),
             Self::BatchCertified(event) => event.write_le(writer),
+            Self::BlockRequest(event) => event.write_le(writer),
+            Self::BlockResponse(event) => event.write_le(writer),
             Self::CertificateRequest(event) => event.write_le(writer),
             Self::CertificateResponse(event) => event.write_le(writer),
             Self::ChallengeRequest(event) => event.write_le(writer),
@@ -171,16 +193,18 @@ impl<N: Network> Event<N> {
             0 => Self::BatchPropose(BatchPropose::read_le(reader)?),
             1 => Self::BatchSignature(BatchSignature::read_le(reader)?),
             2 => Self::BatchCertified(BatchCertified::read_le(reader)?),
-            3 => Self::CertificateRequest(CertificateRequest::read_le(reader)?),
-            4 => Self::CertificateResponse(CertificateResponse::read_le(reader)?),
-            5 => Self::ChallengeRequest(ChallengeRequest::read_le(reader)?),
-            6 => Self::ChallengeResponse(ChallengeResponse::read_le(reader)?),
-            7 => Self::Disconnect(Disconnect::read_le(reader)?),
-            8 => Self::PrimaryPing(PrimaryPing::read_le(reader)?),
-            9 => Self::TransmissionRequest(TransmissionRequest::read_le(reader)?),
-            10 => Self::TransmissionResponse(TransmissionResponse::read_le(reader)?),
-            11 => Self::WorkerPing(WorkerPing::read_le(reader)?),
-            _ => bail!("Unknown event ID {id}"),
+            3 => Self::BlockRequest(BlockRequest::read_le(reader)?),
+            4 => Self::BlockResponse(BlockResponse::read_le(reader)?),
+            5 => Self::CertificateRequest(CertificateRequest::read_le(reader)?),
+            6 => Self::CertificateResponse(CertificateResponse::read_le(reader)?),
+            7 => Self::ChallengeRequest(ChallengeRequest::read_le(reader)?),
+            8 => Self::ChallengeResponse(ChallengeResponse::read_le(reader)?),
+            9 => Self::Disconnect(Disconnect::read_le(reader)?),
+            10 => Self::PrimaryPing(PrimaryPing::read_le(reader)?),
+            11 => Self::TransmissionRequest(TransmissionRequest::read_le(reader)?),
+            12 => Self::TransmissionResponse(TransmissionResponse::read_le(reader)?),
+            13 => Self::WorkerPing(WorkerPing::read_le(reader)?),
+            14.. => bail!("Unknown event ID {id}"),
         };
 
         Ok(event)
@@ -188,24 +212,54 @@ impl<N: Network> Event<N> {
 }
 
 #[cfg(test)]
+mod tests {
+    use crate::Event;
+    use bytes::{BufMut, BytesMut};
+    use snarkvm::console::prelude::ToBytes;
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    #[test]
+    #[should_panic(expected = "Missing event ID")]
+    fn deserializing_empty_defaults_no_reason() {
+        let buf = BytesMut::default().writer();
+        Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap();
+    }
+
+    #[test]
+    fn deserializing_invalid_data_panics() {
+        let mut buf = BytesMut::default().writer();
+        let invalid_id = u16::MAX;
+        invalid_id.write_le(&mut buf).unwrap();
+        assert_eq!(
+            Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap_err().to_string(),
+            format!("Unknown event ID {invalid_id}")
+        );
+    }
+}
+
+#[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        event::{
-            batch_certified::prop_tests::any_batch_certified,
-            batch_propose::prop_tests::any_batch_propose,
-            batch_signature::prop_tests::any_batch_signature,
-            certificate_request::prop_tests::any_certificate_request,
-            certificate_response::prop_tests::any_certificate_response,
-            challenge_request::prop_tests::any_challenge_request,
-            challenge_response::prop_tests::any_challenge_response,
-            transmission_request::prop_tests::any_transmission_request,
-            transmission_response::prop_tests::any_transmission_response,
-            worker_ping::prop_tests::any_worker_ping,
-        },
+        batch_certified::prop_tests::any_batch_certified,
+        batch_propose::prop_tests::any_batch_propose,
+        batch_signature::prop_tests::any_batch_signature,
+        certificate_request::prop_tests::any_certificate_request,
+        certificate_response::prop_tests::any_certificate_response,
+        challenge_request::prop_tests::any_challenge_request,
+        challenge_response::prop_tests::any_challenge_response,
+        transmission_request::prop_tests::any_transmission_request,
+        transmission_response::prop_tests::any_transmission_response,
+        worker_ping::prop_tests::any_worker_ping,
         Disconnect,
         DisconnectReason,
         Event,
     };
+    use snarkvm::{
+        console::{network::Network, types::Field},
+        ledger::{coinbase::PuzzleCommitment, narwhal::TransmissionID},
+        prelude::{Rng, Uniform},
+    };
+
     use bytes::{BufMut, BytesMut};
     use proptest::{
         prelude::{any, BoxedStrategy, Just, Strategy},
@@ -215,6 +269,29 @@ pub mod prop_tests {
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    /// Returns the current UTC epoch timestamp.
+    pub fn now() -> i64 {
+        time::OffsetDateTime::now_utc().unix_timestamp()
+    }
+
+    pub fn any_puzzle_commitment() -> BoxedStrategy<PuzzleCommitment<CurrentNetwork>> {
+        Just(0).prop_perturb(|_, mut rng| PuzzleCommitment::from_g1_affine(rng.gen())).boxed()
+    }
+
+    pub fn any_transaction_id() -> BoxedStrategy<<CurrentNetwork as Network>::TransactionID> {
+        Just(0)
+            .prop_perturb(|_, mut rng| <CurrentNetwork as Network>::TransactionID::from(Field::rand(&mut rng)))
+            .boxed()
+    }
+
+    pub fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
+        prop_oneof![
+            any_transaction_id().prop_map(TransmissionID::Transaction),
+            any_puzzle_commitment().prop_map(TransmissionID::Solution),
+        ]
+        .boxed()
+    }
 
     pub fn any_event() -> BoxedStrategy<Event<CurrentNetwork>> {
         prop_oneof![
@@ -250,31 +327,5 @@ pub mod prop_tests {
         let deserialized: Event<CurrentNetwork> = Event::deserialize(buf.get_ref().clone()).unwrap();
         assert_eq!(original.id(), deserialized.id());
         assert_eq!(original.name(), deserialized.name());
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::Event;
-    use bytes::{BufMut, BytesMut};
-    use snarkvm::console::prelude::ToBytes;
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
-
-    #[test]
-    #[should_panic(expected = "Missing event ID")]
-    fn deserializing_empty_defaults_no_reason() {
-        let buf = BytesMut::default().writer();
-        Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap();
-    }
-
-    #[test]
-    fn deserializing_invalid_data_panics() {
-        let mut buf = BytesMut::default().writer();
-        let invalid_id = u16::MAX;
-        invalid_id.write_le(&mut buf).unwrap();
-        assert_eq!(
-            Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap_err().to_string(),
-            format!("Unknown event ID {invalid_id}")
-        );
     }
 }

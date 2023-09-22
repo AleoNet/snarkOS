@@ -13,9 +13,8 @@
 // limitations under the License.
 
 use crate::{
-    event::{Event, TransmissionRequest, TransmissionResponse},
+    events::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
-    Ledger,
     ProposedBatch,
     Transport,
     MAX_BATCH_DELAY,
@@ -23,6 +22,7 @@ use crate::{
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
 };
+use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
     ledger::narwhal::{Data, Transmission, TransmissionID},
@@ -49,7 +49,7 @@ pub struct Worker<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// The ledger service.
-    ledger: Ledger<N>,
+    ledger: Arc<dyn LedgerService<N>>,
     /// The proposed batch.
     proposed_batch: Arc<ProposedBatch<N>>,
     /// The ready queue.
@@ -66,7 +66,7 @@ impl<N: Network> Worker<N> {
         id: u8,
         gateway: Arc<dyn Transport<N>>,
         storage: Storage<N>,
-        ledger: Ledger<N>,
+        ledger: Arc<dyn LedgerService<N>>,
         proposed_batch: Arc<ProposedBatch<N>>,
     ) -> Result<Self> {
         // Ensure the worker ID is valid.
@@ -408,7 +408,9 @@ impl<N: Network> Worker<N> {
         // Insert the transmission ID into the pending queue.
         self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
         // Send the transmission request to the peer.
-        self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
+        if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
+            bail!("Unable to fetch transmission - failed to send request")
+        }
         // Wait for the transmission to be fetched.
         match timeout(Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
             // If the transmission was fetched, return it.
@@ -440,7 +442,10 @@ impl<N: Network> Worker<N> {
         // Attempt to retrieve the transmission.
         if let Some(transmission) = self.get_transmission(transmission_id) {
             // Send the transmission response to the peer.
-            self.gateway.send(peer_ip, Event::TransmissionResponse((transmission_id, transmission).into()));
+            let self_ = self.clone();
+            tokio::spawn(async move {
+                self_.gateway.send(peer_ip, Event::TransmissionResponse((transmission_id, transmission).into())).await;
+            });
         }
     }
 
@@ -463,19 +468,26 @@ mod tests {
     use snarkos_node_narwhal_ledger_service::LedgerService;
     use snarkvm::{
         console::{network::Network, types::Field},
-        ledger::{committee::Committee, narwhal::TransmissionID},
+        ledger::{
+            block::Block,
+            committee::Committee,
+            narwhal::{Subdag, Transmission, TransmissionID},
+        },
     };
 
     use bytes::Bytes;
+    use indexmap::IndexMap;
     use mockall::mock;
+    use std::{io, ops::Range};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     mock! {
         Gateway<N: Network> {}
+        #[async_trait]
         impl<N:Network> Transport<N> for Gateway<N> {
             fn broadcast(&self, event: Event<N>);
-            fn send(&self, peer_ip: SocketAddr, event: Event<N>);
+            async fn send(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>>;
         }
     }
 
@@ -484,6 +496,12 @@ mod tests {
         Ledger<N: Network> {}
         #[async_trait]
         impl<N: Network> LedgerService<N> for Ledger<N> {
+            fn latest_block_height(&self) -> u32;
+            fn contains_block_height(&self, height: u32) -> bool;
+            fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32>;
+            fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
+            fn get_block(&self, height: u32) -> Result<Block<N>>;
+            fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
@@ -498,6 +516,13 @@ mod tests {
                 transaction_id: N::TransactionID,
                 transaction: Data<Transaction<N>>,
             ) -> Result<()>;
+            fn check_next_block(&self, block: &Block<N>) -> Result<()>;
+            fn prepare_advance_to_next_quorum_block(
+                &self,
+                subdag: Subdag<N>,
+                transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+            ) -> Result<Block<N>>;
+            fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
         }
     }
 
@@ -512,7 +537,7 @@ mod tests {
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -541,10 +566,13 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (_tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -572,12 +600,15 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (_tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -607,12 +638,15 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (_tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -642,12 +676,15 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (_tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -677,12 +714,15 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
-        gateway.expect_send().returning(|_, _| ());
+        gateway.expect_send().returning(|_, _| {
+            let (_tx, rx) = oneshot::channel();
+            Some(rx)
+        });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
-        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
@@ -741,7 +781,7 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let committee = new_test_committee(4);
-        let ledger: Ledger<CurrentNetwork> = Arc::new(MockLedgerService::new(committee));
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(MockLedgerService::new(committee));
         let worker = Worker::new(id, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         assert_eq!(worker.id(), id);
     }
@@ -753,7 +793,7 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let committee = new_test_committee(4);
-        let ledger: Ledger<CurrentNetwork> = Arc::new(MockLedgerService::new(committee));
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(MockLedgerService::new(committee));
         let worker = Worker::new(id, Arc::new(gateway), storage, ledger, Default::default());
         // TODO once Worker implements Debug, simplify this with `unwrap_err`
         if let Err(error) = worker {

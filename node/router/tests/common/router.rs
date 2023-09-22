@@ -19,6 +19,7 @@ use snarkos_node_router::{
         DisconnectReason,
         Message,
         MessageCodec,
+        Ping,
         Pong,
         UnconfirmedSolution,
         UnconfirmedTransaction,
@@ -159,6 +160,11 @@ impl<N: Network> Inbound<N> for TestRouter<N> {
 
     /// Handles a `BlockResponse` message.
     fn block_response(&self, _peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool {
+        true
+    }
+
+    /// Handles an `Ping` message.
+    fn ping(&self, _peer_ip: SocketAddr, _message: Ping<N>) -> bool {
         true
     }
 

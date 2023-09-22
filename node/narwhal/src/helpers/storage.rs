@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::check_timestamp_for_liveness, primary::Ledger};
+use crate::helpers::check_timestamp_for_liveness;
+use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
     ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     prelude::{bail, ensure, Address, Field, Network, Result},
@@ -48,7 +49,7 @@ use std::{
 ///  - The next round is inserted into the `current_round`.
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
-    ledger: Ledger<N>,
+    ledger: Arc<dyn LedgerService<N>>,
     /* Once per round */
     /// The current round.
     current_round: Arc<AtomicU64>,
@@ -69,7 +70,7 @@ pub struct Storage<N: Network> {
 
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
-    pub fn new(ledger: Ledger<N>, max_gc_rounds: u64) -> Self {
+    pub fn new(ledger: Arc<dyn LedgerService<N>>, max_gc_rounds: u64) -> Self {
         // Retrieve the current committee.
         let committee = ledger.current_committee().expect("Ledger is missing a committee.");
         // Retrieve the current round.
@@ -89,7 +90,7 @@ impl<N: Network> Storage<N> {
 
     /// Returns the ledger service.
     #[cfg(test)]
-    pub const fn ledger(&self) -> &Ledger<N> {
+    pub const fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
         &self.ledger
     }
 }

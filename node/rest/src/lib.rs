@@ -55,7 +55,7 @@ use tower_http::{
 #[derive(Clone)]
 pub struct Rest<N: Network, C: ConsensusStorage<N>, R: Routing<N>> {
     /// The consensus module.
-    consensus: Option<Consensus<N, C>>,
+    consensus: Option<Consensus<N>>,
     /// The ledger.
     ledger: Ledger<N, C>,
     /// The node (routing).
@@ -68,7 +68,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
     /// Initializes a new instance of the server.
     pub fn start(
         rest_ip: SocketAddr,
-        consensus: Option<Consensus<N, C>>,
+        consensus: Option<Consensus<N>>,
         ledger: Ledger<N, C>,
         routing: Arc<R>,
     ) -> Result<Self> {
