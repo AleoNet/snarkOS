@@ -134,7 +134,7 @@ pub struct Gateway<N: Network> {
     /// The worker senders.
     worker_senders: Arc<OnceCell<IndexMap<u8, WorkerSender<N>>>>,
     /// A map of peer IPs to their noise states.
-    noise_states: Arc<RwLock<HashMap<SocketAddr, Option<NoiseState>>>>,
+    noise_states: Arc<RwLock<HashMap<SocketAddr, NoiseState>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -790,13 +790,7 @@ impl<N: Network> Reading for Gateway<N> {
     fn codec(&self, peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
         // SAFETY: must exist as the connecton is established.
         let peer_ip = self.resolver.get_listener(peer_addr).unwrap();
-        let state = self
-            .noise_states
-            .read()
-            .get(&peer_ip)
-            .cloned()
-            .expect("noise state entry must exist")
-            .expect("noise state must be some");
+        let state = self.noise_states.read().get(&peer_ip).cloned().unwrap();
         NoiseCodec::new(state)
     }
 
@@ -835,12 +829,7 @@ impl<N: Network> Writing for Gateway<N> {
     fn codec(&self, peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
         // SAFETY: must exist as the connection is established.
         let peer_ip = self.resolver.get_listener(peer_addr).unwrap();
-        let state = self
-            .noise_states
-            .write()
-            .remove(&peer_ip)
-            .expect("noise state entry must exist")
-            .expect("noise state must be some");
+        let state = self.noise_states.write().remove(&peer_ip).unwrap();
         NoiseCodec::new(state)
     }
 }
@@ -891,13 +880,6 @@ impl<N: Network> Handshake for Gateway<N> {
         // Remove the address from the collection of connecting peers if the handshake got to the point where it's known,
         // even if the entire process has failed in the end.
         if let Some(ip) = peer_ip {
-            // If the handshake has failed AND it's not a duplicate handshake attempt, remove the noise state.
-            // FIXME: we should deduplicate connections earlier in the handshake to avoid intricate logic
-            if let Err(e) = &handshake_result {
-                if e.kind() != io::ErrorKind::AlreadyExists {
-                    self.noise_states.write().remove(&ip);
-                }
-            }
             self.connecting_peers.lock().shift_remove(&ip);
         }
 
@@ -974,9 +956,6 @@ impl<N: Network> Gateway<N> {
     ) -> io::Result<SocketAddr> {
         // This value is immediately guaranteed to be present, so it can be unwrapped.
         let peer_ip = peer_ip.unwrap();
-
-        // Make sure there is no noise handshake already in progress.
-        self.register_noise_handshake(peer_ip)?;
 
         /* Noise codec setup */
 
@@ -1106,9 +1085,6 @@ impl<N: Network> Gateway<N> {
         *peer_ip = Some(SocketAddr::new(peer_addr.ip(), peer_request.listener_port));
         let peer_ip = peer_ip.unwrap();
 
-        // Make sure there is no noise handshake already in progress.
-        self.register_noise_handshake(peer_ip)?;
-
         // Knowing the peer's listening address, ensure it is allowed to connect.
         if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_ip) {
             return Err(error(format!("{forbidden_message}")));
@@ -1160,43 +1136,23 @@ impl<N: Network> Gateway<N> {
         Ok(peer_ip)
     }
 
-    /// Store the peer's listener in the noise state map, used to detect double-connects.
-    fn register_noise_handshake(&self, peer_ip: SocketAddr) -> io::Result<()> {
+    /// Saves the finalized noise state, checking for potential duplicate connection attempts.
+    fn save_noise_state(&self, peer_ip: SocketAddr, framed: Framed<&mut TcpStream, NoiseCodec<N>>) -> io::Result<()> {
         match self.noise_states.write().entry(peer_ip) {
             Occupied(_) => {
                 // Double-connect, abort.
                 Err(io::ErrorKind::AlreadyExists.into())
             }
-
             Vacant(entry) => {
-                // Insert a placeholder value to indicate that the handshake is in progress.
-                entry.insert(None);
-                Ok(())
-            }
-        }
-    }
-
-    /// Saves the finalized noise state, checking for potential duplicate connection attempts.
-    fn save_noise_state(&self, peer_ip: SocketAddr, framed: Framed<&mut TcpStream, NoiseCodec<N>>) -> io::Result<()> {
-        match self.noise_states.write().entry(peer_ip) {
-            Occupied(mut entry) => {
-                // A connection with this peer listener has already occured, cancel the handshake.
-                if entry.get().is_some() {
-                    return Err(io::ErrorKind::AlreadyExists.into());
-                }
-
                 // We are the first to handshake with the peer listener, store the noise state for
                 // reuse in Reading and Writing.
                 let FramedParts { codec, .. } = framed.into_parts();
                 let NoiseCodec { noise_state, .. } = codec;
-                entry.insert(Some(noise_state));
-            }
-            Vacant(_) => {
-                unreachable!("noise state entry must exist");
+                entry.insert(noise_state);
+
+                Ok(())
             }
         }
-
-        Ok(())
     }
 
     /// Verifies the given challenge request. Returns a disconnect reason if the request is invalid.
