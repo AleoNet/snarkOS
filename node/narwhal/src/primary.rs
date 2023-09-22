@@ -378,7 +378,7 @@ impl<N: Network> Primary<N> {
         }
 
         // Ensure the batch author is a current committee member.
-        if self.gateway.is_authorized_validator_address(batch_header.author()) {
+        if !self.gateway.is_authorized_validator_address(batch_header.author()) {
             bail!("Malicious peer - proposed batch from a non-committee member ({})", batch_header.author());
         }
         // Ensure the batch proposal is not from the current primary.
@@ -507,7 +507,7 @@ impl<N: Network> Primary<N> {
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
         // Ensure the batch certificate is authored by a current committee member.
-        if self.gateway.is_authorized_validator_address(certificate.author()) {
+        if !self.gateway.is_authorized_validator_address(certificate.author()) {
             bail!("Received a batch certificate from a non-committee member ({})", certificate.author());
         }
         // Ensure the batch proposal is not from the current primary.
