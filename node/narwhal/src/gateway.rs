@@ -891,6 +891,13 @@ impl<N: Network> Handshake for Gateway<N> {
         // Remove the address from the collection of connecting peers if the handshake got to the point where it's known,
         // even if the entire process has failed in the end.
         if let Some(ip) = peer_ip {
+            // If the handshake has failed AND it's not a duplicate handshake attempt, remove the noise state.
+            // FIXME: we should deduplicate connections earlier in the handshake to avoid intricate logic
+            if let Err(e) = &handshake_result {
+                if e.kind() != io::ErrorKind::AlreadyExists {
+                    self.noise_states.write().remove(&ip);
+                }
+            }
             self.connecting_peers.lock().shift_remove(&ip);
         }
 
