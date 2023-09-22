@@ -379,7 +379,11 @@ impl<N: Network> Primary<N> {
 
         // Ensure the batch author is a current committee member.
         if self.gateway.is_authorized_validator_address(batch_header.author()) {
-            bail!("Malicious peer - proposed batch from a non-committee member {}", batch_header.author());
+            bail!("Malicious peer - proposed batch from a non-committee member ({})", batch_header.author());
+        }
+        // Ensure the batch proposal is not from the current primary.
+        if self.gateway.account().address() == batch_header.author() {
+            bail!("Malicious peer - proposed batch from myself ({})", batch_header.author());
         }
 
         // If the peer is ahead, use the batch header to sync up to the peer.
@@ -499,7 +503,11 @@ impl<N: Network> Primary<N> {
     ) -> Result<()> {
         // Ensure the batch certificate is authored by a current committee member.
         if self.gateway.is_authorized_validator_address(certificate.author()) {
-            bail!("Received a batch certificate from a non-committee member {}", certificate.author());
+            bail!("Received a batch certificate from a non-committee member ({})", certificate.author());
+        }
+        // Ensure the batch proposal is not from the current primary.
+        if self.gateway.account().address() == certificate.author() {
+            bail!("Received a batch certificate for myself ({})", certificate.author());
         }
         // Store the certificate, after ensuring it is valid.
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
