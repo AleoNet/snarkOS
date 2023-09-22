@@ -58,7 +58,7 @@ use colored::Colorize;
 use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use rand::seq::IteratorRandom;
+use rand::seq::{IteratorRandom, SliceRandom};
 use snow::{params::NoiseParams, Builder};
 use std::{future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
@@ -602,10 +602,13 @@ impl<N: Network> Gateway<N> {
                 Ok(())
             }
             Event::ValidatorsRequest(_) => {
+                // Retrieve the connected peers.
+                let mut connected_peers: Vec<_> = self.connected_peers.read().iter().cloned().collect();
+                // Shuffle the connected peers.
+                connected_peers.shuffle(&mut rand::thread_rng());
+
                 let self_ = self.clone();
                 tokio::spawn(async move {
-                    // Send the validators response to the peer.
-                    let connected_peers = self_.connected_peers.read().clone();
                     // Initialize the validators.
                     let mut validators = IndexMap::with_capacity(MAX_VALIDATORS_TO_SEND);
                     // Iterate over the validators.
