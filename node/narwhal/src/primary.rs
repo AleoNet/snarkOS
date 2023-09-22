@@ -854,15 +854,18 @@ impl<N: Network> Primary<N> {
         let mut blocks = BTreeMap::new();
 
         // Retrieve the current round and block state.
-        let current_round = self.storage().current_round();
         let latest_block = self.ledger.get_block(self.ledger.latest_block_height())?;
         let latest_round = latest_block.round();
         let max_gc_round = latest_round.saturating_sub(self.storage().max_gc_rounds());
 
+        // TODO (raychu86): Is this needed?
+        // Update the committee to the current ledger. Otherwise, it will be stuck at 1.
+        self.update_committee_to_round(latest_round).await?;
+
         // Insert block certificates up to the maximum garbage collection round or current round.
         let mut block = latest_block;
         let mut round = latest_round;
-        while round > max_gc_round && round > current_round {
+        while round > max_gc_round {
             // Insert the block into the map.
             blocks.insert(round, block.clone());
 
@@ -889,7 +892,7 @@ impl<N: Network> Primary<N> {
             .gateway
             .sync()
             .get_peer_heights()
-            .range(block.height().saturating_add(1)..)
+            .range(block.height()..)
             .flat_map(|(_, ips)| ips.iter())
             .choose(&mut rand::thread_rng())
         {
@@ -897,12 +900,24 @@ impl<N: Network> Primary<N> {
             None => bail!("No peers to fetch block certificates from"),
         };
 
+        // TODO (raychu86): Unify logic or use `sync_with_batch_header_from_peer`.
+
         // Add the block certificates to storage.
         if let Authority::Quorum(subdag) = block.authority() {
             for (_, certificates) in subdag.iter() {
                 for certificate in certificates {
+                    // Ensure the primary has all of the previous certificates.
+                    let missing_certificates =
+                        self.fetch_missing_previous_certificates(peer_ip, certificate.batch_header()).await?;
+
                     // Get transmissions from peer.
                     let transmissions = self.fetch_missing_transmissions(peer_ip, certificate.batch_header()).await?;
+
+                    // Iterate through the missing certificates.
+                    for batch_certificate in missing_certificates {
+                        // Store the batch certificate (recursively fetching any missing previous certificates).
+                        self.sync_with_certificate_from_peer(peer_ip, batch_certificate).await?;
+                    }
 
                     // Insert the certificate into storage.
                     self.storage().insert_certificate(certificate.clone(), transmissions)?;
