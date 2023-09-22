@@ -1158,7 +1158,6 @@ impl<N: Network> Gateway<N> {
         match self.noise_states.write().entry(peer_ip) {
             Occupied(_) => {
                 // Double-connect, abort.
-                warn!("{CONTEXT} Handshake with '{peer_ip}' failed: noise state already exists");
                 Err(io::ErrorKind::AlreadyExists.into())
             }
 
@@ -1176,7 +1175,6 @@ impl<N: Network> Gateway<N> {
             Occupied(mut entry) => {
                 // A connection with this peer listener has already occured, cancel the handshake.
                 if entry.get().is_some() {
-                    warn!("{CONTEXT} Handshake with '{peer_ip}' failed: noise state already exists");
                     return Err(io::ErrorKind::AlreadyExists.into());
                 }
 
