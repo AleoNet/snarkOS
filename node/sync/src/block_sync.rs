@@ -129,17 +129,17 @@ impl<N: Network> BlockSync<N> {
         self.locators.read().get(peer_ip).map(|locators| locators.latest_locator_height())
     }
 
-    // /// Returns a map of peer height to peer IPs.
-    // /// e.g. `{{ 127 => \[peer1, peer2\], 128 => \[peer3\], 135 => \[peer4, peer5\] }}`
-    // fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
-    //     self.locators.read().iter().map(|(peer_ip, locators)| (locators.latest_locator_height(), *peer_ip)).fold(
-    //         Default::default(),
-    //         |mut map, (height, peer_ip)| {
-    //             map.entry(height).or_default().push(peer_ip);
-    //             map
-    //         },
-    //     )
-    // }
+    /// Returns a map of peer height to peer IPs.
+    /// e.g. `{{ 127 => \[peer1, peer2\], 128 => \[peer3\], 135 => \[peer4, peer5\] }}`
+    pub fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
+        self.locators.read().iter().map(|(peer_ip, locators)| (locators.latest_locator_height(), *peer_ip)).fold(
+            Default::default(),
+            |mut map, (height, peer_ip)| {
+                map.entry(height).or_default().push(peer_ip);
+                map
+            },
+        )
+    }
 
     // /// Returns the list of peers with their heights, sorted by height (descending).
     // fn get_peers_by_height(&self) -> Vec<(SocketAddr, u32)> {

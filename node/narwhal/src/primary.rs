@@ -41,7 +41,8 @@ use snarkos_node_sync::BlockSync;
 use snarkvm::{
     console::{prelude::*, types::Field},
     ledger::{
-        block::Transaction,
+        authority::Authority,
+        block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     },
@@ -50,8 +51,9 @@ use snarkvm::{
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
+use rand::seq::IteratorRandom;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     future::Future,
     net::SocketAddr,
     sync::Arc,
@@ -828,6 +830,70 @@ impl<N: Network> Primary<N> {
                 worker.reinsert(transmission_id, transmission);
             },
         )
+    }
+
+    /// Sync the storage with ledger state.
+    pub async fn sync_storage_with_ledger(&self) -> Result<()> {
+        // Determine the blocks whose certificates need to be added to storage.
+        let mut blocks = BTreeMap::new();
+
+        // Retrieve the current round and block state.
+        let current_round = self.storage().current_round();
+        let latest_block = self.ledger.get_block(self.ledger.latest_block_height())?;
+        let latest_round = latest_block.round();
+        let max_gc_round = latest_round.saturating_sub(self.storage().max_gc_rounds());
+
+        // Insert block certificates up to the maximum garbage collection round or current round.
+        let mut block = latest_block;
+        let mut round = latest_round;
+        while round > max_gc_round && round > current_round {
+            // Insert the block into the map.
+            blocks.insert(round, block.clone());
+
+            // Update the current block and round.
+            block = self.ledger.get_block(block.height().saturating_sub(1))?;
+            round = block.round();
+        }
+
+        // Insert the block certificates.
+        for (round, block) in blocks {
+            if let Err(e) = self.insert_block_certificates(&block).await {
+                warn!("Failed to insert block certificates for round {round} - {e}");
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Insert the block and its certificates into storage.
+    pub async fn insert_block_certificates(&self, block: &Block<N>) -> Result<()> {
+        // Select a random peer to fetch the transmissions from.
+        let peer_ip = match self
+            .gateway
+            .sync()
+            .get_peer_heights()
+            .range(block.height().saturating_add(1)..)
+            .flat_map(|(_, ips)| ips.iter())
+            .choose(&mut rand::thread_rng())
+        {
+            Some(peer_ip) => *peer_ip,
+            None => bail!("No peers to fetch block certificates from"),
+        };
+
+        // Add the block certificates to storage.
+        if let Authority::Quorum(subdag) = block.authority() {
+            for (_, certificates) in subdag.iter() {
+                for certificate in certificates {
+                    // Get transmissions from peer.
+                    let transmissions = self.fetch_missing_transmissions(peer_ip, certificate.batch_header()).await?;
+
+                    // Insert the certificate into storage.
+                    self.storage().insert_certificate(certificate.clone(), transmissions)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Recursively stores a given batch certificate, after ensuring:
