@@ -13,9 +13,19 @@
 // limitations under the License.
 
 use super::*;
-
 use snarkos_node_router::{
-    messages::{BlockRequest, DisconnectReason, MessageCodec, Ping, Pong, UnconfirmedTransaction},
+    messages::{
+        BlockRequest,
+        BlockResponse,
+        Data,
+        DataBlocks,
+        DisconnectReason,
+        MessageCodec,
+        Ping,
+        Pong,
+        PuzzleResponse,
+        UnconfirmedTransaction,
+    },
     Routing,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
@@ -156,9 +166,20 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Client<N, C> {
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     /// Handles a `BlockRequest` message.
-    fn block_request(&self, peer_ip: SocketAddr, _message: BlockRequest) -> bool {
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
+    fn block_request(&self, peer_ip: SocketAddr, message: BlockRequest) -> bool {
+        let BlockRequest { start_height, end_height } = &message;
+
+        // Retrieve the blocks within the requested range.
+        let blocks = match self.ledger.get_blocks(*start_height..*end_height) {
+            Ok(blocks) => Data::Object(DataBlocks(blocks)),
+            Err(error) => {
+                error!("Failed to retrieve blocks {start_height} to {end_height} from the ledger - {error}");
+                return false;
+            }
+        };
+        // Send the `BlockResponse` message to the peer.
+        Outbound::send(self, peer_ip, Message::BlockResponse(BlockResponse { request: message, blocks }));
+        true
     }
 
     /// Handles a `BlockResponse` message.
@@ -214,30 +235,25 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
 
     /// Disconnects on receipt of a `PuzzleRequest` message.
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
+        // Retrieve the latest epoch challenge.
+        let epoch_challenge = match self.ledger.latest_epoch_challenge() {
+            Ok(epoch_challenge) => epoch_challenge,
+            Err(error) => {
+                error!("Failed to prepare a puzzle request for '{peer_ip}': {error}");
+                return false;
+            }
+        };
+        // Retrieve the latest block header.
+        let block_header = Data::Object(self.ledger.latest_header());
+        // Send the `PuzzleResponse` message to the peer.
+        Outbound::send(self, peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
+        true
     }
 
     /// Saves the latest epoch challenge and latest block header in the node.
-    fn puzzle_response(&self, peer_ip: SocketAddr, epoch_challenge: EpochChallenge<N>, header: Header<N>) -> bool {
-        // Retrieve the epoch number.
-        let epoch_number = epoch_challenge.epoch_number();
-        // Retrieve the block height.
-        let block_height = header.height();
-
-        info!(
-            "Coinbase Puzzle (Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
-            header.coinbase_target(),
-            header.proof_target()
-        );
-
-        // Save the latest epoch challenge in the node.
-        self.latest_epoch_challenge.write().replace(epoch_challenge);
-        // Save the latest block header in the node.
-        self.latest_block_header.write().replace(header);
-
-        trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
-        true
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
+        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
+        false
     }
 
     /// Propagates the unconfirmed solution to all connected validators.
@@ -248,11 +264,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         solution: ProverSolution<N>,
     ) -> bool {
         // Retrieve the latest epoch challenge.
-        let epoch_challenge = self.latest_epoch_challenge.read().clone();
-        // Retrieve the latest proof target.
-        let proof_target = self.latest_block_header.read().as_ref().map(|header| header.proof_target());
-
-        if let (Some(epoch_challenge), Some(proof_target)) = (epoch_challenge, proof_target) {
+        if let Ok(epoch_challenge) = self.ledger.latest_epoch_challenge() {
+            // Retrieve the latest proof target.
+            let proof_target = self.ledger.latest_block().header().proof_target();
             // Ensure that the prover solution is valid for the given epoch.
             let coinbase_puzzle = self.coinbase_puzzle.clone();
             let is_valid = tokio::task::spawn_blocking(move || {
@@ -281,10 +295,13 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedTransaction<N>,
-        _transaction: Transaction<N>,
+        transaction: Transaction<N>,
     ) -> bool {
-        // Propagate the `UnconfirmedTransaction`.
-        self.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+        // Check that the transaction is well-formed and unique.
+        if self.ledger.check_transaction_basic(&transaction, None).is_ok() {
+            // Propagate the `UnconfirmedTransaction`.
+            self.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+        }
         true
     }
 }

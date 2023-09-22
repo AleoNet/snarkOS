@@ -51,7 +51,7 @@ use std::{
 };
 use tokio::task::JoinHandle;
 
-/// A prover is a full node, capable of producing proofs for consensus.
+/// A prover is a light node, capable of producing proofs for consensus.
 #[derive(Clone)]
 pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     /// The router of the node.

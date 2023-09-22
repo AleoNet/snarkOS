@@ -220,7 +220,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         // Retrieve the latest block header.
         let block_header = Data::Object(self.ledger.latest_header());
         // Send the `PuzzleResponse` message to the peer.
-        self.send(peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
+        Outbound::send(self, peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
         true
     }
 

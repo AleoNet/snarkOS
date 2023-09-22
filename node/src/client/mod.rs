@@ -42,8 +42,8 @@ use snarkvm::{
 };
 
 use anyhow::Result;
-use core::{future::Future, marker::PhantomData};
-use parking_lot::{Mutex, RwLock};
+use core::future::Future;
+use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
@@ -65,16 +65,10 @@ pub struct Client<N: Network, C: ConsensusStorage<N>> {
     genesis: Block<N>,
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
-    /// The latest epoch challenge.
-    latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
-    /// The latest block header.
-    latest_block_header: Arc<RwLock<Option<Header<N>>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
-    /// PhantomData.
-    _phantom: PhantomData<C>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
@@ -127,11 +121,8 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             sync: Arc::new(sync),
             genesis,
             coinbase_puzzle,
-            latest_epoch_challenge: Default::default(),
-            latest_block_header: Default::default(),
             handles: Default::default(),
             shutdown: Default::default(),
-            _phantom: PhantomData,
         };
 
         // Initialize the REST server.
