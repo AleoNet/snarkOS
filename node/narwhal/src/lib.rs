@@ -49,8 +49,8 @@ pub const MAX_GC_ROUNDS: u64 = 50; // rounds
 pub const MAX_LEADER_CERTIFICATE_DELAY: i64 = 2 * MAX_BATCH_DELAY as i64 / 1000; // seconds
 /// The maximum number of milliseconds to wait before sending a primary ping.
 pub const MAX_PRIMARY_PING_DELAY: u64 = MAX_BATCH_DELAY; // ms
-/// The maximum block height difference from peers before prioritizing syncing.
-pub const MAX_SYNC_DIFFERENCE: u32 = 10;
+/// Maximum block height difference allowed before considering the node as not synced.
+pub const MAX_SYNC_THRESHOLD: u32 = 10;
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.

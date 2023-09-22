@@ -17,7 +17,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_narwhal::{helpers::init_primary_channels, ledger_service::CoreLedgerService, MAX_SYNC_DIFFERENCE};
+use snarkos_node_narwhal::{helpers::init_primary_channels, ledger_service::CoreLedgerService, MAX_SYNC_THRESHOLD};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
     messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
@@ -174,7 +174,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 // Perform the sync routine.
                 let communication = node.consensus.bft().primary().gateway();
                 // let communication = &node.router;
-                if let Err(error) = node.sync.try_block_sync(communication, MAX_SYNC_DIFFERENCE).await {
+                if let Err(error) = node.sync.try_block_sync(communication, MAX_SYNC_THRESHOLD).await {
                     warn!("Sync error - {error}");
                 }
             }

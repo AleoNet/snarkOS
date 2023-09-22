@@ -208,7 +208,7 @@ impl<N: Network> BlockSync<N> {
     pub async fn try_block_sync<C: CommunicationService>(
         &self,
         communication: &C,
-        maximum_blocks_behind: u32,
+        is_synced_threshold: u32,
     ) -> Result<()> {
         // Prepare the block requests, if any.
         let block_requests = self.prepare_block_requests();
@@ -239,7 +239,7 @@ impl<N: Network> BlockSync<N> {
         }
 
         // Update the sync status.
-        self.update_sync_status(maximum_blocks_behind);
+        self.update_sync_status(is_synced_threshold);
 
         Ok(())
     }
@@ -410,7 +410,7 @@ impl<N: Network> BlockSync<N> {
     }
 
     /// Updates the sync status of the ledger.
-    pub fn update_sync_status(&self, maximum_blocks_behind: u32) {
+    pub fn update_sync_status(&self, is_synced_threshold: u32) {
         // Retrieve the peer heights.
         let peer_heights = self.get_peer_heights();
         // Retrieve the max peer height.
@@ -420,7 +420,7 @@ impl<N: Network> BlockSync<N> {
         let num_blocks_behind = max_peer_height.saturating_sub(self.canon.latest_block_height());
 
         // Determine if the primary is synced.
-        let is_synced = num_blocks_behind <= maximum_blocks_behind;
+        let is_synced = num_blocks_behind <= is_synced_threshold;
 
         // Update the sync status.
         self.is_synced.store(is_synced, Ordering::SeqCst);
