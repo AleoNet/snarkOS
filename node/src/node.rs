@@ -30,7 +30,7 @@ use std::{net::SocketAddr, sync::Arc};
 pub enum Node<N: Network> {
     /// A validator is a full node, capable of validating blocks.
     Validator(Arc<Validator<N, ConsensusDB<N>>>),
-    /// A prover is a full node, capable of producing proofs for consensus.
+    /// A prover is a light node, capable of producing proofs for consensus.
     Prover(Arc<Prover<N, ConsensusMemory<N>>>),
     /// A client node is a full node, capable of querying with the network.
     Client(Arc<Client<N, ConsensusDB<N>>>),
