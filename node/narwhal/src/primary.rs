@@ -35,6 +35,7 @@ use crate::{
     MAX_WORKERS,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_events::PrimaryPing;
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkos_node_sync::BlockSync;
 use snarkvm::{
@@ -49,7 +50,6 @@ use snarkvm::{
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use snarkos_node_narwhal_events::PrimaryPing;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
