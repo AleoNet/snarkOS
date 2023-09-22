@@ -21,4 +21,4 @@ version = "0.1"
 
 [dependencies.tokio]
 version = "1.28"
-features = [ "macros", "rt-multi-thread" ]
+features = [ "sync" ]
