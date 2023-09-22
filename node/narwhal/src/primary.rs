@@ -1310,12 +1310,10 @@ mod tests {
         }
 
         // Try to process the batch proposal from the peer, should succeed.
-        assert!(
-            primary
-                .process_batch_propose_from_peer(accounts[1].0, (*proposal.batch_header()).clone().into())
-                .await
-                .is_ok()
-        );
+        primary
+            .process_batch_propose_from_peer(accounts[1].0, (*proposal.batch_header()).clone().into())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
