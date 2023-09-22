@@ -605,8 +605,8 @@ impl<N: Network> BFT<N> {
         self.spawn(async move {
             while let Some((current_round, callback)) = rx_primary_round.recv().await {
                 // If the primary is not synced, then do not process the current round.
-                if let Err(e) = self_.primary().check_primary_synced() {
-                    warn!("Cannot process the current round from primary - {e}");
+                if !self_.primary().gateway().sync().is_synced() {
+                    warn!("Cannot process the current round from primary - not synced");
                     continue;
                 }
 
@@ -619,8 +619,8 @@ impl<N: Network> BFT<N> {
         self.spawn(async move {
             while let Some((certificate, callback)) = rx_primary_certificate.recv().await {
                 // If the primary is not synced, then do not process the certificate.
-                if let Err(e) = self_.primary().check_primary_synced() {
-                    warn!("Cannot process the certificate from primary - {e}");
+                if !self_.primary().gateway().sync().is_synced() {
+                    warn!("Cannot process the certificate from primary - not synced");
                     continue;
                 }
 

@@ -29,7 +29,10 @@ use rand::{prelude::IteratorRandom, CryptoRng, Rng};
 use std::{
     collections::BTreeMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 
@@ -80,6 +83,8 @@ pub struct BlockSync<N: Network> {
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
     canon: Arc<dyn LedgerService<N>>,
+    /// The indicator of whether the node is synced.
+    is_synced: Arc<AtomicBool>,
     /// The map of peer IP to their block locators.
     /// The block locators are consistent with the canonical map and every other peer's block locators.
     locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
@@ -106,6 +111,7 @@ impl<N: Network> BlockSync<N> {
         Self {
             mode,
             canon: ledger,
+            is_synced: Default::default(),
             locators: Default::default(),
             common_ancestors: Default::default(),
             requests: Default::default(),
@@ -120,6 +126,11 @@ impl<N: Network> BlockSync<N> {
     pub const fn mode(&self) -> BlockSyncMode {
         self.mode
     }
+
+    /// Returns `true` if the node is synced.
+    pub fn is_synced(&self) -> bool {
+        self.is_synced.load(Ordering::SeqCst)
+    }
 }
 
 #[allow(dead_code)]
@@ -131,7 +142,7 @@ impl<N: Network> BlockSync<N> {
 
     /// Returns a map of peer height to peer IPs.
     /// e.g. `{{ 127 => \[peer1, peer2\], 128 => \[peer3\], 135 => \[peer4, peer5\] }}`
-    pub fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
+    fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
         self.locators.read().iter().map(|(peer_ip, locators)| (locators.latest_locator_height(), *peer_ip)).fold(
             Default::default(),
             |mut map, (height, peer_ip)| {
@@ -194,7 +205,11 @@ impl<N: Network> BlockSync<N> {
 
     /// Performs one iteration of the block sync.
     #[inline]
-    pub async fn try_block_sync<C: CommunicationService>(&self, communication: &C) -> Result<()> {
+    pub async fn try_block_sync<C: CommunicationService>(
+        &self,
+        communication: &C,
+        maximum_blocks_behind: u32,
+    ) -> Result<()> {
         // Prepare the block requests, if any.
         let block_requests = self.prepare_block_requests();
         trace!("Prepared {} block requests", block_requests.len());
@@ -222,6 +237,10 @@ impl<N: Network> BlockSync<N> {
                 tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             }
         }
+
+        // Update the sync status.
+        self.update_sync_status(maximum_blocks_behind);
+
         Ok(())
     }
 
@@ -389,6 +408,23 @@ impl<N: Network> BlockSync<N> {
         }
 
         Ok(())
+    }
+
+    /// Updates the sync status of the ledger.
+    pub fn update_sync_status(&self, maximum_blocks_behind: u32) {
+        // Retrieve the peer heights.
+        let peer_heights = self.get_peer_heights();
+        // Retrieve the max peer height.
+        let max_peer_height = peer_heights.keys().max().unwrap_or(&0);
+
+        // Calculate the number of blocks behind the primary is.
+        let num_blocks_behind = max_peer_height.saturating_sub(self.canon.latest_block_height());
+
+        // Determine if the primary is synced.
+        let is_synced = num_blocks_behind <= maximum_blocks_behind;
+
+        // Update the sync status.
+        self.is_synced.store(is_synced, Ordering::SeqCst);
     }
 
     /// TODO (howardwu): Remove the `common_ancestor` entry. But check that this is safe
