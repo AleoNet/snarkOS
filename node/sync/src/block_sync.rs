@@ -256,7 +256,6 @@ impl<N: Network> BlockSync<N> {
             }
             // Increment the latest height.
             current_height += 1;
-            info!("Advanced to block {} (via syncing)", block.height());
         }
         Ok(())
     }
