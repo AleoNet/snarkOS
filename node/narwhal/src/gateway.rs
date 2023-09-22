@@ -1133,7 +1133,7 @@ impl<N: Network> Gateway<N> {
         // Ensure the address is in the committee.
         if let Ok(committee) = self.ledger.current_committee() {
             if !committee.is_committee_member(address) {
-                warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
+                warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for not being a committee member ({address})");
                 return Some(DisconnectReason::ProtocolViolation);
             }
         }
