@@ -59,13 +59,17 @@ default-features = false
 path = "../../account"
 version = "=2.1.7"
 
+[dependencies.snarkos-node-narwhal-events]
+path = "./events"
+version = "=2.1.7"
+
 [dependencies.snarkos-node-narwhal-ledger-service]
 path = "./ledger-service"
 version = "=2.1.7"
-default-features = false
+features = [ "ledger", "prover" ]
 
-[dependencies.snarkos-node-narwhal-sync]
-path = "./sync"
+[dependencies.snarkos-node-sync]
+path = "../sync"
 version = "=2.1.7"
 
 [dependencies.snarkos-node-tcp]
@@ -130,14 +134,14 @@ version = "0.4"
 [dev-dependencies.rayon]
 version = "1"
 
-[dev-dependencies.snarkvm]
-workspace = true
-features = [ "test-helpers" ]
-
 [dev-dependencies.snarkos-node-narwhal-ledger-service]
 path = "./ledger-service"
 default-features = false
 features = [ "mock" ]
+
+[dev-dependencies.snarkvm]
+workspace = true
+features = [ "test-helpers" ]
 
 [dev-dependencies.test-strategy]
 version = "0.3.1"

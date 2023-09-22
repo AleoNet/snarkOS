@@ -18,9 +18,6 @@ pub use cache::*;
 pub mod channels;
 pub use channels::*;
 
-pub mod codec;
-pub use codec::*;
-
 pub mod dag;
 pub use dag::*;
 

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![forbid(unsafe_code)]
+
 #[macro_use]
 extern crate async_trait;
 
@@ -24,6 +26,11 @@ pub use ledger::*;
 pub mod mock;
 #[cfg(feature = "mock")]
 pub use mock::*;
+
+#[cfg(feature = "prover")]
+pub mod prover;
+#[cfg(feature = "prover")]
+pub use prover::*;
 
 pub mod traits;
 pub use traits::*;

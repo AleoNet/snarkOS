@@ -16,16 +16,22 @@ use crate::{
     helpers::{PeerPair, SyncRequest},
     locators::BlockLocators,
 };
+use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_sync_communication_service::CommunicationService;
+use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
-use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
-use std::{collections::BTreeMap, net::SocketAddr, time::Instant};
+use std::{
+    collections::BTreeMap,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::Arc,
+    time::Instant,
+};
 
 pub const REDUNDANCY_FACTOR: usize = 3;
 const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
@@ -34,6 +40,28 @@ const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
+
+/// This is a dummy IP address that is used to represent the local node.
+/// Note: This here does not need to be a real IP address, but it must be unique/distinct from all other connections.
+const DUMMY_SELF_IP: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum BlockSyncMode {
+    Router,
+    Gateway,
+}
+
+impl BlockSyncMode {
+    /// Returns `true` if the node is in router moder.
+    pub const fn is_router(&self) -> bool {
+        matches!(self, Self::Router)
+    }
+
+    /// Returns `true` if the node is in gateway mode.
+    pub const fn is_gateway(&self) -> bool {
+        matches!(self, Self::Gateway)
+    }
+}
 
 /// A struct that keeps track of the current block sync state.
 ///
@@ -44,38 +72,40 @@ const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 /// - the `request_timestamps` map remains unchanged.
 /// - When a response is removed/completed, the `requests` map and `request_timestamps` map also remove the entry for the request height.
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BlockSync<N: Network> {
-    local_ip: OnceCell<SocketAddr>,
+    /// The block sync mode.
+    mode: BlockSyncMode,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
-    canon: RwLock<BTreeMap<u32, N::BlockHash>>,
+    canon: Arc<dyn LedgerService<N>>,
     /// The map of peer IP to their block locators.
     /// The block locators are consistent with the canonical map and every other peer's block locators.
-    locators: RwLock<IndexMap<SocketAddr, BlockLocators<N>>>,
+    locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
     /// The map of peer-to-peer to their common ancestor.
     /// This map is used to determine which peers to request blocks from.
-    common_ancestors: RwLock<IndexMap<PeerPair, u32>>,
+    common_ancestors: Arc<RwLock<IndexMap<PeerPair, u32>>>,
     /// The map of block height to the expected block hash and peer IPs.
     /// Each entry is removed when its corresponding entry in the responses map is removed.
-    requests: RwLock<BTreeMap<u32, SyncRequest<N>>>,
+    requests: Arc<RwLock<BTreeMap<u32, SyncRequest<N>>>>,
     /// The map of block height to the received blocks.
     /// Removing an entry from this map must remove the corresponding entry from the requests map.
-    responses: RwLock<BTreeMap<u32, Block<N>>>,
+    responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
     /// The map of block height to the timestamp of the last time the block was requested.
     /// This map is used to determine which requests to remove if they have been pending for too long.
-    request_timestamps: RwLock<BTreeMap<u32, Instant>>,
+    request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
     /// The map of (timed out) peer IPs to their request timestamps.
     /// This map is used to determine which peers to remove if they have timed out too many times.
-    request_timeouts: RwLock<IndexMap<SocketAddr, Vec<Instant>>>,
+    request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
 }
 
-impl<N: Network> Default for BlockSync<N> {
-    fn default() -> Self {
+impl<N: Network> BlockSync<N> {
+    /// Initializes a new block sync module.
+    pub fn new(mode: BlockSyncMode, ledger: Arc<dyn LedgerService<N>>) -> Self {
         Self {
-            local_ip: Default::default(),
-            canon: Default::default(),
+            mode,
+            canon: ledger,
             locators: Default::default(),
             common_ancestors: Default::default(),
             requests: Default::default(),
@@ -84,64 +114,42 @@ impl<N: Network> Default for BlockSync<N> {
             request_timeouts: Default::default(),
         }
     }
-}
 
-impl<N: Network> BlockSync<N> {
-    /// Returns the listening address of the associated node.
-    fn local_ip(&self) -> SocketAddr {
-        *self.local_ip.get().expect("The local IP had not been set")
-    }
-
-    /// Returns a dummy listening address of the associated node.
-    pub fn set_local_ip(&self, local_ip: SocketAddr) {
-        self.local_ip.set(local_ip).expect("The local IP was set more than once");
+    /// Returns the block sync mode.
+    #[inline]
+    pub const fn mode(&self) -> BlockSyncMode {
+        self.mode
     }
 }
 
-// TODO (howardwu): Remove `canon` and replace it with a `LedgerService`. This will fix memory growth.
 #[allow(dead_code)]
 impl<N: Network> BlockSync<N> {
-    /// Returns the latest block height in the sync pool.
-    fn latest_canon_height(&self) -> u32 {
-        self.canon.read().keys().last().copied().unwrap_or(0)
-    }
-
-    /// Returns the canonical block height, if it exists.
-    fn get_canon_height(&self, hash: &N::BlockHash) -> Option<u32> {
-        self.canon.read().iter().find(|(_, h)| h == &hash).map(|(h, _)| *h)
-    }
-
-    /// Returns the canonical block hash for the given block height, if it exists.
-    fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash> {
-        self.canon.read().get(&height).copied()
-    }
-
     /// Returns the latest block height of the given peer IP.
     fn get_peer_height(&self, peer_ip: &SocketAddr) -> Option<u32> {
         self.locators.read().get(peer_ip).map(|locators| locators.latest_locator_height())
     }
 
-    /// Returns a map of peer height to peer IPs.
-    /// e.g. `{{ 127 => \[peer1, peer2\], 128 => \[peer3\], 135 => \[peer4, peer5\] }}`
-    fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
-        self.locators.read().iter().map(|(peer_ip, locators)| (locators.latest_locator_height(), *peer_ip)).fold(
-            Default::default(),
-            |mut map, (height, peer_ip)| {
-                map.entry(height).or_default().push(peer_ip);
-                map
-            },
-        )
-    }
+    // /// Returns a map of peer height to peer IPs.
+    // /// e.g. `{{ 127 => \[peer1, peer2\], 128 => \[peer3\], 135 => \[peer4, peer5\] }}`
+    // fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
+    //     self.locators.read().iter().map(|(peer_ip, locators)| (locators.latest_locator_height(), *peer_ip)).fold(
+    //         Default::default(),
+    //         |mut map, (height, peer_ip)| {
+    //             map.entry(height).or_default().push(peer_ip);
+    //             map
+    //         },
+    //     )
+    // }
 
-    /// Returns the list of peers with their heights, sorted by height (descending).
-    fn get_peers_by_height(&self) -> Vec<(SocketAddr, u32)> {
-        self.locators
-            .read()
-            .iter()
-            .map(|(peer_ip, locators)| (*peer_ip, locators.latest_locator_height()))
-            .sorted_by(|(_, a), (_, b)| b.cmp(a))
-            .collect()
-    }
+    // /// Returns the list of peers with their heights, sorted by height (descending).
+    // fn get_peers_by_height(&self) -> Vec<(SocketAddr, u32)> {
+    //     self.locators
+    //         .read()
+    //         .iter()
+    //         .map(|(peer_ip, locators)| (*peer_ip, locators.latest_locator_height()))
+    //         .sorted_by(|(_, a), (_, b)| b.cmp(a))
+    //         .collect()
+    // }
 
     /// Returns the common ancestor for the given peer pair, if it exists.
     fn get_common_ancestor(&self, peer_a: SocketAddr, peer_b: SocketAddr) -> Option<u32> {
@@ -160,28 +168,100 @@ impl<N: Network> BlockSync<N> {
 }
 
 impl<N: Network> BlockSync<N> {
-    /// Inserts a canonical block hash for the given block height, overriding an existing entry if it exists.
-    pub fn insert_canon_locator(&self, height: u32, hash: N::BlockHash) {
-        if let Some(previous_hash) = self.canon.write().insert(height, hash) {
-            // Warn if this insert overrides a different previous block hash.
-            if previous_hash != hash {
-                let change = format!("(from {previous_hash} to {hash})").dimmed();
-                warn!("Sync pool overrode the canon block hash at block {height} {change}");
-            }
+    /// Returns the block locators.
+    #[inline]
+    pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
+        // Retrieve the latest block height.
+        let latest_height = self.canon.latest_block_height();
+
+        // Initialize the recents map.
+        let mut recents = IndexMap::with_capacity(NUM_RECENT_BLOCKS);
+        // Retrieve the recent block hashes.
+        for height in latest_height.saturating_sub((NUM_RECENT_BLOCKS - 1) as u32)..=latest_height {
+            recents.insert(height, self.canon.get_block_hash(height)?);
         }
+
+        // Initialize the checkpoints map.
+        let mut checkpoints = IndexMap::with_capacity((latest_height / CHECKPOINT_INTERVAL + 1).try_into()?);
+        // Retrieve the checkpoint block hashes.
+        for height in (0..=latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
+            checkpoints.insert(height, self.canon.get_block_hash(height)?);
+        }
+
+        // Construct the block locators.
+        BlockLocators::new(recents, checkpoints)
     }
 
-    /// Inserts the block locators as canonical, overriding any existing entries.
-    pub fn insert_canon_locators(&self, locators: BlockLocators<N>) -> Result<()> {
-        // Ensure the given block locators are well-formed.
-        locators.ensure_is_valid()?;
-        // Insert the block locators into canon.
-        locators.checkpoints.into_iter().chain(locators.recents).for_each(|(height, hash)| {
-            self.insert_canon_locator(height, hash);
-        });
+    /// Performs one iteration of the block sync.
+    #[inline]
+    pub async fn try_block_sync<C: CommunicationService>(&self, communication: &C) -> Result<()> {
+        // Prepare the block requests, if any.
+        let block_requests = self.prepare_block_requests();
+        trace!("Prepared {} block requests", block_requests.len());
+
+        // Process the block requests.
+        'outer: for (height, (hash, previous_hash, sync_ips)) in block_requests {
+            // Insert the block request into the sync pool.
+            let result = self.insert_block_request(height, (hash, previous_hash, sync_ips.clone()));
+
+            // If the block request was inserted, send it to the peers.
+            if result.is_ok() {
+                // Construct the message.
+                let message = C::prepare_block_request(height, height + 1);
+                // Send the message to the peers.
+                for sync_ip in sync_ips {
+                    // If the send fails for any peer, remove the block request from the sync pool.
+                    if communication.send(sync_ip, message.clone()).await.is_none() {
+                        // Remove the entire block request.
+                        self.remove_block_request(height);
+                        // Break out of the loop.
+                        break 'outer;
+                    }
+                }
+                // Sleep for 10 milliseconds to avoid triggering spam detection.
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        }
         Ok(())
     }
 
+    /// Attempts to advance with blocks from the sync pool.
+    #[inline]
+    pub fn advance_with_sync_blocks(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> Result<()> {
+        // Insert the candidate blocks into the sync pool.
+        for block in blocks {
+            if let Err(error) = self.insert_block_response(peer_ip, block) {
+                bail!("{error}");
+            }
+        }
+
+        // Retrieve the latest block height.
+        let mut current_height = self.canon.latest_block_height();
+        // Try to advance the ledger with the sync pool.
+        while let Some(block) = self.remove_block_response(current_height + 1) {
+            // Ensure the block height matches.
+            if block.height() != current_height + 1 {
+                warn!("Block height mismatch: expected {}, found {}", current_height + 1, block.height());
+                break;
+            }
+            // Check the next block.
+            if let Err(error) = self.canon.check_next_block(&block) {
+                warn!("The next block ({}) is invalid - {error}", block.height());
+                break;
+            }
+            // Attempt to advance to the next block.
+            if let Err(error) = self.canon.advance_to_next_block(&block) {
+                warn!("{error}");
+                break;
+            }
+            // Increment the latest height.
+            current_height += 1;
+        }
+        Ok(())
+    }
+}
+
+impl<N: Network> BlockSync<N> {
     /// Returns the sync peers with their latest heights, and their minimum common ancestor, if the node can sync.
     /// This function returns peers that are consistent with each other, and have a block height
     /// that is greater than the canon height of this node.
@@ -277,7 +357,7 @@ impl<N: Network> BlockSync<N> {
         // Compute the common ancestor with this node.
         let mut ancestor = 0;
         for (height, hash) in locators.clone().into_iter() {
-            if let Some(canon_hash) = self.get_canon_hash(height) {
+            if let Ok(canon_hash) = self.canon.get_block_hash(height) {
                 match canon_hash == hash {
                     true => ancestor = height,
                     false => break, // fork
@@ -285,7 +365,7 @@ impl<N: Network> BlockSync<N> {
             }
         }
         // Update the common ancestor entry for this node.
-        self.common_ancestors.write().insert(PeerPair(self.local_ip(), peer_ip), ancestor);
+        self.common_ancestors.write().insert(PeerPair(DUMMY_SELF_IP, peer_ip), ancestor);
 
         // Compute the common ancestor with every other peer.
         let mut common_ancestors = self.common_ancestors.write();
@@ -353,8 +433,8 @@ impl<N: Network> BlockSync<N> {
     /// Checks that a block request for the given height does not already exist.
     fn check_block_request(&self, height: u32) -> Result<()> {
         // Ensure the block height is not already canon.
-        if self.canon.read().contains_key(&height) {
-            bail!("Failed to add block request, as block {height} exists in the canon map");
+        if self.canon.contains_block_height(height) {
+            bail!("Failed to add block request, as block {height} exists in the canonical ledger");
         }
         // Ensure the block height is not already requested.
         if self.requests.read().contains_key(&height) {
@@ -498,7 +578,7 @@ impl<N: Network> BlockSync<N> {
     /// Returns the sync peers and their minimum common ancestor, if the node needs to sync.
     fn find_sync_peers_inner(&self) -> Option<(IndexMap<SocketAddr, BlockLocators<N>>, u32)> {
         // Retrieve the latest canon height.
-        let latest_canon_height = self.latest_canon_height();
+        let latest_canon_height = self.canon.latest_block_height();
 
         // Compute the timeout frequency of each peer.
         let timeouts = self
@@ -586,7 +666,7 @@ impl<N: Network> BlockSync<N> {
         rng: &mut R,
     ) -> Vec<(u32, SyncRequest<N>)> {
         // Retrieve the latest canon height.
-        let latest_canon_height = self.latest_canon_height();
+        let latest_canon_height = self.canon.latest_block_height();
 
         // If the minimum common ancestor is at or below the latest canon height, then return early.
         if min_common_ancestor <= latest_canon_height {
@@ -710,17 +790,14 @@ mod tests {
         CHECKPOINT_INTERVAL,
         NUM_RECENT_BLOCKS,
     };
-    use snarkvm::prelude::Field;
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkvm::prelude::{Field, TestRng};
 
     use indexmap::indexset;
+    use snarkvm::ledger::committee::Committee;
     use std::net::{IpAddr, Ipv4Addr};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
-
-    /// Returns the local IP for the sync pool.
-    fn sample_local_ip() -> SocketAddr {
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0)
-    }
 
     /// Returns the peer IP for the sync pool.
     fn sample_peer_ip(id: u16) -> SocketAddr {
@@ -728,12 +805,20 @@ mod tests {
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), id)
     }
 
-    /// Returns the sync pool, with the canonical map initialized to the given height.
+    /// Returns a sample committee.
+    fn sample_committee() -> Committee<CurrentNetwork> {
+        let rng = &mut TestRng::default();
+        snarkvm::ledger::committee::test_helpers::sample_committee(rng)
+    }
+
+    /// Returns the ledger service, initialized to the given height.
+    fn sample_ledger_service(height: u32) -> MockLedgerService<CurrentNetwork> {
+        MockLedgerService::new_at_height(sample_committee(), height)
+    }
+
+    /// Returns the sync pool, with the canonical ledger initialized to the given height.
     fn sample_sync_at_height(height: u32) -> BlockSync<CurrentNetwork> {
-        let sync = BlockSync::<CurrentNetwork>::default();
-        sync.set_local_ip(sample_local_ip());
-        sync.insert_canon_locators(sample_block_locators(height)).unwrap();
-        sync
+        BlockSync::<CurrentNetwork>::new(BlockSyncMode::Router, Arc::new(sample_ledger_service(height)))
     }
 
     /// Checks that the sync pool (starting at genesis) returns the correct requests.
@@ -743,7 +828,7 @@ mod tests {
         peers: IndexSet<SocketAddr>,
     ) {
         // Check test assumptions are met.
-        assert_eq!(sync.latest_canon_height(), 0, "This test assumes the sync pool is at genesis");
+        assert_eq!(sync.canon.latest_block_height(), 0, "This test assumes the sync pool is at genesis");
 
         // Determine the number of peers within range of this sync pool.
         let num_peers_within_recent_range_of_canon = {
@@ -785,28 +870,31 @@ mod tests {
     }
 
     #[test]
-    fn test_latest_canon_height() {
+    fn test_latest_block_height() {
         for height in 0..100_002u32 {
             let sync = sample_sync_at_height(height);
-            assert_eq!(sync.latest_canon_height(), height);
+            assert_eq!(sync.canon.latest_block_height(), height);
         }
     }
 
     #[test]
-    fn test_get_canon_height() {
+    fn test_get_block_height() {
         for height in 0..100_002u32 {
             let sync = sample_sync_at_height(height);
-            assert_eq!(sync.get_canon_height(&(Field::<CurrentNetwork>::from_u32(0)).into()), Some(0));
-            assert_eq!(sync.get_canon_height(&(Field::<CurrentNetwork>::from_u32(height)).into()), Some(height));
+            assert_eq!(sync.canon.get_block_height(&(Field::<CurrentNetwork>::from_u32(0)).into()).unwrap(), 0);
+            assert_eq!(
+                sync.canon.get_block_height(&(Field::<CurrentNetwork>::from_u32(height)).into()).unwrap(),
+                height
+            );
         }
     }
 
     #[test]
-    fn test_get_canon_hash() {
+    fn test_get_block_hash() {
         for height in 0..100_002u32 {
             let sync = sample_sync_at_height(height);
-            assert_eq!(sync.get_canon_hash(0), Some((Field::<CurrentNetwork>::from_u32(0)).into()));
-            assert_eq!(sync.get_canon_hash(height), Some((Field::<CurrentNetwork>::from_u32(height)).into()));
+            assert_eq!(sync.canon.get_block_hash(0).unwrap(), (Field::<CurrentNetwork>::from_u32(0)).into());
+            assert_eq!(sync.canon.get_block_hash(height).unwrap(), (Field::<CurrentNetwork>::from_u32(height)).into());
         }
     }
 

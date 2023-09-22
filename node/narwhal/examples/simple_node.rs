@@ -24,6 +24,7 @@ use snarkos_node_narwhal::{
     MEMORY_POOL_PORT,
 };
 use snarkos_node_narwhal_ledger_service::MockLedgerService;
+use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkvm::{
     ledger::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
@@ -114,6 +115,8 @@ pub async fn start_bft(
     let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the sync module.
+    let sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
     // Initialize the storage.
     let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
@@ -130,7 +133,7 @@ pub async fn start_bft(
     // Initialize the BFT instance.
     let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, ip, &trusted_validators, dev)?;
     // Run the BFT instance.
-    bft.run(sender.clone(), receiver, Some(consensus_sender)).await?;
+    bft.run(sync, sender.clone(), receiver, Some(consensus_sender)).await?;
     // Retrieve the BFT's primary.
     let primary = bft.primary();
     // Handle OS signals.
@@ -151,6 +154,8 @@ pub async fn start_primary(
     let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the sync module.
+    let sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
     // Initialize the storage.
     let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
@@ -163,7 +168,7 @@ pub async fn start_primary(
     // Initialize the primary instance.
     let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, ip, &trusted_validators, dev)?;
     // Run the primary instance.
-    primary.run(sender.clone(), receiver, None).await?;
+    primary.run(sync, sender.clone(), receiver, None).await?;
     // Handle OS signals.
     handle_signals(&primary);
     // Return the primary instance.
@@ -192,7 +197,7 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<Curr
     println!();
 
     // Initialize the committee.
-    let committee = Committee::<CurrentNetwork>::new_genesis(members)?;
+    let committee = Committee::<CurrentNetwork>::new(0u64, members)?;
     // Return the committee and account.
     Ok((committee, account))
 }

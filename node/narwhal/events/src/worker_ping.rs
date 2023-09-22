@@ -65,7 +65,7 @@ impl<N: Network> FromBytes for WorkerPing<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{helpers::storage::prop_tests::any_transmission_id, WorkerPing};
+    use crate::{prop_tests::any_transmission_id, WorkerPing};
     use snarkvm::console::prelude::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};

@@ -61,29 +61,25 @@ impl<N: Network> FromBytes for ChallengeRequest<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::ChallengeRequest;
-    use snarkos_account::Account;
-    use snarkvm::console::prelude::{FromBytes, ToBytes};
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        prelude::{Address, TestRng, Uniform},
+    };
 
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
-    use rand::SeedableRng;
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    pub fn any_valid_account() -> BoxedStrategy<Account<CurrentNetwork>> {
-        any::<u64>()
-            .prop_map(|seed| match Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(seed)) {
-                Ok(account) => account,
-                Err(err) => panic!("Failed to create account {err}"),
-            })
-            .boxed()
+    pub fn any_valid_address() -> BoxedStrategy<Address<CurrentNetwork>> {
+        any::<u64>().prop_map(|seed| Address::rand(&mut TestRng::fixed(seed))).boxed()
     }
 
     pub fn any_challenge_request() -> BoxedStrategy<ChallengeRequest<CurrentNetwork>> {
-        (any_valid_account(), any::<u64>(), any::<u32>(), any::<u16>())
-            .prop_map(|(account, nonce, version, listener_port)| ChallengeRequest {
-                address: account.address(),
+        (any_valid_address(), any::<u64>(), any::<u32>(), any::<u16>())
+            .prop_map(|(address, nonce, version, listener_port)| ChallengeRequest {
+                address,
                 nonce,
                 version,
                 listener_port,

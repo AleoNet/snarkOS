@@ -30,10 +30,10 @@ use std::{net::SocketAddr, sync::Arc};
 pub enum Node<N: Network> {
     /// A validator is a full node, capable of validating blocks.
     Validator(Arc<Validator<N, ConsensusDB<N>>>),
-    /// A prover is a full node, capable of producing proofs for consensus.
+    /// A prover is a light node, capable of producing proofs for consensus.
     Prover(Arc<Prover<N, ConsensusMemory<N>>>),
     /// A client node is a full node, capable of querying with the network.
-    Client(Arc<Client<N, ConsensusMemory<N>>>),
+    Client(Arc<Client<N, ConsensusDB<N>>>),
 }
 
 impl<N: Network> Node<N> {
@@ -67,12 +67,14 @@ impl<N: Network> Node<N> {
     /// Initializes a new client node.
     pub async fn new_client(
         node_ip: SocketAddr,
+        rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Client(Arc::new(Client::new(node_ip, account, trusted_peers, genesis, dev).await?)))
+        Ok(Self::Client(Arc::new(Client::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev).await?)))
     }
 
     /// Returns the node type.

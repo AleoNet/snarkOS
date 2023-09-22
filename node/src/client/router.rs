@@ -13,14 +13,25 @@
 // limitations under the License.
 
 use super::*;
-
 use snarkos_node_router::{
-    messages::{BlockRequest, DisconnectReason, MessageCodec, Pong, UnconfirmedTransaction},
+    messages::{
+        BlockRequest,
+        BlockResponse,
+        Data,
+        DataBlocks,
+        DisconnectReason,
+        MessageCodec,
+        Ping,
+        Pong,
+        PuzzleResponse,
+        UnconfirmedTransaction,
+    },
     Routing,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{block::Transaction, Network};
 
+use snarkos_node_sync::communication_service::CommunicationService;
 use std::{io, net::SocketAddr, time::Duration};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Client<N, C> {
@@ -51,14 +62,18 @@ where
     Self: Outbound<N>,
 {
     async fn on_connect(&self, peer_addr: SocketAddr) {
-        let peer_ip = if let Some(ip) = self.router.resolve_to_listener(&peer_addr) {
-            ip
-        } else {
-            return;
+        // Resolve the peer address to the listener address.
+        let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) else { return };
+        // Retrieve the block locators.
+        let block_locators = match self.sync.get_block_locators() {
+            Ok(block_locators) => Some(block_locators),
+            Err(e) => {
+                error!("Failed to get block locators: {e}");
+                return;
+            }
         };
-
         // Send the first `Ping` message to the peer.
-        self.send_ping(peer_ip, None);
+        self.send_ping(peer_ip, block_locators);
     }
 }
 
@@ -67,6 +82,7 @@ impl<N: Network, C: ConsensusStorage<N>> Disconnect for Client<N, C> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
         if let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) {
+            self.sync.remove_peer(&peer_ip);
             self.router.remove_connected_peer(peer_ip);
         }
     }
@@ -101,12 +117,37 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Client<N, C> {
         if let Err(error) = self.inbound(peer_addr, message).await {
             if let Some(peer_ip) = self.router().resolve_to_listener(&peer_addr) {
                 warn!("Disconnecting from '{peer_ip}' - {error}");
-                self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+                Outbound::send(self, peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
                 // Disconnect from this peer.
                 self.router().disconnect(peer_ip);
             }
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> CommunicationService for Client<N, C> {
+    /// The message type.
+    type Message = Message<N>;
+
+    /// Prepares a block request to be sent.
+    fn prepare_block_request(start_height: u32, end_height: u32) -> Self::Message {
+        debug_assert!(start_height < end_height, "Invalid block request format");
+        Message::BlockRequest(BlockRequest { start_height, end_height })
+    }
+
+    /// Sends the given message to specified peer.
+    ///
+    /// This function returns as soon as the message is queued to be sent,
+    /// without waiting for the actual delivery; instead, the caller is provided with a [`oneshot::Receiver`]
+    /// which can be used to determine when and whether the message has been delivered.
+    async fn send(
+        &self,
+        peer_ip: SocketAddr,
+        message: Self::Message,
+    ) -> Option<tokio::sync::oneshot::Receiver<io::Result<()>>> {
+        Outbound::send(self, peer_ip, message)
     }
 }
 
@@ -125,28 +166,68 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Client<N, C> {
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     /// Handles a `BlockRequest` message.
-    fn block_request(&self, peer_ip: SocketAddr, _message: BlockRequest) -> bool {
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
+    fn block_request(&self, peer_ip: SocketAddr, message: BlockRequest) -> bool {
+        let BlockRequest { start_height, end_height } = &message;
+
+        // Retrieve the blocks within the requested range.
+        let blocks = match self.ledger.get_blocks(*start_height..*end_height) {
+            Ok(blocks) => Data::Object(DataBlocks(blocks)),
+            Err(error) => {
+                error!("Failed to retrieve blocks {start_height} to {end_height} from the ledger - {error}");
+                return false;
+            }
+        };
+        // Send the `BlockResponse` message to the peer.
+        Outbound::send(self, peer_ip, Message::BlockResponse(BlockResponse { request: message, blocks }));
+        true
     }
 
     /// Handles a `BlockResponse` message.
-    fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool {
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
+    fn block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> bool {
+        // Tries to advance with blocks from the sync module.
+        match self.sync.advance_with_sync_blocks(peer_ip, blocks) {
+            Ok(()) => true,
+            Err(error) => {
+                warn!("{error}");
+                false
+            }
+        }
+    }
+
+    /// Processes the block locators and sends back a `Pong` message.
+    fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
+        // Check if the sync module is in router mode.
+        if self.sync.mode().is_router() {
+            // If block locators were provided, then update the peer in the sync pool.
+            if let Some(block_locators) = message.block_locators {
+                // Check the block locators are valid, and update the peer in the sync pool.
+                if let Err(error) = self.sync.update_peer_locators(peer_ip, block_locators) {
+                    warn!("Peer '{peer_ip}' sent invalid block locators: {error}");
+                    return false;
+                }
+            }
+        }
+
+        // Send a `Pong` message to the peer.
+        Outbound::send(self, peer_ip, Message::Pong(Pong { is_fork: Some(false) }));
+        true
     }
 
     /// Sleeps for a period and then sends a `Ping` message to the peer.
     fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
         // Spawn an asynchronous task for the `Ping` request.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
             // Check that the peer is still connected.
-            if self_clone.router().is_connected(&peer_ip) {
-                // Send a `Ping` message to the peer.
-                self_clone.send_ping(peer_ip, None);
+            if self_.router().is_connected(&peer_ip) {
+                // Retrieve the block locators.
+                match self_.sync.get_block_locators() {
+                    // Send a `Ping` message to the peer.
+                    Ok(block_locators) => self_.send_ping(peer_ip, Some(block_locators)),
+                    Err(e) => error!("Failed to get block locators - {e}"),
+                }
             }
         });
         true
@@ -154,30 +235,25 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
 
     /// Disconnects on receipt of a `PuzzleRequest` message.
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
+        // Retrieve the latest epoch challenge.
+        let epoch_challenge = match self.ledger.latest_epoch_challenge() {
+            Ok(epoch_challenge) => epoch_challenge,
+            Err(error) => {
+                error!("Failed to prepare a puzzle request for '{peer_ip}': {error}");
+                return false;
+            }
+        };
+        // Retrieve the latest block header.
+        let block_header = Data::Object(self.ledger.latest_header());
+        // Send the `PuzzleResponse` message to the peer.
+        Outbound::send(self, peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
+        true
     }
 
     /// Saves the latest epoch challenge and latest block header in the node.
-    fn puzzle_response(&self, peer_ip: SocketAddr, epoch_challenge: EpochChallenge<N>, header: Header<N>) -> bool {
-        // Retrieve the epoch number.
-        let epoch_number = epoch_challenge.epoch_number();
-        // Retrieve the block height.
-        let block_height = header.height();
-
-        info!(
-            "Coinbase Puzzle (Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
-            header.coinbase_target(),
-            header.proof_target()
-        );
-
-        // Save the latest epoch challenge in the node.
-        self.latest_epoch_challenge.write().replace(epoch_challenge);
-        // Save the latest block header in the node.
-        self.latest_block_header.write().replace(header);
-
-        trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
-        true
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
+        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
+        false
     }
 
     /// Propagates the unconfirmed solution to all connected validators.
@@ -188,11 +264,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         solution: ProverSolution<N>,
     ) -> bool {
         // Retrieve the latest epoch challenge.
-        let epoch_challenge = self.latest_epoch_challenge.read().clone();
-        // Retrieve the latest proof target.
-        let proof_target = self.latest_block_header.read().as_ref().map(|header| header.proof_target());
-
-        if let (Some(epoch_challenge), Some(proof_target)) = (epoch_challenge, proof_target) {
+        if let Ok(epoch_challenge) = self.ledger.latest_epoch_challenge() {
+            // Retrieve the latest proof target.
+            let proof_target = self.ledger.latest_block().header().proof_target();
             // Ensure that the prover solution is valid for the given epoch.
             let coinbase_puzzle = self.coinbase_puzzle.clone();
             let is_valid = tokio::task::spawn_blocking(move || {
@@ -221,10 +295,13 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedTransaction<N>,
-        _transaction: Transaction<N>,
+        transaction: Transaction<N>,
     ) -> bool {
-        // Propagate the `UnconfirmedTransaction`.
-        self.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+        // Check that the transaction is well-formed and unique.
+        if self.ledger.check_transaction_basic(&transaction, None).is_ok() {
+            // Propagate the `UnconfirmedTransaction`.
+            self.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+        }
         true
     }
 }

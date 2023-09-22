@@ -15,31 +15,81 @@
 use crate::{fmt_id, LedgerService};
 use snarkvm::{
     ledger::{
-        block::Transaction,
+        block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, TransmissionID},
+        narwhal::{Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{Field, Network, Result},
+    prelude::{bail, ensure, Field, Network, Result},
 };
 
+use indexmap::IndexMap;
+use parking_lot::Mutex;
+use std::{collections::BTreeMap, ops::Range};
 use tracing::*;
 
 /// A mock ledger service that always returns `false`.
 #[derive(Debug)]
 pub struct MockLedgerService<N: Network> {
     committee: Committee<N>,
+    height_to_hash: Mutex<BTreeMap<u32, N::BlockHash>>,
 }
 
 impl<N: Network> MockLedgerService<N> {
     /// Initializes a new mock ledger service.
     pub fn new(committee: Committee<N>) -> Self {
-        Self { committee }
+        Self { committee, height_to_hash: Default::default() }
+    }
+
+    /// Initializes a new mock ledger service at the specified height.
+    pub fn new_at_height(committee: Committee<N>, height: u32) -> Self {
+        let mut height_to_hash = BTreeMap::new();
+        for i in 0..=height {
+            height_to_hash.insert(i, (Field::<N>::from_u32(i)).into());
+        }
+        Self { committee, height_to_hash: Mutex::new(height_to_hash) }
     }
 }
 
 #[async_trait]
 impl<N: Network> LedgerService<N> for MockLedgerService<N> {
+    /// Returns the latest block height in the canonical ledger.
+    fn latest_block_height(&self) -> u32 {
+        self.height_to_hash.lock().last_key_value().map(|(height, _)| *height).unwrap_or(0)
+    }
+
+    /// Returns `true` if the given block height exists in the canonical ledger.
+    fn contains_block_height(&self, height: u32) -> bool {
+        self.height_to_hash.lock().contains_key(&height)
+    }
+
+    /// Returns the canonical block height for the given block hash, if it exists.
+    fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32> {
+        match self.height_to_hash.lock().iter().find_map(|(height, h)| if h == hash { Some(*height) } else { None }) {
+            Some(height) => Ok(height),
+            None => bail!("Missing block {hash}"),
+        }
+    }
+
+    /// Returns the canonical block hash for the given block height, if it exists.
+    fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
+        match self.height_to_hash.lock().get(&height).cloned() {
+            Some(hash) => Ok(hash),
+            None => bail!("Missing block {height}"),
+        }
+    }
+
+    /// Returns the block for the given block height.
+    fn get_block(&self, _height: u32) -> Result<Block<N>> {
+        unreachable!("MockLedgerService does not support get_block")
+    }
+
+    /// Returns the blocks in the given block range.
+    /// The range is inclusive of the start and exclusive of the end.
+    fn get_blocks(&self, _heights: Range<u32>) -> Result<Vec<Block<N>>> {
+        unreachable!("MockLedgerService does not support get_blocks")
+    }
+
     /// Returns the current committee.
     fn current_committee(&self) -> Result<Committee<N>> {
         Ok(self.committee.clone())
@@ -80,6 +130,34 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         _transaction: Data<Transaction<N>>,
     ) -> Result<()> {
         trace!("[MockLedgerService] Check transaction basic {:?} - Ok", fmt_id(transaction_id));
+        Ok(())
+    }
+
+    /// Checks the given block is valid next block.
+    fn check_next_block(&self, _block: &Block<N>) -> Result<()> {
+        Ok(())
+    }
+
+    /// Returns a candidate for the next block in the ledger, using a committed subdag and its transmissions.
+    #[cfg(feature = "ledger-write")]
+    fn prepare_advance_to_next_quorum_block(
+        &self,
+        _subdag: Subdag<N>,
+        _transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<Block<N>> {
+        unreachable!("MockLedgerService does not support prepare_advance_to_next_quorum_block")
+    }
+
+    /// Adds the given block as the next block in the ledger.
+    #[cfg(feature = "ledger-write")]
+    fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
+        ensure!(
+            block.height() == self.latest_block_height() + 1,
+            "Tried to advance to block {} from block {}",
+            block.height(),
+            self.latest_block_height()
+        );
+        self.height_to_hash.lock().insert(block.height(), block.hash());
         Ok(())
     }
 }

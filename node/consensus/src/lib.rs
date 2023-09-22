@@ -30,13 +30,13 @@ use snarkos_node_narwhal::{
     BFT,
     MAX_GC_ROUNDS,
 };
-use snarkos_node_narwhal_ledger_service::CoreLedgerService;
+use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_sync::BlockSync;
 use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{Data, Subdag, Transmission, TransmissionID},
-        store::ConsensusStorage,
     },
     prelude::*,
 };
@@ -51,9 +51,9 @@ use tokio::{
 };
 
 #[derive(Clone)]
-pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
+pub struct Consensus<N: Network> {
     /// The ledger.
-    ledger: Ledger<N, C>,
+    ledger: Arc<dyn LedgerService<N>>,
     /// The BFT.
     bft: BFT<N>,
     /// The primary sender.
@@ -62,41 +62,44 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+impl<N: Network> Consensus<N> {
     /// Initializes a new instance of consensus.
     pub fn new(
         account: Account<N>,
-        ledger: Ledger<N, C>,
+        ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
-        // Initialize the ledger service.
-        let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
         // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new(ledger_service.clone(), MAX_GC_ROUNDS);
+        let storage = NarwhalStorage::new(ledger.clone(), MAX_GC_ROUNDS);
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger_service, ip, trusted_validators, dev)?;
+        let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
         // Return the consensus.
         Ok(Self { ledger, bft, primary_sender: Default::default(), handles: Default::default() })
     }
 
     /// Run the consensus instance.
-    pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
+    pub async fn run(
+        &mut self,
+        sync: BlockSync<N>,
+        primary_sender: PrimarySender<N>,
+        primary_receiver: PrimaryReceiver<N>,
+    ) -> Result<()> {
         info!("Starting the consensus instance...");
         // Sets the primary sender.
         self.primary_sender.set(primary_sender.clone()).expect("Primary sender already set");
         // Initialize the consensus channels.
         let (consensus_sender, consensus_receiver) = init_consensus_channels();
         // Start the consensus.
-        self.bft.run(primary_sender, primary_receiver, Some(consensus_sender)).await?;
+        self.bft.run(sync, primary_sender, primary_receiver, Some(consensus_sender)).await?;
         // Start the consensus handlers.
         self.start_handlers(consensus_receiver);
         Ok(())
     }
 
     /// Returns the ledger.
-    pub const fn ledger(&self) -> &Ledger<N, C> {
+    pub const fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
         &self.ledger
     }
 
@@ -111,7 +114,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+impl<N: Network> Consensus<N> {
     /// Returns the number of unconfirmed transmissions.
     pub fn num_unconfirmed_transmissions(&self) -> usize {
         self.bft.num_unconfirmed_transmissions()
@@ -133,7 +136,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+impl<N: Network> Consensus<N> {
     /// Returns the unconfirmed transmission IDs.
     pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
         self.bft.unconfirmed_transmission_ids()
@@ -155,7 +158,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
         // Initialize a callback sender and receiver.
@@ -183,7 +186,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+impl<N: Network> Consensus<N> {
     /// Starts the consensus handlers.
     fn start_handlers(&self, consensus_receiver: ConsensusReceiver<N>) {
         let ConsensusReceiver { mut rx_consensus_subdag } = consensus_receiver;
@@ -229,12 +232,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
-        info!(
-            "\n\nAdvanced to block {} at round {} - {}\n",
-            next_block.height(),
-            next_block.round(),
-            next_block.hash(),
-        );
         Ok(())
     }
 

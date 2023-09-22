@@ -41,7 +41,6 @@ pub use routing::*;
 
 use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_narwhal_sync::BlockSync;
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
@@ -74,8 +73,6 @@ pub struct InnerRouter<N: Network> {
     cache: Cache<N>,
     /// The resolver.
     resolver: Resolver,
-    /// The block sync module.
-    sync: BlockSync<N>,
     /// The set of trusted peers.
     trusted_peers: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
@@ -124,7 +121,6 @@ impl<N: Network> Router<N> {
             account,
             cache: Default::default(),
             resolver: Default::default(),
-            sync: Default::default(),
             trusted_peers: trusted_peers.iter().copied().collect(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
@@ -134,7 +130,9 @@ impl<N: Network> Router<N> {
             is_dev,
         })))
     }
+}
 
+impl<N: Network> Router<N> {
     /// Attempts to connect to the given peer IP.
     pub fn connect(&self, peer_ip: SocketAddr) -> Option<JoinHandle<bool>> {
         // Return early if the attempt is against the protocol rules.
@@ -194,10 +192,10 @@ impl<N: Network> Router<N> {
             if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
                 // Disconnect from this peer.
                 let disconnected = router.tcp.disconnect(peer_addr).await;
-                // FIXME: this shouldn't be necessary; it's a double-check
-                // that the higher-level collection is cleaned up after the
-                // lower-level disconnect.
+                // FIXME (ljedrz): this shouldn't be necessary; it's a double-check
+                //  that the higher-level collection is cleaned up after the lower-level disconnect.
                 if router.is_connected(&peer_ip) && !router.tcp.is_connected(peer_addr) {
+                    warn!("Disconnecting with fallback safety (report this to @ljedrz)");
                     router.remove_connected_peer(peer_ip);
                 }
                 disconnected
@@ -236,11 +234,6 @@ impl<N: Network> Router<N> {
     /// Returns the account address of the node.
     pub fn address(&self) -> Address<N> {
         self.account.address()
-    }
-
-    /// Returns the block sync module.
-    pub fn sync(&self) -> &BlockSync<N> {
-        &self.sync
     }
 
     /// Returns `true` if the node is in development mode.
@@ -379,16 +372,16 @@ impl<N: Network> Router<N> {
         } else {
             // TODO (howardwu): Change this for Phase 3.
             vec![
-                SocketAddr::from_str("24.199.74.2:4133").unwrap(),
-                SocketAddr::from_str("167.172.14.86:4133").unwrap(),
-                SocketAddr::from_str("159.203.146.71:4133").unwrap(),
-                SocketAddr::from_str("188.166.201.188:4133").unwrap(),
-                SocketAddr::from_str("161.35.247.23:4133").unwrap(),
-                SocketAddr::from_str("144.126.245.162:4133").unwrap(),
-                SocketAddr::from_str("138.68.126.82:4133").unwrap(),
-                SocketAddr::from_str("170.64.252.58:4133").unwrap(),
-                SocketAddr::from_str("159.89.211.64:4133").unwrap(),
-                SocketAddr::from_str("143.244.211.239:4133").unwrap(),
+                // SocketAddr::from_str("24.199.74.2:4133").unwrap(),
+                // SocketAddr::from_str("167.172.14.86:4133").unwrap(),
+                // SocketAddr::from_str("159.203.146.71:4133").unwrap(),
+                // SocketAddr::from_str("188.166.201.188:4133").unwrap(),
+                // SocketAddr::from_str("161.35.247.23:4133").unwrap(),
+                // SocketAddr::from_str("144.126.245.162:4133").unwrap(),
+                // SocketAddr::from_str("138.68.126.82:4133").unwrap(),
+                // SocketAddr::from_str("170.64.252.58:4133").unwrap(),
+                // SocketAddr::from_str("159.89.211.64:4133").unwrap(),
+                // SocketAddr::from_str("143.244.211.239:4133").unwrap(),
             ]
         }
     }
@@ -462,8 +455,6 @@ impl<N: Network> Router<N> {
     pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(&peer_ip);
-        // Removes the peer from the sync pool.
-        self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.

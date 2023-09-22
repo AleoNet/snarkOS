@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::prelude::{has_duplicates, Network};
+use snarkvm::prelude::{error, has_duplicates, FromBytes, IoResult, Network, Read, ToBytes, Write};
 
 use anyhow::{bail, ensure, Result};
 use indexmap::{indexmap, IndexMap};
@@ -34,6 +34,28 @@ pub struct BlockLocators<N: Network> {
     pub checkpoints: IndexMap<u32, N::BlockHash>,
 }
 
+impl<N: Network> BlockLocators<N> {
+    /// Initializes a new instance of the block locators.
+    pub fn new(recents: IndexMap<u32, N::BlockHash>, checkpoints: IndexMap<u32, N::BlockHash>) -> Result<Self> {
+        // Construct the block locators.
+        let locators = Self { recents, checkpoints };
+        // Ensure the block locators are well-formed.
+        locators.ensure_is_valid()?;
+        // Return the block locators.
+        Ok(locators)
+    }
+
+    /// Initializes a new instance of the block locators.
+    pub fn new_unchecked(recents: IndexMap<u32, N::BlockHash>, checkpoints: IndexMap<u32, N::BlockHash>) -> Self {
+        Self { recents, checkpoints }
+    }
+
+    /// Initializes a new genesis instance of the block locators.
+    pub fn new_genesis(genesis_hash: N::BlockHash) -> Self {
+        Self { recents: indexmap![0 => genesis_hash], checkpoints: indexmap![0 => genesis_hash] }
+    }
+}
+
 impl<N: Network> IntoIterator for BlockLocators<N> {
     type IntoIter = IntoIter<u32, N::BlockHash>;
     type Item = (u32, N::BlockHash);
@@ -47,16 +69,6 @@ impl<N: Network> IntoIterator for BlockLocators<N> {
 }
 
 impl<N: Network> BlockLocators<N> {
-    /// Initializes a new instance of the block locators.
-    pub fn new(recents: IndexMap<u32, N::BlockHash>, checkpoints: IndexMap<u32, N::BlockHash>) -> Self {
-        Self { recents, checkpoints }
-    }
-
-    /// Initializes a new genesis instance of the block locators.
-    pub fn new_genesis(genesis_hash: N::BlockHash) -> Self {
-        Self { recents: indexmap![0 => genesis_hash], checkpoints: indexmap![0 => genesis_hash] }
-    }
-
     /// Returns the latest locator height.
     pub fn latest_locator_height(&self) -> u32 {
         self.recents.keys().last().copied().unwrap_or_default()
@@ -247,6 +259,53 @@ impl<N: Network> BlockLocators<N> {
     }
 }
 
+impl<N: Network> FromBytes for BlockLocators<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Read the number of recent block hashes.
+        let num_recents = u32::read_le(&mut reader)?;
+        // Read the recent block hashes.
+        let mut recents = IndexMap::with_capacity(num_recents as usize);
+        for _ in 0..num_recents {
+            let height = u32::read_le(&mut reader)?;
+            let hash = N::BlockHash::read_le(&mut reader)?;
+            recents.insert(height, hash);
+        }
+
+        // Read the number of checkpoints.
+        let num_checkpoints = u32::read_le(&mut reader)?;
+        // Read the checkpoints.
+        let mut checkpoints = IndexMap::with_capacity(num_checkpoints as usize);
+        for _ in 0..num_checkpoints {
+            let height = u32::read_le(&mut reader)?;
+            let hash = N::BlockHash::read_le(&mut reader)?;
+            checkpoints.insert(height, hash);
+        }
+
+        Self::new(recents, checkpoints).map_err(error)
+    }
+}
+
+impl<N: Network> ToBytes for BlockLocators<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Write the number of recent block hashes.
+        u32::try_from(self.recents.len()).map_err(error)?.write_le(&mut writer)?;
+        // Write the recent block hashes.
+        for (height, hash) in &self.recents {
+            height.write_le(&mut writer)?;
+            hash.write_le(&mut writer)?;
+        }
+
+        // Write the number of checkpoints.
+        u32::try_from(self.checkpoints.len()).map_err(error)?.write_le(&mut writer)?;
+        // Write the checkpoints.
+        for (height, hash) in &self.checkpoints {
+            height.write_le(&mut writer)?;
+            hash.write_le(&mut writer)?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(any(test, feature = "test"))]
 pub mod test_helpers {
     use super::*;
@@ -273,7 +332,7 @@ pub mod test_helpers {
         }
 
         // Construct the block locators.
-        BlockLocators::new(recents, checkpoints)
+        BlockLocators::new(recents, checkpoints).unwrap()
     }
 
     /// Simulates a block locator at the given height, with a fork within NUM_RECENTS of the given height.
@@ -302,7 +361,7 @@ pub mod test_helpers {
         }
 
         // Construct the block locators.
-        BlockLocators::new(recents, checkpoints)
+        BlockLocators::new(recents, checkpoints).unwrap()
     }
 
     /// A test to ensure that the sample block locators are valid.
@@ -342,7 +401,8 @@ mod tests {
             for i in 0..NUM_RECENT_BLOCKS as u32 {
                 recents.insert(height + i, (Field::<CurrentNetwork>::from_u32(height + i)).into());
 
-                let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints.clone());
+                let block_locators =
+                    BlockLocators::<CurrentNetwork>::new_unchecked(recents.clone(), checkpoints.clone());
                 if height == 0 && recents.len() < NUM_RECENT_BLOCKS {
                     // For the first NUM_RECENTS blocks, ensure NUM_RECENTS - 1 or less is valid.
                     block_locators.ensure_is_valid().unwrap();
@@ -359,7 +419,7 @@ mod tests {
                 height + NUM_RECENT_BLOCKS as u32,
                 (Field::<CurrentNetwork>::from_u32(height + NUM_RECENT_BLOCKS as u32)).into(),
             );
-            let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints.clone());
+            let block_locators = BlockLocators::<CurrentNetwork>::new_unchecked(recents.clone(), checkpoints.clone());
             block_locators.ensure_is_valid().unwrap_err();
         }
     }
@@ -376,7 +436,8 @@ mod tests {
             for i in 0..NUM_RECENT_BLOCKS as u32 {
                 recents.insert(height + i, (Field::<CurrentNetwork>::from_u32(height + i)).into());
 
-                let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints.clone());
+                let block_locators =
+                    BlockLocators::<CurrentNetwork>::new_unchecked(recents.clone(), checkpoints.clone());
                 block_locators.ensure_is_consistent_with(&block_locators).unwrap();
 
                 // Only test consistency when the block locators are valid to begin with.
@@ -412,12 +473,12 @@ mod tests {
         let mut recents = IndexMap::new();
         for i in 0..NUM_RECENT_BLOCKS {
             recents.insert(i as u32, (Field::<CurrentNetwork>::from_u32(i as u32)).into());
-            let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints.clone());
+            let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints.clone()).unwrap();
             block_locators.ensure_is_valid().unwrap();
         }
         // Ensure NUM_RECENTS + 1 is not valid.
         recents.insert(NUM_RECENT_BLOCKS as u32, (Field::<CurrentNetwork>::from_u32(NUM_RECENT_BLOCKS as u32)).into());
-        let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints);
+        let block_locators = BlockLocators::<CurrentNetwork>::new_unchecked(recents.clone(), checkpoints);
         block_locators.ensure_is_valid().unwrap_err();
 
         // Ensure block locators before the second checkpoint are valid.
@@ -438,27 +499,31 @@ mod tests {
         let one: <CurrentNetwork as Network>::BlockHash = (Field::<CurrentNetwork>::from_u32(1)).into();
 
         // Ensure an empty block locators is not valid.
-        let block_locators = BlockLocators::<CurrentNetwork>::new(Default::default(), Default::default());
+        let block_locators = BlockLocators::<CurrentNetwork>::new_unchecked(Default::default(), Default::default());
         block_locators.ensure_is_valid().unwrap_err();
 
         // Ensure internally-mismatching genesis block locators is valid.
         let block_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero)]), IndexMap::from([(0, one)]));
+            BlockLocators::<CurrentNetwork>::new_unchecked(IndexMap::from([(0, zero)]), IndexMap::from([(0, one)]));
         block_locators.ensure_is_valid().unwrap_err();
 
         // Ensure internally-mismatching genesis block locators is valid.
         let block_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, one)]), IndexMap::from([(0, zero)]));
+            BlockLocators::<CurrentNetwork>::new_unchecked(IndexMap::from([(0, one)]), IndexMap::from([(0, zero)]));
         block_locators.ensure_is_valid().unwrap_err();
 
         // Ensure internally-mismatching block locators with two recent blocks is valid.
-        let block_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, one), (1, zero)]), IndexMap::from([(0, zero)]));
+        let block_locators = BlockLocators::<CurrentNetwork>::new_unchecked(
+            IndexMap::from([(0, one), (1, zero)]),
+            IndexMap::from([(0, zero)]),
+        );
         block_locators.ensure_is_valid().unwrap_err();
 
         // Ensure duplicate recent block hashes are not valid.
-        let block_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero), (1, zero)]), IndexMap::from([(0, zero)]));
+        let block_locators = BlockLocators::<CurrentNetwork>::new_unchecked(
+            IndexMap::from([(0, zero), (1, zero)]),
+            IndexMap::from([(0, zero)]),
+        );
         block_locators.ensure_is_valid().unwrap_err();
     }
 
@@ -468,9 +533,11 @@ mod tests {
         let one: <CurrentNetwork as Network>::BlockHash = (Field::<CurrentNetwork>::from_u32(1)).into();
 
         let genesis_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero)]), IndexMap::from([(0, zero)]));
-        let second_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero), (1, one)]), IndexMap::from([(0, zero)]));
+            BlockLocators::<CurrentNetwork>::new_unchecked(IndexMap::from([(0, zero)]), IndexMap::from([(0, zero)]));
+        let second_locators = BlockLocators::<CurrentNetwork>::new_unchecked(
+            IndexMap::from([(0, zero), (1, one)]),
+            IndexMap::from([(0, zero)]),
+        );
 
         // Ensure genesis block locators is consistent with genesis block locators.
         genesis_locators.ensure_is_consistent_with(&genesis_locators).unwrap();
@@ -504,14 +571,16 @@ mod tests {
         let one: <CurrentNetwork as Network>::BlockHash = (Field::<CurrentNetwork>::from_u32(1)).into();
 
         let genesis_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero)]), IndexMap::from([(0, zero)]));
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero)]), IndexMap::from([(0, zero)])).unwrap();
         let second_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero), (1, one)]), IndexMap::from([(0, zero)]));
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero), (1, one)]), IndexMap::from([(0, zero)]))
+                .unwrap();
 
         let wrong_genesis_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, one)]), IndexMap::from([(0, one)]));
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, one)]), IndexMap::from([(0, one)])).unwrap();
         let wrong_second_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, one), (1, zero)]), IndexMap::from([(0, one)]));
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, one), (1, zero)]), IndexMap::from([(0, one)]))
+                .unwrap();
 
         genesis_locators.ensure_is_consistent_with(&wrong_genesis_locators).unwrap_err();
         wrong_genesis_locators.ensure_is_consistent_with(&genesis_locators).unwrap_err();

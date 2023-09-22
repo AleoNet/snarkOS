@@ -58,23 +58,22 @@ impl<N: Network> FromBytes for CertificateResponse<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{
-        event::transmission_response::prop_tests::any_transmission,
-        helpers::{
-            now,
-            storage::prop_tests::{sign_batch_header, CryptoTestRng},
-        },
-        CertificateResponse,
-    };
+    use crate::{prop_tests::now, transmission_response::prop_tests::any_transmission, CertificateResponse};
     use snarkvm::{
-        console::prelude::{FromBytes, ToBytes},
+        console::{
+            account::Signature,
+            prelude::{FromBytes, ToBytes},
+            types::Field,
+        },
         ledger::{
             committee::prop_tests::{CommitteeContext, ValidatorSet},
             narwhal::{BatchCertificate, BatchHeader},
         },
+        prelude::TestRng,
     };
 
     use bytes::{Buf, BufMut, BytesMut};
+    use indexmap::IndexMap;
     use proptest::{
         collection::vec,
         prelude::{any, BoxedStrategy, Just, Strategy},
@@ -85,8 +84,9 @@ pub mod prop_tests {
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     pub fn any_batch_header(committee: &CommitteeContext) -> BoxedStrategy<BatchHeader<CurrentNetwork>> {
-        (Just(committee.clone()), any::<Selector>(), any::<CryptoTestRng>(), vec(any_transmission(), 0..16))
-            .prop_map(|(committee, selector, mut rng, transmissions)| {
+        (Just(committee.clone()), any::<Selector>(), vec(any_transmission(), 0..16))
+            .prop_map(|(committee, selector, transmissions)| {
+                let mut rng = TestRng::default();
                 let CommitteeContext(_, ValidatorSet(validators)) = committee;
                 let signer = selector.select(validators);
                 let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
@@ -98,13 +98,29 @@ pub mod prop_tests {
 
     pub fn any_batch_certificate() -> BoxedStrategy<BatchCertificate<CurrentNetwork>> {
         any::<CommitteeContext>()
-            .prop_flat_map(|committee| (Just(committee.clone()), any_batch_header(&committee), any::<CryptoTestRng>()))
-            .prop_map(|(committee, batch_header, mut rng)| {
+            .prop_flat_map(|committee| (Just(committee.clone()), any_batch_header(&committee)))
+            .prop_map(|(committee, batch_header)| {
                 let CommitteeContext(_, validator_set) = committee;
+                let mut rng = TestRng::default();
                 BatchCertificate::new(batch_header.clone(), sign_batch_header(&validator_set, &batch_header, &mut rng))
                     .unwrap()
             })
             .boxed()
+    }
+
+    pub fn sign_batch_header(
+        validator_set: &ValidatorSet,
+        batch_header: &BatchHeader<CurrentNetwork>,
+        rng: &mut TestRng,
+    ) -> IndexMap<Signature<CurrentNetwork>, i64> {
+        let mut signatures = IndexMap::with_capacity(validator_set.0.len());
+        for validator in validator_set.0.iter() {
+            let private_key = validator.private_key;
+            let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+            let timestamp_field = Field::from_u64(timestamp as u64);
+            signatures.insert(private_key.sign(&[batch_header.batch_id(), timestamp_field], rng).unwrap(), timestamp);
+        }
+        signatures
     }
 
     pub fn any_certificate_response() -> BoxedStrategy<CertificateResponse<CurrentNetwork>> {

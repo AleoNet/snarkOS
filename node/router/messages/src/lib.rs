@@ -24,7 +24,7 @@ mod block_request;
 pub use block_request::BlockRequest;
 
 mod block_response;
-pub use block_response::{BlockResponse, DataBlocks};
+pub use block_response::BlockResponse;
 
 mod challenge_request;
 pub use challenge_request::ChallengeRequest;
@@ -59,11 +59,12 @@ pub use unconfirmed_solution::UnconfirmedSolution;
 mod unconfirmed_transaction;
 pub use unconfirmed_transaction::UnconfirmedTransaction;
 
-use snarkos_node_narwhal_sync_locators::BlockLocators;
+pub use snarkos_node_narwhal_events::DataBlocks;
+
+use snarkos_node_sync_locators::BlockLocators;
 use snarkvm::prelude::{
-    block::{Block, Header, Transaction},
+    block::{Header, Transaction},
     coinbase::{EpochChallenge, ProverSolution, PuzzleCommitment},
-    error,
     Address,
     FromBytes,
     Network,
@@ -77,9 +78,8 @@ use std::{
     borrow::Cow,
     fmt,
     fmt::{Display, Formatter},
-    io::{Read, Result as IoResult, Write},
+    io::Write,
     net::SocketAddr,
-    ops::Deref,
 };
 
 pub trait MessageTrait {

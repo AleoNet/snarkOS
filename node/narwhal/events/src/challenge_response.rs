@@ -44,26 +44,27 @@ impl<N: Network> FromBytes for ChallengeResponse<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{helpers::storage::prop_tests::CryptoTestRng, ChallengeResponse};
+    use crate::ChallengeResponse;
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
         ledger::narwhal::Data,
         prelude::{PrivateKey, Signature},
-        utilities::rand::Uniform,
+        utilities::rand::{TestRng, Uniform},
     };
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use proptest::prelude::{BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     pub fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
-        (any::<CryptoTestRng>(), 0..64)
-            .prop_map(|(mut rng, message_size)| {
-                let message: Vec<_> = (0..message_size).map(|_| Uniform::rand(&mut rng)).collect();
-                let private_key = PrivateKey::new(&mut rng).unwrap();
-                Signature::sign(&private_key, &message, &mut rng).unwrap()
+        (0..64)
+            .prop_map(|message_size| {
+                let rng = &mut TestRng::default();
+                let message: Vec<_> = (0..message_size).map(|_| Uniform::rand(rng)).collect();
+                let private_key = PrivateKey::new(rng).unwrap();
+                Signature::sign(&private_key, &message, rng).unwrap()
             })
             .boxed()
     }

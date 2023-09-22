@@ -13,11 +13,10 @@
 // limitations under the License.
 
 use crate::{
-    messages::{DisconnectReason, Message, PeerRequest, PuzzleRequest},
+    messages::{DisconnectReason, Message, PeerRequest},
     Outbound,
     Router,
 };
-use snarkos_node_narwhal_sync::REDUNDANCY_FACTOR;
 use snarkvm::prelude::Network;
 
 use colored::Colorize;
@@ -69,12 +68,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
         assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MEDIAN_NUMBER_OF_PEERS);
         assert!(Self::MEDIAN_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
-
-        // If the node is not in development mode, and is a validator, check its median number of peers.
-        let is_validator = self.router().node_type().is_validator();
-        if !self.router().is_dev() && is_validator && Self::MEDIAN_NUMBER_OF_PEERS < 2 * REDUNDANCY_FACTOR {
-            warn!("Caution - please raise the median number of peers to be at least {}", 2 * REDUNDANCY_FACTOR);
-        }
     }
 
     /// This function logs the connected peers.
@@ -248,18 +241,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
     /// This function updates the coinbase puzzle if network has updated.
     fn handle_puzzle_request(&self) {
-        // Retrieve the node type.
-        let node_type = self.router().node_type();
-        // If the node is a prover or client, request the coinbase puzzle.
-        if node_type.is_prover() || node_type.is_client() {
-            // Find the sync peers.
-            if let Some((sync_peers, _)) = self.router().sync().find_sync_peers() {
-                // Choose the peer with the highest block height.
-                if let Some((peer_ip, _)) = sync_peers.into_iter().max_by_key(|(_, height)| *height) {
-                    // Request the coinbase puzzle from the peer.
-                    self.send(peer_ip, Message::PuzzleRequest(PuzzleRequest));
-                }
-            }
-        }
+        // No-op
     }
 }

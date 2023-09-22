@@ -20,15 +20,13 @@ extern crate async_trait;
 #[macro_use]
 extern crate tracing;
 
-pub use snarkos_node_narwhal_sync as sync;
+pub use snarkos_node_narwhal_events as events;
+pub use snarkos_node_narwhal_ledger_service as ledger_service;
 
 pub mod helpers;
 
 mod bft;
 pub use bft::*;
-
-mod event;
-pub use event::*;
 
 mod gateway;
 pub use gateway::*;
@@ -49,6 +47,8 @@ pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
 pub const MAX_GC_ROUNDS: u64 = 50; // rounds
 /// The maximum number of seconds allowed for the leader to send their certificate.
 pub const MAX_LEADER_CERTIFICATE_DELAY: i64 = 2 * MAX_BATCH_DELAY as i64 / 1000; // seconds
+/// The maximum number of milliseconds to wait before sending a primary ping.
+pub const MAX_PRIMARY_PING_DELAY: u64 = MAX_BATCH_DELAY; // ms
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.
@@ -59,9 +59,5 @@ pub const MAX_WORKERS: u8 = 2; // workers
 pub const MEMORY_POOL_PORT: u16 = 5000; // port
 /// The frequency at which each worker broadcasts a ping to every other node.
 pub const WORKER_PING_INTERVAL: u64 = 1500; // ms
-
-// TODO (howardwu): Switch the worker's `TransmissionID` to use or include a sha256/blake2s hash.
-// TODO (howardwu): Implement sha256/blake2s hashing on `Data::Bytes`, so we can compare IDs without deserializing.
-//  This is needed by the worker in `process_event_response` to guarantee integrity of the transmission.
 
 // TODO (howardwu): Add a mechanism to keep validators connected (add reconnect logic).

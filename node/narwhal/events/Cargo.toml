@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-node-router-messages"
+name = "snarkos-node-narwhal-events"
 version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "Node messages for a decentralized operating system"
+description = "Events for the gateway in a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -16,14 +16,7 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
-[features]
-default = [ ]
-test = [ ]
-
 [dependencies.anyhow]
-version = "1.0"
-
-[dependencies.bincode]
 version = "1.0"
 
 [dependencies.bytes]
@@ -39,10 +32,6 @@ version = "1"
 [dependencies.serde]
 version = "1"
 
-[dependencies.snarkos-node-narwhal-events]
-path = "../../narwhal/events"
-version = "=2.1.7"
-
 [dependencies.snarkos-node-sync-locators]
 path = "../../sync/locators"
 version = "=2.1.7"
@@ -51,19 +40,7 @@ version = "=2.1.7"
 workspace = true
 
 [dependencies.snow]
-version = "0.9.3"
-
-[dependencies.tokio]
-version = "1.28"
-features = [
-  "io-util",
-  "macros",
-  "net",
-  "rt-multi-thread",
-  "signal",
-  "sync",
-  "time"
-]
+version = "0.9"
 
 [dependencies.tokio-util]
 version = "0.7"
@@ -71,3 +48,16 @@ features = [ "codec" ]
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.proptest]
+version = "1.0.0"
+
+[dev-dependencies.snarkvm]
+workspace = true
+features = [ "test-helpers" ]
+
+[dev-dependencies.test-strategy]
+version = "0.3.1"
+
+[dev-dependencies.time]
+version = "0.3"

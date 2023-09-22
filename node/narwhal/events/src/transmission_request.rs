@@ -59,7 +59,7 @@ impl<N: Network> FromBytes for TransmissionRequest<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
+        prop_tests::{any_puzzle_commitment, any_transaction_id},
         TransmissionRequest,
     };
     use snarkvm::{

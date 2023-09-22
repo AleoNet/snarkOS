@@ -15,6 +15,7 @@
 use crate::{
     messages::{
         BlockRequest,
+        BlockResponse,
         DataBlocks,
         Message,
         PeerResponse,
@@ -33,7 +34,7 @@ use snarkvm::prelude::{
     Network,
 };
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{anyhow, bail, Result};
 use std::{net::SocketAddr, time::Instant};
 use tokio::task::spawn_blocking;
 
@@ -82,33 +83,16 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::BlockResponse(message) => {
-                let request = message.request;
+                let BlockResponse { request, blocks } = message;
 
                 // Remove the block request, checking if this node previously sent a block request to this peer.
                 if !self.router().cache.remove_outbound_block_request(peer_ip, &request) {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
                 }
-
                 // Perform the deferred non-blocking deserialization of the blocks.
-                let blocks = match message.blocks.deserialize().await {
-                    Ok(blocks) => blocks,
-                    Err(error) => bail!("[PuzzleResponse] {error}"),
-                };
-
-                // Ensure the blocks are not empty.
-                ensure!(!blocks.is_empty(), "Peer '{peer_ip}' sent an empty block response (request = {request})");
-                // Check that the blocks are sequentially ordered.
-                if !blocks.windows(2).all(|w| w[0].height() + 1 == w[1].height()) {
-                    bail!("Peer '{peer_ip}' sent an invalid block response (blocks are not sequentially ordered)")
-                }
-
-                // Retrieve the start (inclusive) and end (exclusive) block height.
-                let start_height = blocks.first().map(|b| b.height()).unwrap_or(0);
-                let end_height = 1 + blocks.last().map(|b| b.height()).unwrap_or(0);
-                // Check that the range matches the block request.
-                if start_height != request.start_height || end_height != request.end_height {
-                    bail!("Peer '{peer_ip}' sent an invalid block response (range does not match the block request)")
-                }
+                let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+                // Ensure the block response is well-formed.
+                blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
 
                 // Process the block response.
                 let node = self.clone();
@@ -132,10 +116,51 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 true => Ok(()),
                 false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
             },
-            Message::Ping(message) => match self.ping(peer_ip, message) {
-                true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid ping"),
-            },
+            Message::Ping(message) => {
+                // Ensure the message protocol version is not outdated.
+                if message.version < Message::<N>::VERSION {
+                    bail!("Dropping '{peer_ip}' on message version {} (outdated)", message.version);
+                }
+
+                // If the peer is a client or validator, ensure there are block locators.
+                let is_client_or_validator = message.node_type.is_client() || message.node_type.is_validator();
+                if is_client_or_validator && message.block_locators.is_none() {
+                    bail!("Peer '{peer_ip}' is a {}, but no block locators were provided", message.node_type);
+                }
+                // If the peer is a prover, ensure there are no block locators.
+                else if message.node_type.is_prover() && message.block_locators.is_some() {
+                    bail!("Peer '{peer_ip}' is a prover or client, but block locators were provided");
+                }
+
+                // Update the connected peer.
+                if let Err(error) =
+                    self.router().update_connected_peer(peer_ip, message.node_type, |peer: &mut Peer<N>| {
+                        // Update the version of the peer.
+                        peer.set_version(message.version);
+                        // Update the node type of the peer.
+                        peer.set_node_type(message.node_type);
+                        // Update the last seen timestamp of the peer.
+                        peer.set_last_seen(Instant::now());
+                    })
+                {
+                    bail!("[Ping] {error}");
+                }
+
+                // TODO (howardwu): For this case, check that the peer is not within NUM_RECENTS, and disconnect.
+                //  As the validator, you should disconnect any node type that is not caught up.
+
+                // // If this node is a validator, the peer is not a validator and is syncing, proceed to disconnect.
+                // if self.node_type == NodeType::Validator && node_type != NodeType::Validator && peer_status == Status::Syncing {
+                //     warn!("Dropping '{peer_addr}' as this node is ahead");
+                //     return Some(DisconnectReason::INeedToSyncFirst);
+                // }
+
+                // Process the ping message.
+                match self.ping(peer_ip, message) {
+                    true => Ok(()),
+                    false => bail!("Peer '{peer_ip}' sent an invalid ping"),
+                }
+            }
             Message::Pong(message) => match self.pong(peer_ip, message) {
                 true => Ok(()),
                 false => bail!("Peer '{peer_ip}' sent an invalid pong"),
@@ -251,60 +276,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         true
     }
 
-    fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
-        // Ensure the message protocol version is not outdated.
-        if message.version < Message::<N>::VERSION {
-            warn!("Dropping '{peer_ip}' on version {} (outdated)", message.version);
-            return false;
-        }
-
-        // If the peer is a validator, ensure there are block locators.
-        if message.node_type.is_validator() && message.block_locators.is_none() {
-            warn!("Peer '{peer_ip}' is a validator, but no block locators were provided");
-            return false;
-        }
-        // If the peer is a prover or client, ensure there are no block locators.
-        if (message.node_type.is_prover() || message.node_type.is_client()) && message.block_locators.is_some() {
-            warn!("Peer '{peer_ip}' is a prover or client, but block locators were provided");
-            return false;
-        }
-        // If block locators were provided, then update the peer in the sync pool.
-        if let Some(block_locators) = message.block_locators {
-            // Check the block locators are valid, and update the peer in the sync pool.
-            if let Err(error) = self.router().sync().update_peer_locators(peer_ip, block_locators) {
-                warn!("Peer '{peer_ip}' sent invalid block locators: {error}");
-                return false;
-            }
-        }
-
-        // Update the connected peer.
-        if let Err(error) = self.router().update_connected_peer(peer_ip, message.node_type, |peer: &mut Peer<N>| {
-            // Update the version of the peer.
-            peer.set_version(message.version);
-            // Update the node type of the peer.
-            peer.set_node_type(message.node_type);
-            // Update the last seen timestamp of the peer.
-            peer.set_last_seen(Instant::now());
-        }) {
-            warn!("[Ping] {error}");
-            return false;
-        }
-
-        // TODO (howardwu): For this case, check that the peer is not within NUM_RECENTS, and disconnect.
-        //  As the validator, you should disconnect any node type that is not caught up.
-
-        // // If this node is a validator, the peer is not a validator and is syncing, proceed to disconnect.
-        // if self.node_type == NodeType::Validator && node_type != NodeType::Validator && peer_status == Status::Syncing {
-        //     warn!("Dropping '{peer_addr}' as this node is ahead");
-        //     return Some(DisconnectReason::INeedToSyncFirst);
-        // }
-
-        let is_fork = Some(false);
-
-        // Send a `Pong` message to the peer.
-        self.send(peer_ip, Message::Pong(Pong { is_fork }));
-        true
-    }
+    /// Handles a `Ping` message.
+    fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool;
 
     /// Sleeps for a period and then sends a `Ping` message to the peer.
     fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool;

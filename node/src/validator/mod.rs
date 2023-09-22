@@ -17,16 +17,17 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_narwhal::helpers::init_primary_channels;
+use snarkos_node_narwhal::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
-    messages::{BlockRequest, Message, NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
+    messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
     Heartbeat,
     Inbound,
     Outbound,
     Router,
     Routing,
 };
+use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
@@ -44,10 +45,7 @@ use core::future::Future;
 use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
 use tokio::task::JoinHandle;
@@ -58,11 +56,13 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     /// The ledger of the node.
     ledger: Ledger<N, C>,
     /// The consensus module of the node.
-    consensus: Consensus<N, C>,
+    consensus: Consensus<N>,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
     rest: Option<Rest<N, C, Self>>,
+    /// The sync module.
+    sync: BlockSync<N>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -90,16 +90,22 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
             if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
-                crate::helpers::log_clean_error(dev);
+                crate::log_clean_error(dev);
                 return Err(error);
             }
         }
+
+        // Initialize the ledger service.
+        let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone()));
+        // Initialize the sync module.
+        let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service.clone());
+
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger.clone(), None, trusted_validators, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger_service, None, trusted_validators, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
-        consensus.run(primary_sender, primary_receiver).await?;
+        consensus.run(sync.clone(), primary_sender, primary_receiver).await?;
 
         // Initialize the node router.
         let router = Router::new(
@@ -118,6 +124,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             consensus: consensus.clone(),
             router,
             rest: None,
+            sync,
             handles: Default::default(),
             shutdown: Default::default(),
         };
@@ -126,14 +133,12 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?);
+            node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger.clone(), Arc::new(node.clone()))?);
         }
-        // TODO (howardwu): The sync pool needs to be unified with the BFT, otherwise there is
-        //  no trigger to advance the round when using the sync protocol to catch up.
-        // // Initialize the sync pool.
-        // node.initialize_sync()?;
         // Initialize the routing.
         node.initialize_routing().await;
+        // Initialize the sync module.
+        node.initialize_sync();
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.
@@ -153,85 +158,27 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes the sync pool.
-    fn initialize_sync(&self) -> Result<()> {
-        // Retrieve the canon locators.
-        let canon_locators = crate::helpers::get_block_locators(&self.ledger)?;
-        // Insert the canon locators into the sync pool.
-        self.router.sync().insert_canon_locators(canon_locators).unwrap();
-
+    fn initialize_sync(&self) {
         // Start the sync loop.
-        let validator = self.clone();
+        let node = self.clone();
         self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
-                if validator.shutdown.load(Ordering::Relaxed) {
+                if node.shutdown.load(std::sync::atomic::Ordering::Relaxed) {
                     info!("Shutting down block production");
                     break;
                 }
 
                 // Sleep briefly to avoid triggering spam detection.
                 tokio::time::sleep(Duration::from_secs(1)).await;
-
-                // Prepare the block requests, if any.
-                let block_requests = validator.router.sync().prepare_block_requests();
-                trace!("Prepared {} block requests", block_requests.len());
-
-                // Process the block requests.
-                'outer: for (height, (hash, previous_hash, sync_ips)) in block_requests {
-                    // Insert the block request into the sync pool.
-                    let result =
-                        validator.router.sync().insert_block_request(height, (hash, previous_hash, sync_ips.clone()));
-
-                    // If the block request was inserted, send it to the peers.
-                    if result.is_ok() {
-                        // Construct the message.
-                        let message =
-                            Message::BlockRequest(BlockRequest { start_height: height, end_height: height + 1 });
-                        // Send the message to the peers.
-                        for sync_ip in sync_ips {
-                            // If the send fails for any peer, remove the block request from the sync pool.
-                            if validator.send(sync_ip, message.clone()).is_none() {
-                                // Remove the entire block request.
-                                validator.router.sync().remove_block_request(height);
-                                // Break out of the loop.
-                                break 'outer;
-                            }
-                        }
-                        // Sleep for 10 milliseconds to avoid triggering spam detection.
-                        tokio::time::sleep(Duration::from_millis(10)).await;
-                    }
+                // Perform the sync routine.
+                let communication = node.consensus.bft().primary().gateway();
+                // let communication = &node.router;
+                if let Err(error) = node.sync.try_block_sync(communication).await {
+                    warn!("Sync error - {error}");
                 }
             }
         }));
-        Ok(())
-    }
-
-    /// Attempts to advance with blocks from the sync pool.
-    fn advance_with_sync_blocks(&self) {
-        // Retrieve the latest block height.
-        let mut current_height = self.ledger.latest_height();
-        // Try to advance the ledger with the sync pool.
-        while let Some(block) = self.router.sync().remove_block_response(current_height + 1) {
-            // Ensure the block height matches.
-            if block.height() != current_height + 1 {
-                warn!("Block height mismatch: expected {}, found {}", current_height + 1, block.height());
-                break;
-            }
-            // Check the next block.
-            if let Err(error) = self.ledger.check_next_block(&block) {
-                warn!("The next block ({}) is invalid - {error}", block.height());
-                break;
-            }
-            // Attempt to advance to the next block.
-            if let Err(error) = self.ledger.advance_to_next_block(&block) {
-                warn!("{error}");
-                break;
-            }
-            // Insert the height and hash as canon in the sync pool.
-            self.router.sync().insert_canon_locator(block.height(), block.hash());
-            // Increment the latest height.
-            current_height += 1;
-        }
     }
 
     // /// Initialize the transaction pool.
@@ -475,9 +422,9 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     async fn shut_down(&self) {
         info!("Shutting down...");
 
-        // Shut down the sync pool.
-        trace!("Shutting down the sync pool...");
-        self.shutdown.store(true, Ordering::Relaxed);
+        // Shut down the node.
+        trace!("Shutting down the node...");
+        self.shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the validator...");

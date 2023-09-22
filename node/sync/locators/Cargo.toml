@@ -1,5 +1,5 @@
 [package]
-name = "snarkos-node-narwhal-sync-locators"
+name = "snarkos-node-sync-locators"
 version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Locators to synchronize a decentralized operating system"
@@ -25,7 +25,7 @@ version = "1.0"
 
 [dependencies.indexmap]
 version = "2.0"
-features = [ "rayon" ]
+features = [ "serde", "rayon" ]
 
 [dependencies.serde]
 version = "1"
