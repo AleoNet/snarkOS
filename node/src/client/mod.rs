@@ -17,6 +17,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_narwhal::ledger_service::CoreLedgerService;
+use snarkos_node_rest::Rest;
 use snarkos_node_router::{
     messages::{Message, NodeType, UnconfirmedSolution},
     Heartbeat,
@@ -52,8 +53,12 @@ use tokio::task::JoinHandle;
 /// A client node is a full node, capable of querying with the network.
 #[derive(Clone)]
 pub struct Client<N: Network, C: ConsensusStorage<N>> {
+    /// The ledger of the node.
+    ledger: Ledger<N, C>,
     /// The router of the node.
     router: Router<N>,
+    /// The REST server of the node.
+    rest: Option<Rest<N, C, Self>>,
     /// The sync module.
     sync: Arc<BlockSync<N>>,
     /// The genesis block.
@@ -76,9 +81,11 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
     /// Initializes a new client node.
     pub async fn new(
         node_ip: SocketAddr,
+        rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the signal handler.
@@ -86,17 +93,17 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
 
         // Initialize the ledger.
         let ledger = Ledger::<N, C>::load(genesis.clone(), dev)?;
-        // // Initialize the CDN.
-        // if let Some(base_url) = cdn {
-        //     // Sync the ledger with the CDN.
-        //     if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
-        //         crate::helpers::log_clean_error(dev);
-        //         return Err(error);
-        //     }
-        // }
+        // Initialize the CDN.
+        if let Some(base_url) = cdn {
+            // Sync the ledger with the CDN.
+            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+                crate::log_clean_error(dev);
+                return Err(error);
+            }
+        }
 
         // Initialize the ledger service.
-        let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger));
+        let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
         // Initialize the sync module.
         let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
 
@@ -113,8 +120,10 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
-        let node = Self {
+        let mut node = Self {
+            ledger: ledger.clone(),
             router,
+            rest: None,
             sync: Arc::new(sync),
             genesis,
             coinbase_puzzle,
@@ -124,6 +133,11 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             shutdown: Default::default(),
             _phantom: PhantomData,
         };
+
+        // Initialize the REST server.
+        if let Some(rest_ip) = rest_ip {
+            node.rest = Some(Rest::start(rest_ip, None, ledger.clone(), Arc::new(node.clone()))?);
+        }
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the sync module.
@@ -134,6 +148,18 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         Ok(node)
     }
 
+    /// Returns the ledger.
+    pub fn ledger(&self) -> &Ledger<N, C> {
+        &self.ledger
+    }
+
+    /// Returns the REST server.
+    pub fn rest(&self) -> &Option<Rest<N, C, Self>> {
+        &self.rest
+    }
+}
+
+impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
     /// Initializes the sync pool.
     fn initialize_sync(&self) {
         // Start the sync loop.

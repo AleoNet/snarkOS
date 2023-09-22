@@ -45,8 +45,10 @@ const RECOMMENDED_MIN_NOFILES_LIMIT: u64 = 2048;
 
 /// The development mode RNG seed.
 const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
-/// The development mode number of validators.
-const DEVELOPMENT_MODE_NUM_VALIDATORS: u16 = 4;
+/// The development mode number of genesis committee members.
+const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
+/// The development mode number of nodes with public balance.
+const DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE: u16 = 50;
 
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
@@ -183,10 +185,9 @@ impl Start {
         // Disable CDN if:
         //  1. The node is in development mode.
         //  2. The user has explicitly disabled CDN.
-        //  3. The node is a client (no need to sync).
-        //  4. The node is a prover (no need to sync).
-        //  5. The node type is not declared (defaults to client) (no need to sync).
-        if self.dev.is_some() || self.cdn.is_empty() || self.client || self.prover || is_no_node_type {
+        //  3. The node is a prover (no need to sync).
+        //  4. The node type is not declared (defaults to client) (no need to sync).
+        if self.dev.is_some() || self.cdn.is_empty() || self.prover || is_no_node_type {
             None
         }
         // Enable the CDN otherwise.
@@ -243,7 +244,7 @@ impl Start {
             crate::commands::Clean::remove_ledger(N::ID, Some(dev))?;
 
             // To avoid ambiguity, we define the first few nodes to be the trusted validators to connect to.
-            for i in 0..DEVELOPMENT_MODE_NUM_VALIDATORS {
+            for i in 0..DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS {
                 if i != dev {
                     trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
                 }
@@ -271,13 +272,14 @@ impl Start {
             // Initialize the (fixed) RNG.
             let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
             // Initialize the development private keys.
-            let development_private_keys = (0..DEVELOPMENT_MODE_NUM_VALIDATORS)
+            let development_private_keys = (0..DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE)
                 .map(|_| PrivateKey::<N>::new(&mut rng))
                 .collect::<Result<Vec<_>>>()?;
 
             // Construct the committee members.
             let members = development_private_keys
                 .iter()
+                .take(DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as usize)
                 .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_VALIDATOR_STAKE, true))))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
             // Construct the committee.
@@ -285,11 +287,12 @@ impl Start {
 
             // Determine the public balance per validator.
             let public_balance_per_validator = (N::STARTING_SUPPLY
-                - (DEVELOPMENT_MODE_NUM_VALIDATORS as u64 * MIN_VALIDATOR_STAKE))
-                / (DEVELOPMENT_MODE_NUM_VALIDATORS as u64);
+                - (DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64 * MIN_VALIDATOR_STAKE))
+                / (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64);
             assert_eq!(
                 N::STARTING_SUPPLY,
-                (MIN_VALIDATOR_STAKE + public_balance_per_validator) * DEVELOPMENT_MODE_NUM_VALIDATORS as u64,
+                (DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64 * MIN_VALIDATOR_STAKE)
+                    + (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64 * public_balance_per_validator),
                 "The public balance per validator is not correct."
             );
 
@@ -383,7 +386,7 @@ impl Start {
         match node_type {
             NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
-            NodeType::Client => Node::new_client(self.node, account, &trusted_peers, genesis, self.dev).await,
+            NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
         }
     }
 
@@ -523,10 +526,10 @@ mod tests {
 
         // Client (Prod)
         let config = Start::try_parse_from(["snarkos", "--client", "--private-key", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
+        assert!(config.parse_cdn().is_some());
         let config =
             Start::try_parse_from(["snarkos", "--client", "--private-key", "aleo1xx", "--cdn", "url"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
+        assert!(config.parse_cdn().is_some());
         let config =
             Start::try_parse_from(["snarkos", "--client", "--private-key", "aleo1xx", "--cdn", ""].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
