@@ -604,6 +604,12 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((current_round, callback)) = rx_primary_round.recv().await {
+                // If the primary is not synced, then do not process the current round.
+                if let Err(e) = self_.primary().check_primary_synced() {
+                    warn!("Cannot process the current round from primary - {e}");
+                    continue;
+                }
+
                 callback.send(self_.update_to_next_round(current_round)).ok();
             }
         });
@@ -612,6 +618,12 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((certificate, callback)) = rx_primary_certificate.recv().await {
+                // If the primary is not synced, then do not process the certificate.
+                if let Err(e) = self_.primary().check_primary_synced() {
+                    warn!("Cannot process the certificate from primary - {e}");
+                    continue;
+                }
+
                 // Update the DAG with the certificate.
                 let result = self_.update_dag(certificate).await;
                 // Send the callback **after** updating the DAG.

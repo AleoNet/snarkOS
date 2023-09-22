@@ -17,6 +17,7 @@ use crate::{
     helpers::{
         assign_to_worker,
         assign_to_workers,
+        fmt_id,
         init_worker_channels,
         now,
         BFTSender,
@@ -613,6 +614,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_request)) = rx_certificate_request.recv().await {
+                // If the primary is not synced, then do not process the certificate request.
+                if let Err(e) = self_.check_primary_synced() {
+                    warn!("Cannot process certificate request from peer '{peer_ip}' - {e}");
+                    continue;
+                }
+
                 self_.send_certificate_response(peer_ip, certificate_request);
             }
         });
@@ -621,6 +628,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_response)) = rx_certificate_response.recv().await {
+                // If the primary is not synced, then do not process the certificate response.
+                if let Err(e) = self_.check_primary_synced() {
+                    warn!("Cannot process certificate response from peer '{peer_ip}' - {e}");
+                    continue;
+                }
+
                 self_.finish_certificate_request(peer_ip, certificate_response)
             }
         });
@@ -629,6 +642,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((puzzle_commitment, prover_solution, callback)) = rx_unconfirmed_solution.recv().await {
+                // If the primary is not synced, then do not process the unconfirmed solution.
+                if let Err(e) = self_.check_primary_synced() {
+                    warn!("Cannot process the solution '{}' - {e}", fmt_id(puzzle_commitment));
+                    continue;
+                }
+
                 // Compute the worker ID.
                 let Ok(worker_id) = assign_to_worker(puzzle_commitment, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed solution");
@@ -650,6 +669,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((transaction_id, transaction, callback)) = rx_unconfirmed_transaction.recv().await {
+                // If the primary is not synced, then do not process the unconfirmed transaction.
+                if let Err(e) = self_.check_primary_synced() {
+                    warn!("Cannot process the transaction '{transaction_id}' - {e}",);
+                    continue;
+                }
+
                 // Compute the worker ID.
                 let Ok(worker_id) = assign_to_worker::<N>(&transaction_id, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");
