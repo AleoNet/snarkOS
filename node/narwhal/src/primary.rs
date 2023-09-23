@@ -378,6 +378,15 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
+        // Ensure the batch author is a current committee member.
+        if !self.gateway.is_authorized_validator_address(batch_header.author()) {
+            bail!("Malicious peer - proposed batch from a non-committee member ({})", batch_header.author());
+        }
+        // Ensure the batch proposal is not from the current primary.
+        if self.gateway.account().address() == batch_header.author() {
+            bail!("Malicious peer - proposed batch from myself ({})", batch_header.author());
+        }
+
         // If the peer is ahead, use the batch header to sync up to the peer.
         let transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
 
@@ -431,6 +440,11 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the signature and timestamp.
         let BatchSignature { batch_id, signature, timestamp } = batch_signature;
+
+        // Ensure the batch signature is not from the current primary.
+        if self.gateway.account().address() == signature.to_address() {
+            bail!("Malicious peer - received a batch signature from myself ({})", signature.to_address());
+        }
 
         let proposal = {
             // Acquire the write lock.
@@ -493,6 +507,14 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        // Ensure the batch certificate is authored by a current committee member.
+        if !self.gateway.is_authorized_validator_address(certificate.author()) {
+            bail!("Received a batch certificate from a non-committee member ({})", certificate.author());
+        }
+        // Ensure the batch proposal is not from the current primary.
+        if self.gateway.account().address() == certificate.author() {
+            bail!("Received a batch certificate for myself ({})", certificate.author());
+        }
         // Store the certificate, after ensuring it is valid.
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
         // If there are enough certificates to reach quorum threshold for the current round,
@@ -1338,12 +1360,10 @@ mod tests {
         }
 
         // Try to process the batch proposal from the peer, should succeed.
-        assert!(
-            primary
-                .process_batch_propose_from_peer(accounts[1].0, (*proposal.batch_header()).clone().into())
-                .await
-                .is_ok()
-        );
+        primary
+            .process_batch_propose_from_peer(accounts[1].0, (*proposal.batch_header()).clone().into())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
