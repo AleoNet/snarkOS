@@ -30,9 +30,9 @@ use crate::{
     Transport,
     Worker,
     MAX_BATCH_DELAY,
-    MAX_PRIMARY_PING_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
+    PRIMARY_PING_INTERVAL,
 };
 use snarkos_account::Account;
 use snarkos_node_narwhal_events::PrimaryPing;
@@ -540,7 +540,7 @@ impl<N: Network> Primary<N> {
             let self_ = self.clone();
             self.spawn(async move {
                 loop {
-                    tokio::time::sleep(Duration::from_millis(MAX_PRIMARY_PING_DELAY)).await;
+                    tokio::time::sleep(Duration::from_millis(PRIMARY_PING_INTERVAL)).await;
                     // Construct the primary ping.
                     let primary_ping = match self_.gateway.sync().get_block_locators() {
                         Ok(block_locators) => PrimaryPing::new(<Event<N>>::VERSION, block_locators),
