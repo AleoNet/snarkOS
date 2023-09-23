@@ -579,13 +579,13 @@ impl<N: Network> Storage<N> {
 
     /// Syncs the storage with the block.
     pub fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
-        // Retrieve the current height in storage.
-        let current_height = self.current_height();
-        // Determine the earliest height, conservatively set to the current height minus the max GC rounds.
+        // Retrieve the block height.
+        let block_height = block.height();
+        // Determine the earliest height, conservatively set to the block height minus the max GC rounds.
         // By virtue of the BFT protocol, we can guarantee that all GC range blocks will be loaded.
-        let gc_height = current_height.saturating_sub(u32::try_from(self.max_gc_rounds)?);
+        let gc_height = block_height.saturating_sub(u32::try_from(self.max_gc_rounds)?);
         // Retrieve the blocks.
-        let blocks = self.ledger.get_blocks(gc_height..current_height)?;
+        let blocks = self.ledger.get_blocks(gc_height..block_height.saturating_add(1))?;
 
         // Acquire the sync lock.
         let _sync_lock = self.sync_lock.lock();
@@ -685,6 +685,7 @@ impl<N: Network> Storage<N> {
             }
         }
         // Insert the batch certificate into storage.
+        debug!("Sync - Inserting certificate from {} for round {}", certificate.author(), certificate.round());
         if let Err(error) = self.insert_certificate(certificate.clone(), missing_transmissions) {
             let certificate_id = certificate.certificate_id();
             error!("Failed to sync certificate {certificate_id} with block {} - {error}", block.height());
