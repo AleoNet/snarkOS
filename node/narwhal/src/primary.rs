@@ -578,7 +578,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
                 // If the primary is not synced, then do not sign the batch.
                 if !self_.gateway.sync().is_block_synced() {
-                    warn!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
+                    debug!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
@@ -594,7 +594,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
                 // If the primary is not synced, then do not store the signature.
                 if !self_.gateway.sync().is_block_synced() {
-                    warn!("Skipping a batch signature from '{peer_ip}' - node is syncing");
+                    debug!("Skipping a batch signature from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
@@ -610,7 +610,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
                 // If the primary is not synced, then do not store the certificate.
                 if !self_.gateway.sync().is_block_synced() {
-                    warn!("Skipping a certified batch from '{peer_ip}' - node is syncing");
+                    debug!("Skipping a certified batch from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
@@ -633,7 +633,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, certificate_request)) = rx_certificate_request.recv().await {
                 // If the primary is not synced, then do not process the certificate request.
                 if !self_.gateway.sync().is_block_synced() {
-                    warn!("Skipping batch certificate request from '{peer_ip}' - node is syncing");
+                    debug!("Skipping batch certificate request from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
@@ -647,7 +647,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, certificate_response)) = rx_certificate_response.recv().await {
                 // If the primary is not synced, then do not process the certificate response.
                 if !self_.gateway.sync().is_block_synced() {
-                    warn!("Skipping batch certificate response from '{peer_ip}' - node is syncing");
+                    debug!("Skipping batch certificate response from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
