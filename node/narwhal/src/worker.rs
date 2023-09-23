@@ -496,6 +496,7 @@ mod tests {
         Ledger<N: Network> {}
         #[async_trait]
         impl<N: Network> LedgerService<N> for Ledger<N> {
+            fn latest_round(&self) -> u64;
             fn latest_block_height(&self) -> u32;
             fn contains_block_height(&self, height: u32) -> bool;
             fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32>;

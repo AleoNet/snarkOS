@@ -41,6 +41,11 @@ impl<N: Network> ProverLedgerService<N> {
 
 #[async_trait]
 impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
+    /// Returns the latest round in the ledger.
+    fn latest_round(&self) -> u64 {
+        0u64
+    }
+
     /// Returns the latest block height in the ledger.
     fn latest_block_height(&self) -> u32 {
         0u32

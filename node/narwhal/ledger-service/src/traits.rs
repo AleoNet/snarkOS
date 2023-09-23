@@ -27,6 +27,9 @@ use std::{fmt::Debug, ops::Range};
 
 #[async_trait]
 pub trait LedgerService<N: Network>: Debug + Send + Sync {
+    /// Returns the latest round in the ledger.
+    fn latest_round(&self) -> u64;
+
     /// Returns the latest block height in the ledger.
     fn latest_block_height(&self) -> u32;
 

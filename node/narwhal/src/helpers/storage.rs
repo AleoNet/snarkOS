@@ -49,6 +49,7 @@ use std::{
 ///  - The next round is inserted into the `current_round`.
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
+    /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
     /* Once per round */
     /// The current round.
@@ -71,15 +72,15 @@ pub struct Storage<N: Network> {
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
     pub fn new(ledger: Arc<dyn LedgerService<N>>, max_gc_rounds: u64) -> Self {
-        // Retrieve the current committee.
-        let committee = ledger.current_committee().expect("Ledger is missing a committee.");
         // Retrieve the current round.
-        let current_round = committee.starting_round().max(1);
+        let current_round = ledger.latest_round().max(1);
+        // Compute the GC round.
+        let gc_round = current_round.saturating_sub(max_gc_rounds);
         // Return the storage.
         Self {
             ledger,
             current_round: Arc::new(AtomicU64::new(current_round)),
-            gc_round: Default::default(),
+            gc_round: Arc::new(AtomicU64::new(gc_round)),
             max_gc_rounds,
             rounds: Default::default(),
             certificates: Default::default(),
