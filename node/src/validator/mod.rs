@@ -364,17 +364,19 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         let self_ = self.clone();
         self.spawn(async move {
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            // If the node is running in development mode, only generate if you are allowed.
+            if let Some(dev) = dev {
+                if dev != 0 {
+                    return;
+                }
+            }
+
+            tokio::time::sleep(Duration::from_secs(3)).await;
             info!("Starting transaction pool...");
+
             // Start the transaction loop.
             loop {
                 tokio::time::sleep(Duration::from_millis(500)).await;
-                // If the node is running in development mode, only generate if you are allowed.
-                if let Some(dev) = dev {
-                    if dev != 0 {
-                        continue;
-                    }
-                }
 
                 // Prepare the inputs.
                 let inputs = [Value::from(Literal::Address(self_.address())), Value::from(Literal::U64(U64::new(1)))];
