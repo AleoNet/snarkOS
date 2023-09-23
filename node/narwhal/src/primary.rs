@@ -17,7 +17,6 @@ use crate::{
     helpers::{
         assign_to_worker,
         assign_to_workers,
-        fmt_id,
         init_worker_channels,
         now,
         BFTSender,
