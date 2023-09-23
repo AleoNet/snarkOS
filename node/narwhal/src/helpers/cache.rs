@@ -38,6 +38,8 @@ pub struct Cache<N: Network> {
     seen_outbound_certificates: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
     /// The ordered timestamp map of peer IPs and their cache hits on transmission requests.
     seen_outbound_transmissions: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
+    /// The map of IPs to the number of validators requests.
+    seen_outbound_validators_requests: RwLock<HashMap<SocketAddr, u16>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -58,6 +60,7 @@ impl<N: Network> Cache<N> {
             seen_outbound_events: Default::default(),
             seen_outbound_certificates: Default::default(),
             seen_outbound_transmissions: Default::default(),
+            seen_outbound_validators_requests: Default::default(),
         }
     }
 }
@@ -102,6 +105,23 @@ impl<N: Network> Cache<N> {
 }
 
 impl<N: Network> Cache<N> {
+    /// Returns `true` if the cache contains a validators request from the given IP.
+    pub fn contains_outbound_validators_request(&self, peer_ip: SocketAddr) -> bool {
+        self.seen_outbound_validators_requests.read().get(&peer_ip).map(|r| *r > 0).unwrap_or(false)
+    }
+
+    /// Increment the IP's number of validators requests, returning the updated number of validators requests.
+    pub fn increment_outbound_validators_requests(&self, peer_ip: SocketAddr) -> u16 {
+        Self::increment_counter(&self.seen_outbound_validators_requests, peer_ip)
+    }
+
+    /// Decrement the IP's number of validators requests, returning the updated number of validators requests.
+    pub fn decrement_outbound_validators_requests(&self, peer_ip: SocketAddr) -> u16 {
+        Self::decrement_counter(&self.seen_outbound_validators_requests, peer_ip)
+    }
+}
+
+impl<N: Network> Cache<N> {
     /// Insert a new timestamp for the given key, returning the number of recent entries.
     fn retain_and_insert<K: Copy + Clone + PartialEq + Eq + Hash>(
         map: &RwLock<BTreeMap<i64, HashMap<K, u32>>>,
@@ -127,6 +147,32 @@ impl<N: Network> Cache<N> {
         }
         // Return the frequency.
         cache_hits as usize
+    }
+
+    /// Increments the key's counter in the map, returning the updated counter.
+    fn increment_counter<K: Hash + Eq>(map: &RwLock<HashMap<K, u16>>, key: K) -> u16 {
+        let mut map_write = map.write();
+        // Load the entry for the key, and increment the counter.
+        let entry = map_write.entry(key).or_default();
+        *entry = entry.saturating_add(1);
+        // Return the updated counter.
+        *entry
+    }
+
+    /// Decrements the key's counter in the map, returning the updated counter.
+    fn decrement_counter<K: Copy + Hash + Eq>(map: &RwLock<HashMap<K, u16>>, key: K) -> u16 {
+        let mut map_write = map.write();
+        // Load the entry for the key, and decrement the counter.
+        let entry = map_write.entry(key).or_default();
+        let value = entry.saturating_sub(1);
+        // If the entry is 0, remove the entry.
+        if *entry == 0 {
+            map_write.remove(&key);
+        } else {
+            *entry = value;
+        }
+        // Return the updated counter.
+        value
     }
 }
 

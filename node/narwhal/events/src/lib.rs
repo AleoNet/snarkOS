@@ -56,6 +56,12 @@ pub use transmission_request::TransmissionRequest;
 mod transmission_response;
 pub use transmission_response::TransmissionResponse;
 
+mod validators_request;
+pub use validators_request::ValidatorsRequest;
+
+mod validators_response;
+pub use validators_response::ValidatorsResponse;
+
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
@@ -71,7 +77,7 @@ use snarkvm::{
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, ensure, Result};
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 pub use std::io::Result as IoResult;
 use std::{borrow::Cow, net::SocketAddr};
@@ -96,6 +102,8 @@ pub enum Event<N: Network> {
     PrimaryPing(PrimaryPing<N>),
     TransmissionRequest(TransmissionRequest<N>),
     TransmissionResponse(TransmissionResponse<N>),
+    ValidatorsRequest(ValidatorsRequest),
+    ValidatorsResponse(ValidatorsResponse<N>),
     WorkerPing(WorkerPing<N>),
 }
 
@@ -126,6 +134,8 @@ impl<N: Network> Event<N> {
             Self::PrimaryPing(event) => event.name(),
             Self::TransmissionRequest(event) => event.name(),
             Self::TransmissionResponse(event) => event.name(),
+            Self::ValidatorsRequest(event) => event.name(),
+            Self::ValidatorsResponse(event) => event.name(),
             Self::WorkerPing(event) => event.name(),
         }
     }
@@ -147,7 +157,9 @@ impl<N: Network> Event<N> {
             Self::PrimaryPing(..) => 10,
             Self::TransmissionRequest(..) => 11,
             Self::TransmissionResponse(..) => 12,
-            Self::WorkerPing(..) => 13,
+            Self::ValidatorsRequest(..) => 13,
+            Self::ValidatorsResponse(..) => 14,
+            Self::WorkerPing(..) => 15,
         }
     }
 
@@ -170,6 +182,8 @@ impl<N: Network> Event<N> {
             Self::PrimaryPing(event) => event.write_le(writer),
             Self::TransmissionRequest(event) => event.write_le(writer),
             Self::TransmissionResponse(event) => event.write_le(writer),
+            Self::ValidatorsRequest(event) => event.write_le(writer),
+            Self::ValidatorsResponse(event) => event.write_le(writer),
             Self::WorkerPing(event) => event.write_le(writer),
         }
     }
@@ -203,8 +217,10 @@ impl<N: Network> Event<N> {
             10 => Self::PrimaryPing(PrimaryPing::read_le(reader)?),
             11 => Self::TransmissionRequest(TransmissionRequest::read_le(reader)?),
             12 => Self::TransmissionResponse(TransmissionResponse::read_le(reader)?),
-            13 => Self::WorkerPing(WorkerPing::read_le(reader)?),
-            14.. => bail!("Unknown event ID {id}"),
+            13 => Self::ValidatorsRequest(ValidatorsRequest::read_le(reader)?),
+            14 => Self::ValidatorsResponse(ValidatorsResponse::read_le(reader)?),
+            15 => Self::WorkerPing(WorkerPing::read_le(reader)?),
+            16.. => bail!("Unknown event ID {id}"),
         };
 
         Ok(event)
