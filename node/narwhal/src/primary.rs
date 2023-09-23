@@ -660,12 +660,6 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((puzzle_commitment, prover_solution, callback)) = rx_unconfirmed_solution.recv().await {
-                // If the primary is not synced, then do not process the unconfirmed solution.
-                if !self_.gateway.sync().is_block_synced() {
-                    warn!("Skipping unconfirmed solution '{}' - node is syncing", fmt_id(puzzle_commitment));
-                    continue;
-                }
-
                 // Compute the worker ID.
                 let Ok(worker_id) = assign_to_worker(puzzle_commitment, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed solution");
@@ -687,12 +681,6 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((transaction_id, transaction, callback)) = rx_unconfirmed_transaction.recv().await {
-                // If the primary is not synced, then do not process the unconfirmed transaction.
-                if !self_.gateway.sync().is_block_synced() {
-                    warn!("Skipping unconfirmed transaction '{}' - node is syncing", fmt_id(transaction_id));
-                    continue;
-                }
-
                 // Compute the worker ID.
                 let Ok(worker_id) = assign_to_worker::<N>(&transaction_id, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");
