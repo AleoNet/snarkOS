@@ -563,6 +563,7 @@ impl<N: Network> Primary<N> {
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
                 // If the primary is not synced, then do not propose a batch.
                 if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping batch proposal - node is syncing");
                     continue;
                 }
                 // If there is no proposed batch, attempt to propose a batch.

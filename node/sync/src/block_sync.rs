@@ -370,6 +370,8 @@ impl<N: Network> BlockSync<N> {
             // Return the list of block requests.
             self.construct_requests(sync_peers, min_common_ancestor, &mut rand::thread_rng())
         } else {
+            // Update the state of `is_block_synced` for the sync module.
+            self.update_is_block_synced(0, MAX_BLOCKS_BEHIND);
             // Return an empty list of block requests.
             Vec::new()
         }
