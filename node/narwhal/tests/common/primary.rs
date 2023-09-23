@@ -158,6 +158,7 @@ impl TestNetwork {
 
             let ledger_service = validator.primary.ledger().clone();
             let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service);
+            sync.try_block_sync(validator.primary.gateway()).await.unwrap();
 
             if let Some(bft) = validator.bft.get_mut() {
                 // Setup the channels and start the bft.
