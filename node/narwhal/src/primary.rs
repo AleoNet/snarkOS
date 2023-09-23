@@ -561,6 +561,11 @@ impl<N: Network> Primary<N> {
             loop {
                 // Sleep briefly, but longer than if there were no batch.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
+                // If the primary is not synced, then do not propose a batch.
+                if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping batch proposal - node is syncing");
+                    continue;
+                }
                 // If there is no proposed batch, attempt to propose a batch.
                 if let Err(e) = self_.propose_batch().await {
                     warn!("Cannot propose a batch - {e}");
@@ -572,6 +577,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
+                // If the primary is not synced, then do not sign the batch.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 if let Err(e) = self_.process_batch_propose_from_peer(peer_ip, batch_propose).await {
                     warn!("Cannot sign a batch from peer '{peer_ip}' - {e}");
                 }
@@ -582,6 +593,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
+                // If the primary is not synced, then do not store the signature.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping a batch signature from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
                     warn!("Cannot store a signature from peer '{peer_ip}' - {e}");
                 }
@@ -592,6 +609,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
+                // If the primary is not synced, then do not store the certificate.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping a certified batch from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 // Deserialize the batch certificate.
                 let Ok(Ok(batch_certificate)) =
                     task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
@@ -609,6 +632,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_request)) = rx_certificate_request.recv().await {
+                // If the primary is not synced, then do not process the certificate request.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping batch certificate request from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 self_.send_certificate_response(peer_ip, certificate_request);
             }
         });
@@ -617,6 +646,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_response)) = rx_certificate_response.recv().await {
+                // If the primary is not synced, then do not process the certificate response.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping batch certificate response from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 self_.finish_certificate_request(peer_ip, certificate_response)
             }
         });
