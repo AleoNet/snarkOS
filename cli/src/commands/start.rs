@@ -243,16 +243,16 @@ impl Start {
             // TODO (howardwu): Remove me after we stabilize syncing.
             crate::commands::Clean::remove_ledger(N::ID, Some(dev))?;
 
-            // To avoid ambiguity, we define the first few nodes to be the trusted validators to connect to.
-            for i in 0..2 {
-                if i != dev {
-                    trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
-                }
-            }
             // Add the dev nodes to the trusted peers.
             for i in 0..dev {
                 if i != dev {
                     trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+                }
+            }
+            // To avoid ambiguity, we define the first few nodes to be the trusted validators to connect to.
+            for i in 0..2 {
+                if i != dev {
+                    trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
                 }
             }
             // Set the node IP to `4130 + dev`.
