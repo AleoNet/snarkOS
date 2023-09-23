@@ -41,6 +41,8 @@ pub const CONTEXT: &str = "[MemoryPool]";
 
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY: u64 = 2500; // ms
+/// The maximum number of blocks tolerated before the primary is considered behind its peers.
+pub const MAX_BLOCKS_BEHIND: u32 = 3; // blocks
 /// The maximum number of seconds before a proposed batch is considered expired.
 pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
 /// The maximum number of rounds to store before garbage collecting.
@@ -49,8 +51,6 @@ pub const MAX_GC_ROUNDS: u64 = 50; // rounds
 pub const MAX_LEADER_CERTIFICATE_DELAY: i64 = 2 * MAX_BATCH_DELAY as i64 / 1000; // seconds
 /// The maximum number of milliseconds to wait before sending a primary ping.
 pub const MAX_PRIMARY_PING_DELAY: u64 = MAX_BATCH_DELAY; // ms
-/// Maximum block height difference allowed before considering the node as not synced.
-pub const MAX_SYNC_THRESHOLD: u32 = 10;
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.

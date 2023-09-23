@@ -140,17 +140,17 @@ impl<N: Network> BlockSync<N> {
         self.locators.read().get(peer_ip).map(|locators| locators.latest_locator_height())
     }
 
-    /// Returns a map of peer height to peer IPs.
-    /// e.g. `{{ 127 => \[peer1, peer2\], 128 => \[peer3\], 135 => \[peer4, peer5\] }}`
-    fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
-        self.locators.read().iter().map(|(peer_ip, locators)| (locators.latest_locator_height(), *peer_ip)).fold(
-            Default::default(),
-            |mut map, (height, peer_ip)| {
-                map.entry(height).or_default().push(peer_ip);
-                map
-            },
-        )
-    }
+    // /// Returns a map of peer height to peer IPs.
+    // /// e.g. `{{ 127 => \[peer1, peer2\], 128 => \[peer3\], 135 => \[peer4, peer5\] }}`
+    // fn get_peer_heights(&self) -> BTreeMap<u32, Vec<SocketAddr>> {
+    //     self.locators.read().iter().map(|(peer_ip, locators)| (locators.latest_locator_height(), *peer_ip)).fold(
+    //         Default::default(),
+    //         |mut map, (height, peer_ip)| {
+    //             map.entry(height).or_default().push(peer_ip);
+    //             map
+    //         },
+    //     )
+    // }
 
     // /// Returns the list of peers with their heights, sorted by height (descending).
     // fn get_peers_by_height(&self) -> Vec<(SocketAddr, u32)> {
@@ -208,7 +208,7 @@ impl<N: Network> BlockSync<N> {
     pub async fn try_block_sync<C: CommunicationService>(
         &self,
         communication: &C,
-        is_synced_threshold: u32,
+        max_blocks_behind: u32,
     ) -> Result<()> {
         // Prepare the block requests, if any.
         let block_requests = self.prepare_block_requests();
@@ -238,9 +238,8 @@ impl<N: Network> BlockSync<N> {
             }
         }
 
-        // Update the sync status.
-        self.update_sync_status(is_synced_threshold);
-
+        // Update the block sync status.
+        self.update_block_sync_status(max_blocks_behind);
         Ok(())
     }
 
@@ -409,21 +408,20 @@ impl<N: Network> BlockSync<N> {
         Ok(())
     }
 
-    /// Updates the sync status of the ledger.
-    pub fn update_sync_status(&self, is_synced_threshold: u32) {
-        // Retrieve the peer heights.
-        let peer_heights = self.get_peer_heights();
-        // Retrieve the max peer height.
-        let max_peer_height = peer_heights.keys().max().unwrap_or(&0);
+    /// Updates the block sync status of the ledger.
+    pub fn update_block_sync_status(&self, max_blocks_behind: u32) {
+        // Determine the current sync peers.
+        if let Some((sync_peers, _)) = self.find_sync_peers() {
+            // Retrieve the highest block height.
+            let greatest_peer_height = sync_peers.values().max().unwrap_or(&0);
+            // Compute the number of blocks that we are behind by.
+            let num_blocks_behind = greatest_peer_height.saturating_sub(self.canon.latest_block_height());
 
-        // Calculate the number of blocks behind the primary is.
-        let num_blocks_behind = max_peer_height.saturating_sub(self.canon.latest_block_height());
-
-        // Determine if the primary is synced.
-        let is_synced = num_blocks_behind <= is_synced_threshold;
-
-        // Update the sync status.
-        self.is_synced.store(is_synced, Ordering::SeqCst);
+            // Determine if the primary is synced.
+            let is_synced = num_blocks_behind <= max_blocks_behind;
+            // Update the sync status.
+            self.is_synced.store(is_synced, Ordering::SeqCst);
+        }
     }
 
     /// TODO (howardwu): Remove the `common_ancestor` entry. But check that this is safe
