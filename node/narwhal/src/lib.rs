@@ -41,8 +41,6 @@ pub const CONTEXT: &str = "[MemoryPool]";
 
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY: u64 = 2500; // ms
-/// The maximum number of blocks tolerated before the primary is considered behind its peers.
-pub const MAX_BLOCKS_BEHIND: u32 = 3; // blocks
 /// The maximum number of seconds before a proposed batch is considered expired.
 pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
 /// The maximum number of rounds to store before garbage collecting.

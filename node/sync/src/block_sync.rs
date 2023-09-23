@@ -44,6 +44,9 @@ const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
+/// The maximum number of blocks tolerated before the primary is considered behind its peers.
+pub const MAX_BLOCKS_BEHIND: u32 = 3; // blocks
+
 /// This is a dummy IP address that is used to represent the local node.
 /// Note: This here does not need to be a real IP address, but it must be unique/distinct from all other connections.
 const DUMMY_SELF_IP: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
@@ -206,11 +209,7 @@ impl<N: Network> BlockSync<N> {
 
     /// Performs one iteration of the block sync.
     #[inline]
-    pub async fn try_block_sync<C: CommunicationService>(
-        &self,
-        communication: &C,
-        max_blocks_behind: u32,
-    ) -> Result<()> {
+    pub async fn try_block_sync<C: CommunicationService>(&self, communication: &C) -> Result<()> {
         // Prepare the block requests, if any.
         let block_requests = self.prepare_block_requests();
         trace!("Prepared {} block requests", block_requests.len());
@@ -240,7 +239,7 @@ impl<N: Network> BlockSync<N> {
         }
 
         // Update the state of `is_block_synced` for the sync module.
-        self.update_is_block_synced(max_blocks_behind);
+        self.update_is_block_synced(MAX_BLOCKS_BEHIND);
         Ok(())
     }
 
