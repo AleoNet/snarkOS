@@ -45,7 +45,6 @@ use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
-use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
@@ -367,6 +366,7 @@ impl<N: Network> Router<N> {
 
     /// Returns the list of bootstrap peers.
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
+        #[allow(clippy::if_same_then_else)]
         if cfg!(feature = "test") || self.is_dev {
             vec![]
         } else {
