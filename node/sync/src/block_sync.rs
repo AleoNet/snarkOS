@@ -83,8 +83,6 @@ pub struct BlockSync<N: Network> {
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
     canon: Arc<dyn LedgerService<N>>,
-    /// The indicator of whether the node is synced.
-    is_synced: Arc<AtomicBool>,
     /// The map of peer IP to their block locators.
     /// The block locators are consistent with the canonical map and every other peer's block locators.
     locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
@@ -103,6 +101,8 @@ pub struct BlockSync<N: Network> {
     /// The map of (timed out) peer IPs to their request timestamps.
     /// This map is used to determine which peers to remove if they have timed out too many times.
     request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
+    /// The boolean indicator of whether the node is synced up to the latest block (within the given tolerance).
+    is_block_synced: Arc<AtomicBool>,
 }
 
 impl<N: Network> BlockSync<N> {
@@ -111,13 +111,13 @@ impl<N: Network> BlockSync<N> {
         Self {
             mode,
             canon: ledger,
-            is_synced: Default::default(),
             locators: Default::default(),
             common_ancestors: Default::default(),
             requests: Default::default(),
             responses: Default::default(),
             request_timestamps: Default::default(),
             request_timeouts: Default::default(),
+            is_block_synced: Default::default(),
         }
     }
 
@@ -127,9 +127,10 @@ impl<N: Network> BlockSync<N> {
         self.mode
     }
 
-    /// Returns `true` if the node is synced.
-    pub fn is_synced(&self) -> bool {
-        self.is_synced.load(Ordering::SeqCst)
+    /// Returns `true` if the node is synced up to the latest block (within the given tolerance).
+    #[inline]
+    pub fn is_block_synced(&self) -> bool {
+        self.is_block_synced.load(Ordering::SeqCst)
     }
 }
 
@@ -238,8 +239,8 @@ impl<N: Network> BlockSync<N> {
             }
         }
 
-        // Update the block sync status.
-        self.update_block_sync_status(max_blocks_behind);
+        // Update the state of `is_block_synced` for the sync module.
+        self.update_is_block_synced(max_blocks_behind);
         Ok(())
     }
 
@@ -408,22 +409,6 @@ impl<N: Network> BlockSync<N> {
         Ok(())
     }
 
-    /// Updates the block sync status of the ledger.
-    pub fn update_block_sync_status(&self, max_blocks_behind: u32) {
-        // Determine the current sync peers.
-        if let Some((sync_peers, _)) = self.find_sync_peers() {
-            // Retrieve the highest block height.
-            let greatest_peer_height = sync_peers.values().max().unwrap_or(&0);
-            // Compute the number of blocks that we are behind by.
-            let num_blocks_behind = greatest_peer_height.saturating_sub(self.canon.latest_block_height());
-
-            // Determine if the primary is synced.
-            let is_synced = num_blocks_behind <= max_blocks_behind;
-            // Update the sync status.
-            self.is_synced.store(is_synced, Ordering::SeqCst);
-        }
-    }
-
     /// TODO (howardwu): Remove the `common_ancestor` entry. But check that this is safe
     ///  (that we don't rely upon it for safety when we re-connect with the same peer).
     /// Removes the peer from the sync pool, if they exist.
@@ -464,6 +449,22 @@ impl<N: Network> BlockSync<N> {
 }
 
 impl<N: Network> BlockSync<N> {
+    /// Updates the state of `is_block_synced` for the sync module.
+    fn update_is_block_synced(&self, max_blocks_behind: u32) {
+        // Determine the current sync peers.
+        if let Some((sync_peers, _)) = self.find_sync_peers() {
+            // Retrieve the highest block height.
+            let greatest_peer_height = sync_peers.values().max().unwrap_or(&0);
+            // Compute the number of blocks that we are behind by.
+            let num_blocks_behind = greatest_peer_height.saturating_sub(self.canon.latest_block_height());
+
+            // Determine if the primary is synced.
+            let is_synced = num_blocks_behind <= max_blocks_behind;
+            // Update the sync status.
+            self.is_block_synced.store(is_synced, Ordering::SeqCst);
+        }
+    }
+
     /// Checks that a block request for the given height does not already exist.
     fn check_block_request(&self, height: u32) -> Result<()> {
         // Ensure the block height is not already canon.

@@ -562,13 +562,10 @@ impl<N: Network> Primary<N> {
             loop {
                 // Sleep briefly, but longer than if there were no batch.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
-
                 // If the primary is not synced, then do not propose a batch.
-                if !self_.gateway.sync().is_synced() {
-                    warn!("Cannot propose a batch - not synced");
+                if !self_.gateway.sync().is_block_synced() {
                     continue;
                 }
-
                 // If there is no proposed batch, attempt to propose a batch.
                 if let Err(e) = self_.propose_batch().await {
                     warn!("Cannot propose a batch - {e}");
@@ -581,8 +578,8 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
                 // If the primary is not synced, then do not sign the batch.
-                if !self_.gateway.sync().is_synced() {
-                    warn!("Cannot sign a batch from peer '{peer_ip}' - not synced");
+                if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
@@ -597,8 +594,8 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
                 // If the primary is not synced, then do not store the signature.
-                if !self_.gateway.sync().is_synced() {
-                    warn!("Cannot store a signature from peer '{peer_ip}' - not synced");
+                if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping a batch signature from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
@@ -613,8 +610,8 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
                 // If the primary is not synced, then do not store the certificate.
-                if !self_.gateway.sync().is_synced() {
-                    warn!("Cannot store a certificate from peer '{peer_ip}' - not synced");
+                if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping a certified batch from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
@@ -636,8 +633,8 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, certificate_request)) = rx_certificate_request.recv().await {
                 // If the primary is not synced, then do not process the certificate request.
-                if !self_.gateway.sync().is_synced() {
-                    warn!("Cannot process certificate request from peer '{peer_ip}' - not synced");
+                if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping batch certificate request from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
@@ -650,8 +647,8 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, certificate_response)) = rx_certificate_response.recv().await {
                 // If the primary is not synced, then do not process the certificate response.
-                if !self_.gateway.sync().is_synced() {
-                    warn!("Cannot process certificate response from peer '{peer_ip}' - not synced");
+                if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping batch certificate response from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
@@ -664,8 +661,8 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((puzzle_commitment, prover_solution, callback)) = rx_unconfirmed_solution.recv().await {
                 // If the primary is not synced, then do not process the unconfirmed solution.
-                if !self_.gateway.sync().is_synced() {
-                    warn!("Cannot process the solution '{}' - not synced", fmt_id(puzzle_commitment));
+                if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping unconfirmed solution '{}' - node is syncing", fmt_id(puzzle_commitment));
                     continue;
                 }
 
@@ -691,8 +688,8 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((transaction_id, transaction, callback)) = rx_unconfirmed_transaction.recv().await {
                 // If the primary is not synced, then do not process the unconfirmed transaction.
-                if !self_.gateway.sync().is_synced() {
-                    warn!("Cannot process the transaction '{transaction_id}' - not synced",);
+                if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping unconfirmed transaction '{}' - node is syncing", fmt_id(transaction_id));
                     continue;
                 }
 
