@@ -51,6 +51,11 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         0u32
     }
 
+    /// Returns the latest block in the ledger.
+    fn latest_block(&self) -> Block<N> {
+        unreachable!("Latest block does not exist in prover")
+    }
+
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, _height: u32) -> bool {
         false

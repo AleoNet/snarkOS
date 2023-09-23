@@ -18,6 +18,7 @@ use snarkos_node::{narwhal::MEMORY_POOL_PORT, router::messages::NodeType, Node};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
+        algorithms::Hash,
         network::{Network, Testnet3},
     },
     ledger::{
@@ -25,8 +26,9 @@ use snarkvm::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
     },
-    prelude::FromBytes,
+    prelude::{FromBytes, ToBits, ToBytes},
     synthesizer::VM,
+    utilities::to_bytes_le,
 };
 
 use anyhow::{bail, Result};
@@ -240,8 +242,8 @@ impl Start {
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
         // and the REST IP to `3030 + dev`.
         if let Some(dev) = self.dev {
-            // TODO (howardwu): Remove me after we stabilize syncing.
-            crate::commands::Clean::remove_ledger(N::ID, Some(dev))?;
+            // // TODO (howardwu): Remove me after we stabilize syncing.
+            // crate::commands::Clean::remove_ledger(N::ID, Some(dev))?;
 
             // Add the dev nodes to the trusted peers.
             for i in 0..dev {
@@ -302,10 +304,8 @@ impl Start {
                 .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
 
-            // Initialize a new VM.
-            let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
-            // Initialize the genesis block.
-            vm.genesis_quorum(&development_private_keys[0], committee, public_balances, &mut rng)
+            // Construct the genesis block.
+            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
         } else {
             Block::from_bytes_le(N::genesis_bytes())
         }
@@ -425,6 +425,50 @@ impl Start {
             .build()
             .expect("Failed to initialize a runtime for the router")
     }
+}
+
+/// Loads or computes the genesis block.
+fn load_or_compute_genesis<N: Network>(
+    genesis_private_key: PrivateKey<N>,
+    committee: Committee<N>,
+    public_balances: indexmap::IndexMap<Address<N>, u64>,
+    rng: &mut ChaChaRng,
+) -> Result<Block<N>> {
+    // Construct the preimage.
+    let bytes = to_bytes_le![genesis_private_key, committee, public_balances.iter().collect::<Vec<(_, _)>>()]?;
+    // Initialize the hasher.
+    let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
+    // Compute the hash.
+    let hash = hasher.hash(&bytes.to_bits_le())?.to_string();
+
+    // A closure to load the block.
+    let load_block = |file_path| -> Result<Block<N>> {
+        // Attempts to load the genesis block file locally.
+        let buffer = std::fs::read(file_path)?;
+        // Return the genesis block.
+        Block::from_bytes_le(&buffer)
+    };
+
+    // Construct the file path.
+    let file_path = std::env::temp_dir().join(hash);
+    // Check if the genesis block exists.
+    if file_path.exists() {
+        // If the block loads successfully, return it.
+        if let Ok(block) = load_block(&file_path) {
+            return Ok(block);
+        }
+    }
+
+    /* Otherwise, compute the genesis block and store it. */
+
+    // Initialize a new VM.
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
+    // Initialize the genesis block.
+    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng)?;
+    // Write the genesis block to the file.
+    std::fs::write(&file_path, block.to_bytes_le()?)?;
+    // Return the genesis block.
+    Ok(block)
 }
 
 #[cfg(test)]

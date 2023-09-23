@@ -664,7 +664,7 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        let storage = Storage::new(ledger.clone(), 10).unwrap();
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -704,7 +704,7 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        let storage = Storage::new(ledger.clone(), 10).unwrap();
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -728,7 +728,7 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
         let account = Account::new(rng)?;
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        let storage = Storage::new(ledger.clone(), 10).unwrap();
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -751,7 +751,7 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
         let account = Account::new(rng)?;
         let ledger = Arc::new(MockLedgerService::new(committee.clone()));
-        let storage = Storage::new(ledger.clone(), 10);
+        let storage = Storage::new(ledger.clone(), 10).unwrap();
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -776,7 +776,7 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        let storage = Storage::new(ledger.clone(), 10).unwrap();
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -795,7 +795,7 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        let storage = Storage::new(ledger.clone(), 10).unwrap();
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -817,7 +817,7 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
         let account = Account::new(rng)?;
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        let storage = Storage::new(ledger.clone(), 10).unwrap();
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -871,7 +871,7 @@ mod tests {
         // Ensure the function succeeds in returning only certificates above GC.
         {
             // Initialize the storage.
-            let storage = Storage::new(ledger.clone(), 1);
+            let storage = Storage::new(ledger.clone(), 1).unwrap();
             // Initialize the BFT.
             let bft = BFT::new(account.clone(), storage, ledger.clone(), None, &[], None)?;
 
@@ -901,7 +901,7 @@ mod tests {
         // Ensure the function succeeds in returning all given certificates.
         {
             // Initialize the storage.
-            let storage = Storage::new(ledger.clone(), 1);
+            let storage = Storage::new(ledger.clone(), 1).unwrap();
             // Initialize the BFT.
             let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
@@ -964,7 +964,7 @@ mod tests {
         /* Test missing previous certificate. */
 
         // Initialize the storage.
-        let storage = Storage::new(ledger.clone(), 1);
+        let storage = Storage::new(ledger.clone(), 1).unwrap();
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 

@@ -63,6 +63,11 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         self.height_to_hash.lock().last_key_value().map(|(height, _)| *height).unwrap_or(0)
     }
 
+    /// Returns the latest block in the ledger.
+    fn latest_block(&self) -> Block<N> {
+        unreachable!("MockLedgerService does not support latest_block")
+    }
+
     /// Returns `true` if the given block height exists in the canonical ledger.
     fn contains_block_height(&self, height: u32) -> bool {
         self.height_to_hash.lock().contains_key(&height)

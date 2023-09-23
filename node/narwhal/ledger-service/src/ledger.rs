@@ -59,6 +59,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         self.ledger.latest_height()
     }
 
+    /// Returns the latest block in the ledger.
+    fn latest_block(&self) -> Block<N> {
+        self.ledger.latest_block()
+    }
+
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, height: u32) -> bool {
         self.ledger.contains_block_height(height).unwrap_or(false)
