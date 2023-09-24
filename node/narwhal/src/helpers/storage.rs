@@ -87,36 +87,6 @@ impl<N: Network> Storage<N> {
             transmissions: Default::default(),
         }
     }
-
-    /// Returns the ledger service.
-    #[cfg(test)]
-    pub const fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
-        &self.ledger
-    }
-}
-
-impl<N: Network> Storage<N> {
-    /// Returns an iterator over the `(round, (certificate ID, batch ID, author))` entries.
-    pub fn rounds_iter(&self) -> impl Iterator<Item = (u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)> {
-        self.rounds.read().clone().into_iter()
-    }
-
-    /// Returns an iterator over the `(certificate ID, certificate)` entries.
-    pub fn certificates_iter(&self) -> impl Iterator<Item = (Field<N>, BatchCertificate<N>)> {
-        self.certificates.read().clone().into_iter()
-    }
-
-    /// Returns an iterator over the `(batch ID, round)` entries.
-    pub fn batch_ids_iter(&self) -> impl Iterator<Item = (Field<N>, u64)> {
-        self.batch_ids.read().clone().into_iter()
-    }
-
-    /// Returns an iterator over the `(transmission ID, (transmission, certificate IDs))` entries.
-    pub fn transmissions_iter(
-        &self,
-    ) -> impl Iterator<Item = (TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>))> {
-        self.transmissions.read().clone().into_iter()
-    }
 }
 
 impl<N: Network> Storage<N> {
@@ -561,6 +531,36 @@ impl<N: Network> Storage<N> {
         }
         // Return successfully.
         true
+    }
+}
+
+#[cfg(test)]
+impl<N: Network> Storage<N> {
+    /// Returns the ledger service.
+    pub const fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
+        &self.ledger
+    }
+
+    /// Returns an iterator over the `(round, (certificate ID, batch ID, author))` entries.
+    pub fn rounds_iter(&self) -> impl Iterator<Item = (u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)> {
+        self.rounds.read().clone().into_iter()
+    }
+
+    /// Returns an iterator over the `(certificate ID, certificate)` entries.
+    pub fn certificates_iter(&self) -> impl Iterator<Item = (Field<N>, BatchCertificate<N>)> {
+        self.certificates.read().clone().into_iter()
+    }
+
+    /// Returns an iterator over the `(batch ID, round)` entries.
+    pub fn batch_ids_iter(&self) -> impl Iterator<Item = (Field<N>, u64)> {
+        self.batch_ids.read().clone().into_iter()
+    }
+
+    /// Returns an iterator over the `(transmission ID, (transmission, certificate IDs))` entries.
+    pub fn transmissions_iter(
+        &self,
+    ) -> impl Iterator<Item = (TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>))> {
+        self.transmissions.read().clone().into_iter()
     }
 }
 

@@ -30,9 +30,9 @@ use crate::{
     Transport,
     Worker,
     MAX_BATCH_DELAY,
-    MAX_PRIMARY_PING_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
+    PRIMARY_PING_INTERVAL,
 };
 use snarkos_account::Account;
 use snarkos_node_narwhal_events::PrimaryPing;
@@ -377,6 +377,15 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
+        // Ensure the batch author is a current committee member.
+        if !self.gateway.is_authorized_validator_address(batch_header.author()) {
+            bail!("Malicious peer - proposed batch from a non-committee member ({})", batch_header.author());
+        }
+        // Ensure the batch proposal is not from the current primary.
+        if self.gateway.account().address() == batch_header.author() {
+            bail!("Malicious peer - proposed batch from myself ({})", batch_header.author());
+        }
+
         // If the peer is ahead, use the batch header to sync up to the peer.
         let transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
 
@@ -430,6 +439,11 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the signature and timestamp.
         let BatchSignature { batch_id, signature, timestamp } = batch_signature;
+
+        // Ensure the batch signature is not from the current primary.
+        if self.gateway.account().address() == signature.to_address() {
+            bail!("Malicious peer - received a batch signature from myself ({})", signature.to_address());
+        }
 
         let proposal = {
             // Acquire the write lock.
@@ -492,6 +506,14 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        // Ensure the batch certificate is authored by a current committee member.
+        if !self.gateway.is_authorized_validator_address(certificate.author()) {
+            bail!("Received a batch certificate from a non-committee member ({})", certificate.author());
+        }
+        // Ensure the batch proposal is not from the current primary.
+        if self.gateway.account().address() == certificate.author() {
+            bail!("Received a batch certificate for myself ({})", certificate.author());
+        }
         // Store the certificate, after ensuring it is valid.
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
         // If there are enough certificates to reach quorum threshold for the current round,
@@ -518,7 +540,7 @@ impl<N: Network> Primary<N> {
             let self_ = self.clone();
             self.spawn(async move {
                 loop {
-                    tokio::time::sleep(Duration::from_millis(MAX_PRIMARY_PING_DELAY)).await;
+                    tokio::time::sleep(Duration::from_millis(PRIMARY_PING_INTERVAL)).await;
                     // Construct the primary ping.
                     let primary_ping = match self_.gateway.sync().get_block_locators() {
                         Ok(block_locators) => PrimaryPing::new(<Event<N>>::VERSION, block_locators),
@@ -539,6 +561,11 @@ impl<N: Network> Primary<N> {
             loop {
                 // Sleep briefly, but longer than if there were no batch.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
+                // If the primary is not synced, then do not propose a batch.
+                if !self_.gateway.sync().is_block_synced() {
+                    warn!("Skipping batch proposal - node is syncing");
+                    continue;
+                }
                 // If there is no proposed batch, attempt to propose a batch.
                 if let Err(e) = self_.propose_batch().await {
                     warn!("Cannot propose a batch - {e}");
@@ -550,6 +577,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
+                // If the primary is not synced, then do not sign the batch.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 if let Err(e) = self_.process_batch_propose_from_peer(peer_ip, batch_propose).await {
                     warn!("Cannot sign a batch from peer '{peer_ip}' - {e}");
                 }
@@ -560,6 +593,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
+                // If the primary is not synced, then do not store the signature.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping a batch signature from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
                     warn!("Cannot store a signature from peer '{peer_ip}' - {e}");
                 }
@@ -570,6 +609,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
+                // If the primary is not synced, then do not store the certificate.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping a certified batch from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 // Deserialize the batch certificate.
                 let Ok(Ok(batch_certificate)) =
                     task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
@@ -587,6 +632,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_request)) = rx_certificate_request.recv().await {
+                // If the primary is not synced, then do not process the certificate request.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping batch certificate request from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 self_.send_certificate_response(peer_ip, certificate_request);
             }
         });
@@ -595,6 +646,12 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_response)) = rx_certificate_response.recv().await {
+                // If the primary is not synced, then do not process the certificate response.
+                if !self_.gateway.sync().is_block_synced() {
+                    debug!("Skipping batch certificate response from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
                 self_.finish_certificate_request(peer_ip, certificate_response)
             }
         });
@@ -1444,12 +1501,10 @@ mod tests {
         }
 
         // Try to process the batch proposal from the peer, should succeed.
-        assert!(
-            primary
-                .process_batch_propose_from_peer(accounts[1].0, (*proposal.batch_header()).clone().into())
-                .await
-                .is_ok()
-        );
+        primary
+            .process_batch_propose_from_peer(accounts[1].0, (*proposal.batch_header()).clone().into())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
