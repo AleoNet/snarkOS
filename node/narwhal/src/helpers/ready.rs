@@ -160,7 +160,7 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
         // Initialize the ready queue.
         let ready = Ready::<CurrentNetwork>::new(storage);
 
@@ -229,7 +229,7 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
         // Initialize the ready queue.
         let ready = Ready::<CurrentNetwork>::new(storage);
 

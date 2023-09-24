@@ -1201,7 +1201,7 @@ mod tests {
 
         let account = accounts.first().unwrap().1.clone();
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10).unwrap();
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the primary.
         let mut primary = Primary::new(account, storage, ledger, None, &[], None).unwrap();

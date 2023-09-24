@@ -541,7 +541,7 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
         let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -576,7 +576,7 @@ mod tests {
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
         let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -612,7 +612,7 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
         let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -650,7 +650,7 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
         let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -688,7 +688,7 @@ mod tests {
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
         let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -726,7 +726,7 @@ mod tests {
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
         let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();

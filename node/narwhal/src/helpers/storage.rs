@@ -81,25 +81,34 @@ pub struct Storage<N: Network> {
 
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
-    pub fn new(ledger: Arc<dyn LedgerService<N>>, max_gc_rounds: u64) -> Result<Self> {
+    pub fn new_with_sync(ledger: Arc<dyn LedgerService<N>>, max_gc_rounds: u64) -> Result<Self> {
         // Initialize the storage.
-        let storage = Self {
+        let storage = Self::new(ledger, max_gc_rounds);
+        // Sync the storage with the ledger.
+        storage.sync_storage_with_ledger()?;
+        // Return the storage.
+        Ok(storage)
+    }
+
+    /// Initializes a new instance of storage.
+    pub fn new(ledger: Arc<dyn LedgerService<N>>, max_gc_rounds: u64) -> Self {
+        // Retrieve the current committee.
+        let committee = ledger.current_committee().expect("Ledger is missing a committee.");
+        // Retrieve the current round.
+        let current_round = committee.starting_round().max(1);
+        // Return the storage.
+        Self {
             ledger,
             sync_lock: Default::default(),
             current_height: Default::default(),
-            current_round: Arc::new(AtomicU64::new(1)),
+            current_round: Arc::new(AtomicU64::new(current_round)),
             gc_round: Default::default(),
             max_gc_rounds,
             rounds: Default::default(),
             certificates: Default::default(),
             batch_ids: Default::default(),
             transmissions: Default::default(),
-        };
-        // Sync the storage with the ledger.
-        #[cfg(not(test))]
-        storage.sync_storage_with_ledger()?;
-        // Return the storage.
-        Ok(storage)
+        }
     }
 }
 
@@ -808,7 +817,7 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
 
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());
@@ -870,7 +879,7 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
 
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());
@@ -958,7 +967,7 @@ pub mod prop_tests {
             (any::<CommitteeContext>(), 0..MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
                     let ledger = Arc::new(MockLedgerService::new(committee));
-                    Storage::<CurrentNetwork>::new(ledger, gc_rounds).unwrap()
+                    Storage::<CurrentNetwork>::new(ledger, gc_rounds)
                 })
                 .boxed()
         }
@@ -967,7 +976,7 @@ pub mod prop_tests {
             (Just(context), 0..MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
                     let ledger = Arc::new(MockLedgerService::new(committee));
-                    Storage::<CurrentNetwork>::new(ledger, gc_rounds).unwrap()
+                    Storage::<CurrentNetwork>::new(ledger, gc_rounds)
                 })
                 .boxed()
         }
@@ -1085,7 +1094,7 @@ pub mod prop_tests {
 
         // Initialize the storage.
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1).unwrap();
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
 
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());
