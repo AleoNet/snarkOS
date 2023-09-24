@@ -101,16 +101,21 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         match self.ledger.get_committee_for_round(round)? {
             // Return the committee if it exists.
             Some(committee) => Ok(committee),
-            // Return the current committee if the round is in the future.
-            None => {
-                // Retrieve the current committee.
-                let current_committee = self.current_committee()?;
+            // Check if the round is in the future.
+            None => match round >= self.ledger.latest_round() {
                 // Return the current committee if the round is in the future.
-                match current_committee.starting_round() <= round {
-                    true => Ok(current_committee),
-                    false => bail!("No committee found for round {round} in the ledger"),
+                true => {
+                    // Retrieve the current committee.
+                    let current_committee = self.current_committee()?;
+                    // Return the current committee if the round is in the future.
+                    match current_committee.starting_round() <= round {
+                        true => Ok(current_committee),
+                        false => bail!("No committee found for round {round} in the ledger"),
+                    }
                 }
-            }
+                // Otherwise, return the committee of the previous round.
+                false => self.get_committee_for_round(round.saturating_sub(1)),
+            },
         }
     }
 
