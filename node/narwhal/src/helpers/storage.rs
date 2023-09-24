@@ -414,7 +414,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Retrieve the committee for the batch round.
-        let Ok(committee) = self.ledger.get_committee_for_round(round) else {
+        let Ok(committee) = self.ledger.get_committee_for_round(round.saturating_sub(1)) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
 
