@@ -253,6 +253,15 @@ impl<N: Network> BlockSync<N> {
         Ok(())
     }
 
+    /// Returns the next block to process, if one is ready.
+    #[inline]
+    pub fn process_next_block(&self) -> Option<Block<N>> {
+        // Retrieve the latest block height.
+        let current_height = self.canon.latest_block_height();
+        // Try to advance the ledger with a block from the sync pool.
+        self.remove_block_response(current_height + 1)
+    }
+
     /// Attempts to advance with blocks from the sync pool.
     #[inline]
     pub fn advance_with_sync_blocks(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> Result<()> {

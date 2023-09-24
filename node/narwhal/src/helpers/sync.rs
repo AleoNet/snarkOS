@@ -113,14 +113,14 @@ impl<N: Network> Sync<N> {
         self.spawn(async move {
             while let Some((peer_ip, blocks, callback)) = rx_block_sync_advance_with_sync_blocks.recv().await {
                 // Process the block response.
-                if let Err(e) = self_.block_sync.process_block_response(peer_ip, blocks.clone()) {
+                if let Err(e) = self_.block_sync.process_block_response(peer_ip, blocks) {
                     // Send the error to the callback.
                     callback.send(Err(e)).ok();
                     continue;
                 }
 
                 // Sync the storage with the blocks.
-                if let Err(e) = self_.sync_storage_with_blocks(blocks).await {
+                if let Err(e) = self_.sync_storage_with_blocks().await {
                     // Send the error to the callback.
                     callback.send(Err(e)).ok();
                     continue;
@@ -250,9 +250,9 @@ impl<N: Network> Sync<N> {
     }
 
     /// Syncs the storage with the given blocks.
-    pub async fn sync_storage_with_blocks(&self, blocks: Vec<Block<N>>) -> Result<()> {
-        // Iterate over the blocks.
-        for block in blocks {
+    pub async fn sync_storage_with_blocks(&self) -> Result<()> {
+        // Try to advance the ledger with sync blocks.
+        while let Some(block) = self.block_sync.process_next_block() {
             // Sync the storage with the block.
             self.sync_storage_with_block(block).await?;
         }

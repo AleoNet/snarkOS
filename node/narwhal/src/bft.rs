@@ -642,7 +642,7 @@ impl<N: Network> BFT<N> {
         self.spawn(async move {
             while let Some((certificate, callback)) = rx_primary_certificate.recv().await {
                 // Update the DAG with the certificate.
-                let result = self_.update_dag::<false>(certificate).await;
+                let result = self_.update_dag::<true>(certificate).await;
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(result).ok();

@@ -722,7 +722,7 @@ impl<N: Network> Gateway<N> {
                 // Process a heartbeat in the router.
                 self_clone.heartbeat();
                 // Sleep for the heartbeat interval.
-                tokio::time::sleep(Duration::from_secs(30)).await;
+                tokio::time::sleep(Duration::from_secs(15)).await;
             }
         });
     }
@@ -929,8 +929,7 @@ impl<N: Network> Reading for Gateway<N> {
                 warn!("{CONTEXT} Disconnecting from '{peer_ip}' - {error}");
                 let self_ = self.clone();
                 tokio::spawn(async move {
-                    Transport::send(&self_, peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()))
-                        .await;
+                    Transport::send(&self_, peer_ip, DisconnectReason::ProtocolViolation.into()).await;
                     // Disconnect from this peer.
                     self_.disconnect(peer_ip);
                 });
