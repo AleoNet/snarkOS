@@ -3124,7 +3124,6 @@ dependencies = [
  "snarkos-account",
  "snarkos-node-narwhal",
  "snarkos-node-narwhal-ledger-service",
- "snarkos-node-sync",
  "snarkvm",
  "tokio",
  "tracing",

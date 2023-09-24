@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, WorkerSender},
+    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
     CONTEXT,
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
@@ -42,7 +42,7 @@ use snarkos_node_narwhal_events::{
     NOISE_HANDSHAKE_TYPE,
 };
 use snarkos_node_narwhal_ledger_service::LedgerService;
-use snarkos_node_sync::{communication_service::CommunicationService, BlockSync};
+use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
@@ -110,8 +110,6 @@ pub struct Gateway<N: Network> {
     account: Account<N>,
     /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
-    /// The sync module.
-    sync: Arc<OnceCell<BlockSync<N>>>,
     /// The TCP stack.
     tcp: Tcp,
     /// The cache.
@@ -131,6 +129,8 @@ pub struct Gateway<N: Network> {
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The worker senders.
     worker_senders: Arc<OnceCell<IndexMap<u8, WorkerSender<N>>>>,
+    /// The sync sender.
+    sync_sender: Arc<OnceCell<SyncSender<N>>>,
     /// A map of peer IPs to their noise states.
     noise_states: Arc<RwLock<IndexMap<SocketAddr, NoiseState>>>,
     /// The spawned handles.
@@ -158,7 +158,6 @@ impl<N: Network> Gateway<N> {
         Ok(Self {
             account,
             ledger,
-            sync: Default::default(),
             tcp,
             cache: Default::default(),
             resolver: Default::default(),
@@ -167,20 +166,31 @@ impl<N: Network> Gateway<N> {
             connecting_peers: Default::default(),
             primary_sender: Default::default(),
             worker_senders: Default::default(),
+            sync_sender: Default::default(),
             noise_states: Default::default(),
             handles: Default::default(),
         })
     }
 
     /// Run the gateway.
-    pub async fn run(&self, sync: BlockSync<N>, worker_senders: IndexMap<u8, WorkerSender<N>>) {
+    pub async fn run(
+        &self,
+        primary_sender: PrimarySender<N>,
+        worker_senders: IndexMap<u8, WorkerSender<N>>,
+        sync_sender: Option<SyncSender<N>>,
+    ) {
         debug!("Starting the gateway for the memory pool...");
 
-        // Set the sync module.
-        self.sync.set(sync).expect("Sync module already set");
+        // Set the primary sender.
+        self.primary_sender.set(primary_sender).expect("Primary sender already set in gateway");
 
         // Set the worker senders.
         self.worker_senders.set(worker_senders).expect("The worker senders are already set");
+
+        // If the sync sender was provided, set the sync sender.
+        if let Some(sync_sender) = sync_sender {
+            self.sync_sender.set(sync_sender).expect("Sync sender already set in gateway");
+        }
 
         // Enable the TCP protocols.
         self.enable_handshake().await;
@@ -195,11 +205,6 @@ impl<N: Network> Gateway<N> {
         self.initialize_heartbeat();
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
-    }
-
-    /// Returns the sync module.
-    pub fn sync(&self) -> &BlockSync<N> {
-        self.sync.get().expect("Sync module not set")
     }
 }
 
@@ -248,12 +253,7 @@ impl<N: Network> Gateway<N> {
 
     /// Returns the primary sender.
     pub fn primary_sender(&self) -> &PrimarySender<N> {
-        self.primary_sender.get().expect("Primary sender not set")
-    }
-
-    /// Sets the primary sender.
-    pub fn set_primary_sender(&self, primary_sender: PrimarySender<N>) {
-        self.primary_sender.set(primary_sender).expect("Primary sender already set");
+        self.primary_sender.get().expect("Primary sender not set in gateway")
     }
 
     /// Returns the number of workers.
@@ -402,8 +402,15 @@ impl<N: Network> Gateway<N> {
 
     /// Removes the connected peer and adds them to the candidate peers.
     fn remove_connected_peer(&self, peer_ip: SocketAddr) {
-        // Removes the peer from the sync module.
-        self.sync().remove_peer(&peer_ip);
+        // If a sync sender was provided, remove the peer from the sync module.
+        if let Some(sync_sender) = self.sync_sender.get() {
+            let tx_block_sync_remove_peer_ = sync_sender.tx_block_sync_remove_peer.clone();
+            tokio::spawn(async move {
+                if let Err(e) = tx_block_sync_remove_peer_.send(peer_ip).await {
+                    warn!("Unable to remove '{peer_ip}' from the sync module - {e}");
+                }
+            });
+        }
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(peer_ip);
         // Remove this peer from the connected peers, if it exists.
@@ -509,7 +516,7 @@ impl<N: Network> Gateway<N> {
                 }
 
                 let self_ = self.clone();
-                match task::spawn_blocking(move || {
+                let blocks = match task::spawn_blocking(move || {
                     // Retrieve the blocks within the requested range.
                     match self_.ledger.get_blocks(start_height..end_height) {
                         Ok(blocks) => Ok(Data::Object(DataBlocks(blocks))),
@@ -518,42 +525,47 @@ impl<N: Network> Gateway<N> {
                 })
                 .await
                 {
-                    Ok(Ok(blocks)) => {
-                        let self_ = self.clone();
-                        tokio::spawn(async move {
-                            // Send the `BlockResponse` message to the peer.
-                            let event = Event::BlockResponse(BlockResponse { request: block_request, blocks });
-                            Transport::send(&self_, peer_ip, event).await;
-                        });
-                        Ok(())
-                    }
-                    Ok(Err(error)) => Err(error),
-                    Err(error) => Err(anyhow!("[BlockRequest] {error}")),
-                }
+                    Ok(Ok(blocks)) => blocks,
+                    Ok(Err(error)) => return Err(error),
+                    Err(error) => return Err(anyhow!("[BlockRequest] {error}")),
+                };
+
+                let self_ = self.clone();
+                tokio::spawn(async move {
+                    // Send the `BlockResponse` message to the peer.
+                    let event = Event::BlockResponse(BlockResponse { request: block_request, blocks });
+                    Transport::send(&self_, peer_ip, event).await;
+                });
+                Ok(())
             }
             Event::BlockResponse(block_response) => {
-                let BlockResponse { request, blocks } = block_response;
-                // Perform the deferred non-blocking deserialization of the blocks.
-                let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
-                // Ensure the block response is well-formed.
-                blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
-
-                // Tries to advance with blocks from the sync module.
-                let self_ = self.clone();
-                match task::spawn_blocking(move || self_.sync().advance_with_sync_blocks(peer_ip, blocks.0)).await {
-                    Ok(Ok(())) => Ok(()),
-                    Ok(Err(error)) => Err(error),
-                    Err(error) => Err(anyhow!("[BlockResponse] {error}")),
+                // If a sync sender was provided, then process the block response.
+                if let Some(sync_sender) = self.sync_sender.get() {
+                    // Retrieve the block response.
+                    let BlockResponse { request, blocks } = block_response;
+                    // Perform the deferred non-blocking deserialization of the blocks.
+                    let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+                    // Ensure the block response is well-formed.
+                    blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
+                    // Send the blocks to the sync module.
+                    return sync_sender.advance_with_sync_blocks(peer_ip, blocks.0).await;
                 }
+                Ok(())
             }
             Event::CertificateRequest(certificate_request) => {
-                // Send the certificate request to the primary.
-                let _ = self.primary_sender().tx_certificate_request.send((peer_ip, certificate_request)).await;
+                // If a sync sender was provided, send the certificate request to the sync module.
+                if let Some(sync_sender) = self.sync_sender.get() {
+                    // Send the certificate request to the sync module.
+                    let _ = sync_sender.tx_certificate_request.send((peer_ip, certificate_request)).await;
+                }
                 Ok(())
             }
             Event::CertificateResponse(certificate_response) => {
-                // Send the certificate response to the primary.
-                let _ = self.primary_sender().tx_certificate_response.send((peer_ip, certificate_response)).await;
+                // If a sync sender was provided, send the certificate response to the sync module.
+                if let Some(sync_sender) = self.sync_sender.get() {
+                    // Send the certificate response to the sync module.
+                    let _ = sync_sender.tx_certificate_response.send((peer_ip, certificate_response)).await;
+                }
                 Ok(())
             }
             Event::ChallengeRequest(..) | Event::ChallengeResponse(..) => {
@@ -568,9 +580,12 @@ impl<N: Network> Gateway<N> {
                 if ping.version < Event::<N>::VERSION {
                     bail!("Dropping '{peer_ip}' on event version {} (outdated)", ping.version);
                 }
-                // Check the block locators are valid, and update the validators in the sync module.
-                if let Err(error) = self.sync().update_peer_locators(peer_ip, ping.block_locators) {
-                    bail!("Validator '{peer_ip}' sent invalid block locators - {error}");
+                // If a sync sender was provided, update the peer locators.
+                if let Some(sync_sender) = self.sync_sender.get() {
+                    // Check the block locators are valid, and update the validators in the sync module.
+                    if let Err(error) = sync_sender.update_peer_locators(peer_ip, ping.block_locators).await {
+                        bail!("Validator '{peer_ip}' sent invalid block locators - {error}");
+                    }
                 }
                 Ok(())
             }
@@ -1289,7 +1304,7 @@ mod prop_tests {
     use super::MAX_COMMITTEE_SIZE;
     use crate::{
         gateway::prop_tests::GatewayAddress::{Dev, Prod},
-        helpers::{init_worker_channels, Storage},
+        helpers::{init_primary_channels, init_worker_channels, Storage},
         Gateway,
         Worker,
         MAX_WORKERS,
@@ -1297,7 +1312,6 @@ mod prop_tests {
     };
     use snarkos_account::Account;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
-    use snarkos_node_sync::{BlockSync, BlockSyncMode};
     use snarkos_node_tcp::P2P;
     use snarkvm::{
         ledger::committee::prop_tests::{CommitteeContext, ValidatorSet},
@@ -1443,9 +1457,10 @@ mod prop_tests {
         let committee = committee.0;
         let worker_storage = storage.clone();
         let account = Account::try_from(private_key).unwrap();
-        let sync = BlockSync::new(BlockSyncMode::Gateway, storage.ledger().clone());
 
         let gateway = Gateway::new(account, storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+
+        let (primary_sender, _) = init_primary_channels();
 
         let (workers, worker_senders) = {
             // Construct a map of the worker senders.
@@ -1470,7 +1485,8 @@ mod prop_tests {
             }
             (workers, tx_workers)
         };
-        gateway.run(sync, worker_senders).await;
+
+        gateway.run(primary_sender, worker_senders, None).await;
         assert_eq!(
             gateway.local_ip(),
             SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + dev.port().unwrap())

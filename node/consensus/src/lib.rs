@@ -31,7 +31,6 @@ use snarkos_node_narwhal::{
     MAX_GC_ROUNDS,
 };
 use snarkos_node_narwhal_ledger_service::LedgerService;
-use snarkos_node_sync::BlockSync;
 use snarkvm::{
     ledger::{
         block::Transaction,
@@ -80,19 +79,14 @@ impl<N: Network> Consensus<N> {
     }
 
     /// Run the consensus instance.
-    pub async fn run(
-        &mut self,
-        sync: BlockSync<N>,
-        primary_sender: PrimarySender<N>,
-        primary_receiver: PrimaryReceiver<N>,
-    ) -> Result<()> {
+    pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
         info!("Starting the consensus instance...");
         // Sets the primary sender.
         self.primary_sender.set(primary_sender.clone()).expect("Primary sender already set");
         // Initialize the consensus channels.
         let (consensus_sender, consensus_receiver) = init_consensus_channels();
         // Start the consensus.
-        self.bft.run(sync, primary_sender, primary_receiver, Some(consensus_sender)).await?;
+        self.bft.run(Some(consensus_sender), primary_sender, primary_receiver).await?;
         // Start the consensus handlers.
         self.start_handlers(consensus_receiver);
         Ok(())

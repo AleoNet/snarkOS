@@ -29,7 +29,6 @@ use crate::{
 };
 use snarkos_account::Account;
 use snarkos_node_narwhal_ledger_service::LedgerService;
-use snarkos_node_sync::BlockSync;
 use snarkvm::{
     console::account::Address,
     ledger::{
@@ -99,10 +98,9 @@ impl<N: Network> BFT<N> {
     /// Run the BFT instance.
     pub async fn run(
         &mut self,
-        sync: BlockSync<N>,
+        consensus_sender: Option<ConsensusSender<N>>,
         primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
-        consensus_sender: Option<ConsensusSender<N>>,
     ) -> Result<()> {
         info!("Starting the BFT instance...");
         // Set the consensus sender.
@@ -112,7 +110,7 @@ impl<N: Network> BFT<N> {
         // Initialize the BFT channels.
         let (bft_sender, bft_receiver) = init_bft_channels::<N>();
         // Run the primary instance.
-        self.primary.run(sync, primary_sender, primary_receiver, Some(bft_sender)).await?;
+        self.primary.run(Some(bft_sender), primary_sender, primary_receiver).await?;
         // Start the BFT handlers.
         self.start_handlers(bft_receiver);
         Ok(())

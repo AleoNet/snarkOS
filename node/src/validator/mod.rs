@@ -105,7 +105,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
-        consensus.run(sync.clone(), primary_sender, primary_receiver).await?;
+        consensus.run(primary_sender, primary_receiver).await?;
 
         // Initialize the node router.
         let router = Router::new(

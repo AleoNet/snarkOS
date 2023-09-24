@@ -46,10 +46,6 @@ version = "=2.1.7"
 default-features = false
 features = [ "ledger", "ledger-write" ]
 
-[dependencies.snarkos-node-sync]
-path = "../sync"
-version = "=2.1.7"
-
 [dependencies.snarkvm]
 workspace = true
 
