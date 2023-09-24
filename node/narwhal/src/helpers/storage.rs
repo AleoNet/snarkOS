@@ -96,6 +96,7 @@ impl<N: Network> Storage<N> {
             transmissions: Default::default(),
         };
         // Sync the storage with the ledger.
+        #[cfg(not(test))]
         storage.sync_storage_with_ledger()?;
         // Return the storage.
         Ok(storage)
