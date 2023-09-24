@@ -53,7 +53,7 @@ use std::{
     },
 };
 use tokio::{
-    sync::{oneshot, OnceCell},
+    sync::{oneshot, Mutex as TMutex, OnceCell},
     task::JoinHandle,
 };
 
@@ -71,6 +71,8 @@ pub struct BFT<N: Network> {
     consensus_sender: Arc<OnceCell<ConsensusSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// The BFT lock.
+    lock: Arc<TMutex<()>>,
 }
 
 impl<N: Network> BFT<N> {
@@ -90,6 +92,7 @@ impl<N: Network> BFT<N> {
             leader_certificate_timer: Default::default(),
             consensus_sender: Default::default(),
             handles: Default::default(),
+            lock: Default::default(),
         })
     }
 
@@ -187,7 +190,10 @@ impl<N: Network> BFT<N> {
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    fn update_to_next_round(&self, current_round: u64) -> Result<()> {
+    async fn update_to_next_round(&self, current_round: u64) -> Result<()> {
+        // Acquire the BFT lock.
+        let _lock = self.lock.lock().await;
+
         // Determine if the BFT is ready to update to the next round.
         let is_ready = match current_round % 2 == 0 {
             true => self.update_leader_certificate_to_even_round(current_round)?,
@@ -203,8 +209,7 @@ impl<N: Network> BFT<N> {
 
         // If the BFT is ready to update to the next round, update to the next committee.
         if is_ready {
-            // Update to the next committee in storage.
-            // TODO (howardwu): Fix to increment to the next round.
+            // Update to the next round in storage.
             self.storage().increment_to_next_round()?;
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
@@ -360,6 +365,9 @@ impl<N: Network> BFT<N> {
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
     async fn update_dag(&self, certificate: BatchCertificate<N>) -> Result<()> {
+        // Acquire the BFT lock.
+        let _lock = self.lock.lock().await;
+
         // Retrieve the certificate round.
         let certificate_round = certificate.round();
         // Insert the certificate into the DAG.
@@ -604,7 +612,7 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((current_round, callback)) = rx_primary_round.recv().await {
-                callback.send(self_.update_to_next_round(current_round)).ok();
+                callback.send(self_.update_to_next_round(current_round).await).ok();
             }
         });
 
@@ -629,6 +637,8 @@ impl<N: Network> BFT<N> {
     /// Shuts down the BFT.
     pub async fn shut_down(&self) {
         trace!("Shutting down the BFT...");
+        // Acquire the lock.
+        let _lock = self.lock.lock().await;
         // Shut down the primary.
         self.primary.shut_down().await;
         // Abort the tasks.

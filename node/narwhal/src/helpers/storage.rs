@@ -685,7 +685,7 @@ impl<N: Network> Storage<N> {
             }
         }
         // Insert the batch certificate into storage.
-        debug!("Sync - Inserting certificate from {} for round {}", certificate.author(), certificate.round());
+        debug!("Sync - Inserting certificate for round {} (from {})", certificate.round(), certificate.author());
         if let Err(error) = self.insert_certificate(certificate.clone(), missing_transmissions) {
             let certificate_id = certificate.certificate_id();
             error!("Failed to sync certificate {certificate_id} with block {} - {error}", block.height());

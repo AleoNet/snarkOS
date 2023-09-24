@@ -242,9 +242,6 @@ impl Start {
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
         // and the REST IP to `3030 + dev`.
         if let Some(dev) = self.dev {
-            // // TODO (howardwu): Remove me after we stabilize syncing.
-            // crate::commands::Clean::remove_ledger(N::ID, Some(dev))?;
-
             // Add the dev nodes to the trusted peers.
             for i in 0..dev {
                 if i != dev {
