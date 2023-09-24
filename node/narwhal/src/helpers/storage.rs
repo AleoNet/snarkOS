@@ -574,11 +574,11 @@ impl<N: Network> Storage<N> {
 
 impl<N: Network> Storage<N> {
     /// Syncs the current height with the block.
-    pub(super) fn sync_height_with_block(&self, block: &Block<N>) {
+    pub(super) fn sync_height_with_block(&self, next_height: u32) {
         // If the block height is greater than the current height in storage, sync the height.
-        if block.height() > self.current_height() {
+        if next_height > self.current_height() {
             // Update the current height in storage.
-            self.current_height.store(block.height(), Ordering::SeqCst);
+            self.current_height.store(next_height, Ordering::SeqCst);
         }
     }
 

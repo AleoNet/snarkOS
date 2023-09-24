@@ -26,12 +26,12 @@ use snarkvm::{
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{oneshot, Mutex as TMutex, OnceCell},
-    task::{spawn_blocking, JoinHandle},
+    task::JoinHandle,
 };
 
 #[derive(Clone)]
@@ -80,7 +80,7 @@ impl<N: Network> Sync<N> {
         }
 
         // Sync the storage with the ledger.
-        self.sync_storage_with_ledger().await?;
+        self.sync_storage_with_ledger_at_bootup().await?;
 
         info!("Starting the sync module...");
 
@@ -112,17 +112,22 @@ impl<N: Network> Sync<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, blocks, callback)) = rx_block_sync_advance_with_sync_blocks.recv().await {
-                let block_sync_ = self_.block_sync.clone();
-                // Advance with the sync blocks.
-                let result = spawn_blocking(move || block_sync_.advance_with_sync_blocks(peer_ip, blocks)).await;
-                // Convert the result to an `anyhow::Result`.
-                let result = match result {
-                    Ok(Ok(())) => Ok(()),
-                    Ok(Err(error)) => Err(error),
-                    Err(error) => Err(anyhow!("[BlockResponse] {error}")),
-                };
+                // Process the block response.
+                if let Err(e) = self_.block_sync.process_block_response(peer_ip, blocks.clone()) {
+                    // Send the error to the callback.
+                    callback.send(Err(e)).ok();
+                    continue;
+                }
+
+                // Sync the storage with the blocks.
+                if let Err(e) = self_.sync_storage_with_blocks(blocks).await {
+                    // Send the error to the callback.
+                    callback.send(Err(e)).ok();
+                    continue;
+                }
+
                 // Send the result to the callback.
-                callback.send(result).ok();
+                callback.send(Ok(())).ok();
             }
         });
 
@@ -170,55 +175,121 @@ impl<N: Network> Sync<N> {
 
 // Methods to manage storage.
 impl<N: Network> Sync<N> {
-    /// Syncs the storage with the ledger.
-    pub async fn sync_storage_with_ledger(&self) -> Result<()> {
+    /// Syncs the storage with the ledger at bootup.
+    pub async fn sync_storage_with_ledger_at_bootup(&self) -> Result<()> {
         // Retrieve the latest block in the ledger.
         let latest_block = self.ledger.latest_block();
-        // Sync the storage with the block.
-        self.sync_storage_with_block(latest_block).await
-    }
 
-    /// Syncs the storage with the block.
-    pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
         // Retrieve the block height.
-        let block_height = block.height();
+        let block_height = latest_block.height();
         // Determine the earliest height, conservatively set to the block height minus the max GC rounds.
         // By virtue of the BFT protocol, we can guarantee that all GC range blocks will be loaded.
         let gc_height = block_height.saturating_sub(u32::try_from(self.storage.max_gc_rounds())?);
         // Retrieve the blocks.
         let blocks = self.ledger.get_blocks(gc_height..block_height.saturating_add(1))?;
 
-        // Sync the height with the block.
-        self.storage.sync_height_with_block(&block);
-        // Sync the round with the block.
-        self.storage.sync_round_with_block(block.round());
-
         // Acquire the sync lock.
         let _lock = self.lock.lock().await;
+
+        /* Sync storage */
+
+        // Sync the height with the block.
+        self.storage.sync_height_with_block(latest_block.height());
+        // Sync the round with the block.
+        self.storage.sync_round_with_block(latest_block.round());
         // Iterate over the blocks.
-        for block in blocks {
+        for block in &blocks {
             // If the block authority is a subdag, then sync the batch certificates with the block.
             if let Authority::Quorum(subdag) = block.authority() {
                 // Iterate over the certificates.
                 for certificate in subdag.values().flatten() {
                     // Sync the batch certificate with the block.
-                    self.storage.sync_certificate_with_block(&block, certificate);
-                    // If a BFT sender was provided, send the certificate to the BFT.
-                    if let Some(bft_sender) = self.bft_sender.get() {
-                        // Await the callback to continue.
-                        if let Err(e) = bft_sender.send_primary_certificate_to_bft(certificate.clone()).await {
-                            warn!("Failed to update the BFT DAG from sync: {e}");
-                            return Err(e);
-                        };
-                    }
+                    self.storage.sync_certificate_with_block(block, certificate);
                 }
             }
         }
+
+        /* Sync the BFT DAG */
+
+        // Retrieve the leader certificates.
+        let leader_certificates = blocks
+            .iter()
+            .flat_map(|block| {
+                match block.authority() {
+                    // If the block authority is a beacon, then skip the block.
+                    Authority::Beacon(_) => None,
+                    // If the block authority is a subdag, then retrieve the certificates.
+                    Authority::Quorum(subdag) => Some(subdag.leader_certificate().clone()),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Construct a list of the certificates.
+        let certificates = blocks
+            .iter()
+            .flat_map(|block| {
+                match block.authority() {
+                    // If the block authority is a beacon, then skip the block.
+                    Authority::Beacon(_) => None,
+                    // If the block authority is a subdag, then retrieve the certificates.
+                    Authority::Quorum(subdag) => Some(subdag.values().flatten().cloned().collect::<Vec<_>>()),
+                }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        // If a BFT sender was provided, send the certificate to the BFT.
+        if let Some(bft_sender) = self.bft_sender.get() {
+            // Await the callback to continue.
+            if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send((leader_certificates, certificates)).await {
+                bail!("Failed to update the BFT DAG from sync: {e}");
+            };
+        }
+
+        Ok(())
+    }
+
+    /// Syncs the storage with the given blocks.
+    pub async fn sync_storage_with_blocks(&self, blocks: Vec<Block<N>>) -> Result<()> {
+        // Iterate over the blocks.
+        for block in blocks {
+            // Sync the storage with the block.
+            self.sync_storage_with_block(block).await?;
+        }
+        Ok(())
+    }
+
+    /// Syncs the storage with the given blocks.
+    pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
+        // Acquire the sync lock.
+        let _lock = self.lock.lock().await;
+
+        // If the block authority is a subdag, then sync the batch certificates with the block.
+        if let Authority::Quorum(subdag) = block.authority() {
+            // Iterate over the certificates.
+            for certificate in subdag.values().flatten() {
+                // Sync the batch certificate with the block.
+                self.storage.sync_certificate_with_block(&block, certificate);
+                // If a BFT sender was provided, send the certificate to the BFT.
+                if let Some(bft_sender) = self.bft_sender.get() {
+                    // Await the callback to continue.
+                    if let Err(e) = bft_sender.send_sync_bft(certificate.clone()).await {
+                        bail!("Sync - {e}");
+                    };
+                }
+            }
+        }
+
+        // Sync the height with the block.
+        self.storage.sync_height_with_block(block.height());
+        // Sync the round with the block.
+        self.storage.sync_round_with_block(block.round());
+
         Ok(())
     }
 }
 
-// Methods to assist with block synchronization.
+// Methods to assist with the block sync module.
 impl<N: Network> Sync<N> {
     /// Returns `true` if the node is synced.
     pub fn is_synced(&self) -> bool {

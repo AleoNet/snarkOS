@@ -45,7 +45,7 @@ const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
 /// The maximum number of blocks tolerated before the primary is considered behind its peers.
-pub const MAX_BLOCKS_BEHIND: u32 = 3; // blocks
+pub const MAX_BLOCKS_BEHIND: u32 = 2; // blocks
 
 /// This is a dummy IP address that is used to represent the local node.
 /// Note: This here does not need to be a real IP address, but it must be unique/distinct from all other connections.
@@ -241,15 +241,23 @@ impl<N: Network> BlockSync<N> {
         Ok(())
     }
 
-    /// Attempts to advance with blocks from the sync pool.
+    /// Processes the block response from the given peer IP.
     #[inline]
-    pub fn advance_with_sync_blocks(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> Result<()> {
+    pub fn process_block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> Result<()> {
         // Insert the candidate blocks into the sync pool.
         for block in blocks {
             if let Err(error) = self.insert_block_response(peer_ip, block) {
                 bail!("{error}");
             }
         }
+        Ok(())
+    }
+
+    /// Attempts to advance with blocks from the sync pool.
+    #[inline]
+    pub fn advance_with_sync_blocks(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> Result<()> {
+        // Process the block response from the given peer IP.
+        self.process_block_response(peer_ip, blocks)?;
 
         // Retrieve the latest block height.
         let mut current_height = self.canon.latest_block_height();

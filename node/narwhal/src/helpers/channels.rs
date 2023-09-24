@@ -66,6 +66,8 @@ pub fn init_consensus_channels<N: Network>() -> (ConsensusSender<N>, ConsensusRe
 pub struct BFTSender<N: Network> {
     pub tx_primary_round: mpsc::Sender<(u64, oneshot::Sender<Result<()>>)>,
     pub tx_primary_certificate: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
+    pub tx_sync_bft_dag_at_bootup: mpsc::Sender<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
+    pub tx_sync_bft: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
 }
 
 impl<N: Network> BFTSender<N> {
@@ -88,21 +90,35 @@ impl<N: Network> BFTSender<N> {
         // Await the callback to continue.
         callback_receiver.await?
     }
+
+    /// Sends the batch certificates to the BFT for syncing.
+    pub async fn send_sync_bft(&self, certificate: BatchCertificate<N>) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Send the certificate to the BFT for syncing.
+        self.tx_sync_bft.send((certificate, callback_sender)).await?;
+        // Await the callback to continue.
+        callback_receiver.await?
+    }
 }
 
 #[derive(Debug)]
 pub struct BFTReceiver<N: Network> {
     pub rx_primary_round: mpsc::Receiver<(u64, oneshot::Sender<Result<()>>)>,
     pub rx_primary_certificate: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
+    pub rx_sync_bft_dag_at_bootup: mpsc::Receiver<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
+    pub rx_sync_bft: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
 }
 
 /// Initializes the BFT channels.
 pub fn init_bft_channels<N: Network>() -> (BFTSender<N>, BFTReceiver<N>) {
     let (tx_primary_round, rx_primary_round) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_primary_certificate, rx_primary_certificate) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_sync_bft_dag_at_bootup, rx_sync_bft_dag_at_bootup) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_sync_bft, rx_sync_bft) = mpsc::channel(MAX_CHANNEL_SIZE);
 
-    let sender = BFTSender { tx_primary_round, tx_primary_certificate };
-    let receiver = BFTReceiver { rx_primary_round, rx_primary_certificate };
+    let sender = BFTSender { tx_primary_round, tx_primary_certificate, tx_sync_bft_dag_at_bootup, tx_sync_bft };
+    let receiver = BFTReceiver { rx_primary_round, rx_primary_certificate, rx_sync_bft_dag_at_bootup, rx_sync_bft };
 
     (sender, receiver)
 }

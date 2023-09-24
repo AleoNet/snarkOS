@@ -363,7 +363,7 @@ impl<N: Network> BFT<N> {
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    async fn update_dag(&self, certificate: BatchCertificate<N>) -> Result<()> {
+    async fn update_dag<const ALLOW_LEDGER_ACCESS: bool>(&self, certificate: BatchCertificate<N>) -> Result<()> {
         // Acquire the BFT lock.
         let _lock = self.lock.lock().await;
 
@@ -443,7 +443,7 @@ impl<N: Network> BFT<N> {
             // Retrieve the leader certificate round.
             let leader_round = leader_certificate.round();
             // Compute the commit subdag.
-            let commit_subdag = match self.order_dag_with_dfs(leader_certificate) {
+            let commit_subdag = match self.order_dag_with_dfs::<ALLOW_LEDGER_ACCESS>(leader_certificate) {
                 Ok(subdag) => subdag,
                 Err(e) => bail!("BFT failed to order the DAG with DFS - {e}"),
             };
@@ -498,7 +498,7 @@ impl<N: Network> BFT<N> {
     }
 
     /// Returns the certificates to commit.
-    fn order_dag_with_dfs(
+    fn order_dag_with_dfs<const ALLOW_LEDGER_ACCESS: bool>(
         &self,
         leader_certificate: BatchCertificate<N>,
     ) -> Result<BTreeMap<u64, IndexSet<BatchCertificate<N>>>> {
@@ -544,18 +544,28 @@ impl<N: Network> BFT<N> {
                             match self.storage().get_certificate(*previous_certificate_id) {
                                 // If the previous certificate is found, return it.
                                 Some(previous_certificate) => previous_certificate,
-                                // Otherwise, retrieve the previous certificate from the ledger.
-                                None => match self.ledger().get_batch_certificate(previous_certificate_id) {
-                                    // If the previous certificate is found, return it.
-                                    Ok(previous_certificate) => previous_certificate,
-                                    // Otherwise, the previous certificate is missing, and throw an error.
-                                    Err(_) => {
+                                None => {
+                                    // Otherwise, retrieve the previous certificate from the ledger.
+                                    if ALLOW_LEDGER_ACCESS {
+                                        match self.ledger().get_batch_certificate(previous_certificate_id) {
+                                            // If the previous certificate is found, return it.
+                                            Ok(previous_certificate) => previous_certificate,
+                                            // Otherwise, the previous certificate is missing, and throw an error.
+                                            Err(e) => {
+                                                bail!(
+                                                    "Missing previous certificate {} for round {previous_round} - {e}",
+                                                    fmt_id(previous_certificate_id)
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        // Otherwise, the previous certificate is missing, and throw an error.
                                         bail!(
                                             "Missing previous certificate {} for round {previous_round}",
                                             fmt_id(previous_certificate_id)
                                         )
                                     }
-                                },
+                                }
                             }
                         }
                     }
@@ -612,7 +622,12 @@ impl<N: Network> BFT<N> {
 impl<N: Network> BFT<N> {
     /// Starts the BFT handlers.
     fn start_handlers(&self, bft_receiver: BFTReceiver<N>) {
-        let BFTReceiver { mut rx_primary_round, mut rx_primary_certificate } = bft_receiver;
+        let BFTReceiver {
+            mut rx_primary_round,
+            mut rx_primary_certificate,
+            mut rx_sync_bft_dag_at_bootup,
+            mut rx_sync_bft,
+        } = bft_receiver;
 
         // Process the current round from the primary.
         let self_ = self.clone();
@@ -627,12 +642,52 @@ impl<N: Network> BFT<N> {
         self.spawn(async move {
             while let Some((certificate, callback)) = rx_primary_certificate.recv().await {
                 // Update the DAG with the certificate.
-                let result = self_.update_dag(certificate).await;
+                let result = self_.update_dag::<false>(certificate).await;
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(result).ok();
             }
         });
+
+        // Process the request to sync the BFT DAG at bootup.
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some((leader_certificates, certificates)) = rx_sync_bft_dag_at_bootup.recv().await {
+                self_.sync_bft_dag_at_bootup(leader_certificates, certificates);
+            }
+        });
+
+        // Process the request to sync the BFT.
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some((certificate, callback)) = rx_sync_bft.recv().await {
+                // Update the DAG with the certificate.
+                let result = self_.update_dag::<true>(certificate).await;
+                // Send the callback **after** updating the DAG.
+                // Note: We must await the DAG update before proceeding.
+                callback.send(result).ok();
+            }
+        });
+    }
+
+    /// Syncs the BFT DAG with the given leader certificates and batch certificates.
+    fn sync_bft_dag_at_bootup(
+        &self,
+        leader_certificates: Vec<BatchCertificate<N>>,
+        certificates: Vec<BatchCertificate<N>>,
+    ) {
+        // Acquire the BFT write lock.
+        let mut dag = self.dag.write();
+        // Iterate over the certificates.
+        for certificate in certificates {
+            // Insert the certificate into the DAG.
+            dag.insert(certificate);
+        }
+        // Iterate over the leader certificates.
+        for leader_certificate in leader_certificates {
+            // Commit the leader certificate.
+            dag.commit(leader_certificate, self.storage().max_gc_rounds());
+        }
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
@@ -898,11 +953,11 @@ mod tests {
 
             // Insert the previous certificates into the BFT.
             for certificate in previous_certificates.clone() {
-                assert!(bft.update_dag(certificate).await.is_ok());
+                assert!(bft.update_dag::<false>(certificate).await.is_ok());
             }
 
             // Ensure this call succeeds and returns all given certificates.
-            let result = bft.order_dag_with_dfs(certificate.clone());
+            let result = bft.order_dag_with_dfs::<false>(certificate.clone());
             assert!(result.is_ok());
             let candidate_certificates = result.unwrap().into_values().flatten().collect::<Vec<_>>();
             assert_eq!(candidate_certificates.len(), 1);
@@ -928,11 +983,11 @@ mod tests {
 
             // Insert the previous certificates into the BFT.
             for certificate in previous_certificates.clone() {
-                assert!(bft.update_dag(certificate).await.is_ok());
+                assert!(bft.update_dag::<false>(certificate).await.is_ok());
             }
 
             // Ensure this call succeeds and returns all given certificates.
-            let result = bft.order_dag_with_dfs(certificate.clone());
+            let result = bft.order_dag_with_dfs::<false>(certificate.clone());
             assert!(result.is_ok());
             let candidate_certificates = result.unwrap().into_values().flatten().collect::<Vec<_>>();
             assert_eq!(candidate_certificates.len(), 4);
@@ -993,7 +1048,7 @@ mod tests {
         );
 
         // Ensure this call fails on a missing previous certificate.
-        let result = bft.order_dag_with_dfs(certificate);
+        let result = bft.order_dag_with_dfs::<false>(certificate);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), error_msg);
         Ok(())
