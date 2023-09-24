@@ -72,7 +72,7 @@ impl<N: Network> Consensus<N> {
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new(ledger.clone(), MAX_GC_ROUNDS);
+        let storage = NarwhalStorage::new_with_sync(ledger.clone(), MAX_GC_ROUNDS)?;
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
         // Return the consensus.

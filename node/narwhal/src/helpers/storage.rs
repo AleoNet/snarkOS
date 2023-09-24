@@ -15,16 +15,20 @@
 use crate::helpers::check_timestamp_for_liveness;
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
-    ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    ledger::{
+        block::Block,
+        narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    },
     prelude::{bail, ensure, Address, Field, Network, Result},
 };
 
 use indexmap::{map::Entry, IndexMap, IndexSet};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
+use snarkvm::ledger::authority::Authority;
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
     },
 };
@@ -32,6 +36,7 @@ use std::{
 /// The storage for the memory pool.
 ///
 /// The storage is used to store the following:
+/// - `current_height` tracker.
 /// - `current_round` tracker.
 /// - `round` to `(certificate ID, batch ID, author)` entries.
 /// - `certificate ID` to `certificate` entries.
@@ -49,7 +54,13 @@ use std::{
 ///  - The next round is inserted into the `current_round`.
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
+    /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
+    /// The sync lock.
+    sync_lock: Arc<Mutex<()>>,
+    /* Once per block */
+    /// The current height.
+    current_height: Arc<AtomicU32>,
     /* Once per round */
     /// The current round.
     current_round: Arc<AtomicU64>,
@@ -70,6 +81,16 @@ pub struct Storage<N: Network> {
 
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
+    pub fn new_with_sync(ledger: Arc<dyn LedgerService<N>>, max_gc_rounds: u64) -> Result<Self> {
+        // Initialize the storage.
+        let storage = Self::new(ledger, max_gc_rounds);
+        // Sync the storage with the ledger.
+        storage.sync_storage_with_ledger()?;
+        // Return the storage.
+        Ok(storage)
+    }
+
+    /// Initializes a new instance of storage.
     pub fn new(ledger: Arc<dyn LedgerService<N>>, max_gc_rounds: u64) -> Self {
         // Retrieve the current committee.
         let committee = ledger.current_committee().expect("Ledger is missing a committee.");
@@ -78,6 +99,8 @@ impl<N: Network> Storage<N> {
         // Return the storage.
         Self {
             ledger,
+            sync_lock: Default::default(),
+            current_height: Default::default(),
             current_round: Arc::new(AtomicU64::new(current_round)),
             gc_round: Default::default(),
             max_gc_rounds,
@@ -86,6 +109,14 @@ impl<N: Network> Storage<N> {
             batch_ids: Default::default(),
             transmissions: Default::default(),
         }
+    }
+}
+
+impl<N: Network> Storage<N> {
+    /// Returns the current height.
+    pub fn current_height(&self) -> u32 {
+        // Get the current height.
+        self.current_height.load(Ordering::SeqCst)
     }
 }
 
@@ -120,6 +151,25 @@ impl<N: Network> Storage<N> {
         // Ensure the next round is at or after the current committee's starting round.
         ensure!(next_round >= current_committee.starting_round(), "Next round is behind the current committee");
 
+        // Update the storage to the next round.
+        self.update_current_round(next_round);
+
+        // Retrieve the current round.
+        let current_round = self.current_round();
+        // Retrieve the GC round.
+        let gc_round = self.gc_round();
+        // Ensure the next round matches in storage.
+        ensure!(next_round == current_round, "The next round {next_round} does not match in storage ({current_round})");
+        // Ensure the next round is greater than or equal to the GC round.
+        ensure!(next_round >= gc_round, "The next round {next_round} is behind the GC round {gc_round}");
+
+        // Log the updated round.
+        info!("Starting round {next_round}...");
+        Ok(())
+    }
+
+    /// Updates the storage to the next round.
+    fn update_current_round(&self, next_round: u64) {
         // Update the current round.
         self.current_round.store(next_round, Ordering::SeqCst);
 
@@ -140,12 +190,6 @@ impl<N: Network> Storage<N> {
             // Update the GC round.
             self.gc_round.store(next_gc_round, Ordering::SeqCst);
         }
-
-        // Ensure the next round matches in storage.
-        ensure!(next_round == self.current_round(), "The next round {next_round} does not match in storage");
-        // Log the updated round.
-        info!("Starting round {next_round}...");
-        Ok(())
     }
 }
 
@@ -531,6 +575,131 @@ impl<N: Network> Storage<N> {
         }
         // Return successfully.
         true
+    }
+}
+
+impl<N: Network> Storage<N> {
+    /// Syncs the storage with the ledger.
+    pub fn sync_storage_with_ledger(&self) -> Result<()> {
+        // Retrieve the latest block in the ledger.
+        let latest_block = self.ledger.latest_block();
+        // Sync the storage with the block.
+        self.sync_storage_with_block(latest_block)
+    }
+
+    /// Syncs the storage with the block.
+    pub fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
+        // Retrieve the block height.
+        let block_height = block.height();
+        // Determine the earliest height, conservatively set to the block height minus the max GC rounds.
+        // By virtue of the BFT protocol, we can guarantee that all GC range blocks will be loaded.
+        let gc_height = block_height.saturating_sub(u32::try_from(self.max_gc_rounds)?);
+        // Retrieve the blocks.
+        let blocks = self.ledger.get_blocks(gc_height..block_height.saturating_add(1))?;
+
+        // Acquire the sync lock.
+        let _sync_lock = self.sync_lock.lock();
+        // Sync the height with the block.
+        self.sync_height_with_block(&block);
+        // Sync the round with the block.
+        self.sync_round_with_block(&block);
+        // Iterate over the blocks.
+        for block in blocks {
+            // Sync the batch certificates with the block.
+            self.sync_certificates_with_block(block);
+        }
+        Ok(())
+    }
+
+    /// Syncs the current height with the block.
+    fn sync_height_with_block(&self, block: &Block<N>) {
+        // If the block height is greater than the current height in storage, sync the height.
+        if block.height() > self.current_height() {
+            // Update the current height in storage.
+            self.current_height.store(block.height(), Ordering::SeqCst);
+        }
+    }
+
+    /// Syncs the current round with the block.
+    fn sync_round_with_block(&self, block: &Block<N>) {
+        // Retrieve the current round in the block.
+        let block_round = block.round().max(1);
+        // If the round in the block is greater than the current round in storage, sync the round.
+        if block_round > self.current_round() {
+            // Update the current round in storage.
+            self.update_current_round(block_round);
+            // Log the updated round.
+            info!("Synced to round {block_round}...");
+        }
+    }
+
+    /// Syncs the batch certificates with the block.
+    fn sync_certificates_with_block(&self, block: Block<N>) {
+        // If the block authority is a subdag, then load the certificates.
+        if let Authority::Quorum(subdag) = block.authority() {
+            // Iterate over the certificates.
+            for certificate in subdag.values().flatten() {
+                // Sync the batch certificate with the block.
+                self.sync_certificate_with_block(&block, certificate);
+            }
+        }
+    }
+
+    /// Syncs the batch certificate with the block.
+    fn sync_certificate_with_block(&self, block: &Block<N>, certificate: &BatchCertificate<N>) {
+        // Skip if the certificate round is below the GC round.
+        if certificate.round() <= self.gc_round() {
+            return;
+        }
+        // If the certificate ID already exists in storage, skip it.
+        if self.contains_certificate(certificate.certificate_id()) {
+            return;
+        }
+        // Retrieve the transmissions for the certificate.
+        let mut missing_transmissions = HashMap::new();
+        // Iterate over the transmission IDs.
+        for transmission_id in certificate.transmission_ids() {
+            // If the transmission ID already exists in the map, skip it.
+            if missing_transmissions.contains_key(transmission_id) {
+                continue;
+            }
+            // If the transmission ID exists in storage, skip it.
+            if self.contains_transmission(*transmission_id) {
+                continue;
+            }
+            // Retrieve the transmission.
+            match transmission_id {
+                TransmissionID::Ratification => (),
+                TransmissionID::Solution(puzzle_commitment) => {
+                    // Retrieve the solution.
+                    match block.get_solution(puzzle_commitment) {
+                        // Insert the solution.
+                        Some(solution) => missing_transmissions.insert(*transmission_id, (*solution).into()),
+                        None => {
+                            error!("Missing solution {puzzle_commitment} in block {}", block.height());
+                            continue;
+                        }
+                    };
+                }
+                TransmissionID::Transaction(transaction_id) => {
+                    // Retrieve the transaction.
+                    match block.get_transaction(transaction_id) {
+                        // Insert the transaction.
+                        Some(transaction) => missing_transmissions.insert(*transmission_id, transaction.clone().into()),
+                        None => {
+                            warn!("Missing transaction {transaction_id} in block {}", block.height());
+                            continue;
+                        }
+                    };
+                }
+            }
+        }
+        // Insert the batch certificate into storage.
+        debug!("Sync - Inserting certificate for round {} (from {})", certificate.round(), certificate.author());
+        if let Err(error) = self.insert_certificate(certificate.clone(), missing_transmissions) {
+            let certificate_id = certificate.certificate_id();
+            error!("Failed to sync certificate {certificate_id} with block {} - {error}", block.height());
+        }
     }
 }
 

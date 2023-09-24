@@ -49,9 +49,19 @@ impl<N: Network, C: ConsensusStorage<N>> fmt::Debug for CoreLedgerService<N, C> 
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<N, C> {
+    /// Returns the latest round in the ledger.
+    fn latest_round(&self) -> u64 {
+        self.ledger.latest_round()
+    }
+
     /// Returns the latest block height in the ledger.
     fn latest_block_height(&self) -> u32 {
         self.ledger.latest_height()
+    }
+
+    /// Returns the latest block in the ledger.
+    fn latest_block(&self) -> Block<N> {
+        self.ledger.latest_block()
     }
 
     /// Returns `true` if the given block height exists in the ledger.

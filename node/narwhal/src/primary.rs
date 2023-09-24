@@ -58,7 +58,7 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    sync::{oneshot, OnceCell},
+    sync::{oneshot, Mutex as TMutex, OnceCell},
     task::{self, JoinHandle},
     time::timeout,
 };
@@ -84,6 +84,8 @@ pub struct Primary<N: Network> {
     pending: Arc<Pending<Field<N>, BatchCertificate<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// The primary lock.
+    lock: Arc<TMutex<()>>,
 }
 
 impl<N: Network> Primary<N> {
@@ -105,6 +107,7 @@ impl<N: Network> Primary<N> {
             proposed_batch: Default::default(),
             pending: Default::default(),
             handles: Default::default(),
+            lock: Default::default(),
         })
     }
 
@@ -377,6 +380,9 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
+        // Acquire the lock.
+        let _lock = self.lock.lock().await;
+
         // Ensure the batch author is a current committee member.
         if !self.gateway.is_authorized_validator_address(batch_header.author()) {
             bail!("Malicious peer - proposed batch from a non-committee member ({})", batch_header.author());
@@ -506,6 +512,9 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        // Acquire the lock.
+        let _lock = self.lock.lock().await;
+
         // Ensure the batch certificate is authored by a current committee member.
         if !self.gateway.is_authorized_validator_address(certificate.author()) {
             bail!("Received a batch certificate from a non-committee member ({})", certificate.author());
@@ -739,14 +748,8 @@ impl<N: Network> Primary<N> {
 
         // Determine whether to advance to the next round.
         if is_quorum && !is_proposing {
-            // Update to the next committee in storage.
-            // self.storage.increment_committee_to_next_round()?;
-            // // If we have reached the quorum threshold, then proceed to the next round.
-            // self.try_advance_to_next_round_in_narwhal().await?;
             // If we have reached the quorum threshold, then proceed to the next round.
             self.update_committee_to_round(current_round + 1).await?;
-            // // Start proposing a batch for the next round.
-            // self.propose_batch().await?;
         }
         Ok(())
     }
@@ -758,8 +761,7 @@ impl<N: Network> Primary<N> {
     async fn update_committee_to_round(&self, next_round: u64) -> Result<()> {
         // Iterate until the penultimate round is reached.
         while self.current_round() < next_round.saturating_sub(1) {
-            // Update to the next committee in storage.
-            // TODO (howardwu): Fix to increment to the next round.
+            // Update to the next round in storage.
             self.storage.increment_to_next_round()?;
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
@@ -775,8 +777,7 @@ impl<N: Network> Primary<N> {
             }
             // Otherwise, handle the Narwhal case.
             else {
-                // Update to the next committee in storage.
-                // TODO (howardwu): Fix to increment to the next round.
+                // Update to the next round in storage.
                 self.storage.increment_to_next_round()?;
             }
             // Propose a batch for the next round.
@@ -1151,6 +1152,8 @@ impl<N: Network> Primary<N> {
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
         trace!("Shutting down the primary...");
+        // Acquire the lock.
+        let _lock = self.lock.lock().await;
         // Shut down the workers.
         self.workers.iter().for_each(|worker| worker.shut_down());
         // Abort the tasks.
@@ -1347,7 +1350,7 @@ mod tests {
 
         let batch_header =
             BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
-        let signatures = peer_signatures_for_batch(primary_address, &accounts, batch_header.batch_id(), rng);
+        let signatures = peer_signatures_for_batch(primary_address, accounts, batch_header.batch_id(), rng);
         let certificate = BatchCertificate::<CurrentNetwork>::new(batch_header, signatures).unwrap();
         (certificate, transmissions)
     }
@@ -1365,7 +1368,7 @@ mod tests {
             for (_, account) in accounts.iter() {
                 let (certificate, transmissions) = create_batch_certificate(
                     account.address(),
-                    &accounts,
+                    accounts,
                     cur_round,
                     previous_certificates.clone(),
                     rng,

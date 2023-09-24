@@ -41,9 +41,19 @@ impl<N: Network> ProverLedgerService<N> {
 
 #[async_trait]
 impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
+    /// Returns the latest round in the ledger.
+    fn latest_round(&self) -> u64 {
+        0u64
+    }
+
     /// Returns the latest block height in the ledger.
     fn latest_block_height(&self) -> u32 {
         0u32
+    }
+
+    /// Returns the latest block in the ledger.
+    fn latest_block(&self) -> Block<N> {
+        unreachable!("Latest block does not exist in prover")
     }
 
     /// Returns `true` if the given block height exists in the ledger.

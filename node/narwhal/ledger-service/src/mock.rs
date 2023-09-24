@@ -53,9 +53,19 @@ impl<N: Network> MockLedgerService<N> {
 
 #[async_trait]
 impl<N: Network> LedgerService<N> for MockLedgerService<N> {
+    /// Returns the latest round in the ledger.
+    fn latest_round(&self) -> u64 {
+        *self.height_to_hash.lock().keys().last().unwrap_or(&0) as u64
+    }
+
     /// Returns the latest block height in the canonical ledger.
     fn latest_block_height(&self) -> u32 {
         self.height_to_hash.lock().last_key_value().map(|(height, _)| *height).unwrap_or(0)
+    }
+
+    /// Returns the latest block in the ledger.
+    fn latest_block(&self) -> Block<N> {
+        unreachable!("MockLedgerService does not support latest_block")
     }
 
     /// Returns `true` if the given block height exists in the canonical ledger.

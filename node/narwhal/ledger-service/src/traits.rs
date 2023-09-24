@@ -27,8 +27,14 @@ use std::{fmt::Debug, ops::Range};
 
 #[async_trait]
 pub trait LedgerService<N: Network>: Debug + Send + Sync {
+    /// Returns the latest round in the ledger.
+    fn latest_round(&self) -> u64;
+
     /// Returns the latest block height in the ledger.
     fn latest_block_height(&self) -> u32;
+
+    /// Returns the latest block in the ledger.
+    fn latest_block(&self) -> Block<N>;
 
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, height: u32) -> bool;
