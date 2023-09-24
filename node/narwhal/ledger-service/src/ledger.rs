@@ -22,7 +22,7 @@ use snarkvm::{
         store::ConsensusStorage,
         Ledger,
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, ensure, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
@@ -114,7 +114,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                     }
                 }
                 // Otherwise, return the committee of the previous round.
-                false => self.get_committee_for_round(round.saturating_sub(1)),
+                false => {
+                    let committee = self.get_committee_for_round(round.saturating_sub(1))?;
+                    ensure!(round >= committee.starting_round(), "Batch round must be >= the committee round");
+                    committee
+                }
             },
         }
     }
