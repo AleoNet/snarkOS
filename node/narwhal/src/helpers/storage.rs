@@ -87,7 +87,7 @@ impl<N: Network> Storage<N> {
             ledger,
             sync_lock: Default::default(),
             current_height: Default::default(),
-            current_round: Default::default(),
+            current_round: Arc::new(AtomicU64::new(1)),
             gc_round: Default::default(),
             max_gc_rounds,
             rounds: Default::default(),
