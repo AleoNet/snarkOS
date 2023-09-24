@@ -361,6 +361,9 @@ impl<N: Network> Storage<N> {
             }
             // Ensure the previous certificates have reached the quorum threshold.
             if !previous_committee.is_quorum_threshold_reached(&previous_authors) {
+                println!("\n----------Previous certificates for a batch in round -------");
+                println!("\t previous committee: {:?}", previous_committee);
+                println!("\t previous authors: {:?}", previous_authors);
                 bail!("Previous certificates for a batch in round {round} did not reach quorum threshold {gc_log}")
             }
         }
@@ -437,6 +440,10 @@ impl<N: Network> Storage<N> {
 
         // Ensure the signatures have reached the quorum threshold.
         if !committee.is_quorum_threshold_reached(&signers) {
+            println!("\nround: {round}, committee starting round: {}", committee.starting_round());
+            println!("Num committee members: {}", committee.num_members());
+            println!("Num signers: {}", signers.len());
+
             bail!("Signatures for a batch in round {round} did not reach quorum threshold {gc_log}")
         }
         Ok(missing_transmissions)

@@ -479,6 +479,10 @@ impl<N: Network> BFT<N> {
                 transmissions.len(),
                 subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
             );
+
+            println!("----round {leader_round}, committee starting round: {}", committee.starting_round());
+            println!("Num committee members: {}\n", committee.num_members());
+
             // Trigger consensus.
             if let Some(consensus_sender) = self.consensus_sender.get() {
                 // Retrieve the anchor round.

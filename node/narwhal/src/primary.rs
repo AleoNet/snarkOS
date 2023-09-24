@@ -498,7 +498,8 @@ impl<N: Network> Primary<N> {
         };
 
         /* Proceeding to certify the batch. */
-
+        println!("\n------Quorum threshold reached -------");
+        println!("\t proposal number of  signers: {:?}", proposal.signers().len());
         info!("Quorum threshold reached - Preparing to certify our batch...");
 
         // Store the certified batch and broadcast it to all validators.

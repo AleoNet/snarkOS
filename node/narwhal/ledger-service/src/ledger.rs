@@ -118,6 +118,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Returns the committee for the given round.
     /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
+        println!("Getting committee for round: {round}, latest round: {}", self.ledger.latest_round());
         match self.ledger.get_committee_for_round(round)? {
             // Return the committee if it exists.
             Some(committee) => Ok(committee),
