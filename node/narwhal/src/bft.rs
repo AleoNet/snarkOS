@@ -739,6 +739,8 @@ mod tests {
         let account = Account::new(rng)?;
         let ledger = Arc::new(MockLedgerService::new(committee));
         let storage = Storage::new(ledger.clone(), 10).unwrap();
+        storage.increment_to_next_round().unwrap();
+        assert_eq!(storage.current_round(), 2);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -828,6 +830,8 @@ mod tests {
         let account = Account::new(rng)?;
         let ledger = Arc::new(MockLedgerService::new(committee));
         let storage = Storage::new(ledger.clone(), 10).unwrap();
+        storage.increment_to_next_round().unwrap();
+        assert_eq!(storage.current_round(), 2);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
