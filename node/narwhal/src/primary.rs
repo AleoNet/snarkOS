@@ -45,6 +45,7 @@ use snarkvm::{
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     },
+    prelude::committee::Committee,
 };
 
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -268,7 +269,7 @@ impl<N: Network> Primary<N> {
             // TODO(ljedrz): the BatchHeader should be serialized only once in advance before being sent to non-signers.
             let event = Event::BatchPropose(proposal.batch_header().clone().into());
             // Iterate through the non-signers.
-            for address in proposal.nonsigners() {
+            for address in proposal.nonsigners(&self.ledger.current_committee()?) {
                 // Resolve the address to the peer IP.
                 match self.gateway.resolver().get_peer_ip_for_address(address) {
                     // Broadcast the batch to all validators for signing.
@@ -457,6 +458,9 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - received a batch signature from myself ({})", signature.to_address());
         }
 
+        // Retrieve the current committee.
+        let current_committee = self.ledger.current_committee()?;
+
         let proposal = {
             // Acquire the write lock.
             let mut proposed_batch = self.proposed_batch.write();
@@ -473,12 +477,12 @@ impl<N: Network> Primary<N> {
                     // Retrieve the address of the peer.
                     match self.gateway.resolver().get_address(peer_ip) {
                         // Add the signature to the batch.
-                        Some(signer) => proposal.add_signature(signer, signature, timestamp)?,
+                        Some(signer) => proposal.add_signature(signer, signature, timestamp, &current_committee)?,
                         None => bail!("Signature is from a disconnected peer"),
                     };
                     info!("Added a batch signature from peer '{peer_ip}'");
                     // Check if the batch is ready to be certified.
-                    if !proposal.is_quorum_threshold_reached() {
+                    if !proposal.is_quorum_threshold_reached(&current_committee) {
                         // If the batch is not ready to be certified, return early.
                         return Ok(());
                     }
@@ -499,7 +503,7 @@ impl<N: Network> Primary<N> {
 
         // Store the certified batch and broadcast it to all validators.
         // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
-        if let Err(e) = self.store_and_broadcast_certificate(&proposal).await {
+        if let Err(e) = self.store_and_broadcast_certificate(&proposal, &current_committee).await {
             // Reinsert the transmissions back into the ready queue for the next proposal.
             self.reinsert_transmissions_into_workers(proposal)?;
             return Err(e);
@@ -788,9 +792,9 @@ impl<N: Network> Primary<N> {
     }
 
     /// Stores the certified batch and broadcasts it to all validators, returning the certificate.
-    async fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>) -> Result<()> {
+    async fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>, committee: &Committee<N>) -> Result<()> {
         // Create the batch certificate and transmissions.
-        let (certificate, transmissions) = proposal.to_certificate()?;
+        let (certificate, transmissions) = proposal.to_certificate(committee)?;
         // Convert the transmissions into a HashMap.
         // Note: Do not change the `Proposal` to use a HashMap. The ordering there is necessary for safety.
         let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
