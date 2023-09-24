@@ -471,7 +471,7 @@ mod tests {
         ledger::{
             block::Block,
             committee::Committee,
-            narwhal::{Subdag, Transmission, TransmissionID},
+            narwhal::{BatchCertificate, Subdag, Transmission, TransmissionID},
         },
     };
 
@@ -504,6 +504,9 @@ mod tests {
             fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
             fn get_block(&self, height: u32) -> Result<Block<N>>;
             fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
+            fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
+            fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
+            fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;

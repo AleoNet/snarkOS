@@ -18,7 +18,7 @@ use snarkvm::{
         block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
     prelude::{bail, Field, Network, Result},
 };
@@ -80,6 +80,21 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     /// The range is inclusive of the start and exclusive of the end.
     fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>> {
         bail!("Blocks {heights:?} do not exist in prover")
+    }
+
+    /// Returns the solution for the given solution ID.
+    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+        bail!("Solution '{solution_id}' does not exist in prover")
+    }
+
+    /// Returns the transaction for the given transaction ID.
+    fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
+        bail!("Transaction '{transaction_id}' does not exist in prover")
+    }
+
+    /// Returns the batch certificate for the given batch certificate ID.
+    fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>> {
+        bail!("Batch certificate '{certificate_id}' does not exist in prover")
     }
 
     /// Returns the current committee.

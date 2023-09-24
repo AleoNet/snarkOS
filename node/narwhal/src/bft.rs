@@ -103,16 +103,17 @@ impl<N: Network> BFT<N> {
         primary_receiver: PrimaryReceiver<N>,
     ) -> Result<()> {
         info!("Starting the BFT instance...");
-        // Set the consensus sender.
+        // Initialize the BFT channels.
+        let (bft_sender, bft_receiver) = init_bft_channels::<N>();
+        // First, start the BFT handlers.
+        self.start_handlers(bft_receiver);
+        // Next, run the primary instance.
+        self.primary.run(Some(bft_sender), primary_sender, primary_receiver).await?;
+        // Lastly, set the consensus sender.
+        // Note: This ensures during initial syncing, that the BFT does not advance the ledger.
         if let Some(consensus_sender) = consensus_sender {
             self.consensus_sender.set(consensus_sender).expect("Consensus sender already set");
         }
-        // Initialize the BFT channels.
-        let (bft_sender, bft_receiver) = init_bft_channels::<N>();
-        // Run the primary instance.
-        self.primary.run(Some(bft_sender), primary_sender, primary_receiver).await?;
-        // Start the BFT handlers.
-        self.start_handlers(bft_receiver);
         Ok(())
     }
 
@@ -543,11 +544,18 @@ impl<N: Network> BFT<N> {
                             match self.storage().get_certificate(*previous_certificate_id) {
                                 // If the previous certificate is found, return it.
                                 Some(previous_certificate) => previous_certificate,
-                                // If the previous certificate is not found, throw an error.
-                                None => bail!(
-                                    "Missing previous certificate {} for round {previous_round}",
-                                    fmt_id(previous_certificate_id)
-                                ),
+                                // Otherwise, retrieve the previous certificate from the ledger.
+                                None => match self.ledger().get_batch_certificate(previous_certificate_id) {
+                                    // If the previous certificate is found, return it.
+                                    Ok(previous_certificate) => previous_certificate,
+                                    // Otherwise, the previous certificate is missing, and throw an error.
+                                    Err(_) => {
+                                        bail!(
+                                            "Missing previous certificate {} for round {previous_round}",
+                                            fmt_id(previous_certificate_id)
+                                        )
+                                    }
+                                },
                             }
                         }
                     }

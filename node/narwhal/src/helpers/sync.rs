@@ -23,14 +23,14 @@ use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
-    ledger::narwhal::BatchCertificate,
+    ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
 };
 
 use anyhow::{anyhow, bail, Result};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{
-    sync::{oneshot, OnceCell},
+    sync::{oneshot, Mutex as TMutex, OnceCell},
     task::{spawn_blocking, JoinHandle},
 };
 
@@ -40,6 +40,8 @@ pub struct Sync<N: Network> {
     gateway: Gateway<N>,
     /// The storage.
     storage: Storage<N>,
+    /// The ledger service.
+    ledger: Arc<dyn LedgerService<N>>,
     /// The block sync module.
     block_sync: BlockSync<N>,
     /// The pending certificates queue.
@@ -48,26 +50,56 @@ pub struct Sync<N: Network> {
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// The sync lock.
+    lock: Arc<TMutex<()>>,
 }
 
 impl<N: Network> Sync<N> {
     /// Initializes a new sync instance.
     pub fn new(gateway: Gateway<N>, storage: Storage<N>, ledger: Arc<dyn LedgerService<N>>) -> Self {
         // Initialize the block sync module.
-        let block_sync = BlockSync::new(BlockSyncMode::Gateway, ledger);
+        let block_sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
         // Return the sync instance.
         Self {
             gateway,
             storage,
+            ledger,
             block_sync,
             pending: Default::default(),
             bft_sender: Default::default(),
             handles: Default::default(),
+            lock: Default::default(),
         }
     }
 
     /// Starts the sync module.
-    pub fn run(&self, sync_receiver: SyncReceiver<N>) {
+    pub async fn run(&self, bft_sender: Option<BFTSender<N>>, sync_receiver: SyncReceiver<N>) -> Result<()> {
+        // If a BFT sender was provided, set it.
+        if let Some(bft_sender) = bft_sender {
+            self.bft_sender.set(bft_sender).expect("BFT sender already set in gateway");
+        }
+
+        // Sync the storage with the ledger.
+        self.sync_storage_with_ledger().await?;
+
+        info!("Starting the sync module...");
+
+        // Start the block sync loop.
+        let self_ = self.clone();
+        self.handles.lock().push(tokio::spawn(async move {
+            loop {
+                // Sleep briefly to avoid triggering spam detection.
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                // Perform the sync routine.
+                let communication = &self_.gateway;
+                // let communication = &node.router;
+                if let Err(error) = self_.block_sync.try_block_sync(communication).await {
+                    warn!("Sync error - {error}");
+                }
+            }
+        }));
+
+        // Retrieve the sync receiver.
         let SyncReceiver {
             mut rx_block_sync_advance_with_sync_blocks,
             mut rx_block_sync_remove_peer,
@@ -131,18 +163,58 @@ impl<N: Network> Sync<N> {
                 self_.finish_certificate_request(peer_ip, certificate_response)
             }
         });
+
+        Ok(())
     }
 }
 
+// Methods to manage storage.
 impl<N: Network> Sync<N> {
-    /// Returns the BFT sender, if one is set.
-    pub fn bft_sender(&self) -> Option<&BFTSender<N>> {
-        self.bft_sender.get()
+    /// Syncs the storage with the ledger.
+    pub async fn sync_storage_with_ledger(&self) -> Result<()> {
+        // Retrieve the latest block in the ledger.
+        let latest_block = self.ledger.latest_block();
+        // Sync the storage with the block.
+        self.sync_storage_with_block(latest_block).await
     }
 
-    /// Sets the BFT sender.
-    pub(crate) fn set_bft_sender(&self, bft_sender: BFTSender<N>) {
-        self.bft_sender.set(bft_sender).expect("BFT sender already set in gateway");
+    /// Syncs the storage with the block.
+    pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
+        // Retrieve the block height.
+        let block_height = block.height();
+        // Determine the earliest height, conservatively set to the block height minus the max GC rounds.
+        // By virtue of the BFT protocol, we can guarantee that all GC range blocks will be loaded.
+        let gc_height = block_height.saturating_sub(u32::try_from(self.storage.max_gc_rounds())?);
+        // Retrieve the blocks.
+        let blocks = self.ledger.get_blocks(gc_height..block_height.saturating_add(1))?;
+
+        // Sync the height with the block.
+        self.storage.sync_height_with_block(&block);
+        // Sync the round with the block.
+        self.storage.sync_round_with_block(block.round());
+
+        // Acquire the sync lock.
+        let _lock = self.lock.lock().await;
+        // Iterate over the blocks.
+        for block in blocks {
+            // If the block authority is a subdag, then sync the batch certificates with the block.
+            if let Authority::Quorum(subdag) = block.authority() {
+                // Iterate over the certificates.
+                for certificate in subdag.values().flatten() {
+                    // Sync the batch certificate with the block.
+                    self.storage.sync_certificate_with_block(&block, certificate);
+                    // If a BFT sender was provided, send the certificate to the BFT.
+                    if let Some(bft_sender) = self.bft_sender.get() {
+                        // Await the callback to continue.
+                        if let Err(e) = bft_sender.send_primary_certificate_to_bft(certificate.clone()).await {
+                            warn!("Failed to update the BFT DAG from sync: {e}");
+                            return Err(e);
+                        };
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -191,7 +263,7 @@ impl<N: Network> Sync<N> {
     }
 
     /// Handles the incoming certificate request.
-    pub fn send_certificate_response(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
+    fn send_certificate_response(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
         // Attempt to retrieve the certificate.
         if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
             // Send the certificate response to the peer.
@@ -204,7 +276,7 @@ impl<N: Network> Sync<N> {
 
     /// Handles the incoming certificate response.
     /// This method ensures the certificate response is well-formed and matches the certificate ID.
-    pub fn finish_certificate_request(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) {
+    fn finish_certificate_request(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) {
         let certificate = response.certificate;
         // Check if the peer IP exists in the pending queue for the given certificate ID.
         let exists = self.pending.get(certificate.certificate_id()).unwrap_or_default().contains(&peer_ip);
@@ -226,6 +298,8 @@ impl<N: Network> Sync<N> {
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
         trace!("Shutting down the sync module...");
+        // Acquire the sync lock.
+        let _lock = self.lock.lock().await;
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
     }

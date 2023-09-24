@@ -18,7 +18,7 @@ use snarkvm::{
         block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
     prelude::{bail, ensure, Field, Network, Result},
 };
@@ -98,6 +98,21 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// The range is inclusive of the start and exclusive of the end.
     fn get_blocks(&self, _heights: Range<u32>) -> Result<Vec<Block<N>>> {
         unreachable!("MockLedgerService does not support get_blocks")
+    }
+
+    /// Returns the solution for the given solution ID.
+    fn get_solution(&self, _solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+        unreachable!("MockLedgerService does not support get_solution")
+    }
+
+    /// Returns the transaction for the given transaction ID.
+    fn get_transaction(&self, _transaction_id: N::TransactionID) -> Result<Transaction<N>> {
+        unreachable!("MockLedgerService does not support get_transaction")
+    }
+
+    /// Returns the batch certificate for the given batch certificate ID.
+    fn get_batch_certificate(&self, _certificate_id: &Field<N>) -> Result<BatchCertificate<N>> {
+        unreachable!("MockLedgerService does not support get_batch_certificate")
     }
 
     /// Returns the current committee.

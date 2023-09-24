@@ -115,7 +115,7 @@ pub async fn start_bft(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the storage.
-    let storage = Storage::new_with_sync(ledger.clone(), MAX_GC_ROUNDS)?;
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -152,7 +152,7 @@ pub async fn start_primary(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the storage.
-    let storage = Storage::new_with_sync(ledger.clone(), MAX_GC_ROUNDS)?;
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),

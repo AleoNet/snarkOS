@@ -125,11 +125,9 @@ impl<N: Network> Primary<N> {
         info!("Starting the primary instance of the memory pool...");
 
         // Set the BFT sender.
-        if let Some(bft_sender) = bft_sender {
+        if let Some(bft_sender) = &bft_sender {
             // Set the BFT sender in the primary.
             self.bft_sender.set(bft_sender.clone()).expect("BFT sender already set");
-            // Set the BFT sender in the sync module.
-            self.sync.set_bft_sender(bft_sender);
         }
 
         // Construct a map of the worker senders.
@@ -158,15 +156,14 @@ impl<N: Network> Primary<N> {
         // Set the workers.
         self.workers = Arc::from(workers);
 
-        // Initialize the sync channels.
+        // First, initialize the sync channels.
         let (sync_sender, sync_receiver) = init_sync_channels();
-        // Initialize the sync module.
-        self.sync.run(sync_receiver);
-
-        // Initialize the gateway.
+        // Next, initialize the sync module.
+        self.sync.run(bft_sender, sync_receiver).await?;
+        // Next, initialize the gateway.
         self.gateway.run(primary_sender, worker_senders, Some(sync_sender)).await;
-
-        // Start the primary handlers.
+        // Lastly, start the primary handlers.
+        // Note: This ensure the primary does not start communicating before syncing is complete.
         self.start_handlers(primary_receiver);
 
         Ok(())
