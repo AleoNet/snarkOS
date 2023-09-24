@@ -1350,7 +1350,7 @@ mod tests {
 
         let batch_header =
             BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
-        let signatures = peer_signatures_for_batch(primary_address, &accounts, batch_header.batch_id(), rng);
+        let signatures = peer_signatures_for_batch(primary_address, accounts, batch_header.batch_id(), rng);
         let certificate = BatchCertificate::<CurrentNetwork>::new(batch_header, signatures).unwrap();
         (certificate, transmissions)
     }
@@ -1368,7 +1368,7 @@ mod tests {
             for (_, account) in accounts.iter() {
                 let (certificate, transmissions) = create_batch_certificate(
                     account.address(),
-                    &accounts,
+                    accounts,
                     cur_round,
                     previous_certificates.clone(),
                     rng,
