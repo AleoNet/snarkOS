@@ -47,7 +47,14 @@ use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    future::Future,
+    net::SocketAddr,
+    ops::Deref,
+    sync::Arc,
+    time::Instant,
+};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -82,7 +89,7 @@ pub struct InnerRouter<N: Network> {
     /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
-    connecting_peers: Mutex<HashSet<SocketAddr>>,
+    connecting_peers: Mutex<HashMap<SocketAddr, Option<Peer<N>>>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<IndexSet<SocketAddr>>,
     /// The set of restricted peer IPs.
@@ -179,9 +186,10 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection attempt to '{peer_ip}' (restricted)")
         }
         // Ensure the node is not already connecting to this peer.
-        if !self.connecting_peers.lock().insert(peer_ip) {
-            bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
-        }
+        match self.connecting_peers.lock().entry(peer_ip) {
+            Entry::Occupied(_) => bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands)"),
+            Entry::Vacant(entry) => entry.insert(None),
+        };
         Ok(())
     }
 
@@ -283,7 +291,7 @@ impl<N: Network> Router<N> {
 
     /// Returns `true` if the node is currently connecting to the given peer IP.
     pub fn is_connecting(&self, ip: &SocketAddr) -> bool {
-        self.connecting_peers.lock().contains(ip)
+        self.connecting_peers.lock().contains_key(ip)
     }
 
     /// Returns `true` if the given IP is restricted.

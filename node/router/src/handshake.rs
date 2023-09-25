@@ -29,7 +29,7 @@ use snarkvm::prelude::{block::Header, error, Address, Network};
 use anyhow::{bail, Result};
 use futures::SinkExt;
 use rand::{rngs::OsRng, Rng};
-use std::{io, net::SocketAddr};
+use std::{collections::hash_map::Entry, io, net::SocketAddr};
 use tokio::net::TcpStream;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
@@ -265,9 +265,10 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection request from '{peer_ip}' (attempted to self-connect)")
         }
         // Ensure the node is not already connecting to this peer.
-        if !self.connecting_peers.lock().insert(peer_ip) {
-            bail!("Dropping connection request from '{peer_ip}' (already shaking hands as the initiator)")
-        }
+        match self.connecting_peers.lock().entry(peer_ip) {
+            Entry::Occupied(_) => bail!("Dropping connection request from '{peer_ip}' (already shaking hands)"),
+            Entry::Vacant(entry) => entry.insert(None),
+        };
         // Ensure the node is not already connected to this peer.
         if self.is_connected(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (already connected)")
