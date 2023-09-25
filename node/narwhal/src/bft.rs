@@ -419,7 +419,21 @@ impl<N: Network> BFT<N> {
 
         /* Proceeding to commit the leader. */
 
-        // Order all previous leader certificates since the last committed round.
+        // Commit the leader certificate, and all previous leader certificates since the last committed round.
+        self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, false>(leader_certificate).await
+    }
+
+    /// Commits the leader certificate, and all previous leader certificates since the last committed round.
+    async fn commit_leader_certificate<const ALLOW_LEDGER_ACCESS: bool, const IS_SYNCING: bool>(
+        &self,
+        leader_certificate: BatchCertificate<N>,
+    ) -> Result<()> {
+        // Retrieve the commit round and leader.
+        let commit_round = leader_certificate.round();
+        let leader = leader_certificate.author();
+
+        // Determine the list of all previous leader certificates since the last committed round.
+        // The order of the leader certificates is from **newest** to **oldest**.
         let mut leader_certificates = vec![leader_certificate.clone()];
         let mut current_certificate = leader_certificate;
         for round in (self.dag.read().last_committed_round() + 2..=commit_round.saturating_sub(2)).rev().step_by(2) {
@@ -451,7 +465,7 @@ impl<N: Network> BFT<N> {
             // Start from the oldest leader certificate.
             for certificate in commit_subdag.values().flatten() {
                 // Update the DAG.
-                self.dag.write().commit(certificate.clone(), self.storage().max_gc_rounds());
+                self.dag.write().commit(certificate, self.storage().max_gc_rounds());
                 // Retrieve the transmissions.
                 for transmission_id in certificate.transmission_ids() {
                     // If the transmission already exists in the map, skip it.
@@ -471,32 +485,35 @@ impl<N: Network> BFT<N> {
                     transmissions.insert(*transmission_id, transmission);
                 }
             }
-            // Construct the subdag.
-            let subdag = Subdag::from(commit_subdag)?;
-            info!(
-                "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
-                transmissions.len(),
-                subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
-            );
-            // Trigger consensus.
-            if let Some(consensus_sender) = self.consensus_sender.get() {
-                // Retrieve the anchor round.
-                let anchor_round = subdag.anchor_round();
-                // Initialize a callback sender and receiver.
-                let (callback_sender, callback_receiver) = oneshot::channel();
-                // Send the subdag and transmissions to consensus.
-                consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
-                // Await the callback to continue.
-                if let Err(e) = callback_receiver.await {
-                    error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
-                    break;
+            // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
+            if !IS_SYNCING {
+                // Construct the subdag.
+                let subdag = Subdag::from(commit_subdag)?;
+                info!(
+                    "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
+                    transmissions.len(),
+                    subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
+                );
+                // Trigger consensus.
+                if let Some(consensus_sender) = self.consensus_sender.get() {
+                    // Retrieve the anchor round.
+                    let anchor_round = subdag.anchor_round();
+                    // Initialize a callback sender and receiver.
+                    let (callback_sender, callback_receiver) = oneshot::channel();
+                    // Send the subdag and transmissions to consensus.
+                    consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
+                    // Await the callback to continue.
+                    if let Err(e) = callback_receiver.await {
+                        error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                        break;
+                    }
                 }
             }
         }
         Ok(())
     }
 
-    /// Returns the certificates to commit.
+    /// Returns the subdag of batch certificates to commit.
     fn order_dag_with_dfs<const ALLOW_LEDGER_ACCESS: bool>(
         &self,
         leader_certificate: BatchCertificate<N>,
@@ -652,7 +669,7 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((leader_certificates, certificates)) = rx_sync_bft_dag_at_bootup.recv().await {
-                self_.sync_bft_dag_at_bootup(leader_certificates, certificates);
+                self_.sync_bft_dag_at_bootup(leader_certificates, certificates).await;
             }
         });
 
@@ -670,22 +687,49 @@ impl<N: Network> BFT<N> {
     }
 
     /// Syncs the BFT DAG with the given leader certificates and batch certificates.
-    fn sync_bft_dag_at_bootup(
+    ///
+    /// This method starts by inserting all certificates (except the latest leader certificate)
+    /// into the DAG. Then, it commits all leader certificates (except the latest leader certificate).
+    /// Finally, it updates the DAG with the latest leader certificate.
+    async fn sync_bft_dag_at_bootup(
         &self,
         leader_certificates: Vec<BatchCertificate<N>>,
         certificates: Vec<BatchCertificate<N>>,
     ) {
-        // Acquire the BFT write lock.
-        let mut dag = self.dag.write();
-        // Iterate over the certificates.
-        for certificate in certificates {
-            // Insert the certificate into the DAG.
-            dag.insert(certificate);
+        // Split the leader certificates into past leader certificates and the latest leader certificate.
+        let (past_leader_certificates, leader_certificate) = {
+            // Compute the penultimate index.
+            let index = leader_certificates.len().saturating_sub(1);
+            // Split the leader certificates.
+            let (past, latest) = leader_certificates.split_at(index);
+            debug_assert!(latest.len() == 1, "There should only be one latest leader certificate");
+            // Retrieve the latest leader certificate.
+            match latest.first() {
+                Some(leader_certificate) => (past, leader_certificate.clone()),
+                // If there is no latest leader certificate, return early.
+                None => return,
+            }
+        };
+        {
+            // Acquire the BFT write lock.
+            let mut dag = self.dag.write();
+            // Iterate over the certificates.
+            for certificate in certificates {
+                // If the certificate is not the latest leader certificate, insert it.
+                if leader_certificate.certificate_id() != certificate.certificate_id() {
+                    // Insert the certificate into the DAG.
+                    dag.insert(certificate);
+                }
+            }
+            // Iterate over the leader certificates.
+            for leader_certificate in past_leader_certificates {
+                // Commit the leader certificate.
+                dag.commit(leader_certificate, self.storage().max_gc_rounds());
+            }
         }
-        // Iterate over the leader certificates.
-        for leader_certificate in leader_certificates {
-            // Commit the leader certificate.
-            dag.commit(leader_certificate, self.storage().max_gc_rounds());
+        // Commit the latest leader certificate.
+        if let Err(e) = self.commit_leader_certificate::<true, true>(leader_certificate).await {
+            error!("BFT failed to update the DAG with the latest leader certificate - {e}");
         }
     }
 
@@ -696,7 +740,7 @@ impl<N: Network> BFT<N> {
 
     /// Shuts down the BFT.
     pub async fn shut_down(&self) {
-        trace!("Shutting down the BFT...");
+        info!("Shutting down the BFT...");
         // Acquire the lock.
         let _lock = self.lock.lock().await;
         // Shut down the primary.

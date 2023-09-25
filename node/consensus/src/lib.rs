@@ -273,7 +273,7 @@ impl<N: Network> Consensus<N> {
 
     /// Shuts down the BFT.
     pub async fn shut_down(&self) {
-        trace!("Shutting down consensus...");
+        info!("Shutting down consensus...");
         // Shut down the BFT.
         self.bft.shut_down().await;
         // Abort the tasks.
