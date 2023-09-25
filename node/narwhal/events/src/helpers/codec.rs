@@ -99,7 +99,7 @@ impl<N: Network> Decoder for EventCodec<N> {
 /* NOISE CODEC */
 
 // The maximum message size for noise messages. If the data to be encrypted exceedes it, it is chunked.
-const MAX_MESSAGE_LEN: usize = 100 * 65535;
+const MAX_MESSAGE_LEN: usize = 65535;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EventOrBytes<N: Network> {
