@@ -98,6 +98,25 @@ pub mod prop_tests {
         any_transmission().prop_map(|(id, t)| TransmissionResponse::new(id, t)).boxed()
     }
 
+    // TODO(nkls): dedup this?
+    pub fn any_large_transmission() -> BoxedStrategy<(TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>)> {
+        prop_oneof![
+            (any_puzzle_commitment(), collection::vec(any::<u8>(), 65535..=65535 * 5)).prop_map(|(pc, bytes)| (
+                TransmissionID::Solution(pc),
+                Transmission::Solution(Data::Buffer(Bytes::from(bytes)))
+            )),
+            (any_transaction_id(), collection::vec(any::<u8>(), 65535..=65353 * 5)).prop_map(|(tid, bytes)| (
+                TransmissionID::Transaction(tid),
+                Transmission::Transaction(Data::Buffer(Bytes::from(bytes)))
+            )),
+        ]
+        .boxed()
+    }
+
+    pub fn any_large_transmission_response() -> BoxedStrategy<TransmissionResponse<CurrentNetwork>> {
+        any_large_transmission().prop_map(|(id, t)| TransmissionResponse::new(id, t)).boxed()
+    }
+
     #[proptest]
     fn serialize_deserialize(#[strategy(any_transmission_response())] original: TransmissionResponse<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();

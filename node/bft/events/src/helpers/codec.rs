@@ -330,7 +330,11 @@ impl<N: Network> Decoder for NoiseCodec<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prop_tests::any_event;
+    use crate::{
+        prop_tests::any_event,
+        transmission_response::prop_tests::any_large_transmission_response,
+        TransmissionResponse,
+    };
 
     use snow::{params::NoiseParams, Builder};
     use test_strategy::proptest;
@@ -388,5 +392,18 @@ mod tests {
     #[proptest]
     fn event_roundtrip(#[strategy(any_event())] event: Event<CurrentNetwork>) {
         assert_roundtrip(EventOrBytes::Event(event))
+    }
+
+    #[proptest]
+    fn rayon_chunking_roundtrip(
+        #[strategy(any_large_transmission_response())] transmission: TransmissionResponse<CurrentNetwork>,
+    ) {
+        let (mut initiator_codec, mut responder_codec) = handshake_xx();
+        let mut ciphertext = BytesMut::new();
+
+        let msg = EventOrBytes::Event(Event::TransmissionResponse(transmission.clone()));
+
+        assert!(initiator_codec.encode(msg.clone(), &mut ciphertext).is_ok());
+        assert_eq!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(), msg);
     }
 }
