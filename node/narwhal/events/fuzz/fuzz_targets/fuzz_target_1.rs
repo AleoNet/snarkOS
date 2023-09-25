@@ -1,5 +1,7 @@
 #![no_main]
 
+use std::sync::Mutex;
+
 use snarkos_node_narwhal_events::{
     Event,
     EventOrBytes,
@@ -10,20 +12,25 @@ use snarkos_node_narwhal_events::{
 };
 use snarkvm::{
     ledger::narwhal::{Data, Transmission, TransmissionID},
-    prelude::{Field, Network, Uniform},
+    prelude::{Field, Network, TestRng, Uniform},
 };
 
 use bytes::{Bytes, BytesMut};
 use libfuzzer_sys::fuzz_target;
+use once_cell::sync::OnceCell;
 use snow::{params::NoiseParams, Builder};
 use tokio_util::codec::{Decoder, Encoder};
 
 type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-fuzz_target!(|data: &[u8]| {
-    let mut rng = rand::thread_rng();
+static RNG: OnceCell<Mutex<TestRng>> = OnceCell::new();
+static CODECS: OnceCell<Mutex<(NoiseCodec<CurrentNetwork>, NoiseCodec<CurrentNetwork>)>> = OnceCell::new();
 
-    let (mut initiator_codec, mut responder_codec) = handshake_xx();
+fuzz_target!(|data: &[u8]| {
+    let mut rng = &mut *RNG.get_or_init(|| Default::default()).lock().unwrap();
+
+    let codecs = CODECS.get_or_init(|| handshake_xx());
+    let (initiator_codec, responder_codec) = &mut *codecs.lock().unwrap();
     let mut ciphertext = BytesMut::new();
 
     let id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::from(Field::rand(&mut rng)));
@@ -36,7 +43,7 @@ fuzz_target!(|data: &[u8]| {
     assert_eq!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(), msg);
 });
 
-fn handshake_xx() -> (NoiseCodec<CurrentNetwork>, NoiseCodec<CurrentNetwork>) {
+fn handshake_xx() -> Mutex<(NoiseCodec<CurrentNetwork>, NoiseCodec<CurrentNetwork>)> {
     let params: NoiseParams = NOISE_HANDSHAKE_TYPE.parse().unwrap();
     let initiator_builder = Builder::new(params.clone());
     let initiator_kp = initiator_builder.generate_keypair().unwrap();
@@ -72,5 +79,5 @@ fn handshake_xx() -> (NoiseCodec<CurrentNetwork>, NoiseCodec<CurrentNetwork>) {
     initiator_codec.noise_state = initiator_codec.noise_state.into_post_handshake_state();
     responder_codec.noise_state = responder_codec.noise_state.into_post_handshake_state();
 
-    (initiator_codec, responder_codec)
+    Mutex::new((initiator_codec, responder_codec))
 }

@@ -16,6 +16,9 @@ path = ".."
 [dependencies.bytes]
 version = "1"
 
+[dependencies.once_cell]
+version = "1"
+
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
 rev = "bedb8f0"

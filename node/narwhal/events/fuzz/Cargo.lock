@@ -2058,6 +2058,7 @@ version = "0.0.0"
 dependencies = [
  "bytes",
  "libfuzzer-sys",
+ "once_cell",
  "rand",
  "snarkos-node-narwhal-events",
  "snarkvm",
