@@ -431,16 +431,22 @@ impl<N: Network> Router<N> {
     }
 
     /// Inserts the given peer into the connected peers.
-    pub fn insert_connected_peer(&self, peer: Peer<N>, peer_addr: SocketAddr) {
-        let peer_ip = peer.ip();
-        // Adds a bidirectional map between the listener address and (ambiguous) peer address.
-        self.resolver.insert_peer(peer_ip, peer_addr);
+    pub fn insert_connected_peer(&self, peer_ip: SocketAddr) {
+        // Move the peer from "connecting" to "connected".
+        let peer = if let Some(Some(peer)) = self.connecting_peers.lock().remove(&peer_ip) {
+            peer
+        } else {
+            warn!("Couldn't promote {peer_ip} from \"connecting\" to \"connected\"");
+            return;
+        };
         // Add an entry for this `Peer` in the connected peers.
         self.connected_peers.write().insert(peer_ip, peer);
         // Remove this peer from the candidate peers, if it exists.
         self.candidate_peers.write().remove(&peer_ip);
         // Remove this peer from the restricted peers, if it exists.
         self.restricted_peers.write().remove(&peer_ip);
+
+        info!("Connected to '{peer_ip}'");
     }
 
     /// Inserts the given peer IPs to the set of candidate peers.

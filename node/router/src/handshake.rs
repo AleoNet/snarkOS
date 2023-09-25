@@ -110,14 +110,11 @@ impl<N: Network> Router<N> {
             self.handshake_inner_responder(peer_addr, &mut peer_ip, stream, genesis_header).await
         };
 
-        // Remove the address from the collection of connecting peers (if the handshake got to the point where it's known).
         if let Some(ip) = peer_ip {
-            self.connecting_peers.lock().remove(&ip);
-        }
-
-        // If the handshake succeeded, announce it.
-        if let Ok((ref peer_ip, _)) = handshake_result {
-            info!("Connected to '{peer_ip}'");
+            if handshake_result.is_err() {
+                // Remove the address from the collection of connecting peers (if the handshake got to the point where it's known).
+                self.connecting_peers.lock().remove(&ip);
+            }
         }
 
         handshake_result
@@ -181,8 +178,10 @@ impl<N: Network> Router<N> {
         trace!("Sending '{}' to '{peer_addr}'", our_response.name());
         framed.send(Message::ChallengeResponse(our_response)).await?;
 
-        // Add the peer to the router.
-        self.insert_connected_peer(Peer::new(peer_ip, &peer_request), peer_addr);
+        // Finalize the connecting peer information.
+        self.connecting_peers.lock().insert(peer_ip, Some(Peer::new(peer_ip, peer_addr, &peer_request)));
+        // Adds a bidirectional map between the listener address and (ambiguous) peer address.
+        self.resolver.insert_peer(peer_ip, peer_addr);
 
         Ok((peer_ip, framed))
     }
@@ -252,8 +251,10 @@ impl<N: Network> Router<N> {
             peer_addr
         );
 
-        // Add the peer to the router.
-        self.insert_connected_peer(Peer::new(peer_ip, &peer_request), peer_addr);
+        // Finalize the connecting peer information.
+        self.connecting_peers.lock().insert(peer_ip, Some(Peer::new(peer_ip, peer_addr, &peer_request)));
+        // Adds a bidirectional map between the listener address and (ambiguous) peer address.
+        self.resolver.insert_peer(peer_ip, peer_addr);
 
         Ok((peer_ip, framed))
     }

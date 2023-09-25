@@ -65,6 +65,9 @@ where
             return;
         };
 
+        // Promote the peer's status from "connecting" to "connected".
+        self.router().insert_connected_peer(peer_ip);
+
         // Retrieve the block locators.
         let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
             Ok(block_locators) => Some(block_locators),

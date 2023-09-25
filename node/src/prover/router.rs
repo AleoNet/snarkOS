@@ -54,6 +54,9 @@ where
             return;
         };
 
+        // Promote the peer's status from "connecting" to "connected".
+        self.router().insert_connected_peer(peer_ip);
+
         // Send the first `Ping` message to the peer.
         self.send_ping(peer_ip, None);
     }
