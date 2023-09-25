@@ -43,7 +43,7 @@ members = ["."]
 debug = 1
 
 [[bin]]
-name = "fuzz_target_1"
-path = "fuzz_targets/fuzz_target_1.rs"
+name = "codec"
+path = "fuzz_targets/codec.rs"
 test = false
 doc = false
