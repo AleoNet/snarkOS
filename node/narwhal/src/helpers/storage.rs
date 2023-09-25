@@ -294,12 +294,12 @@ impl<N: Network> Storage<N> {
             bail!("Batch for round {round} already exists in storage {gc_log}")
         }
 
-        // Retrieve the committee for the batch round.
-        let Ok(committee) = self.ledger.get_committee_for_round(round) else {
+        // Retrieve the previous committee for the batch round.
+        let Ok(previous_commitee) = self.ledger.get_previous_committee_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
         // Ensure the author is in the committee.
-        if !committee.is_committee_member(batch_header.author()) {
+        if !previous_commitee.is_committee_member(batch_header.author()) {
             bail!("Author {} is not in the committee for round {round} {gc_log}", batch_header.author())
         }
 
@@ -326,7 +326,7 @@ impl<N: Network> Storage<N> {
         // Check if the previous round is within range of the GC round.
         if previous_round > gc_round {
             // Retrieve the committee for the previous round.
-            let Ok(previous_committee) = self.ledger.get_committee_for_round(previous_round) else {
+            let Ok(previous_committee) = self.ledger.get_previous_committee_for_round(previous_round) else {
                 bail!("Missing committee for the previous round {previous_round} in storage {gc_log}")
             };
             // Ensure the previous round certificates exists in storage.
@@ -413,8 +413,8 @@ impl<N: Network> Storage<N> {
             check_timestamp_for_liveness(timestamp)?;
         }
 
-        // Retrieve the committee for the batch round.
-        let Ok(committee) = self.ledger.get_committee_for_round(round.saturating_sub(1)) else {
+        // Retrieve the previous committee for the batch round.
+        let Ok(previous_committee) = self.ledger.get_previous_committee_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
 
@@ -428,7 +428,7 @@ impl<N: Network> Storage<N> {
             // Retrieve the signer.
             let signer = signature.to_address();
             // Ensure the signer is in the committee.
-            if !committee.is_committee_member(signer) {
+            if !previous_committee.is_committee_member(signer) {
                 bail!("Signer {signer} is not in the committee for round {round} {gc_log}")
             }
             // Append the signer.
@@ -436,7 +436,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Ensure the signatures have reached the quorum threshold.
-        if !committee.is_quorum_threshold_reached(&signers) {
+        if !previous_committee.is_quorum_threshold_reached(&signers) {
             bail!("Signatures for a batch in round {round} did not reach quorum threshold {gc_log}")
         }
         Ok(missing_transmissions)

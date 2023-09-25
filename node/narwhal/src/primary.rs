@@ -269,7 +269,7 @@ impl<N: Network> Primary<N> {
             // TODO(ljedrz): the BatchHeader should be serialized only once in advance before being sent to non-signers.
             let event = Event::BatchPropose(proposal.batch_header().clone().into());
             // Iterate through the non-signers.
-            for address in proposal.nonsigners(&self.ledger.current_committee()?) {
+            for address in proposal.nonsigners(&self.ledger.get_previous_committee_for_round(proposal.round())?) {
                 // Resolve the address to the peer IP.
                 match self.gateway.resolver().get_peer_ip_for_address(address) {
                     // Broadcast the batch to all validators for signing.
@@ -314,14 +314,14 @@ impl<N: Network> Primary<N> {
         let mut is_ready = previous_round == 0;
         // If the previous round is not 0, check if the previous certificates have reached the quorum threshold.
         if previous_round > 0 {
-            // Retrieve the committee for the round.
-            let Ok(committee) = self.ledger.get_committee_for_round(previous_round) else {
+            // Retrieve the previous committee for the round.
+            let Ok(previous_committee) = self.ledger.get_previous_committee_for_round(previous_round) else {
                 bail!("Cannot propose a batch for round {round}: the previous committee is not known yet")
             };
             // Construct a set over the authors.
             let authors = previous_certificates.iter().map(BatchCertificate::author).collect();
             // Check if the previous certificates have reached the quorum threshold.
-            if committee.is_quorum_threshold_reached(&authors) {
+            if previous_committee.is_quorum_threshold_reached(&authors) {
                 is_ready = true;
             }
         }
@@ -360,7 +360,8 @@ impl<N: Network> Primary<N> {
         // Sign the batch header.
         let batch_header = BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng)?;
         // Construct the proposal.
-        let proposal = Proposal::new(self.ledger.current_committee()?, batch_header.clone(), transmissions)?;
+        let proposal =
+            Proposal::new(self.ledger.get_previous_committee_for_round(round)?, batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
@@ -477,18 +478,18 @@ impl<N: Network> Primary<N> {
                         }
                     }
 
-                    // Retrieve the committee for the round.
-                    let committee = self.ledger.get_committee_for_round(proposal.round())?;
+                    // Retrieve the previous committee for the round.
+                    let previous_committee = self.ledger.get_previous_committee_for_round(proposal.round())?;
 
                     // Retrieve the address of the peer.
                     match self.gateway.resolver().get_address(peer_ip) {
                         // Add the signature to the batch.
-                        Some(signer) => proposal.add_signature(signer, signature, timestamp, &committee)?,
+                        Some(signer) => proposal.add_signature(signer, signature, timestamp, &previous_committee)?,
                         None => bail!("Signature is from a disconnected peer"),
                     };
                     info!("Added a batch signature from peer '{peer_ip}'");
                     // Check if the batch is ready to be certified.
-                    if !proposal.is_quorum_threshold_reached(&committee) {
+                    if !proposal.is_quorum_threshold_reached(&previous_committee) {
                         // If the batch is not ready to be certified, return early.
                         return Ok(());
                     }
@@ -507,11 +508,11 @@ impl<N: Network> Primary<N> {
 
         info!("Quorum threshold reached - Preparing to certify our batch for round {}...", proposal.round());
 
-        // Retrieve the committee for the round.
-        let committee = self.ledger.get_committee_for_round(proposal.round())?;
+        // Retrieve the previous committee for the round.
+        let previous_committee = self.ledger.get_previous_committee_for_round(proposal.round())?;
         // Store the certified batch and broadcast it to all validators.
         // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
-        if let Err(e) = self.store_and_broadcast_certificate(&proposal, &committee).await {
+        if let Err(e) = self.store_and_broadcast_certificate(&proposal, &previous_committee).await {
             // Reinsert the transmissions back into the ready queue for the next proposal.
             self.reinsert_transmissions_into_workers(proposal)?;
             return Err(e);
@@ -550,14 +551,14 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the current round.
         let current_round = self.current_round();
-        // Retrieve the current committee.
-        let committee = self.ledger.get_committee_for_round(current_round)?;
+        // Retrieve the previous committee.
+        let previous_committee = self.ledger.get_previous_committee_for_round(current_round)?;
         // Retrieve the certificates.
         let certificates = self.storage.get_certificates_for_round(current_round);
         // Construct a set over the authors.
         let authors = certificates.iter().map(BatchCertificate::author).collect();
         // Check if the certificates have reached the quorum threshold.
-        let is_quorum = committee.is_quorum_threshold_reached(&authors);
+        let is_quorum = previous_committee.is_quorum_threshold_reached(&authors);
 
         // Determine if we are currently proposing a round.
         // Note: This is important, because while our peers have advanced,
