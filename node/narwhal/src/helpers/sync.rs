@@ -251,10 +251,14 @@ impl<N: Network> Sync<N> {
 
     /// Syncs the storage with the given blocks.
     pub async fn sync_storage_with_blocks(&self) -> Result<()> {
+        // Retrieve the latest block height.
+        let mut current_height = self.ledger.latest_block_height() + 1;
         // Try to advance the ledger with sync blocks.
-        while let Some(block) = self.block_sync.process_next_block() {
+        while let Some(block) = self.block_sync.process_next_block(current_height) {
             // Sync the storage with the block.
             self.sync_storage_with_block(block).await?;
+            // Update the current height.
+            current_height += 1;
         }
         Ok(())
     }

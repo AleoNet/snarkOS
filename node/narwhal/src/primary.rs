@@ -744,12 +744,17 @@ impl<N: Network> Primary<N> {
 
     /// Increments to the next round.
     async fn try_increment_to_the_next_round(&self, next_round: u64) -> Result<()> {
-        // Iterate until the penultimate round is reached.
-        while self.current_round() < next_round.saturating_sub(1) {
-            // Update to the next round in storage.
-            self.storage.increment_to_next_round()?;
-            // Clear the proposed batch.
-            *self.proposed_batch.write() = None;
+        // Retrieve the current round.
+        let current_round = self.current_round();
+        // If the next round is within GC range, then iterate to the penultimate round.
+        if current_round + self.storage.max_gc_rounds() >= next_round {
+            // Iterate until the penultimate round is reached.
+            while self.current_round() < next_round.saturating_sub(1) {
+                // Update to the next round in storage.
+                self.storage.increment_to_next_round()?;
+                // Clear the proposed batch.
+                *self.proposed_batch.write() = None;
+            }
         }
         // Attempt to advance to the next round.
         if self.current_round() < next_round {

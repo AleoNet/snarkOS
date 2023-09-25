@@ -255,11 +255,9 @@ impl<N: Network> BlockSync<N> {
 
     /// Returns the next block to process, if one is ready.
     #[inline]
-    pub fn process_next_block(&self) -> Option<Block<N>> {
-        // Retrieve the latest block height.
-        let current_height = self.canon.latest_block_height();
+    pub fn process_next_block(&self, next_height: u32) -> Option<Block<N>> {
         // Try to advance the ledger with a block from the sync pool.
-        self.remove_block_response(current_height + 1)
+        self.remove_block_response(next_height)
     }
 
     /// Attempts to advance with blocks from the sync pool.
@@ -515,16 +513,20 @@ impl<N: Network> BlockSync<N> {
 
     /// Removes and returns the block response for the given height, if the request is complete.
     fn remove_block_response(&self, height: u32) -> Option<Block<N>> {
+        // Acquire the requests write lock.
+        // Note: This lock must be held across the entire scope, due to asynchronous block responses
+        // from multiple peers that may be received concurrently.
+        let mut requests = self.requests.write();
+
         // Determine if the request is complete.
-        let is_request_complete =
-            self.requests.read().get(&height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false);
+        let is_request_complete = requests.get(&height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false);
 
         // If the request is not complete, return early.
         if !is_request_complete {
             return None;
         }
         // Remove the request entry for the given height.
-        self.requests.write().remove(&height);
+        requests.remove(&height);
         // Remove the response entry for the given height.
         self.responses.write().remove(&height)
     }
