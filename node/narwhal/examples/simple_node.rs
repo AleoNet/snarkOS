@@ -24,7 +24,6 @@ use snarkos_node_narwhal::{
     MEMORY_POOL_PORT,
 };
 use snarkos_node_narwhal_ledger_service::MockLedgerService;
-use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkvm::{
     ledger::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
@@ -115,10 +114,8 @@ pub async fn start_bft(
     let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
-    // Initialize the sync module.
-    let sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
     // Initialize the storage.
-    let storage = Storage::new_with_sync(ledger.clone(), MAX_GC_ROUNDS)?;
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -133,7 +130,7 @@ pub async fn start_bft(
     // Initialize the BFT instance.
     let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, ip, &trusted_validators, dev)?;
     // Run the BFT instance.
-    bft.run(sync, sender.clone(), receiver, Some(consensus_sender)).await?;
+    bft.run(Some(consensus_sender), sender.clone(), receiver).await?;
     // Retrieve the BFT's primary.
     let primary = bft.primary();
     // Handle OS signals.
@@ -154,10 +151,8 @@ pub async fn start_primary(
     let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
-    // Initialize the sync module.
-    let sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
     // Initialize the storage.
-    let storage = Storage::new_with_sync(ledger.clone(), MAX_GC_ROUNDS)?;
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -168,7 +163,7 @@ pub async fn start_primary(
     // Initialize the primary instance.
     let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, ip, &trusted_validators, dev)?;
     // Run the primary instance.
-    primary.run(sync, sender.clone(), receiver, None).await?;
+    primary.run(None, sender.clone(), receiver).await?;
     // Handle OS signals.
     handle_signals(&primary);
     // Return the primary instance.

@@ -31,7 +31,6 @@ use snarkos_node_narwhal::{
     MAX_GC_ROUNDS,
 };
 use snarkos_node_narwhal_ledger_service::LedgerService;
-use snarkos_node_sync::BlockSync;
 use snarkvm::{
     ledger::{
         block::Transaction,
@@ -72,7 +71,7 @@ impl<N: Network> Consensus<N> {
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new_with_sync(ledger.clone(), MAX_GC_ROUNDS)?;
+        let storage = NarwhalStorage::new(ledger.clone(), MAX_GC_ROUNDS);
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
         // Return the consensus.
@@ -80,21 +79,17 @@ impl<N: Network> Consensus<N> {
     }
 
     /// Run the consensus instance.
-    pub async fn run(
-        &mut self,
-        sync: BlockSync<N>,
-        primary_sender: PrimarySender<N>,
-        primary_receiver: PrimaryReceiver<N>,
-    ) -> Result<()> {
+    pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
         info!("Starting the consensus instance...");
-        // Sets the primary sender.
+        // Set the primary sender.
         self.primary_sender.set(primary_sender.clone()).expect("Primary sender already set");
-        // Initialize the consensus channels.
+
+        // First, initialize the consensus channels.
         let (consensus_sender, consensus_receiver) = init_consensus_channels();
-        // Start the consensus.
-        self.bft.run(sync, primary_sender, primary_receiver, Some(consensus_sender)).await?;
-        // Start the consensus handlers.
+        // Then, start the consensus handlers.
         self.start_handlers(consensus_receiver);
+        // Lastly, the consensus.
+        self.bft.run(Some(consensus_sender), primary_sender, primary_receiver).await?;
         Ok(())
     }
 

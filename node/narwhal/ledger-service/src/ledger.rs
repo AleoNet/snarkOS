@@ -26,6 +26,7 @@ use snarkvm::{
 };
 
 use indexmap::IndexMap;
+use snarkvm::prelude::narwhal::BatchCertificate;
 use std::{fmt, ops::Range};
 
 /// A core ledger service.
@@ -88,6 +89,25 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// The range is inclusive of the start and exclusive of the end.
     fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>> {
         self.ledger.get_blocks(heights)
+    }
+
+    /// Returns the solution for the given solution ID.
+    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+        self.ledger.get_solution(solution_id)
+    }
+
+    /// Returns the transaction for the given transaction ID.
+    fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
+        self.ledger.get_transaction(transaction_id)
+    }
+
+    /// Returns the batch certificate for the given batch certificate ID.
+    fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>> {
+        match self.ledger.get_batch_certificate(certificate_id) {
+            Ok(Some(certificate)) => Ok(certificate),
+            Ok(None) => bail!("No batch certificate found for certificate ID {certificate_id} in the ledger"),
+            Err(error) => Err(error),
+        }
     }
 
     /// Returns the current committee.

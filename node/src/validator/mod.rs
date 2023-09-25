@@ -105,7 +105,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
-        consensus.run(sync.clone(), primary_sender, primary_receiver).await?;
+        consensus.run(primary_sender, primary_receiver).await?;
 
         // Initialize the node router.
         let router = Router::new(
@@ -137,8 +137,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         }
         // Initialize the routing.
         node.initialize_routing().await;
-        // Initialize the sync module.
-        node.initialize_sync();
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.
@@ -157,30 +155,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
-    /// Initializes the sync pool.
-    fn initialize_sync(&self) {
-        // Start the sync loop.
-        let node = self.clone();
-        self.handles.lock().push(tokio::spawn(async move {
-            loop {
-                // If the Ctrl-C handler registered the signal, stop the node.
-                if node.shutdown.load(std::sync::atomic::Ordering::Relaxed) {
-                    info!("Shutting down block production");
-                    break;
-                }
-
-                // Sleep briefly to avoid triggering spam detection.
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                // Perform the sync routine.
-                let communication = node.consensus.bft().primary().gateway();
-                // let communication = &node.router;
-                if let Err(error) = node.sync.try_block_sync(communication).await {
-                    warn!("Sync error - {error}");
-                }
-            }
-        }));
-    }
-
     // /// Initialize the transaction pool.
     // fn initialize_transaction_pool(&self, dev: Option<u16>) -> Result<()> {
     //     use snarkvm::{

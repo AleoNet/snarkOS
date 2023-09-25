@@ -17,7 +17,7 @@ use snarkvm::{
         block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
     prelude::{Field, Network, Result},
 };
@@ -51,6 +51,15 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// Returns the blocks in the given block range.
     /// The range is inclusive of the start and exclusive of the end.
     fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
+
+    /// Returns the solution for the given solution ID.
+    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
+
+    /// Returns the transaction for the given transaction ID.
+    fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
+
+    /// Returns the batch certificate for the given batch certificate ID.
+    fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;
 
     /// Returns the current committee.
     fn current_committee(&self) -> Result<Committee<N>>;

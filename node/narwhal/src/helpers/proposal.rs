@@ -33,8 +33,6 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 
 pub struct Proposal<N: Network> {
-    /// The committee for the round.
-    committee: Committee<N>,
     /// The proposed batch header.
     batch_header: BatchHeader<N>,
     /// The proposed transmissions.
@@ -65,7 +63,7 @@ impl<N: Network> Proposal<N> {
             ensure!(a == b, "The transmission IDs do not match in the batch header and transmissions");
         }
         // Return the proposal.
-        Ok(Self { committee, batch_header, transmissions, signatures: Default::default() })
+        Ok(Self { batch_header, transmissions, signatures: Default::default() })
     }
 
     /// Returns the proposed batch header.
@@ -104,13 +102,13 @@ impl<N: Network> Proposal<N> {
     }
 
     /// Returns the nonsigners.
-    pub fn nonsigners(&self) -> HashSet<Address<N>> {
+    pub fn nonsigners(&self, committee: &Committee<N>) -> HashSet<Address<N>> {
         // Retrieve the current signers.
         let signers = self.signers();
         // Initialize a set for the non-signers.
         let mut nonsigners = HashSet::new();
         // Iterate through the committee members.
-        for address in self.committee.members().keys() {
+        for address in committee.members().keys() {
             // Insert the address if it is not a signer.
             if !signers.contains(address) {
                 nonsigners.insert(*address);
@@ -126,9 +124,9 @@ impl<N: Network> Proposal<N> {
     }
 
     /// Returns `true` if the quorum threshold has been reached for the proposed batch.
-    pub fn is_quorum_threshold_reached(&self) -> bool {
+    pub fn is_quorum_threshold_reached(&self, committee: &Committee<N>) -> bool {
         // Check if the batch has reached the quorum threshold.
-        self.committee.is_quorum_threshold_reached(&self.signers())
+        committee.is_quorum_threshold_reached(&self.signers())
     }
 
     /// Returns `true` if the proposal contains the given transmission ID.
@@ -142,9 +140,15 @@ impl<N: Network> Proposal<N> {
     }
 
     /// Adds a signature to the proposal, if the signature is valid.
-    pub fn add_signature(&mut self, signer: Address<N>, signature: Signature<N>, timestamp: i64) -> Result<()> {
+    pub fn add_signature(
+        &mut self,
+        signer: Address<N>,
+        signature: Signature<N>,
+        timestamp: i64,
+        committee: &Committee<N>,
+    ) -> Result<()> {
         // Ensure the signer is in the committee.
-        if !self.committee.is_committee_member(signer) {
+        if !committee.is_committee_member(signer) {
             bail!("Signature is from a non-committee peer '{signer}'")
         }
         // Ensure the signer is new.
@@ -164,9 +168,12 @@ impl<N: Network> Proposal<N> {
     }
 
     /// Returns the batch certificate and transmissions.
-    pub fn to_certificate(&self) -> Result<(BatchCertificate<N>, IndexMap<TransmissionID<N>, Transmission<N>>)> {
+    pub fn to_certificate(
+        &self,
+        committee: &Committee<N>,
+    ) -> Result<(BatchCertificate<N>, IndexMap<TransmissionID<N>, Transmission<N>>)> {
         // Ensure the quorum threshold has been reached.
-        ensure!(self.is_quorum_threshold_reached(), "The quorum threshold has not been reached");
+        ensure!(self.is_quorum_threshold_reached(committee), "The quorum threshold has not been reached");
         // Create the batch certificate.
         let certificate = BatchCertificate::new(self.batch_header.clone(), self.signatures.clone())?;
         // Return the certificate and transmissions.
