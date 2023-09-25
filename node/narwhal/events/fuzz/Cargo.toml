@@ -1,0 +1,46 @@
+[package]
+name = "snarkos-node-narwhal-events-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.snarkos-node-narwhal-events]
+path = ".."
+
+[dependencies.bytes]
+version = "1"
+
+[dependencies.snarkvm]
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "bedb8f0"
+#version = "=0.14.1"
+features = [ "circuit", "console", "rocks" ]
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.snow]
+version = "0.9"
+
+[dependencies.tokio-util]
+version = "0.7"
+features = [ "codec" ]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "fuzz_target_1"
+path = "fuzz_targets/fuzz_target_1.rs"
+test = false
+doc = false
