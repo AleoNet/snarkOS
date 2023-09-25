@@ -134,6 +134,20 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
     }
 
+    /// Returns the previous committee for the given round.
+    /// If the previous round is in the future, then the current committee is returned.
+    fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
+        // Get the round number for the previous committee. Note, we subtract 2 from even rounds,
+        // because committees are updated in odd rounds.
+        let previous_round = match round % 2 == 0 {
+            true => round.saturating_sub(2),
+            false => round.saturating_sub(1),
+        };
+
+        // Retrieve the committee for the previous round.
+        self.get_committee_for_round(previous_round)
+    }
+
     /// Returns `true` if the ledger contains the given certificate ID in block history.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
         self.ledger.contains_certificate(certificate_id)
