@@ -15,7 +15,10 @@
 mod common;
 use common::*;
 
-use snarkos_node_tcp::{protocols::Handshake, P2P};
+use snarkos_node_tcp::{
+    protocols::{Handshake, OnConnect},
+    P2P,
+};
 
 use core::time::Duration;
 
@@ -86,6 +89,10 @@ async fn test_connect_with_handshake() {
     // Enable handshake protocol.
     node0.enable_handshake().await;
     node1.enable_handshake().await;
+
+    // Enable on_connect protocol.
+    node0.enable_on_connect().await;
+    node1.enable_on_connect().await;
 
     // Start listening.
     node0.tcp().enable_listener().await.unwrap();
