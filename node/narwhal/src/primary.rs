@@ -291,8 +291,7 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the current round.
         let round = self.current_round();
-        // Compute the previous round.
-        let previous_round = round.saturating_sub(1);
+
         // Ensure the primary has not proposed a batch for this round before.
         if self.storage.contains_certificate_in_round_from(round, self.gateway.account().address()) {
             // If a BFT sender was provided, attempt to advance the current round.
@@ -302,8 +301,11 @@ impl<N: Network> Primary<N> {
                     return Err(e);
                 }
             }
-            bail!("Primary is safely skipping (round {round} was already certified)")
+            bail!("Primary is safely skipping (round {round} was already certified)");
         }
+
+        // Compute the previous round.
+        let previous_round = round.saturating_sub(1);
         // Retrieve the previous certificates.
         let previous_certificates = self.storage.get_certificates_for_round(previous_round);
 
@@ -458,8 +460,8 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - received a batch signature from myself ({})", signature.to_address());
         }
 
-        // Retrieve the current committee.
-        let current_committee = self.ledger.current_committee()?;
+        // Acquire the lock.
+        let _lock = self.lock.lock().await;
 
         let proposal = {
             // Acquire the write lock.
@@ -474,15 +476,19 @@ impl<N: Network> Primary<N> {
                             false => bail!("Unknown batch ID '{batch_id}'"),
                         }
                     }
+
+                    // Retrieve the committee for the round.
+                    let committee = self.ledger.get_committee_for_round(proposal.round())?;
+
                     // Retrieve the address of the peer.
                     match self.gateway.resolver().get_address(peer_ip) {
                         // Add the signature to the batch.
-                        Some(signer) => proposal.add_signature(signer, signature, timestamp, &current_committee)?,
+                        Some(signer) => proposal.add_signature(signer, signature, timestamp, &committee)?,
                         None => bail!("Signature is from a disconnected peer"),
                     };
                     info!("Added a batch signature from peer '{peer_ip}'");
                     // Check if the batch is ready to be certified.
-                    if !proposal.is_quorum_threshold_reached(&current_committee) {
+                    if !proposal.is_quorum_threshold_reached(&committee) {
                         // If the batch is not ready to be certified, return early.
                         return Ok(());
                     }
@@ -499,11 +505,13 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to certify the batch. */
 
-        info!("Quorum threshold reached - Preparing to certify our batch...");
+        info!("Quorum threshold reached - Preparing to certify our batch for round {}...", proposal.round());
 
+        // Retrieve the committee for the round.
+        let committee = self.ledger.get_committee_for_round(proposal.round())?;
         // Store the certified batch and broadcast it to all validators.
         // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
-        if let Err(e) = self.store_and_broadcast_certificate(&proposal, &current_committee).await {
+        if let Err(e) = self.store_and_broadcast_certificate(&proposal, &committee).await {
             // Reinsert the transmissions back into the ready queue for the next proposal.
             self.reinsert_transmissions_into_workers(proposal)?;
             return Err(e);
@@ -533,11 +541,35 @@ impl<N: Network> Primary<N> {
         if self.gateway.account().address() == certificate.author() {
             bail!("Received a batch certificate for myself ({})", certificate.author());
         }
+
         // Store the certificate, after ensuring it is valid.
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
+
         // If there are enough certificates to reach quorum threshold for the current round,
         // then proceed to advance to the next round.
-        self.try_advance_to_next_round().await
+
+        // Retrieve the current round.
+        let current_round = self.current_round();
+        // Retrieve the current committee.
+        let committee = self.ledger.get_committee_for_round(current_round)?;
+        // Retrieve the certificates.
+        let certificates = self.storage.get_certificates_for_round(current_round);
+        // Construct a set over the authors.
+        let authors = certificates.iter().map(BatchCertificate::author).collect();
+        // Check if the certificates have reached the quorum threshold.
+        let is_quorum = committee.is_quorum_threshold_reached(&authors);
+
+        // Determine if we are currently proposing a round.
+        // Note: This is important, because while our peers have advanced,
+        // they may not be proposing yet, and thus still able to sign our proposed batch.
+        let is_proposing = self.proposed_batch.read().is_some();
+
+        // Determine whether to advance to the next round.
+        if is_quorum && !is_proposing {
+            // If we have reached the quorum threshold, then proceed to the next round.
+            self.try_increment_to_the_next_round(current_round + 1).await?;
+        }
+        Ok(())
     }
 }
 
@@ -599,7 +631,7 @@ impl<N: Network> Primary<N> {
                     debug!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
                     continue;
                 }
-
+                // Process the proposed batch.
                 if let Err(e) = self_.process_batch_propose_from_peer(peer_ip, batch_propose).await {
                     warn!("Cannot sign a batch from peer '{peer_ip}' - {e}");
                 }
@@ -615,7 +647,7 @@ impl<N: Network> Primary<N> {
                     debug!("Skipping a batch signature from '{peer_ip}' - node is syncing");
                     continue;
                 }
-
+                // Process the batch signature.
                 if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
                     warn!("Cannot store a signature from peer '{peer_ip}' - {e}");
                 }
@@ -639,6 +671,8 @@ impl<N: Network> Primary<N> {
                     warn!("Failed to deserialize the batch certificate from peer '{peer_ip}'");
                     continue;
                 };
+
+                // Process the batch certificate.
                 if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
                     warn!("Cannot store a certificate from peer '{peer_ip}' - {e}");
                 }
@@ -708,37 +742,8 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    /// If the current round has reached quorum threshold, then advance to the next round.
-    async fn try_advance_to_next_round(&self) -> Result<()> {
-        // Retrieve the current committee.
-        let current_committee = self.ledger.current_committee()?;
-        // Retrieve the current round.
-        let current_round = self.current_round();
-        // Retrieve the certificates.
-        let certificates = self.storage.get_certificates_for_round(current_round);
-        // Construct a set over the authors.
-        let authors = certificates.iter().map(BatchCertificate::author).collect();
-        // Check if the certificates have reached the quorum threshold.
-        let is_quorum = current_committee.is_quorum_threshold_reached(&authors);
-
-        // Determine if we are currently proposing a round.
-        // Note: This is important, because while our peers have advanced,
-        // they may not be proposing yet, and thus still able to sign our proposed batch.
-        let is_proposing = self.proposed_batch.read().is_some();
-
-        // Determine whether to advance to the next round.
-        if is_quorum && !is_proposing {
-            // If we have reached the quorum threshold, then proceed to the next round.
-            self.update_committee_to_round(current_round + 1).await?;
-        }
-        Ok(())
-    }
-
-    /// Updates the committee to the specified round.
-    ///
-    /// This method should only be called after processing a proposed batch, or in catching up,
-    /// and thus enforces that the proposed batch is cleared.
-    async fn update_committee_to_round(&self, next_round: u64) -> Result<()> {
+    /// Increments to the next round.
+    async fn try_increment_to_the_next_round(&self, next_round: u64) -> Result<()> {
         // Iterate until the penultimate round is reached.
         while self.current_round() < next_round.saturating_sub(1) {
             // Update to the next round in storage.
@@ -801,22 +806,22 @@ impl<N: Network> Primary<N> {
         // Store the certified batch.
         self.storage.insert_certificate(certificate.clone(), transmissions)?;
         debug!("Stored certificate for round {}", certificate.round());
-        // Broadcast the certified batch to all validators.
-        self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
             // Await the callback to continue.
             if let Err(e) = bft_sender.send_primary_certificate_to_bft(certificate.clone()).await {
-                warn!("Failed to update the BFT DAG from primary: {e}");
+                warn!("Failed to update the BFT DAG from primary - {e}");
                 return Err(e);
             };
         }
+        // Broadcast the certified batch to all validators.
+        self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
         // Log the certified batch.
         let num_transmissions = certificate.transmission_ids().len();
         let round = certificate.round();
         info!("\n\nOur batch with {num_transmissions} transmissions for round {round} was certified!\n");
-        // Update the committee to the next round.
-        self.update_committee_to_round(round + 1).await
+        // Increment to the next round.
+        self.try_increment_to_the_next_round(round + 1).await
     }
 
     /// Inserts the missing transmissions from the proposal into the workers.
@@ -862,11 +867,9 @@ impl<N: Network> Primary<N> {
         let batch_header = certificate.batch_header();
         // Retrieve the batch round.
         let batch_round = batch_header.round();
-        // Retrieve the GC round.
-        let gc_round = self.storage.gc_round();
 
         // If the certificate round is outdated, do not store it.
-        if batch_round <= gc_round {
+        if batch_round <= self.storage.gc_round() {
             return Ok(());
         }
         // If the certificate already exists in storage, return early.
@@ -882,9 +885,9 @@ impl<N: Network> Primary<N> {
             // Store the batch certificate.
             self.storage.insert_certificate(certificate.clone(), missing_transmissions)?;
             debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
-            // If a BFT sender was provided, send the certificate to the BFT.
+            // If a BFT sender was provided, send the round and certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
-                // Await the callback to continue.
+                // Send the certificate to the BFT.
                 if let Err(e) = bft_sender.send_primary_certificate_to_bft(certificate).await {
                     warn!("Failed to update the BFT DAG from sync: {e}");
                     return Err(e);
@@ -894,7 +897,6 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    // TODO (howardwu): This method is a mess. There are many redundant checks and logic. Ignore these until design is stable.
     /// Recursively syncs using the given batch header.
     async fn sync_with_batch_header_from_peer(
         &self,
@@ -916,19 +918,9 @@ impl<N: Network> Primary<N> {
         // If our primary is far behind the peer, update our committee to the batch round.
         if is_behind_schedule || is_peer_far_in_future {
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
-            // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
             // If the batch round is greater than the current committee round, update the committee.
-            // self.update_committee_to_round_catch_up(batch_round).await?;
-            // TODO (howardwu): This case should be removed.
-            self.update_committee_to_round(batch_round).await?;
+            self.try_increment_to_the_next_round(batch_round).await?;
         }
-
-        // // Ensure this batch does not contain already committed transmissions from past rounds.
-        // if batch_header.transmission_ids().iter().any(|id| self.storage.contains_transmission(*id)) {
-        //     bail!("Batch contains already transmissions from past rounds");
-        // }
-        // Ensure this batch does not contain already committed transmissions in the ledger.
-        // TODO: Add a ledger service.
 
         // Ensure the primary has all of the previous certificates.
         let missing_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
@@ -1163,7 +1155,7 @@ mod tests {
     // Creates a batch proposal with one solution and one transaction.
     fn create_test_proposal(
         author: &Account<CurrentNetwork>,
-        current_committee: Committee<CurrentNetwork>,
+        committee: Committee<CurrentNetwork>,
         round: u64,
         previous_certificate_ids: IndexSet<Field<CurrentNetwork>>,
         timestamp: i64,
@@ -1185,7 +1177,7 @@ mod tests {
         let batch_header =
             BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
         // Construct the proposal.
-        Proposal::new(current_committee, batch_header, transmissions).unwrap()
+        Proposal::new(committee, batch_header, transmissions).unwrap()
     }
 
     // Creates a signature of the primary's current proposal for each committe member (excluding

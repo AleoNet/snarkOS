@@ -206,7 +206,7 @@ impl<N: Network> BFT<N> {
             }
         }
 
-        // If the BFT is ready to update to the next round, update to the next committee.
+        // If the BFT is ready, then update to the next round.
         if is_ready {
             // Update to the next round in storage.
             self.storage().increment_to_next_round()?;
@@ -384,7 +384,6 @@ impl<N: Network> BFT<N> {
         }
 
         // Retrieve the committee for the commit round.
-        // Note: This is equivalent to calling `self.ledger().current_committee()`.
         let Ok(committee) = self.ledger().get_committee_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee for commit round {commit_round}");
         };
