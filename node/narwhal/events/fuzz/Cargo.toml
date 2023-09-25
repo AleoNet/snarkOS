@@ -1,32 +1,45 @@
 [package]
 name = "snarkos-node-narwhal-events-fuzz"
-version = "0.0.0"
+version = "2.1.7"
 publish = false
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "Event fuzzing for the gateway in a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "Apache-2.0"
 edition = "2021"
 
 [package.metadata]
 cargo-fuzz = true
 
-[dependencies]
-libfuzzer-sys = "0.4"
-
-[dependencies.snarkos-node-narwhal-events]
-path = ".."
-
 [dependencies.bytes]
 version = "1"
 
+[dependencies.libfuzzer-sys]
+version = "0.4"
+
 [dependencies.once_cell]
 version = "1"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.snarkos-node-narwhal-events]
+path = ".."
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
 rev = "bedb8f0"
 #version = "=0.14.1"
 features = [ "circuit", "console", "rocks" ]
-
-[dependencies.rand]
-version = "0.8"
 
 [dependencies.snow]
 version = "0.9"

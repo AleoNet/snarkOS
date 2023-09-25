@@ -2054,7 +2054,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-narwhal-events-fuzz"
-version = "0.0.0"
+version = "2.1.7"
 dependencies = [
  "bytes",
  "libfuzzer-sys",
