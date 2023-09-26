@@ -49,6 +49,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         ErasedJson::pretty(rest.ledger.latest_state_root())
     }
 
+    // GET /testnet3/latest/committee
+    pub(crate) async fn latest_committee(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
+    }
+
     // GET /testnet3/block/{height}
     // GET /testnet3/block/{blockHash}
     pub(crate) async fn get_block(
