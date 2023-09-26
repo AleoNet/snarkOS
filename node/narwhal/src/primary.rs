@@ -393,13 +393,21 @@ impl<N: Network> Primary<N> {
         // Acquire the lock.
         let _lock = self.lock.lock().await;
 
+        // Ensure the batch proposal is from the validator.
+        if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != batch_header.author()) {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!("Malicious peer - proposed batch from a different validator ({})", batch_header.author());
+        }
         // Ensure the batch author is a current committee member.
         if !self.gateway.is_authorized_validator_address(batch_header.author()) {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
             bail!("Malicious peer - proposed batch from a non-committee member ({})", batch_header.author());
         }
         // Ensure the batch proposal is not from the current primary.
         if self.gateway.account().address() == batch_header.author() {
-            bail!("Malicious peer - proposed batch from myself ({})", batch_header.author());
+            bail!("Invalid peer - proposed batch from myself ({})", batch_header.author());
         }
 
         // If the peer is ahead, use the batch header to sync up to the peer.
@@ -456,9 +464,18 @@ impl<N: Network> Primary<N> {
         // Retrieve the signature and timestamp.
         let BatchSignature { batch_id, signature, timestamp } = batch_signature;
 
+        // Retrieve the signer.
+        let signer = signature.to_address();
+
+        // Ensure the batch signature is signed by the validator.
+        if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != signer) {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!("Malicious peer - batch signature is from a different validator ({signer})");
+        }
         // Ensure the batch signature is not from the current primary.
-        if self.gateway.account().address() == signature.to_address() {
-            bail!("Malicious peer - received a batch signature from myself ({})", signature.to_address());
+        if self.gateway.account().address() == signer {
+            bail!("Invalid peer - received a batch signature from myself ({signer})");
         }
 
         // Acquire the lock.
@@ -534,13 +551,24 @@ impl<N: Network> Primary<N> {
         // Acquire the lock.
         let _lock = self.lock.lock().await;
 
+        // Retrieve the batch certificate author.
+        let author = certificate.author();
+
+        // Ensure the batch certificate is from the validator
+        if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != author) {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!("Malicious peer - batch certificate from a different validator ({author})");
+        }
         // Ensure the batch certificate is authored by a current committee member.
-        if !self.gateway.is_authorized_validator_address(certificate.author()) {
-            bail!("Received a batch certificate from a non-committee member ({})", certificate.author());
+        if !self.gateway.is_authorized_validator_address(author) {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!("Malicious peer - Received a batch certificate from a non-committee member ({author})");
         }
         // Ensure the batch proposal is not from the current primary.
-        if self.gateway.account().address() == certificate.author() {
-            bail!("Received a batch certificate for myself ({})", certificate.author());
+        if self.gateway.account().address() == author {
+            bail!("Received a batch certificate for myself ({author})");
         }
 
         // Store the certificate, after ensuring it is valid.

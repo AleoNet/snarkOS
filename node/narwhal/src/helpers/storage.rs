@@ -19,11 +19,12 @@ use snarkvm::{
         block::Block,
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, Address, Field, Network, Result},
+    prelude::{bail, cfg_iter, ensure, Address, Field, Network, Result},
 };
 
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     sync::{
@@ -607,6 +608,12 @@ impl<N: Network> Storage<N> {
         }
         // Retrieve the transmissions for the certificate.
         let mut missing_transmissions = HashMap::new();
+
+        // Reconstruct the unconfirmed transactions.
+        let mut unconfirmed_transactions = cfg_iter!(block.transactions())
+            .filter_map(|tx| tx.unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok())
+            .collect::<IndexMap<_, _>>();
+
         // Iterate over the transmission IDs.
         for transmission_id in certificate.transmission_ids() {
             // If the transmission ID already exists in the map, skip it.
@@ -638,9 +645,9 @@ impl<N: Network> Storage<N> {
                 }
                 TransmissionID::Transaction(transaction_id) => {
                     // Retrieve the transaction.
-                    match block.get_transaction(transaction_id) {
+                    match unconfirmed_transactions.remove(transaction_id) {
                         // Insert the transaction.
-                        Some(transaction) => missing_transmissions.insert(*transmission_id, transaction.clone().into()),
+                        Some(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
                         // Otherwise, try to load the transaction from the ledger.
                         None => match self.ledger.get_transaction(*transaction_id) {
                             // Insert the transaction.
