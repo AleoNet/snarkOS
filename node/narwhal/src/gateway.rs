@@ -296,10 +296,11 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given address is an authorized validator.
     pub fn is_authorized_validator_address(&self, validator_address: Address<N>) -> bool {
-        // Determine of the validator address is a member of the previous or current committee.
-        // We allow for leniency in validation checks to accommodate two scenarios:
-        // 1. New validators should have the ability to connect immediately once they are a committee member.
-        // 2. Exiting validators should remain connected until there are no outstanding batches they are responsible for.
+        // Determine if the validator address is a member of the previous or current committee.
+        // We allow leniency in this validation check in order to accommodate these two scenarios:
+        //  1. New validators should be able to connect immediately once bonded as a committee member.
+        //  2. Existing validators must remain connected until they are no longer bonded as a committee member.
+        //     (i.e. meaning they must stay online until the next block has been produced)
         self.ledger
             .get_previous_committee_for_round(self.ledger.latest_round())
             .map_or(false, |committee| committee.is_committee_member(validator_address))
