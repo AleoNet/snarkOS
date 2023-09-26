@@ -375,7 +375,7 @@ impl<N: Network> BFT<N> {
         // Construct the commit round.
         let commit_round = certificate_round.saturating_sub(1);
         // If the commit round is odd, return early.
-        if commit_round % 2 != 1 {
+        if commit_round % 2 != 0 || commit_round < 2 {
             return Ok(());
         }
         // If the commit round is at or below the last committed round, return early.
