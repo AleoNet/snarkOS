@@ -1056,7 +1056,7 @@ impl<N: Network> Primary<N> {
 
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
-        trace!("Shutting down the primary...");
+        info!("Shutting down the primary...");
         // Acquire the lock.
         let _lock = self.lock.lock().await;
         // Shut down the workers.

@@ -657,9 +657,9 @@ impl<N: Network> Storage<N> {
         // Insert the batch certificate into storage.
         let certificate_id = fmt_id(certificate.certificate_id());
         debug!(
-            "Syncing certificate '{certificate_id}' in round {} (from {})",
+            "Syncing certificate '{certificate_id}' for round {} with {} transmissions",
             certificate.round(),
-            certificate.author()
+            certificate.transmission_ids().len()
         );
         if let Err(error) = self.insert_certificate(certificate.clone(), missing_transmissions) {
             error!("Failed to insert certificate '{certificate_id}' from block {} - {error}", block.height());

@@ -358,7 +358,7 @@ impl<N: Network> Worker<N> {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
                 if let Err(e) = self_.process_transmission_id_from_ping(peer_ip, transmission_id).await {
                     warn!(
-                        "Worker {} failed to fetch missing transmission '{}' from '{peer_ip}': {e}",
+                        "Worker {} - Failed to fetch transmission '{}' from '{peer_ip}' - {e}",
                         self_.id,
                         fmt_id(transmission_id)
                     );

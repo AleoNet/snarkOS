@@ -372,7 +372,7 @@ impl<N: Network> Sync<N> {
 
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
-        trace!("Shutting down the sync module...");
+        info!("Shutting down the sync module...");
         // Acquire the sync lock.
         let _lock = self.lock.lock().await;
         // Abort the tasks.

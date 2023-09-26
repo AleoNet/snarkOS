@@ -58,7 +58,7 @@ pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.
 pub const MAX_TRANSMISSIONS_PER_BATCH: usize = 250; // transmissions
 /// The maximum number of workers that can be spawned.
-pub const MAX_WORKERS: u8 = 2; // workers
+pub const MAX_WORKERS: u8 = 1; // workers
 
 /// The frequency at which each primary broadcasts a ping to every other node.
 pub const PRIMARY_PING_INTERVAL: u64 = MAX_BATCH_DELAY; // ms

@@ -38,6 +38,10 @@ pub fn sha256d_to_u128(data: &[u8]) -> u128 {
 
 /// Returns the worker ID for the given transmission ID.
 pub fn assign_to_worker<N: Network>(transmission_id: impl Into<TransmissionID<N>>, num_workers: u8) -> Result<u8> {
+    // If there is only one worker, return it.
+    if num_workers == 1 {
+        return Ok(0);
+    }
     // Hash the transmission ID to a u128.
     let hash = sha256d_to_u128(&transmission_id.into().to_bytes_le()?);
     // Convert the hash to a worker ID.
