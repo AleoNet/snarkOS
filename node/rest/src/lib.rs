@@ -108,6 +108,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/latest/hash", get(Self::latest_hash))
             .route("/testnet3/latest/block", get(Self::latest_block))
             .route("/testnet3/latest/stateRoot", get(Self::latest_state_root))
+            .route("/testnet3/latest/committee", get(Self::latest_committee))
 
             // GET ../block/..
             .route("/testnet3/block/:height_or_hash", get(Self::get_block))
