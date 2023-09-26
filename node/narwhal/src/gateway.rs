@@ -296,8 +296,8 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given address is an authorized validator.
     pub fn is_authorized_validator_address(&self, validator_address: Address<N>) -> bool {
-        // Retrieve the current committee.
-        match self.ledger.current_committee() {
+        // Retrieve the previous committee for the latest round.
+        match self.ledger.get_previous_committee_for_round(self.ledger.latest_round()) {
             // Determine if the peer IP is an authorized validator.
             Ok(committee) => committee.is_committee_member(validator_address),
             Err(_) => false,
