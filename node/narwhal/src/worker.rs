@@ -547,7 +547,7 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
-        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
         let transmission_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
