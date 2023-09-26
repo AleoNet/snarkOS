@@ -486,7 +486,7 @@ impl<N: Network> Primary<N> {
                         Some(signer) => proposal.add_signature(signer, signature, timestamp, &committee)?,
                         None => bail!("Signature is from a disconnected peer"),
                     };
-                    info!("Received a batch signature from '{peer_ip}'");
+                    info!("Received a batch signature for round {} from '{peer_ip}'", proposal.round());
                     // Check if the batch is ready to be certified.
                     if !proposal.is_quorum_threshold_reached(&committee) {
                         // If the batch is not ready to be certified, return early.
