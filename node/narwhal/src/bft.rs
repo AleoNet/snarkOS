@@ -553,35 +553,32 @@ impl<N: Network> BFT<N> {
                         // If the previous certificate is found, return it.
                         Some(previous_certificate) => previous_certificate,
                         // If the previous certificate is not found, retrieve it from the storage.
-                        None => {
-                            // Otherwise, retrieve the previous certificate from the storage.
-                            match self.storage().get_certificate(*previous_certificate_id) {
-                                // If the previous certificate is found, return it.
-                                Some(previous_certificate) => previous_certificate,
-                                None => {
-                                    // Otherwise, retrieve the previous certificate from the ledger.
-                                    if ALLOW_LEDGER_ACCESS {
-                                        match self.ledger().get_batch_certificate(previous_certificate_id) {
-                                            // If the previous certificate is found, return it.
-                                            Ok(previous_certificate) => previous_certificate,
-                                            // Otherwise, the previous certificate is missing, and throw an error.
-                                            Err(e) => {
-                                                bail!(
-                                                    "Missing previous certificate {} for round {previous_round} - {e}",
-                                                    fmt_id(previous_certificate_id)
-                                                )
-                                            }
-                                        }
-                                    } else {
+                        None => match self.storage().get_certificate(*previous_certificate_id) {
+                            // If the previous certificate is found, return it.
+                            Some(previous_certificate) => previous_certificate,
+                            // Otherwise, retrieve the previous certificate from the ledger.
+                            None => {
+                                if ALLOW_LEDGER_ACCESS {
+                                    match self.ledger().get_batch_certificate(previous_certificate_id) {
+                                        // If the previous certificate is found, return it.
+                                        Ok(previous_certificate) => previous_certificate,
                                         // Otherwise, the previous certificate is missing, and throw an error.
-                                        bail!(
-                                            "Missing previous certificate {} for round {previous_round}",
-                                            fmt_id(previous_certificate_id)
-                                        )
+                                        Err(e) => {
+                                            bail!(
+                                                "Missing previous certificate {} for round {previous_round} - {e}",
+                                                fmt_id(previous_certificate_id)
+                                            )
+                                        }
                                     }
+                                } else {
+                                    // Otherwise, the previous certificate is missing, and throw an error.
+                                    bail!(
+                                        "Missing previous certificate {} for round {previous_round}",
+                                        fmt_id(previous_certificate_id)
+                                    )
                                 }
                             }
-                        }
+                        },
                     }
                 };
                 // Insert the previous certificate into the set of already ordered certificates.
