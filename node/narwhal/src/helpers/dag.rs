@@ -108,9 +108,10 @@ impl<N: Network> DAG<N> {
         // If the certificate was not recently committed, insert it into the DAG.
         if !self.is_recently_committed(round, certificate.certificate_id()) {
             // Insert the certificate into the DAG.
-            let previous = self.graph.entry(round).or_default().insert(author, certificate);
+            let _previous = self.graph.entry(round).or_default().insert(author, certificate);
             // If a previous certificate existed for the author, log it.
-            if previous.is_some() {
+            #[cfg(debug_assertions)]
+            if _previous.is_some() {
                 error!("A certificate for round {round} by author {author} already existed in the DAG");
             }
         }
