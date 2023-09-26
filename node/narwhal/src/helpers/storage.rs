@@ -19,11 +19,12 @@ use snarkvm::{
         block::Block,
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, Address, Field, Network, Result},
+    prelude::{bail, cfg_iter, ensure, Address, Field, Network, Result},
 };
 
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     sync::{
@@ -609,9 +610,7 @@ impl<N: Network> Storage<N> {
         let mut missing_transmissions = HashMap::new();
 
         // Reconstruct the unconfirmed transactions.
-        let mut unconfirmed_transactions = block
-            .transactions()
-            .iter()
+        let mut unconfirmed_transactions = cfg_iter!(block.transactions())
             .filter_map(|tx| tx.unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok())
             .collect::<IndexMap<_, _>>();
 
