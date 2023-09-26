@@ -590,14 +590,15 @@ impl<N: Network> Primary<N> {
             self.spawn(async move {
                 loop {
                     tokio::time::sleep(Duration::from_millis(PRIMARY_PING_INTERVAL)).await;
-                    // Construct the primary ping.
-                    let primary_ping = match self_.sync.get_block_locators() {
-                        Ok(block_locators) => PrimaryPing::new(<Event<N>>::VERSION, block_locators),
-                        Err(e) => {
-                            warn!("Failed to retrieve block locators - {e}");
-                            continue;
-                        }
+                    // Retrieve the block locators.
+                    let Ok(block_locators) = self_.sync.get_block_locators() else {
+                        warn!("Failed to retrieve block locators");
+                        continue;
                     };
+                    // Retrieve the round locators.
+                    let round_locators = self_.sync.get_round_locators();
+                    // Construct the primary ping.
+                    let primary_ping = PrimaryPing::new(<Event<N>>::VERSION, block_locators, round_locators);
                     // Broadcast the event.
                     self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
                 }

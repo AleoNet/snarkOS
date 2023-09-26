@@ -14,6 +14,7 @@
 
 use crate::helpers::{check_timestamp_for_liveness, fmt_id};
 use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_sync::locators::RoundLocators;
 use snarkvm::{
     ledger::{
         block::Block,
@@ -25,7 +26,7 @@ use snarkvm::{
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::{
         atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
@@ -263,6 +264,21 @@ impl<N: Network> Storage<N> {
         } else {
             Default::default()
         }
+    }
+
+    /// Returns the round locators.
+    pub fn round_locators(&self) -> RoundLocators<N> {
+        // Retrieve the certificate IDs for each round.
+        let certificate_ids = self
+            .rounds
+            .read()
+            .iter()
+            .map(|(round, entries)| {
+                (*round, entries.iter().map(|(certificate_id, _, _)| *certificate_id).collect::<IndexSet<_>>())
+            })
+            .collect::<BTreeMap<_, _>>();
+        // Return the round locators.
+        RoundLocators::new(certificate_ids)
     }
 
     /// Checks the given `batch_header` for validity, returning the missing transmissions from storage.

@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    helpers::{PeerPair, SyncRequest},
-    locators::BlockLocators,
-};
+use crate::{helpers::PeerPair, locators::BlockLocators};
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkos_node_sync_communication_service::CommunicationService;
 use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
@@ -50,6 +47,10 @@ pub const MAX_BLOCKS_BEHIND: u32 = 2; // blocks
 /// This is a dummy IP address that is used to represent the local node.
 /// Note: This here does not need to be a real IP address, but it must be unique/distinct from all other connections.
 const DUMMY_SELF_IP: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
+
+/// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
+pub type BlockSyncRequest<N> =
+    (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BlockSyncMode {
@@ -94,7 +95,7 @@ pub struct BlockSync<N: Network> {
     common_ancestors: Arc<RwLock<IndexMap<PeerPair, u32>>>,
     /// The map of block height to the expected block hash and peer IPs.
     /// Each entry is removed when its corresponding entry in the responses map is removed.
-    requests: Arc<RwLock<BTreeMap<u32, SyncRequest<N>>>>,
+    requests: Arc<RwLock<BTreeMap<u32, BlockSyncRequest<N>>>>,
     /// The map of block height to the received blocks.
     /// Removing an entry from this map must remove the corresponding entry from the requests map.
     responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
@@ -172,7 +173,7 @@ impl<N: Network> BlockSync<N> {
     }
 
     /// Returns the block request for the given height, if it exists.
-    fn get_block_request(&self, height: u32) -> Option<SyncRequest<N>> {
+    fn get_block_request(&self, height: u32) -> Option<BlockSyncRequest<N>> {
         self.requests.read().get(&height).cloned()
     }
 
@@ -373,7 +374,7 @@ impl<N: Network> BlockSync<N> {
 
 impl<N: Network> BlockSync<N> {
     /// Returns a list of block requests, if the node needs to sync.
-    fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
+    fn prepare_block_requests(&self) -> Vec<(u32, BlockSyncRequest<N>)> {
         // Remove timed out block requests.
         self.remove_timed_out_block_requests();
         // Prepare the block requests.
@@ -403,7 +404,7 @@ impl<N: Network> BlockSync<N> {
     }
 
     /// Inserts a block request for the given height.
-    fn insert_block_request(&self, height: u32, (hash, previous_hash, sync_ips): SyncRequest<N>) -> Result<()> {
+    fn insert_block_request(&self, height: u32, (hash, previous_hash, sync_ips): BlockSyncRequest<N>) -> Result<()> {
         // Ensure the block request does not already exist.
         self.check_block_request(height)?;
         // Ensure the sync IPs are not empty.
@@ -715,7 +716,7 @@ impl<N: Network> BlockSync<N> {
         sync_peers: IndexMap<SocketAddr, BlockLocators<N>>,
         min_common_ancestor: u32,
         rng: &mut R,
-    ) -> Vec<(u32, SyncRequest<N>)> {
+    ) -> Vec<(u32, BlockSyncRequest<N>)> {
         // Retrieve the latest canon height.
         let latest_canon_height = self.canon.latest_block_height();
 

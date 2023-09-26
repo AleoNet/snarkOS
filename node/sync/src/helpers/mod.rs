@@ -12,14 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::prelude::Network;
-
-use core::hash::Hash;
-use indexmap::IndexSet;
-use std::net::SocketAddr;
-
-/// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
-pub type SyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
+use std::{hash::Hash, net::SocketAddr};
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct PeerPair(pub SocketAddr, pub SocketAddr);

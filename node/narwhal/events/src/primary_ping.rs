@@ -16,21 +16,25 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrimaryPing<N: Network> {
+    /// The event version.
     pub version: u32,
+    /// The block locators.
     pub block_locators: BlockLocators<N>,
+    /// The round locators.
+    pub round_locators: RoundLocators<N>,
 }
 
 impl<N: Network> PrimaryPing<N> {
     /// Initializes a new ping event.
-    pub const fn new(version: u32, block_locators: BlockLocators<N>) -> Self {
-        Self { version, block_locators }
+    pub const fn new(version: u32, block_locators: BlockLocators<N>, round_locators: RoundLocators<N>) -> Self {
+        Self { version, block_locators, round_locators }
     }
 }
 
-impl<N: Network> From<(u32, BlockLocators<N>)> for PrimaryPing<N> {
+impl<N: Network> From<(u32, BlockLocators<N>, RoundLocators<N>)> for PrimaryPing<N> {
     /// Initializes a new ping event.
-    fn from((version, block_locators): (u32, BlockLocators<N>)) -> Self {
-        Self::new(version, block_locators)
+    fn from((version, block_locators, round_locators): (u32, BlockLocators<N>, RoundLocators<N>)) -> Self {
+        Self::new(version, block_locators, round_locators)
     }
 }
 
@@ -45,7 +49,8 @@ impl<N: Network> EventTrait for PrimaryPing<N> {
 impl<N: Network> ToBytes for PrimaryPing<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.version.write_le(&mut writer)?;
-        self.block_locators.write_le(&mut writer)
+        self.block_locators.write_le(&mut writer)?;
+        self.round_locators.write_le(&mut writer)
     }
 }
 
@@ -53,7 +58,8 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let version = u32::read_le(&mut reader)?;
         let block_locators = BlockLocators::read_le(&mut reader)?;
-        Ok(Self::new(version, block_locators))
+        let round_locators = RoundLocators::read_le(&mut reader)?;
+        Ok(Self::new(version, block_locators, round_locators))
     }
 }
 

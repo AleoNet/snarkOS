@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    events::EventCodec,
+    events::{EventCodec, PrimaryPing},
     helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
     CONTEXT,
     MAX_BATCH_DELAY,
@@ -569,15 +569,21 @@ impl<N: Network> Gateway<N> {
                 bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
             }
             Event::PrimaryPing(ping) => {
+                let PrimaryPing { version, block_locators, round_locators } = ping;
+
                 // Ensure the event version is not outdated.
-                if ping.version < Event::<N>::VERSION {
-                    bail!("Dropping '{peer_ip}' on event version {} (outdated)", ping.version);
+                if version < Event::<N>::VERSION {
+                    bail!("Dropping '{peer_ip}' on event version {version} (outdated)");
                 }
-                // If a sync sender was provided, update the peer locators.
+                // If a sync sender was provided, update the block locators.
                 if let Some(sync_sender) = self.sync_sender.get() {
                     // Check the block locators are valid, and update the validators in the sync module.
-                    if let Err(error) = sync_sender.update_peer_locators(peer_ip, ping.block_locators).await {
+                    if let Err(error) = sync_sender.update_block_locators(peer_ip, block_locators).await {
                         bail!("Validator '{peer_ip}' sent invalid block locators - {error}");
+                    }
+                    // Check the round locators are valid, and update the validators in the sync module.
+                    if let Err(error) = sync_sender.update_round_locators(peer_ip, round_locators).await {
+                        bail!("Validator '{peer_ip}' sent invalid round locators - {error}");
                     }
                 }
                 Ok(())

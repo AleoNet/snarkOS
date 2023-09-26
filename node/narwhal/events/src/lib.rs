@@ -65,7 +65,7 @@ pub use validators_response::ValidatorsResponse;
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
-use snarkos_node_sync_locators::BlockLocators;
+use snarkos_node_sync_locators::{BlockLocators, RoundLocators};
 use snarkvm::{
     console::prelude::{error, FromBytes, Network, Read, ToBytes, Write},
     ledger::{

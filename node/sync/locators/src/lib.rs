@@ -19,3 +19,6 @@ extern crate tracing;
 
 mod block_locators;
 pub use block_locators::*;
+
+mod round_locators;
+pub use round_locators::*;

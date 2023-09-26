@@ -24,4 +24,6 @@ mod block_sync;
 pub use block_sync::*;
 
 mod helpers;
-pub use helpers::*;
+
+mod round_sync;
+pub use round_sync::*;

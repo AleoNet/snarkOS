@@ -20,7 +20,12 @@ use crate::{
 };
 use snarkos_node_narwhal_events::{CertificateRequest, CertificateResponse, Event};
 use snarkos_node_narwhal_ledger_service::LedgerService;
-use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
+use snarkos_node_sync::{
+    locators::{BlockLocators, RoundLocators},
+    BlockSync,
+    BlockSyncMode,
+    RoundSync,
+};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
@@ -44,6 +49,8 @@ pub struct Sync<N: Network> {
     ledger: Arc<dyn LedgerService<N>>,
     /// The block sync module.
     block_sync: BlockSync<N>,
+    /// The round sync module.
+    round_sync: RoundSync<N>,
     /// The pending certificates queue.
     pending: Arc<Pending<Field<N>, BatchCertificate<N>>>,
     /// The BFT sender.
@@ -65,6 +72,7 @@ impl<N: Network> Sync<N> {
             storage,
             ledger,
             block_sync,
+            round_sync: RoundSync::new(),
             pending: Default::default(),
             bft_sender: Default::default(),
             handles: Default::default(),
@@ -99,13 +107,32 @@ impl<N: Network> Sync<N> {
             }
         }));
 
+        // // Start the round sync loop.
+        // let self_ = self.clone();
+        // self.handles.lock().push(tokio::spawn(async move {
+        //     loop {
+        //         // Sleep briefly to avoid triggering spam detection.
+        //         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        //         // Retrieve the round locators.
+        //         let round_locators = self_.get_round_locators();
+        //         // Retrieve the current GC round.
+        //         let gc_round = self_.storage.gc_round();
+        //         // Set the threshold.
+        //         let threshold = 0;
+        //         // Retrieve the missing certificate IDs.
+        //         let missing = self_.round_sync.find_missing_certificates(&round_locators, gc_round, threshold);
+        //         println!("\n\n\n {missing:#?} \n\n\n");
+        //     }
+        // }));
+
         // Retrieve the sync receiver.
         let SyncReceiver {
             mut rx_block_sync_advance_with_sync_blocks,
             mut rx_block_sync_remove_peer,
-            mut rx_block_sync_update_peer_locators,
+            mut rx_block_sync_update_block_locators,
             mut rx_certificate_request,
             mut rx_certificate_response,
+            mut rx_round_sync_update_round_locators,
         } = sync_receiver;
 
         // Process the block sync request to advance with sync blocks.
@@ -139,13 +166,13 @@ impl<N: Network> Sync<N> {
             }
         });
 
-        // Process the block sync request to update peer locators.
+        // Process the block sync request to update block locators.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((peer_ip, locators, callback)) = rx_block_sync_update_peer_locators.recv().await {
+            while let Some((peer_ip, locators, callback)) = rx_block_sync_update_block_locators.recv().await {
                 let self_clone = self_.clone();
                 tokio::spawn(async move {
-                    // Update the peer locators.
+                    // Update the block locators.
                     let result = self_clone.block_sync.update_peer_locators(peer_ip, locators);
                     // Send the result to the callback.
                     callback.send(result).ok();
@@ -169,7 +196,45 @@ impl<N: Network> Sync<N> {
             }
         });
 
+        // Process the round sync request to update round locators.
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some((peer_ip, locators, callback)) = rx_round_sync_update_round_locators.recv().await {
+                // Update the round locators.
+                let result = self_.update_round_locators(peer_ip, &locators);
+                // Send the result to the callback.
+                callback.send(result).ok();
+            }
+        });
+
         Ok(())
+    }
+}
+
+impl<N: Network> Sync<N> {
+    /// Returns `true` if the node is synced.
+    pub fn is_synced(&self) -> bool {
+        self.block_sync.is_block_synced()
+    }
+
+    /// Returns `true` if the node is in gateway mode.
+    pub const fn is_gateway_mode(&self) -> bool {
+        self.block_sync.mode().is_gateway()
+    }
+
+    /// Returns the current block locators of the node.
+    pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
+        self.block_sync.get_block_locators()
+    }
+
+    /// Returns the current round locators of the node.
+    pub fn get_round_locators(&self) -> RoundLocators<N> {
+        self.storage.round_locators()
+    }
+
+    /// Checks the round locators are valid, and update the round sync module.
+    pub fn update_round_locators(&self, peer_ip: SocketAddr, round_locators: &RoundLocators<N>) -> Result<()> {
+        self.round_sync.update_round_locators(peer_ip, &round_locators)
     }
 }
 
@@ -290,24 +355,6 @@ impl<N: Network> Sync<N> {
         self.storage.sync_round_with_block(block.round());
 
         Ok(())
-    }
-}
-
-// Methods to assist with the block sync module.
-impl<N: Network> Sync<N> {
-    /// Returns `true` if the node is synced.
-    pub fn is_synced(&self) -> bool {
-        self.block_sync.is_block_synced()
-    }
-
-    /// Returns `true` if the node is in gateway mode.
-    pub const fn is_gateway_mode(&self) -> bool {
-        self.block_sync.mode().is_gateway()
-    }
-
-    /// Returns the current block locators of the node.
-    pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
-        self.block_sync.get_block_locators()
     }
 }
 
