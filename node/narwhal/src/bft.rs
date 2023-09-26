@@ -542,20 +542,18 @@ impl<N: Network> BFT<N> {
                 if already_ordered.contains(previous_certificate_id) {
                     continue;
                 }
+                // If the previous certificate was recently committed, continue.
+                if self.dag.read().is_recently_committed(previous_round, *previous_certificate_id) {
+                    continue;
+                }
                 // Retrieve the previous certificate.
                 let previous_certificate = {
                     // Start by retrieving the previous certificate from the DAG.
                     match self.dag.read().get_certificate_for_round_with_id(previous_round, *previous_certificate_id) {
                         // If the previous certificate is found, return it.
                         Some(previous_certificate) => previous_certificate,
-                        // If the previous certificate is not found, check if it was recently committed.
-                        //  - If the previous certificate was not recently committed, retrieve it from the storage.
-                        //  - If the previous certificate was recently committed, continue.
+                        // If the previous certificate is not found, retrieve it from the storage.
                         None => {
-                            // If the previous certificate was recently committed, continue.
-                            if self.dag.read().is_recently_committed(previous_round, *previous_certificate_id) {
-                                continue;
-                            }
                             // Otherwise, retrieve the previous certificate from the storage.
                             match self.storage().get_certificate(*previous_certificate_id) {
                                 // If the previous certificate is found, return it.
@@ -586,17 +584,6 @@ impl<N: Network> BFT<N> {
                         }
                     }
                 };
-                // If the last committed round is the same as the previous certificate round for this author, continue.
-                if self
-                    .dag
-                    .read()
-                    .last_committed_authors()
-                    .get(&previous_certificate.author())
-                    .map_or(false, |round| *round == previous_certificate.round())
-                {
-                    // If the previous certificate is already ordered, continue.
-                    continue;
-                }
                 // Insert the previous certificate into the set of already ordered certificates.
                 already_ordered.insert(previous_certificate.certificate_id());
                 // Insert the previous certificate into the buffer.
