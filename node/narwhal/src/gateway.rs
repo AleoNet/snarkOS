@@ -728,7 +728,7 @@ impl<N: Network> Gateway<N> {
 
     /// Shuts down the gateway.
     pub async fn shut_down(&self) {
-        trace!("Shutting down the gateway...");
+        info!("Shutting down the gateway...");
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.

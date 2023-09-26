@@ -478,7 +478,7 @@ impl<N: Network> Router<N> {
 
     /// Shuts down the router.
     pub async fn shut_down(&self) {
-        trace!("Shutting down the router...");
+        info!("Shutting down the router...");
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.

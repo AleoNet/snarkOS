@@ -259,7 +259,7 @@ impl<N: Network> Worker<N> {
         if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_WORKER {
             return Ok(());
         }
-        trace!("Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
+        trace!("Worker {} - Found a new transmission ID '{}' from '{peer_ip}'", self.id, fmt_id(transmission_id));
         // Send an transmission request to the peer.
         let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
         // Ensure the transmission ID matches.
@@ -280,7 +280,7 @@ impl<N: Network> Worker<N> {
         if !self.contains_transmission(transmission_id) {
             // Insert the transmission into the ready queue.
             self.ready.insert(transmission_id, transmission);
-            trace!("Worker {} - Added transmission '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
+            trace!("Worker {} - Added transmission '{}' from '{peer_ip}'", self.id, fmt_id(transmission_id));
         }
     }
 
@@ -358,7 +358,7 @@ impl<N: Network> Worker<N> {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
                 if let Err(e) = self_.process_transmission_id_from_ping(peer_ip, transmission_id).await {
                     warn!(
-                        "Worker {} failed to fetch missing transmission '{}' from peer '{peer_ip}': {e}",
+                        "Worker {} - Failed to fetch transmission '{}' from '{peer_ip}' - {e}",
                         self_.id,
                         fmt_id(transmission_id)
                     );
@@ -548,7 +548,7 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
-        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
         let transmission_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -583,7 +583,7 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
-        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let transmission_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
         let worker_ = worker.clone();
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -619,7 +619,7 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
-        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let puzzle = PuzzleCommitment::from_g1_affine(rng.gen());
         let transmission_id = TransmissionID::Solution(puzzle);
         let worker_ = worker.clone();
@@ -657,7 +657,7 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
-        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let puzzle = PuzzleCommitment::from_g1_affine(rng.gen());
         let transmission_id = TransmissionID::Solution(puzzle);
         let worker_ = worker.clone();
@@ -695,7 +695,7 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
-        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
         let transmission_id = TransmissionID::Transaction(transaction_id);
         let worker_ = worker.clone();
@@ -733,7 +733,7 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
 
         // Create the Worker.
-        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
         let transmission_id = TransmissionID::Transaction(transaction_id);
         let worker_ = worker.clone();
