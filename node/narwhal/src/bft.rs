@@ -419,7 +419,8 @@ impl<N: Network> BFT<N> {
 
         /* Proceeding to commit the leader. */
 
-        // Order all previous leader certificates since the last committed round.
+        // Determine the list of all previous leader certificates since the last committed round.
+        // The order of the leader certificates is from **newest** to **oldest**.
         let mut leader_certificates = vec![leader_certificate.clone()];
         let mut current_certificate = leader_certificate;
         for round in (self.dag.read().last_committed_round() + 2..=commit_round.saturating_sub(2)).rev().step_by(2) {
@@ -496,7 +497,7 @@ impl<N: Network> BFT<N> {
         Ok(())
     }
 
-    /// Returns the certificates to commit.
+    /// Returns the subdag of batch certificates to commit.
     fn order_dag_with_dfs<const ALLOW_LEDGER_ACCESS: bool>(
         &self,
         leader_certificate: BatchCertificate<N>,

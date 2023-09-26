@@ -25,9 +25,9 @@ use crate::{
         PrimarySender,
         Proposal,
         Storage,
-        Sync,
     },
     Gateway,
+    Sync,
     Transport,
     Worker,
     MAX_BATCH_DELAY,
@@ -430,7 +430,7 @@ impl<N: Network> Primary<N> {
             let event = Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp));
             // Send the batch signature to the peer.
             if self_.gateway.send(peer_ip, event).await.is_some() {
-                debug!("Signed a batch for round {batch_round} from peer '{peer_ip}'");
+                debug!("Signed a batch for round {batch_round} from '{peer_ip}'");
             }
         });
         Ok(())
@@ -486,7 +486,7 @@ impl<N: Network> Primary<N> {
                         Some(signer) => proposal.add_signature(signer, signature, timestamp, &committee)?,
                         None => bail!("Signature is from a disconnected peer"),
                     };
-                    info!("Added a batch signature from peer '{peer_ip}'");
+                    info!("Received a batch signature from '{peer_ip}'");
                     // Check if the batch is ready to be certified.
                     if !proposal.is_quorum_threshold_reached(&committee) {
                         // If the batch is not ready to be certified, return early.
@@ -633,7 +633,7 @@ impl<N: Network> Primary<N> {
                 }
                 // Process the proposed batch.
                 if let Err(e) = self_.process_batch_propose_from_peer(peer_ip, batch_propose).await {
-                    warn!("Cannot sign a batch from peer '{peer_ip}' - {e}");
+                    warn!("Cannot sign a batch from '{peer_ip}' - {e}");
                 }
             }
         });
@@ -649,7 +649,7 @@ impl<N: Network> Primary<N> {
                 }
                 // Process the batch signature.
                 if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
-                    warn!("Cannot store a signature from peer '{peer_ip}' - {e}");
+                    warn!("Cannot store a signature from '{peer_ip}' - {e}");
                 }
             }
         });
@@ -668,13 +668,13 @@ impl<N: Network> Primary<N> {
                 let Ok(Ok(batch_certificate)) =
                     task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
                 else {
-                    warn!("Failed to deserialize the batch certificate from peer '{peer_ip}'");
+                    warn!("Failed to deserialize the batch certificate from '{peer_ip}'");
                     continue;
                 };
 
                 // Process the batch certificate.
                 if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
-                    warn!("Cannot store a certificate from peer '{peer_ip}' - {e}");
+                    warn!("Cannot store a certificate from '{peer_ip}' - {e}");
                 }
             }
         });
@@ -810,7 +810,7 @@ impl<N: Network> Primary<N> {
         let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
         // Store the certified batch.
         self.storage.insert_certificate(certificate.clone(), transmissions)?;
-        debug!("Stored certificate for round {}", certificate.round());
+        debug!("Stored a batch certificate for round {}", certificate.round());
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
             // Await the callback to continue.
@@ -889,7 +889,7 @@ impl<N: Network> Primary<N> {
         if !self.storage.contains_certificate(certificate.certificate_id()) {
             // Store the batch certificate.
             self.storage.insert_certificate(certificate.clone(), missing_transmissions)?;
-            debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
+            debug!("Stored a batch certificate for round {batch_round} from '{peer_ip}'");
             // If a BFT sender was provided, send the round and certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
                 // Send the certificate to the BFT.
@@ -1016,7 +1016,7 @@ impl<N: Network> Primary<N> {
             }
             // If we do not have the previous certificate, request it.
             if !self.storage.contains_certificate(*certificate_id) {
-                trace!("Primary - Found a new certificate ID for round {round} from peer '{peer_ip}'");
+                trace!("Primary - Found a new certificate ID for round {round} from '{peer_ip}'");
                 // TODO (howardwu): Limit the number of open requests we send to a peer.
                 // Send an certificate request to the peer.
                 fetch_certificates.push(self.sync.send_certificate_request(peer_ip, *certificate_id));
@@ -1027,7 +1027,7 @@ impl<N: Network> Primary<N> {
         match fetch_certificates.is_empty() {
             true => return Ok(Default::default()),
             false => trace!(
-                "Fetching {} missing previous certificates for round {round} from peer '{peer_ip}'...",
+                "Fetching {} missing previous certificates for round {round} from '{peer_ip}'...",
                 fetch_certificates.len(),
             ),
         }
@@ -1040,7 +1040,7 @@ impl<N: Network> Primary<N> {
             missing_previous_certificates.insert(result?);
         }
         debug!(
-            "Fetched {} missing previous certificates for round {round} from peer '{peer_ip}'",
+            "Fetched {} missing previous certificates for round {round} from '{peer_ip}'",
             missing_previous_certificates.len(),
         );
         // Return the missing previous certificates.

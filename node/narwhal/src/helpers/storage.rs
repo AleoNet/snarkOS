@@ -574,7 +574,7 @@ impl<N: Network> Storage<N> {
 
 impl<N: Network> Storage<N> {
     /// Syncs the current height with the block.
-    pub(super) fn sync_height_with_block(&self, next_height: u32) {
+    pub(crate) fn sync_height_with_block(&self, next_height: u32) {
         // If the block height is greater than the current height in storage, sync the height.
         if next_height > self.current_height() {
             // Update the current height in storage.
@@ -583,7 +583,7 @@ impl<N: Network> Storage<N> {
     }
 
     /// Syncs the current round with the block.
-    pub(super) fn sync_round_with_block(&self, next_round: u64) {
+    pub(crate) fn sync_round_with_block(&self, next_round: u64) {
         // Retrieve the current round in the block.
         let next_round = next_round.max(1);
         // If the round in the block is greater than the current round in storage, sync the round.
@@ -596,7 +596,7 @@ impl<N: Network> Storage<N> {
     }
 
     /// Syncs the batch certificate with the block.
-    pub(super) fn sync_certificate_with_block(&self, block: &Block<N>, certificate: &BatchCertificate<N>) {
+    pub(crate) fn sync_certificate_with_block(&self, block: &Block<N>, certificate: &BatchCertificate<N>) {
         // Skip if the certificate round is below the GC round.
         if certificate.round() <= self.gc_round() {
             return;

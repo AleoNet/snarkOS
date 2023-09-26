@@ -259,7 +259,7 @@ impl<N: Network> Worker<N> {
         if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_WORKER {
             return Ok(());
         }
-        trace!("Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
+        trace!("Worker {} - Found a new transmission ID '{}' from '{peer_ip}'", self.id, fmt_id(transmission_id));
         // Send an transmission request to the peer.
         let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
         // Ensure the transmission ID matches.
@@ -280,7 +280,7 @@ impl<N: Network> Worker<N> {
         if !self.contains_transmission(transmission_id) {
             // Insert the transmission into the ready queue.
             self.ready.insert(transmission_id, transmission);
-            trace!("Worker {} - Added transmission '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
+            trace!("Worker {} - Added transmission '{}' from '{peer_ip}'", self.id, fmt_id(transmission_id));
         }
     }
 
@@ -358,7 +358,7 @@ impl<N: Network> Worker<N> {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
                 if let Err(e) = self_.process_transmission_id_from_ping(peer_ip, transmission_id).await {
                     warn!(
-                        "Worker {} failed to fetch missing transmission '{}' from peer '{peer_ip}': {e}",
+                        "Worker {} failed to fetch missing transmission '{}' from '{peer_ip}': {e}",
                         self_.id,
                         fmt_id(transmission_id)
                     );

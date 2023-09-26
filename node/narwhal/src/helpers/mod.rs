@@ -39,9 +39,6 @@ pub use resolver::*;
 pub mod storage;
 pub use storage::*;
 
-pub mod sync;
-pub use sync::*;
-
 pub mod timestamp;
 pub use timestamp::*;
 
