@@ -378,6 +378,8 @@ impl Start {
         if node_type.is_validator() {
             crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT);
         }
+        // Check if the machine meets the minimum requirements for a validator.
+        crate::helpers::check_validator_machine(node_type, self.dev.is_some());
 
         // Initialize the node.
         match node_type {
