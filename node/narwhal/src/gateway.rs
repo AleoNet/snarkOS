@@ -1115,6 +1115,11 @@ impl<N: Network> Gateway<N> {
         // Listen for the challenge request message.
         let peer_request = expect_event!(Event::ChallengeRequest, framed, peer_addr);
 
+        // Ensure the address is not the same as this node.
+        if self.account.address() == peer_request.address {
+            return Err(error("Skipping request to connect to self".to_string()));
+        }
+
         // Obtain the peer's listening address.
         *peer_ip = Some(SocketAddr::new(peer_addr.ip(), peer_request.listener_port));
         let peer_ip = peer_ip.unwrap();
@@ -1173,11 +1178,6 @@ impl<N: Network> Gateway<N> {
         if version < Event::<N>::VERSION {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' on version {version} (outdated)");
             return Some(DisconnectReason::OutdatedClientVersion);
-        }
-        // Ensure the address is not the same as this node.
-        if self.account.address() == address {
-            warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for being the same as this node ({address})");
-            return Some(DisconnectReason::ProtocolViolation);
         }
         // Ensure the address is a current committee member.
         if !self.is_authorized_validator_address(address) {
