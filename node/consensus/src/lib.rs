@@ -168,17 +168,18 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
-        // If the memory pool of this node is full, save the solution and return early.
+        // Add the solution to the memory pool.
+        self.solutions_queue.lock().insert(solution.commitment(), solution);
+
+        // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
         if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
-            // Save the solution to the memory pool.
-            self.solutions_queue.lock().insert(solution.commitment(), solution);
             return Ok(());
         }
-        // Retrieve the remaining solutions.
-        let remaining = {
+        // Retrieve the solutions.
+        let solutions = {
             // Determine the available capacity.
-            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed).saturating_sub(1);
+            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
             // Acquire the lock on the queue.
             let mut queue = self.solutions_queue.lock();
             // Determine the number of solutions to send.
@@ -187,9 +188,7 @@ impl<N: Network> Consensus<N> {
             queue.drain(..num_solutions).collect::<Vec<_>>()
         };
         // Iterate over the solutions.
-        for (i, (_, solution)) in
-            [(solution.commitment(), solution)].into_iter().chain(remaining.into_iter()).enumerate()
-        {
+        for (_, solution) in solutions.into_iter() {
             // Initialize a callback sender and receiver.
             let (callback, callback_receiver) = oneshot::channel();
             // Send the transaction to the primary.
@@ -197,32 +196,26 @@ impl<N: Network> Consensus<N> {
                 .tx_unconfirmed_solution
                 .send((solution.commitment(), Data::Object(solution), callback))
                 .await?;
-            // Handle the callback.
-            match i == 0 {
-                // Handle the result for the first solution, as an error is relevant for the caller.
-                true => callback_receiver.await??,
-                false => {
-                    // Ignore the result for the remaining solutions.
-                    let _ = callback_receiver.await?;
-                }
-            }
+            // Ignore the result for the solutions.
+            let _ = callback_receiver.await?;
         }
         Ok(())
     }
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
-        // If the memory pool of this node is full, save the transaction and return early.
+        // Add the transaction to the memory pool.
+        self.transactions_queue.lock().insert(transaction.id(), transaction);
+
+        // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
         if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
-            // Save the transaction to the memory pool.
-            self.transactions_queue.lock().insert(transaction.id(), transaction);
             return Ok(());
         }
-        // Retrieve the remaining transactions.
-        let remaining = {
+        // Retrieve the transactions.
+        let transactions = {
             // Determine the available capacity.
-            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed).saturating_sub(1);
+            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
             // Acquire the lock on the queue.
             let mut queue = self.transactions_queue.lock();
             // Determine the number of transactions to send.
@@ -231,9 +224,7 @@ impl<N: Network> Consensus<N> {
             queue.drain(..num_transactions).collect::<Vec<_>>()
         };
         // Iterate over the transactions.
-        for (i, (_, transaction)) in
-            [(transaction.id(), transaction)].into_iter().chain(remaining.into_iter()).enumerate()
-        {
+        for (_, transaction) in transactions.into_iter() {
             // Initialize a callback sender and receiver.
             let (callback, callback_receiver) = oneshot::channel();
             // Send the transaction to the primary.
@@ -241,15 +232,8 @@ impl<N: Network> Consensus<N> {
                 .tx_unconfirmed_transaction
                 .send((transaction.id(), Data::Object(transaction), callback))
                 .await?;
-            // Handle the callback.
-            match i == 0 {
-                // Handle the result for the first transaction, as an error is relevant for the caller.
-                true => callback_receiver.await??,
-                false => {
-                    // Ignore the result for the remaining transactions.
-                    let _ = callback_receiver.await?;
-                }
-            }
+            // Ignore the result for the transactions.
+            let _ = callback_receiver.await?;
         }
         Ok(())
     }
