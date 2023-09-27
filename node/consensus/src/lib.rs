@@ -42,7 +42,7 @@ use snarkvm::{
 };
 
 use anyhow::Result;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{
@@ -199,10 +199,10 @@ impl<N: Network> Consensus<N> {
                 .await?;
             // Handle the callback.
             match i > 0 {
-                // Return the error for the first solution, as this error is relevant for the caller.
+                // Handle the result for the first solution, as an error is relevant for the caller.
                 true => callback_receiver.await??,
                 false => {
-                    // Ignore the error for the remaining solutions.
+                    // Ignore the result for the remaining solutions.
                     let _ = callback_receiver.await?;
                 }
             }
@@ -243,10 +243,10 @@ impl<N: Network> Consensus<N> {
                 .await?;
             // Handle the callback.
             match i > 0 {
-                // Return the error for the first transaction, as this error is relevant for the caller.
+                // Handle the result for the first transaction, as an error is relevant for the caller.
                 true => callback_receiver.await??,
                 false => {
-                    // Ignore the error for the remaining transactions.
+                    // Ignore the result for the remaining transactions.
                     let _ = callback_receiver.await?;
                 }
             }
