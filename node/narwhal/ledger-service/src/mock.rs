@@ -126,6 +126,11 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         Ok(self.committee.clone())
     }
 
+    /// Returns the previous committee for the given round.
+    fn get_previous_committee_for_round(&self, _round: u64) -> Result<Committee<N>> {
+        Ok(self.committee.clone())
+    }
+
     /// Returns `false` for all queries.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
         trace!("[MockLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));

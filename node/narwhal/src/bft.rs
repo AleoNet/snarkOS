@@ -230,7 +230,7 @@ impl<N: Network> BFT<N> {
             "BFT storage (at round {current_round}) is out of sync with the current even round {even_round}"
         );
         // If the current round is odd, throw an error.
-        if current_round % 2 != 0 {
+        if current_round % 2 != 0 || current_round < 2 {
             bail!("BFT cannot update the leader certificate in an odd round")
         }
 
@@ -243,18 +243,17 @@ impl<N: Network> BFT<N> {
             return Ok(false);
         }
 
-        // Retrieve the committee for the current round.
-        // Note: This is equivalent to calling `self.ledger().current_committee()`.
-        let Ok(committee) = self.ledger().get_committee_for_round(current_round) else {
+        // Retrieve the previous committee for the current round.
+        let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(current_round) else {
             bail!("BFT failed to retrieve the committee for the even round")
         };
         // Determine the leader of the current round.
-        let leader = committee.get_leader(current_round)?;
+        let leader = previous_committee.get_leader(current_round)?;
         // Find and set the leader certificate, if the leader was present in the current even round.
         let leader_certificate = current_certificates.iter().find(|certificate| certificate.author() == leader);
         *self.leader_certificate.write() = leader_certificate.cloned();
 
-        Ok(self.is_even_round_ready_for_next_round(current_certificates, committee))
+        Ok(self.is_even_round_ready_for_next_round(current_certificates, previous_committee))
     }
 
     /// Returns 'true' under one of the following conditions:
@@ -313,18 +312,20 @@ impl<N: Network> BFT<N> {
         let leader_certificate_id = leader_certificate.certificate_id();
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
-        // Retrieve the committee of the current round.
-        // Note: This is equivalent to calling `self.ledger().current_committee()`.
-        let Ok(current_committee) = self.ledger().get_committee_for_round(current_round) else {
-            bail!("BFT failed to retrieve the committee for the current round")
+        // Retrieve the previous committee of the current round.
+        let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(current_round) else {
+            bail!("BFT failed to retrieve the previous committee for the current round")
         };
 
         // Compute the stake for the leader certificate.
-        let (stake_with_leader, stake_without_leader) =
-            self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &current_committee)?;
+        let (stake_with_leader, stake_without_leader) = self.compute_stake_for_leader_certificate(
+            leader_certificate_id,
+            current_certificates,
+            &previous_committee,
+        )?;
         // Return 'true' if any of the following conditions hold:
-        Ok(stake_with_leader >= current_committee.availability_threshold()
-            || stake_without_leader >= current_committee.quorum_threshold()
+        Ok(stake_with_leader >= previous_committee.availability_threshold()
+            || stake_without_leader >= previous_committee.quorum_threshold()
             || self.is_timer_expired())
     }
 
@@ -383,12 +384,12 @@ impl<N: Network> BFT<N> {
             return Ok(());
         }
 
-        // Retrieve the committee for the commit round.
-        let Ok(committee) = self.ledger().get_committee_for_round(commit_round) else {
+        // Retrieve the previous committee for the commit round.
+        let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee for commit round {commit_round}");
         };
         // Compute the leader for the commit round.
-        let Ok(leader) = committee.get_leader(commit_round) else {
+        let Ok(leader) = previous_committee.get_leader(commit_round) else {
             bail!("BFT failed to compute the leader for commit round {commit_round}");
         };
         // Retrieve the leader certificate for the commit round.
@@ -411,7 +412,7 @@ impl<N: Network> BFT<N> {
             })
             .collect();
         // Check if the leader is ready to be committed.
-        if !committee.is_availability_threshold_reached(&authors) {
+        if !previous_committee.is_availability_threshold_reached(&authors) {
             // If the leader is not ready to be committed, return early.
             trace!("BFT is not ready to commit {commit_round}");
             return Ok(());
