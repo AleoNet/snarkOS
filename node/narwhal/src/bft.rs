@@ -230,7 +230,7 @@ impl<N: Network> BFT<N> {
             "BFT storage (at round {current_round}) is out of sync with the current even round {even_round}"
         );
         // If the current round is odd, throw an error.
-        if current_round % 2 != 0 {
+        if current_round % 2 != 0 || current_round < 2 {
             bail!("BFT cannot update the leader certificate in an odd round")
         }
 
