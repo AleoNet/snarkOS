@@ -19,6 +19,7 @@ use crate::{
     Transport,
     MAX_BATCH_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
+    MAX_TRANSMISSIONS_PER_WORKER_PING,
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
 };
@@ -391,7 +392,7 @@ impl<N: Network> Worker<N> {
             self.ready
                 .transmission_ids()
                 .into_iter()
-                .take(MAX_TRANSMISSIONS_PER_WORKER)
+                .take(MAX_TRANSMISSIONS_PER_WORKER_PING)
                 .collect::<IndexSet<_>>()
                 .into(),
         ));

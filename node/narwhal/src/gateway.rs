@@ -19,6 +19,7 @@ use crate::{
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
     MAX_TRANSMISSIONS_PER_BATCH,
+    MAX_TRANSMISSIONS_PER_WORKER_PING,
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
@@ -674,8 +675,15 @@ impl<N: Network> Gateway<N> {
                 Ok(())
             }
             Event::WorkerPing(ping) => {
+                // Ensure the number of transmissions is not too large.
+                ensure!(
+                    ping.transmission_ids.len() <= MAX_TRANSMISSIONS_PER_WORKER_PING,
+                    "{CONTEXT} Received too many transmissions"
+                );
+                // Retrieve the number of workers.
                 let num_workers = self.num_workers();
-                for transmission_id in ping.transmission_ids.into_iter().take(MAX_TRANSMISSIONS_PER_BATCH) {
+                // Iterate over the transmission IDs.
+                for transmission_id in ping.transmission_ids.into_iter() {
                     // Determine the worker ID.
                     let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
                         warn!("{CONTEXT} Unable to assign transmission ID '{transmission_id}' to a worker");
