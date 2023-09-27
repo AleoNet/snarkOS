@@ -144,7 +144,7 @@ pub(crate) fn check_validator_machine(node_type: NodeType, is_dev: bool) {
             let message = "⚠️  The drive type of this machine is an HDD, and is insufficient for a validator (NVMe SSD required)\n".to_string();
             match is_dev {
                 true => println!("{}", message.yellow().bold()),
-                false => panic!("{message} in production mode"),
+                false => println!("{message} in production mode"),
             }
         }
         // Enforce the drive.
