@@ -101,6 +101,8 @@ pub(crate) fn detect_ram_memory() -> Result<u64, sys_info::Error> {
 }
 
 /// Ensures the current system meets the minimum requirements for a validator.
+/// Note: Some of the checks in this method are overly-permissive, in order to ensure
+/// future hardware architecture changes do not prevent validators from running a node.
 #[rustfmt::skip]
 pub(crate) fn check_validator_machine(node_type: NodeType, is_dev: bool) {
     // If the node is a validator, ensure it meets the minimum requirements.
