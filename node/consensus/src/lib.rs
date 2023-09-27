@@ -198,7 +198,7 @@ impl<N: Network> Consensus<N> {
                 .send((solution.commitment(), Data::Object(solution), callback))
                 .await?;
             // Handle the callback.
-            match i > 0 {
+            match i == 0 {
                 // Handle the result for the first solution, as an error is relevant for the caller.
                 true => callback_receiver.await??,
                 false => {
@@ -242,7 +242,7 @@ impl<N: Network> Consensus<N> {
                 .send((transaction.id(), Data::Object(transaction), callback))
                 .await?;
             // Handle the callback.
-            match i > 0 {
+            match i == 0 {
                 // Handle the result for the first transaction, as an error is relevant for the caller.
                 true => callback_receiver.await??,
                 false => {
