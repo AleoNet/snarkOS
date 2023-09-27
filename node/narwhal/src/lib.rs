@@ -57,6 +57,8 @@ pub const MAX_LEADER_CERTIFICATE_DELAY: i64 = 2 * MAX_BATCH_DELAY as i64 / 1000;
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.
 pub const MAX_TRANSMISSIONS_PER_BATCH: usize = 250; // transmissions
+/// The maximum number of transmissions allowed in a worker ping.
+pub const MAX_TRANSMISSIONS_PER_WORKER_PING: usize = MAX_TRANSMISSIONS_PER_BATCH / 10; // transmissions
 /// The maximum number of workers that can be spawned.
 pub const MAX_WORKERS: u8 = 1; // workers
 
