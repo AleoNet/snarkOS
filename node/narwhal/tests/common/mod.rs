@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod primary;
+pub mod trans;
 pub mod utils;
 
 pub type CurrentNetwork = snarkvm::prelude::Testnet3;

@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crate::common::{
+    trans::TranslucentLedgerService,
     utils::{fire_unconfirmed_solutions, fire_unconfirmed_transactions, initialize_logger},
     CurrentNetwork,
-    MockLedgerService,
 };
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
@@ -26,8 +26,19 @@ use snarkos_node_narwhal::{
     MAX_GC_ROUNDS,
 };
 use snarkvm::{
-    ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
-    prelude::TestRng,
+    ledger::{
+        committee::{Committee, MIN_VALIDATOR_STAKE},
+        Ledger,
+    },
+    prelude::{
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        Address,
+        CryptoRng,
+        PrivateKey,
+        Rng,
+        TestRng,
+        VM,
+    },
 };
 
 use std::{
@@ -85,6 +96,8 @@ pub struct TestValidator {
     pub handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
+pub type CurrentLedger = Ledger<CurrentNetwork, ConsensusMemory<CurrentNetwork>>;
+
 impl TestValidator {
     pub fn fire_transmissions(&mut self, interval_ms: u64) {
         let solution_handle = fire_unconfirmed_solutions(self.primary_sender.as_mut().unwrap(), self.id, interval_ms);
@@ -118,10 +131,19 @@ impl TestNetwork {
         }
 
         let (accounts, committee) = new_test_committee(config.num_nodes);
+        let gen_key = *accounts[0].private_key();
+        let public_balance_per_validator =
+            (1_500_000_000_000_000 - (config.num_nodes as u64) * 1_000_000_000_000) / (config.num_nodes as u64);
+        let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
+        for account in accounts.iter() {
+            balances.insert(account.address(), public_balance_per_validator);
+        }
 
         let mut validators = HashMap::with_capacity(config.num_nodes as usize);
         for (id, account) in accounts.into_iter().enumerate() {
-            let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+            let mut rng = TestRng::fixed(id as u64);
+            let gen_ledger = genesis_ledger(gen_key, committee.clone(), balances.clone(), &mut rng);
+            let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger));
             let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
 
             let (primary, bft) = if config.bft {
@@ -268,7 +290,23 @@ fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<Curren
         accounts.push(account);
     }
     // Initialize the committee.
-    let committee = Committee::<CurrentNetwork>::new(1u64, members).unwrap();
+    let committee = Committee::<CurrentNetwork>::new(0u64, members).unwrap();
 
     (accounts, committee)
+}
+
+fn genesis_ledger(
+    genesis_private_key: PrivateKey<CurrentNetwork>,
+    committee: Committee<CurrentNetwork>,
+    public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    rng: &mut (impl Rng + CryptoRng),
+) -> CurrentLedger {
+    // Initialize the store.
+    let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
+    // Initialize a new VM.
+    let vm = VM::from(store).unwrap();
+    // Initialize the genesis block.
+    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng).unwrap();
+    // Initialize the ledger with the genesis block.
+    CurrentLedger::load(block, None).unwrap()
 }
