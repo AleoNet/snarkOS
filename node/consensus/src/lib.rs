@@ -29,6 +29,7 @@ use snarkos_node_narwhal::{
     },
     BFT,
     MAX_GC_ROUNDS,
+    MAX_TRANSMISSIONS_PER_BATCH,
 };
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
@@ -41,7 +42,7 @@ use snarkvm::{
 };
 
 use anyhow::Result;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{
@@ -57,6 +58,10 @@ pub struct Consensus<N: Network> {
     bft: BFT<N>,
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
+    /// The unconfirmed solutions queue.
+    solutions_queue: Arc<Mutex<IndexMap<PuzzleCommitment<N>, ProverSolution<N>>>>,
+    /// The unconfirmed transactions queue.
+    transactions_queue: Arc<Mutex<IndexMap<N::TransactionID, Transaction<N>>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -75,7 +80,14 @@ impl<N: Network> Consensus<N> {
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
         // Return the consensus.
-        Ok(Self { ledger, bft, primary_sender: Default::default(), handles: Default::default() })
+        Ok(Self {
+            ledger,
+            bft,
+            primary_sender: Default::default(),
+            solutions_queue: Default::default(),
+            transactions_queue: Default::default(),
+            handles: Default::default(),
+        })
     }
 
     /// Run the consensus instance.
@@ -156,28 +168,90 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
-        // Initialize a callback sender and receiver.
-        let (callback, callback_receiver) = oneshot::channel();
-        // Send the transaction to the primary.
-        self.primary_sender()
-            .tx_unconfirmed_solution
-            .send((solution.commitment(), Data::Object(solution), callback))
-            .await?;
-        // Return the callback.
-        callback_receiver.await?
+        // If the memory pool of this node is full, save the solution and return early.
+        let num_unconfirmed = self.num_unconfirmed_transmissions();
+        if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+            // Save the solution to the memory pool.
+            self.solutions_queue.lock().insert(solution.commitment(), solution);
+            return Ok(());
+        }
+        // Retrieve the remaining solutions.
+        let remaining = {
+            // Determine the available capacity.
+            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed).saturating_sub(1);
+            // Acquire the lock on the queue.
+            let mut queue = self.solutions_queue.lock();
+            // Determine the number of solutions to send.
+            let num_solutions = queue.len().min(capacity);
+            // Drain the solutions from the queue.
+            queue.drain(..num_solutions).collect::<Vec<_>>()
+        };
+        // Iterate over the solutions.
+        for (i, (_, solution)) in
+            [(solution.commitment(), solution)].into_iter().chain(remaining.into_iter()).enumerate()
+        {
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
+            // Send the transaction to the primary.
+            self.primary_sender()
+                .tx_unconfirmed_solution
+                .send((solution.commitment(), Data::Object(solution), callback))
+                .await?;
+            // Handle the callback.
+            match i > 0 {
+                // Return the error for the first solution, as this error is relevant for the caller.
+                true => callback_receiver.await??,
+                false => {
+                    // Ignore the error for the remaining solutions.
+                    let _ = callback_receiver.await?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
-        // Initialize a callback sender and receiver.
-        let (callback, callback_receiver) = oneshot::channel();
-        // Send the transaction to the primary.
-        self.primary_sender()
-            .tx_unconfirmed_transaction
-            .send((transaction.id(), Data::Object(transaction), callback))
-            .await?;
-        // Return the callback.
-        callback_receiver.await?
+        // If the memory pool of this node is full, save the transaction and return early.
+        let num_unconfirmed = self.num_unconfirmed_transmissions();
+        if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+            // Save the transaction to the memory pool.
+            self.transactions_queue.lock().insert(transaction.id(), transaction);
+            return Ok(());
+        }
+        // Retrieve the remaining transactions.
+        let remaining = {
+            // Determine the available capacity.
+            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed).saturating_sub(1);
+            // Acquire the lock on the queue.
+            let mut queue = self.transactions_queue.lock();
+            // Determine the number of transactions to send.
+            let num_transactions = queue.len().min(capacity);
+            // Drain the solutions from the queue.
+            queue.drain(..num_transactions).collect::<Vec<_>>()
+        };
+        // Iterate over the transactions.
+        for (i, (_, transaction)) in
+            [(transaction.id(), transaction)].into_iter().chain(remaining.into_iter()).enumerate()
+        {
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
+            // Send the transaction to the primary.
+            self.primary_sender()
+                .tx_unconfirmed_transaction
+                .send((transaction.id(), Data::Object(transaction), callback))
+                .await?;
+            // Handle the callback.
+            match i > 0 {
+                // Return the error for the first transaction, as this error is relevant for the caller.
+                true => callback_receiver.await??,
+                false => {
+                    // Ignore the error for the remaining transactions.
+                    let _ = callback_receiver.await?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
