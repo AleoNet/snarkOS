@@ -86,6 +86,9 @@ version = "=2.1.7"
 [dependencies.snarkvm]
 workspace = true
 
+[dependencies.sys-info]
+version = "0.9"
+
 [dependencies.thiserror]
 version = "1.0"
 

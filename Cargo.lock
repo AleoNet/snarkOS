@@ -3027,6 +3027,7 @@ dependencies = [
  "snarkos-node",
  "snarkos-node-rest",
  "snarkvm",
+ "sys-info",
  "thiserror",
  "tokio",
  "tracing-subscriber 0.3.17",
@@ -4270,6 +4271,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a393066ed9010ebaed60b9eafa373d4b1baac186dd7e008555b0f702b51945b6"
 dependencies = [
  "unicode-xid",
+]
+
+[[package]]
+name = "sys-info"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b3a0d0aba8bf96a0e1ddfdc352fc53b3df7f39318c71854910c3c4b024ae52c"
+dependencies = [
+ "cc",
+ "libc",
 ]
 
 [[package]]
