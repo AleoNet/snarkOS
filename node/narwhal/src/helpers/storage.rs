@@ -136,12 +136,19 @@ impl<N: Network> Storage<N> {
         // Retrieve the next round.
         let next_round = self.current_round() + 1;
         // Ensure there are no certificates for the next round yet.
-        ensure!(!self.contains_certificates_for_round(next_round), "Certificates for the next round cannot exist yet");
+        if self.contains_certificates_for_round(next_round) {
+            bail!("Certificates for the next round ({next_round}) cannot exist yet");
+        }
 
         // Retrieve the current committee.
         let current_committee = self.ledger.current_committee()?;
         // Ensure the next round is at or after the current committee's starting round.
-        ensure!(next_round >= current_committee.starting_round(), "Next round is behind the current committee");
+        if next_round < current_committee.starting_round() {
+            bail!(
+                "Next round ({next_round}) is behind the current committee's starting round ({})",
+                current_committee.starting_round()
+            );
+        }
 
         // Update the storage to the next round.
         self.update_current_round(next_round);
