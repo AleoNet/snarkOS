@@ -1180,6 +1180,11 @@ impl<N: Network> Gateway<N> {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' on version {version} (outdated)");
             return Some(DisconnectReason::OutdatedClientVersion);
         }
+        // Ensure the address is not the same as this node.
+        if self.account.address() == address {
+            warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for being the same as this node ({address})");
+            return Some(DisconnectReason::ProtocolViolation);
+        }
         // Ensure the address is a current committee member.
         if !self.is_authorized_validator_address(address) {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for being an unauthorized validator ({address})");
