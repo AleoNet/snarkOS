@@ -26,6 +26,8 @@ pub use updater::*;
 
 use snarkos_node::router::messages::NodeType;
 
+use colored::Colorize;
+
 #[cfg(target_family = "unix")]
 use colored::*;
 #[cfg(target_family = "unix")]
