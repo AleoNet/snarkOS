@@ -67,6 +67,7 @@ pub fn check_open_files_limit(minimum: u64) {
 }
 
 #[cfg(target_family = "unix")]
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub(crate) enum DriveType {
     SSD,
@@ -78,7 +79,7 @@ pub(crate) enum DriveType {
 #[cfg(target_family = "unix")]
 pub(crate) fn detect_drive_type(device: &str) -> Result<DriveType, std::io::Error> {
     let path = format!("/sys/block/{}/queue/rotational", device);
-    match std::fs::read_to_string(&path)?.trim() {
+    match std::fs::read_to_string(path)?.trim() {
         "0" => Ok(DriveType::SSD),
         "1" => Ok(DriveType::HDD),
         _ => Ok(DriveType::Unknown),
