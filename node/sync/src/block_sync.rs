@@ -378,6 +378,7 @@ impl<N: Network> BlockSync<N> {
         self.remove_timed_out_block_requests();
         // Prepare the block requests.
         if let Some((sync_peers, min_common_ancestor)) = self.find_sync_peers_inner() {
+            trace!("Found {} sync peers, min_common_ancestor {}", sync_peers.len(), min_common_ancestor);
             // Retrieve the highest block height.
             let greatest_peer_height = sync_peers.values().map(|l| l.latest_locator_height()).max().unwrap_or(0);
             // Update the state of `is_block_synced` for the sync module.
@@ -385,6 +386,7 @@ impl<N: Network> BlockSync<N> {
             // Return the list of block requests.
             self.construct_requests(sync_peers, min_common_ancestor, &mut rand::thread_rng())
         } else {
+            trace!("No sync peers found");
             // Update the state of `is_block_synced` for the sync module.
             self.update_is_block_synced(0, MAX_BLOCKS_BEHIND);
             // Return an empty list of block requests.
@@ -394,11 +396,20 @@ impl<N: Network> BlockSync<N> {
 
     /// Updates the state of `is_block_synced` for the sync module.
     fn update_is_block_synced(&self, greatest_peer_height: u32, max_blocks_behind: u32) {
-        // Compute the number of blocks that we are behind by.
-        let num_blocks_behind = greatest_peer_height.saturating_sub(self.canon.latest_block_height());
-        // Determine if the primary is synced.
-        let is_synced = num_blocks_behind <= max_blocks_behind;
-        // Update the sync status.
+        trace!(
+            "update_is_block_synced: Greatest peer height: {}, max_blocks_behind {}",
+            greatest_peer_height,
+            max_blocks_behind
+        );
+        let mut is_synced = false;
+        if !self.locators.read().is_empty() {
+            // Compute the number of blocks that we are behind by.
+            let num_blocks_behind = greatest_peer_height.saturating_sub(self.canon.latest_block_height());
+            // Determine if the primary is synced.
+            is_synced = num_blocks_behind <= max_blocks_behind;
+            // Update the sync status.
+        }
+        trace!("update_is_block_synced: is_synced: {}", is_synced);
         self.is_block_synced.store(is_synced, Ordering::SeqCst);
     }
 
