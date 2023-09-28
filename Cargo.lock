@@ -1443,9 +1443,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5477fe2230a79769d8dc68e0eabf5437907c0457a5614a9e8dddb67f65eb65d"
+checksum = "ad227c3af19d4914570ad36d30409928b75967c298feb9ea1969db3a610bb14e"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.0",
@@ -2632,7 +2632,7 @@ version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b420ce6e3d8bd882e9b243c6eed35dbc9a6110c9769e74b584e0d68d1f20c65"
 dependencies = [
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "itoa",
  "ryu",
  "serde",
@@ -2802,7 +2802,7 @@ dependencies = [
  "clap",
  "colored",
  "crossterm 0.27.0",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "nix",
  "num_cpus",
  "parking_lot",
@@ -2856,7 +2856,7 @@ dependencies = [
  "colored",
  "deadline",
  "futures-util",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "num_cpus",
  "once_cell",
  "parking_lot",
@@ -2905,7 +2905,7 @@ name = "snarkos-node-consensus"
 version = "2.1.7"
 dependencies = [
  "anyhow",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "itertools",
  "once_cell",
  "parking_lot",
@@ -2921,7 +2921,7 @@ dependencies = [
  "anyhow",
  "bincode 1.3.3",
  "bytes",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "kadmium",
  "rayon",
  "serde",
@@ -2949,7 +2949,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "http",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "jsonwebtoken",
  "once_cell",
  "parking_lot",
@@ -2978,7 +2978,7 @@ dependencies = [
  "deadline",
  "futures",
  "futures-util",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "itertools",
  "linked-hash-map",
  "once_cell",
@@ -3025,7 +3025,7 @@ dependencies = [
  "clap",
  "colored",
  "dotenvy",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "num-format",
  "once_cell",
  "parking_lot",
@@ -3057,7 +3057,7 @@ dependencies = [
  "fxhash",
  "hashbrown 0.14.0",
  "hex",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "itertools",
  "parking_lot",
  "rand",
@@ -3129,7 +3129,7 @@ version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8b388c125b85e80a6ecaf58cc7573752dfc385e2324cc48a99ca9486ba7752f"
 dependencies = [
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "itertools",
  "nom",
  "num-traits",
@@ -3332,7 +3332,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebbf5866302e2ef5ddefded5bff934510a1459d11c9a67b60a3a6b3d960ff94b"
 dependencies = [
  "anyhow",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "itertools",
  "lazy_static",
  "once_cell",
@@ -3375,7 +3375,7 @@ checksum = "315c9a2048a4360f0248513abb2645f110d50ae342e9e5e84126c1e24e2d1a1b"
 dependencies = [
  "enum_index",
  "enum_index_derive",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "num-derive",
  "num-traits",
  "once_cell",
@@ -3521,7 +3521,7 @@ checksum = "56fb2d805d561826e4490e403138a8e103aa968672e1214fc7352fec069cd36f"
 dependencies = [
  "aleo-std",
  "anyhow",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "parking_lot",
  "rand",
  "rayon",
@@ -3541,7 +3541,7 @@ version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d07d0571e7089ed6f756639d0d6878b477fe2659f79d989aa356df05a0b05b98"
 dependencies = [
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "rayon",
  "serde_json",
  "snarkvm-console",
@@ -3593,7 +3593,7 @@ dependencies = [
  "aleo-std",
  "anyhow",
  "bincode 1.3.3",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "once_cell",
  "parking_lot",
  "rayon",
@@ -3620,7 +3620,7 @@ dependencies = [
  "colored",
  "curl",
  "hex",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "itertools",
  "lazy_static",
  "paste",
@@ -3639,7 +3639,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f463af912a47b3fac9d12e78a9f3fe39b285d76261bb7918d72ceeec5653e91"
 dependencies = [
  "aleo-std",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "parking_lot",
  "rand",
  "snarkvm-circuit",
@@ -3661,7 +3661,7 @@ checksum = "bdec147a8eda547537827dbd2a3dbeec530a49a9bdfd16595a7fb77878fddd2b"
 dependencies = [
  "aleo-std",
  "colored",
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "once_cell",
  "parking_lot",
  "rand",
@@ -3681,7 +3681,7 @@ version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5760c27c8dc4ec7ffa4ea9a3c432b07185a702178f5ec58a2d9144e79f4586f8"
 dependencies = [
- "indexmap 2.0.0",
+ "indexmap 2.0.1",
  "paste",
  "rand",
  "rand_chacha",
