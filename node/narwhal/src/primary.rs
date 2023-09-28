@@ -338,10 +338,12 @@ impl<N: Network> Primary<N> {
         for worker in self.workers.iter() {
             transmissions.extend(worker.take_candidates(num_transmissions_per_worker).await);
         }
-        // Determine if there is at least one transaction to propose.
-        let has_transactions = transmissions.par_keys().any(|id| matches!(id, TransmissionID::Transaction(..)));
+        // Determine if there is at least one unconfirmed transaction to propose.
+        let has_unconfirmed_transaction = transmissions.par_keys().any(|id| {
+            matches!(id, TransmissionID::Transaction(..)) && !self.ledger.contains_transmission(id).unwrap_or(true)
+        });
         // If the batch is not ready to be proposed, return early.
-        match has_transactions {
+        match has_unconfirmed_transaction {
             true => info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len()),
             false => return Ok(()),
         }
