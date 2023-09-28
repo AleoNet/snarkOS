@@ -295,8 +295,11 @@ impl<N: Network> Sync<N> {
 
 // Methods to assist with the block sync module.
 impl<N: Network> Sync<N> {
-    /// Returns `true` if the node is synced.
+    /// Returns `true` if the node is synced and has connected peers.
     pub fn is_synced(&self) -> bool {
+        if self.gateway.number_of_connected_peers() == 0 {
+            return false;
+        }
         self.block_sync.is_block_synced()
     }
 
