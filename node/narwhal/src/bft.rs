@@ -429,85 +429,58 @@ impl<N: Network> BFT<N> {
         &self,
         leader_certificate: BatchCertificate<N>,
     ) -> Result<()> {
-        // Retrieve the commit round and leader.
-        let commit_round = leader_certificate.round();
-        let leader = leader_certificate.author();
-
-        // Determine the list of all previous leader certificates since the last committed round.
-        // The order of the leader certificates is from **newest** to **oldest**.
-        let mut leader_certificates = vec![leader_certificate.clone()];
-        let mut current_certificate = leader_certificate;
-        for round in (self.dag.read().last_committed_round() + 2..=commit_round.saturating_sub(2)).rev().step_by(2) {
-            // Retrieve the previous leader certificate.
-            let Some(previous_certificate) = self.dag.read().get_certificate_for_round_with_author(round, leader)
-            else {
-                continue;
-            };
-            // Determine if there is a path between the previous certificate and the current certificate.
-            if self.is_linked(previous_certificate.clone(), current_certificate.clone())? {
-                // Add the previous leader certificate to the list of certificates to commit.
-                leader_certificates.push(previous_certificate.clone());
-                // Update the current certificate to the previous leader certificate.
-                current_certificate = previous_certificate;
+        // Retrieve the leader certificate round.
+        let leader_round = leader_certificate.round();
+        // Compute the commit subdag.
+        let commit_subdag = match self.order_dag_with_dfs::<ALLOW_LEDGER_ACCESS>(leader_certificate) {
+            Ok(subdag) => subdag,
+            Err(e) => bail!("BFT failed to order the DAG with DFS - {e}"),
+        };
+        // Initialize a map for the deduped transmissions.
+        let mut transmissions = IndexMap::new();
+        // Start from the oldest leader certificate.
+        for certificate in commit_subdag.values().flatten() {
+            // Update the DAG.
+            self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+            // Retrieve the transmissions.
+            for transmission_id in certificate.transmission_ids() {
+                // If the transmission already exists in the map, skip it.
+                if transmissions.contains_key(transmission_id) {
+                    continue;
+                }
+                // If the transmission already exists in the ledger, skip it.
+                // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
+                if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
+                    continue;
+                }
+                // Retrieve the transmission.
+                let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
+                    bail!("BFT failed to retrieve transmission {}", fmt_id(transmission_id));
+                };
+                // Add the transmission to the set.
+                transmissions.insert(*transmission_id, transmission);
             }
         }
-
-        // Iterate over the leader certificates to commit.
-        for leader_certificate in leader_certificates.into_iter().rev() {
-            // Retrieve the leader certificate round.
-            let leader_round = leader_certificate.round();
-            // Compute the commit subdag.
-            let commit_subdag = match self.order_dag_with_dfs::<ALLOW_LEDGER_ACCESS>(leader_certificate) {
-                Ok(subdag) => subdag,
-                Err(e) => bail!("BFT failed to order the DAG with DFS - {e}"),
-            };
-            // Initialize a map for the deduped transmissions.
-            let mut transmissions = IndexMap::new();
-            // Start from the oldest leader certificate.
-            for certificate in commit_subdag.values().flatten() {
-                // Update the DAG.
-                self.dag.write().commit(certificate, self.storage().max_gc_rounds());
-                // Retrieve the transmissions.
-                for transmission_id in certificate.transmission_ids() {
-                    // If the transmission already exists in the map, skip it.
-                    if transmissions.contains_key(transmission_id) {
-                        continue;
-                    }
-                    // If the transmission already exists in the ledger, skip it.
-                    // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
-                    if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
-                        continue;
-                    }
-                    // Retrieve the transmission.
-                    let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
-                        bail!("BFT failed to retrieve transmission {}", fmt_id(transmission_id));
-                    };
-                    // Add the transmission to the set.
-                    transmissions.insert(*transmission_id, transmission);
-                }
-            }
-            // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
-            if !IS_SYNCING {
-                // Construct the subdag.
-                let subdag = Subdag::from(commit_subdag)?;
-                info!(
-                    "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
-                    transmissions.len(),
-                    subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
-                );
-                // Trigger consensus.
-                if let Some(consensus_sender) = self.consensus_sender.get() {
-                    // Retrieve the anchor round.
-                    let anchor_round = subdag.anchor_round();
-                    // Initialize a callback sender and receiver.
-                    let (callback_sender, callback_receiver) = oneshot::channel();
-                    // Send the subdag and transmissions to consensus.
-                    consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
-                    // Await the callback to continue.
-                    if let Err(e) = callback_receiver.await {
-                        error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
-                        break;
-                    }
+        // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
+        if !IS_SYNCING {
+            // Construct the subdag.
+            let subdag = Subdag::from(commit_subdag)?;
+            info!(
+                "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
+                transmissions.len(),
+                subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
+            );
+            // Trigger consensus.
+            if let Some(consensus_sender) = self.consensus_sender.get() {
+                // Retrieve the anchor round.
+                let anchor_round = subdag.anchor_round();
+                // Initialize a callback sender and receiver.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Send the subdag and transmissions to consensus.
+                consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
+                // Await the callback to continue.
+                if let Err(e) = callback_receiver.await {
+                    error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
                 }
             }
         }
@@ -592,31 +565,6 @@ impl<N: Network> BFT<N> {
         commit.retain(|round, _| round + self.storage().max_gc_rounds() > self.dag.read().last_committed_round());
         // Return the certificates to commit.
         Ok(commit)
-    }
-
-    /// Returns `true` if there is a path from the previous certificate to the current certificate.
-    fn is_linked(
-        &self,
-        previous_certificate: BatchCertificate<N>,
-        current_certificate: BatchCertificate<N>,
-    ) -> Result<bool> {
-        // Initialize the list containing the traversal.
-        let mut traversal = vec![current_certificate.clone()];
-        // Iterate over the rounds from the current certificate to the previous certificate.
-        for round in (previous_certificate.round()..current_certificate.round()).rev() {
-            // Retrieve all of the certificates for this past round.
-            let Some(certificates) = self.dag.read().get_certificates_for_round(round) else {
-                // This is a critical error, as the traversal should have these certificates.
-                // If this error is hit, it is likely that the maximum GC rounds should be increased.
-                bail!("BFT failed to retrieve the certificates for past round {round}");
-            };
-            // Filter the certificates to only include those that are in the traversal.
-            traversal = certificates
-                .into_values()
-                .filter(|c| traversal.iter().any(|p| c.previous_certificate_ids().contains(&p.certificate_id())))
-                .collect();
-        }
-        Ok(traversal.contains(&previous_certificate))
     }
 }
 
