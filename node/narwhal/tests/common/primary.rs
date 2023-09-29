@@ -262,10 +262,24 @@ impl TestNetwork {
     where
         T: RangeBounds<u64> + IntoIterator<Item = u64>,
     {
-        rounds_range.into_iter().all(|round| {
-            self.validators.values().map(|v| v.primary.ledger().get_committee_for_round(round).unwrap()).dedup().count()
-                == 1
-        })
+        for round in rounds_range.into_iter() {
+            let mut last: Option<Committee<CurrentNetwork>> = None;
+            for validator in self.validators.values() {
+                // Round might be in future, in case validator didn't get to it.
+                if let Ok(committee) = validator.primary.ledger().get_committee_for_round(round) {
+                    match last.clone() {
+                        None => last = Some(committee),
+                        Some(first) => {
+                            if first != committee {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 
     // Checks if the certificates are coherent in storage for all nodes (not quorum) over a range
