@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use snarkvm::prelude::{error, FromBytes, ToBytes};
+
 use serde::{Deserialize, Serialize};
+use std::io;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[repr(u8)]
@@ -58,5 +61,25 @@ impl core::fmt::Display for NodeType {
             Self::Prover => "Prover",
             Self::Validator => "Validator",
         })
+    }
+}
+
+impl ToBytes for NodeType {
+    fn write_le<W: io::Write>(&self, writer: W) -> io::Result<()> {
+        (*self as u8).write_le(writer)
+    }
+}
+
+impl FromBytes for NodeType {
+    fn read_le<R: io::Read>(reader: R) -> io::Result<Self>
+    where
+        Self: Sized,
+    {
+        match u8::read_le(reader)? {
+            0 => Ok(Self::Client),
+            1 => Ok(Self::Prover),
+            2 => Ok(Self::Validator),
+            _ => Err(error("Invalid node type")),
+        }
     }
 }

@@ -14,7 +14,6 @@
 
 use super::*;
 
-use bincode::Options;
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,18 +35,24 @@ impl<N: Network> MessageTrait for ChallengeRequest<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(
-            writer,
-            &(self.version, self.listener_port, self.node_type, self.address, self.nonce),
-        )?)
+        self.version.write_le(&mut *writer)?;
+        self.listener_port.write_le(&mut *writer)?;
+        self.node_type.write_le(&mut *writer)?;
+        self.address.write_le(&mut *writer)?;
+        self.nonce.write_le(&mut *writer)?;
+        Ok(())
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let options =
-            bincode::options().with_limit(MAXIMUM_MESSAGE_SIZE as u64).with_fixint_encoding().allow_trailing_bytes();
-        let (version, listener_port, node_type, address, nonce) = options.deserialize_from(&mut bytes.reader())?;
+        let mut reader = bytes.reader();
+        let version = u32::read_le(&mut reader)?;
+        let listener_port = u16::read_le(&mut reader)?;
+        let node_type = NodeType::read_le(&mut reader)?;
+        let address = Address::<N>::read_le(&mut reader)?;
+        let nonce = u64::read_le(&mut reader)?;
+
         Ok(Self { version, listener_port, node_type, address, nonce })
     }
 }

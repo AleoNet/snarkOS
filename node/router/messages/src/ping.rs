@@ -14,7 +14,7 @@
 
 use super::*;
 
-use bincode::Options;
+use indexmap::IndexMap;
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,16 +34,59 @@ impl<N: Network> MessageTrait for Ping<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(&mut *writer, &(self.version, self.node_type, &self.block_locators))?)
+        self.version.write_le(&mut *writer)?;
+        self.node_type.write_le(&mut *writer)?;
+        if let Some(locators) = &self.block_locators {
+            1u8.write_le(&mut *writer)?;
+
+            (locators.recents.len().min(u32::MAX as usize) as u32).write_le(&mut *writer)?;
+            for (height, hash) in locators.recents.iter() {
+                height.write_le(&mut *writer)?;
+                hash.write_le(&mut *writer)?;
+            }
+
+            (locators.checkpoints.len().min(u32::MAX as usize) as u32).write_le(&mut *writer)?;
+            for (height, hash) in locators.checkpoints.iter() {
+                height.write_le(&mut *writer)?;
+                hash.write_le(&mut *writer)?;
+            }
+        } else {
+            0u8.write_le(&mut *writer)?;
+        }
+
+        Ok(())
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let options =
-            bincode::options().with_limit(MAXIMUM_MESSAGE_SIZE as u64).with_fixint_encoding().allow_trailing_bytes();
         let mut reader = bytes.reader();
-        let (version, node_type, block_locators) = options.deserialize_from(&mut reader)?;
+
+        let version = u32::read_le(&mut reader)?;
+        let node_type = NodeType::read_le(&mut reader)?;
+
+        if u8::read_le(&mut reader)? == 0 {
+            return Ok(Self { version, node_type, block_locators: None });
+        }
+
+        let mut recents = IndexMap::new();
+        let num_recents = u32::read_le(&mut reader)?;
+        for _ in 0..num_recents {
+            let height = u32::read_le(&mut reader)?;
+            let hash = N::BlockHash::read_le(&mut reader)?;
+            recents.insert(height, hash);
+        }
+
+        let mut checkpoints = IndexMap::new();
+        let num_checkpoints = u32::read_le(&mut reader)?;
+        for _ in 0..num_checkpoints {
+            let height = u32::read_le(&mut reader)?;
+            let hash = N::BlockHash::read_le(&mut reader)?;
+            checkpoints.insert(height, hash);
+        }
+
+        let block_locators = Some(BlockLocators { recents, checkpoints });
+
         Ok(Self { version, node_type, block_locators })
     }
 }

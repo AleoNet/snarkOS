@@ -40,17 +40,18 @@ impl MessageTrait for BlockRequest {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &(self.start_height, self.end_height))?)
+        self.start_height.write_le(&mut *writer)?;
+        self.end_height.write_le(writer)?;
+        Ok(())
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
-        Ok(Self {
-            start_height: bincode::deserialize_from(&mut reader)?,
-            end_height: bincode::deserialize_from(&mut reader)?,
-        })
+        let start_height = u32::read_le(&mut reader)?;
+        let end_height = u32::read_le(&mut reader)?;
+        Ok(Self { start_height, end_height })
     }
 }
 

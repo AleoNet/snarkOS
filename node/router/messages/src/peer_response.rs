@@ -14,7 +14,8 @@
 
 use super::*;
 
-use bincode::Options;
+use snarkvm::prelude::{FromBytes, ToBytes};
+
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,14 +33,24 @@ impl MessageTrait for PeerResponse {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &self.peers)?)
+        (self.peers.len().min(u8::MAX as usize) as u8).write_le(&mut *writer)?;
+        for peer in &self.peers {
+            peer.write_le(&mut *writer)?;
+        }
+
+        Ok(())
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let options =
-            bincode::options().with_limit(MAXIMUM_MESSAGE_SIZE as u64).with_fixint_encoding().allow_trailing_bytes();
-        Ok(Self { peers: options.deserialize_from(&mut bytes.reader())? })
+        let mut reader = bytes.reader();
+        let count = u8::read_le(&mut reader)?;
+        let mut peers = Vec::with_capacity(count as usize);
+        for _ in 0..count {
+            peers.push(SocketAddr::read_le(&mut reader)?);
+        }
+
+        Ok(Self { peers })
     }
 }
