@@ -133,11 +133,11 @@ impl<N: Network> Storage<N> {
     /// Increments storage to the next round, updating the current round.
     /// Note: This method is only called once per round, upon certification of the primary's batch.
     pub fn increment_to_next_round(&self) -> Result<()> {
-        // Retrieve the next round.
-        let next_round = self.current_round() + 1;
-        // Ensure there are no certificates for the next round yet.
-        if self.contains_certificates_for_round(next_round) {
-            bail!("Certificates for the next round ({next_round}) cannot exist yet");
+        // Determine the next round.
+        let mut next_round = self.current_round() + 1;
+        // Increment the round until there are no certificates for the next round.
+        while self.contains_certificates_for_round(next_round) {
+            next_round = next_round.saturating_add(1);
         }
 
         // Retrieve the current committee.

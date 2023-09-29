@@ -21,7 +21,6 @@ use crate::{
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_TRANSMISSIONS_PER_WORKER_PING,
     MAX_WORKERS,
-    WORKER_PING_INTERVAL,
 };
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
@@ -242,6 +241,18 @@ impl<N: Network> Worker<N> {
         }
         false
     }
+
+    /// Broadcasts a worker ping event.
+    pub(crate) fn broadcast_ping(&self) {
+        // Retrieve the transmission IDs.
+        let transmission_ids =
+            self.ready.transmission_ids().into_iter().take(MAX_TRANSMISSIONS_PER_WORKER_PING).collect::<IndexSet<_>>();
+
+        // Broadcast the ping event.
+        if !transmission_ids.is_empty() {
+            self.gateway.broadcast(Event::WorkerPing(transmission_ids.into()));
+        }
+    }
 }
 
 impl<N: Network> Worker<N> {
@@ -342,17 +353,6 @@ impl<N: Network> Worker<N> {
     fn start_handlers(&self, receiver: WorkerReceiver<N>) {
         let WorkerReceiver { mut rx_worker_ping, mut rx_transmission_request, mut rx_transmission_response } = receiver;
 
-        // Broadcast a ping event periodically.
-        let self_ = self.clone();
-        self.spawn(async move {
-            loop {
-                // Broadcast the ping event.
-                self_.broadcast_ping();
-                // Wait for the next interval.
-                tokio::time::sleep(Duration::from_millis(WORKER_PING_INTERVAL)).await;
-            }
-        });
-
         // Process the ping events.
         let self_ = self.clone();
         self.spawn(async move {
@@ -383,19 +383,6 @@ impl<N: Network> Worker<N> {
                 self_.finish_transmission_request(peer_ip, transmission_response);
             }
         });
-    }
-
-    /// Broadcasts a ping event.
-    fn broadcast_ping(&self) {
-        // Broadcast the ping event.
-        self.gateway.broadcast(Event::WorkerPing(
-            self.ready
-                .transmission_ids()
-                .into_iter()
-                .take(MAX_TRANSMISSIONS_PER_WORKER_PING)
-                .collect::<IndexSet<_>>()
-                .into(),
-        ));
     }
 
     /// Sends an transmission request to the specified peer.

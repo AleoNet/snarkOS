@@ -34,6 +34,7 @@ use crate::{
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
     PRIMARY_PING_INTERVAL,
+    WORKER_PING_INTERVAL,
 };
 use snarkos_account::Account;
 use snarkos_node_narwhal_events::PrimaryPing;
@@ -636,6 +637,25 @@ impl<N: Network> Primary<N> {
             });
         }
 
+        // Start the worker ping(s).
+        if self.sync.is_gateway_mode() {
+            let self_ = self.clone();
+            self.spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(WORKER_PING_INTERVAL)).await;
+                    // If the primary is not synced, then do not broadcast the worker ping(s).
+                    if !self_.sync.is_synced() {
+                        trace!("Skipping worker ping(s) - node is syncing");
+                        continue;
+                    }
+                    // Broadcast the worker ping(s).
+                    for worker in self_.workers.iter() {
+                        worker.broadcast_ping();
+                    }
+                }
+            });
+        }
+
         // Start the batch proposer.
         let self_ = self.clone();
         self.spawn(async move {
@@ -644,7 +664,7 @@ impl<N: Network> Primary<N> {
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
                 // If the primary is not synced, then do not propose a batch.
                 if !self_.sync.is_synced() {
-                    warn!("Skipping batch proposal - node is syncing");
+                    debug!("Skipping batch proposal - node is syncing");
                     continue;
                 }
                 // If there is no proposed batch, attempt to propose a batch.
@@ -660,7 +680,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
                 // If the primary is not synced, then do not sign the batch.
                 if !self_.sync.is_synced() {
-                    debug!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
+                    trace!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
                     continue;
                 }
                 // Process the proposed batch.
@@ -676,7 +696,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
                 // If the primary is not synced, then do not store the signature.
                 if !self_.sync.is_synced() {
-                    debug!("Skipping a batch signature from '{peer_ip}' - node is syncing");
+                    trace!("Skipping a batch signature from '{peer_ip}' - node is syncing");
                     continue;
                 }
                 // Process the batch signature.
@@ -692,7 +712,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
                 // If the primary is not synced, then do not store the certificate.
                 if !self_.sync.is_synced() {
-                    debug!("Skipping a certified batch from '{peer_ip}' - node is syncing");
+                    trace!("Skipping a certified batch from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
