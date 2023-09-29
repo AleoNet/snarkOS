@@ -13,8 +13,10 @@
 // limitations under the License.
 
 use snarkos_account::Account;
-use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, MessageTrait, NodeType};
-use snarkos_node_router::expect_message;
+use snarkos_node_router::{
+    expect_message,
+    messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, MessageTrait, NodeType},
+};
 use snarkvm::prelude::{block::Block, error, Address, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
 
 use std::{
@@ -62,10 +64,6 @@ impl Pea2Pea for TestPeer {
 }
 
 impl TestPeer {
-    pub async fn beacon() -> Self {
-        Self::new(NodeType::Beacon, sample_account()).await
-    }
-
     pub async fn client() -> Self {
         Self::new(NodeType::Client, sample_account()).await
     }

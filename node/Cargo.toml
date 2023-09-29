@@ -74,8 +74,8 @@ version = "=2.1.7"
 path = "./consensus"
 version = "=2.1.7"
 
-[dependencies.snarkos-node-messages]
-path = "./messages"
+[dependencies.snarkos-node-narwhal]
+path = "./narwhal"
 version = "=2.1.7"
 
 [dependencies.snarkos-node-rest]
@@ -84,6 +84,10 @@ version = "=2.1.7"
 
 [dependencies.snarkos-node-router]
 path = "./router"
+version = "=2.1.7"
+
+[dependencies.snarkos-node-sync]
+path = "./sync"
 version = "=2.1.7"
 
 [dependencies.snarkos-node-tcp]

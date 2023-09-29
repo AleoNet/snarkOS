@@ -1,0 +1,139 @@
+// Copyright (C) 2019-2023 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use super::*;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CertificateResponse<N: Network> {
+    pub certificate: BatchCertificate<N>,
+}
+
+impl<N: Network> CertificateResponse<N> {
+    /// Initializes a new certificate response event.
+    pub fn new(certificate: BatchCertificate<N>) -> Self {
+        Self { certificate }
+    }
+}
+
+impl<N: Network> From<BatchCertificate<N>> for CertificateResponse<N> {
+    /// Initializes a new certificate response event.
+    fn from(certificate: BatchCertificate<N>) -> Self {
+        Self::new(certificate)
+    }
+}
+
+impl<N: Network> EventTrait for CertificateResponse<N> {
+    /// Returns the event name.
+    #[inline]
+    fn name(&self) -> Cow<'static, str> {
+        "CertificateResponse".into()
+    }
+}
+
+impl<N: Network> ToBytes for CertificateResponse<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.certificate.write_le(&mut writer)?;
+        Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for CertificateResponse<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let certificate = BatchCertificate::read_le(&mut reader)?;
+
+        Ok(Self { certificate })
+    }
+}
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{prop_tests::now, transmission_response::prop_tests::any_transmission, CertificateResponse};
+    use snarkvm::{
+        console::{
+            account::Signature,
+            prelude::{FromBytes, ToBytes},
+            types::Field,
+        },
+        ledger::{
+            committee::prop_tests::{CommitteeContext, ValidatorSet},
+            narwhal::{BatchCertificate, BatchHeader},
+        },
+        prelude::TestRng,
+    };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use indexmap::IndexMap;
+    use proptest::{
+        collection::vec,
+        prelude::{any, BoxedStrategy, Just, Strategy},
+        sample::Selector,
+    };
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_batch_header(committee: &CommitteeContext) -> BoxedStrategy<BatchHeader<CurrentNetwork>> {
+        (Just(committee.clone()), any::<Selector>(), vec(any_transmission(), 0..16))
+            .prop_map(|(committee, selector, transmissions)| {
+                let mut rng = TestRng::default();
+                let CommitteeContext(_, ValidatorSet(validators)) = committee;
+                let signer = selector.select(validators);
+                let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
+
+                BatchHeader::new(&signer.private_key, 0, now(), transmission_ids, Default::default(), &mut rng).unwrap()
+            })
+            .boxed()
+    }
+
+    pub fn any_batch_certificate() -> BoxedStrategy<BatchCertificate<CurrentNetwork>> {
+        any::<CommitteeContext>()
+            .prop_flat_map(|committee| (Just(committee.clone()), any_batch_header(&committee)))
+            .prop_map(|(committee, batch_header)| {
+                let CommitteeContext(_, validator_set) = committee;
+                let mut rng = TestRng::default();
+                BatchCertificate::new(batch_header.clone(), sign_batch_header(&validator_set, &batch_header, &mut rng))
+                    .unwrap()
+            })
+            .boxed()
+    }
+
+    pub fn sign_batch_header(
+        validator_set: &ValidatorSet,
+        batch_header: &BatchHeader<CurrentNetwork>,
+        rng: &mut TestRng,
+    ) -> IndexMap<Signature<CurrentNetwork>, i64> {
+        let mut signatures = IndexMap::with_capacity(validator_set.0.len());
+        for validator in validator_set.0.iter() {
+            let private_key = validator.private_key;
+            let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+            let timestamp_field = Field::from_u64(timestamp as u64);
+            signatures.insert(private_key.sign(&[batch_header.batch_id(), timestamp_field], rng).unwrap(), timestamp);
+        }
+        signatures
+    }
+
+    pub fn any_certificate_response() -> BoxedStrategy<CertificateResponse<CurrentNetwork>> {
+        any_batch_certificate().prop_map(CertificateResponse::new).boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_certificate_response())] original: CertificateResponse<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        CertificateResponse::write_le(&original, &mut buf).unwrap();
+
+        let deserialized: CertificateResponse<CurrentNetwork> =
+            CertificateResponse::read_le(buf.into_inner().reader()).unwrap();
+        assert_eq!(original, deserialized);
+    }
+}

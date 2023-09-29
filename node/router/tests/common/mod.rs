@@ -23,8 +23,7 @@ use std::{
 };
 
 use snarkos_account::Account;
-use snarkos_node_messages::NodeType;
-use snarkos_node_router::Router;
+use snarkos_node_router::{messages::NodeType, Router};
 use snarkvm::prelude::{block::Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
 /// A helper macro to print the TCP listening address, along with the connected and connecting peers.
@@ -67,22 +66,6 @@ pub fn initialize_logger(level: u8) {
 
     // Initialize tracing.
     let _ = tracing_subscriber::fmt().with_env_filter(filter).with_target(level == 3).try_init();
-}
-
-/// Initializes a beacon router. Setting the `listening_port = 0` will result in a random port being assigned.
-#[allow(dead_code)]
-pub async fn beacon(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNetwork> {
-    Router::new(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), listening_port),
-        NodeType::Beacon,
-        sample_account(),
-        &[],
-        max_peers,
-        true,
-    )
-    .await
-    .expect("couldn't create beacon router")
-    .into()
 }
 
 /// Initializes a client router. Setting the `listening_port = 0` will result in a random port being assigned.

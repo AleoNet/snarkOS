@@ -16,8 +16,16 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_messages::{Data, Message, NodeType, UnconfirmedSolution};
-use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
+use snarkos_node_narwhal::ledger_service::ProverLedgerService;
+use snarkos_node_router::{
+    messages::{Data, Message, NodeType, UnconfirmedSolution},
+    Heartbeat,
+    Inbound,
+    Outbound,
+    Router,
+    Routing,
+};
+use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
@@ -43,11 +51,13 @@ use std::{
 };
 use tokio::task::JoinHandle;
 
-/// A prover is a full node, capable of producing proofs for consensus.
+/// A prover is a light node, capable of producing proofs for consensus.
 #[derive(Clone)]
 pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     /// The router of the node.
     router: Router<N>,
+    /// The sync module.
+    sync: Arc<BlockSync<N>>,
     /// The genesis block.
     genesis: Block<N>,
     /// The coinbase puzzle.
@@ -80,6 +90,11 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Initialize the signal handler.
         let signal_node = Self::handle_signals();
 
+        // Initialize the ledger service.
+        let ledger_service = Arc::new(ProverLedgerService::new());
+        // Initialize the sync module.
+        let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
+
         // Initialize the node router.
         let router = Router::new(
             node_ip,
@@ -97,6 +112,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Initialize the node.
         let node = Self {
             router,
+            sync: Arc::new(sync),
             genesis,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),

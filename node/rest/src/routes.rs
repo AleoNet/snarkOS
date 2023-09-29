@@ -13,10 +13,11 @@
 // limitations under the License.
 
 use super::*;
+use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
 
+use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -46,6 +47,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // GET /testnet3/latest/stateRoot
     pub(crate) async fn latest_state_root(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_state_root())
+    }
+
+    // GET /testnet3/latest/committee
+    pub(crate) async fn latest_committee(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
     // GET /testnet3/block/{height}
@@ -123,11 +129,29 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_transaction(tx_id)?))
     }
 
+    // GET /testnet3/memoryPool/transmissions
+    pub(crate) async fn get_memory_pool_transmissions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => {
+                Ok(ErasedJson::pretty(consensus.unconfirmed_transmissions().collect::<IndexMap<_, _>>()))
+            }
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
+    // GET /testnet3/memoryPool/solutions
+    pub(crate) async fn get_memory_pool_solutions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_solutions().collect::<IndexMap<_, _>>())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
     // GET /testnet3/memoryPool/transactions
     pub(crate) async fn get_memory_pool_transactions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(consensus.memory_pool().unconfirmed_transactions())),
-            None => Err(RestError("route isn't available for this node type".to_string())),
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_transactions().collect::<IndexMap<_, _>>())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
         }
     }
 
@@ -163,12 +187,9 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_state_path_for_commitment(&commitment)?))
     }
 
-    // GET /testnet3/beacons
-    pub(crate) async fn get_beacons(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
-        match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(consensus.ledger().latest_committee())),
-            None => Err(RestError("route isn't available for this node type".to_string())),
-        }
+    // GET /testnet3/committee/latest
+    pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
     // GET /testnet3/peers/count
@@ -231,7 +252,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
-            consensus.add_unconfirmed_transaction(tx.clone())?;
+            consensus.add_unconfirmed_transaction(tx.clone()).await?;
         }
 
         // Prepare the unconfirmed transaction message.

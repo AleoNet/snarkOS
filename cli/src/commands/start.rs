@@ -14,15 +14,21 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{messages::NodeType, Node};
-use snarkvm::prelude::{
-    block::Block,
-    store::{helpers::memory::ConsensusMemory, ConsensusStore},
-    FromBytes,
-    Network,
-    PrivateKey,
-    Testnet3,
-    VM,
+use snarkos_node::{narwhal::MEMORY_POOL_PORT, router::messages::NodeType, Node};
+use snarkvm::{
+    console::{
+        account::{Address, PrivateKey},
+        algorithms::Hash,
+        network::{Network, Testnet3},
+    },
+    ledger::{
+        block::Block,
+        committee::{Committee, MIN_VALIDATOR_STAKE},
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+    },
+    prelude::{FromBytes, ToBits, ToBytes},
+    synthesizer::VM,
+    utilities::to_bytes_le,
 };
 
 use anyhow::{bail, Result};
@@ -34,14 +40,17 @@ use rand_chacha::ChaChaRng;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
 
-/// The recommended minimum number of 'open files' limit for a beacon.
-/// Beacons should be able to handle at least 1000 concurrent connections, each requiring 2 sockets.
-#[cfg(target_family = "unix")]
-const RECOMMENDED_MIN_NOFILES_LIMIT_BEACON: u64 = 2048;
 /// The recommended minimum number of 'open files' limit for a validator.
-/// Validators should be able to handle at least 500 concurrent connections, each requiring 2 sockets.
+/// Validators should be able to handle at least 1000 concurrent connections, each requiring 2 sockets.
 #[cfg(target_family = "unix")]
-const RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR: u64 = 1024;
+const RECOMMENDED_MIN_NOFILES_LIMIT: u64 = 2048;
+
+/// The development mode RNG seed.
+const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
+/// The development mode number of genesis committee members.
+const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
+/// The development mode number of nodes with public balance.
+const DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE: u16 = 50;
 
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
@@ -50,9 +59,6 @@ pub struct Start {
     #[clap(default_value = "3", long = "network")]
     pub network: u16,
 
-    /// Specify this node as a beacon
-    #[clap(long = "beacon")]
-    pub beacon: bool,
     /// Specify this node as a validator
     #[clap(long = "validator")]
     pub validator: bool,
@@ -63,19 +69,22 @@ pub struct Start {
     #[clap(long = "client")]
     pub client: bool,
 
-    /// Specify the node's account private key.
+    /// Specify the account private key of the node
     #[clap(long = "private-key")]
     pub private_key: Option<String>,
-    /// Specify the path to a file containing the node's account private key.
+    /// Specify the path to a file containing the account private key of the node
     #[clap(long = "private-key-file")]
-    pub private_key_path: Option<PathBuf>,
+    pub private_key_file: Option<PathBuf>,
 
     /// Specify the IP address and port for the node server
     #[clap(default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
-    /// Specify the IP address and port of a peer to connect to
-    #[clap(default_value = "", long = "connect")]
-    pub connect: String,
+    /// Specify the IP address and port of the peer(s) to connect to
+    #[clap(default_value = "", long = "peers")]
+    pub peers: String,
+    /// Specify the IP address and port of the validator(s) to connect to
+    #[clap(default_value = "", long = "validators")]
+    pub validators: String,
 
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
@@ -88,7 +97,7 @@ pub struct Start {
     #[clap(long)]
     pub nodisplay: bool,
     /// Specify the verbosity of the node [options: 0, 1, 2, 3, 4]
-    #[clap(default_value = "2", long = "verbosity")]
+    #[clap(default_value = "1", long = "verbosity")]
     pub verbosity: u8,
     /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
@@ -134,17 +143,35 @@ impl Start {
 }
 
 impl Start {
-    /// Returns the initial node(s) to connect to, from the given configurations.
+    /// Returns the initial peer(s) to connect to, from the given configurations.
     fn parse_trusted_peers(&self) -> Result<Vec<SocketAddr>> {
-        match self.connect.is_empty() {
+        match self.peers.is_empty() {
             true => Ok(vec![]),
             false => Ok(self
-                .connect
+                .peers
                 .split(',')
                 .flat_map(|ip| match ip.parse::<SocketAddr>() {
                     Ok(ip) => Some(ip),
                     Err(e) => {
-                        eprintln!("The IP supplied to --connect ('{ip}') is malformed: {e}");
+                        eprintln!("The IP supplied to --peers ('{ip}') is malformed: {e}");
+                        None
+                    }
+                })
+                .collect()),
+        }
+    }
+
+    /// Returns the initial validator(s) to connect to, from the given configurations.
+    fn parse_trusted_validators(&self) -> Result<Vec<SocketAddr>> {
+        match self.validators.is_empty() {
+            true => Ok(vec![]),
+            false => Ok(self
+                .validators
+                .split(',')
+                .flat_map(|ip| match ip.parse::<SocketAddr>() {
+                    Ok(ip) => Some(ip),
+                    Err(e) => {
+                        eprintln!("The IP supplied to --validators ('{ip}') is malformed: {e}");
                         None
                     }
                 })
@@ -153,18 +180,16 @@ impl Start {
     }
 
     /// Returns the CDN to prefetch initial blocks from, from the given configurations.
-    #[allow(clippy::if_same_then_else)]
     fn parse_cdn(&self) -> Option<String> {
+        // Determine if the node type is not declared.
+        let is_no_node_type = !(self.validator || self.prover || self.client);
+
         // Disable CDN if:
         //  1. The node is in development mode.
         //  2. The user has explicitly disabled CDN.
-        //  3. The node is a client (no need to sync).
-        //  4. The node is a prover (no need to sync).
-        if self.dev.is_some() || self.cdn.is_empty() || self.client || self.prover {
-            None
-        }
-        // Check for an edge case, where the node defaults to a client.
-        else if !(self.beacon || self.validator || self.prover || self.client) {
+        //  3. The node is a prover (no need to sync).
+        //  4. The node type is not declared (defaults to client) (no need to sync).
+        if self.dev.is_some() || self.cdn.is_empty() || self.prover || is_no_node_type {
             None
         }
         // Enable the CDN otherwise.
@@ -173,54 +198,61 @@ impl Start {
         }
     }
 
-    /// Read the private key directly from an argument or from a filesystem location.
-    fn parse_private_key(&mut self) -> Result<()> {
-        // Ensure only one private key flag is provided to the CLI.
-        if self.private_key.is_some() && self.private_key_path.is_some() {
-            bail!("Both the private key string and file path flags were specified, please pick only one");
-        }
-
-        // If the private key is provided directly, don't do anything else; make sure it's non-empty too.
-        if let Some(private_key) = &self.private_key {
-            if private_key.is_empty() {
-                bail!("The private-key argument can't be empty");
-            } else {
-                return Ok(());
+    /// Read the private key directly from an argument or from a filesystem location,
+    /// returning the Aleo account.
+    fn parse_private_key<N: Network>(&self) -> Result<Account<N>> {
+        match (&self.private_key, &self.private_key_file) {
+            // Parse the private key directly.
+            (Some(private_key), None) => Account::from_str(private_key.trim()),
+            // Parse the private key from a file.
+            (None, Some(path)) => Account::from_str(std::fs::read_to_string(path)?.trim()),
+            // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
+            (None, None) => {
+                if self.client {
+                    Account::new(&mut rand::thread_rng())
+                } else if let Some(dev) = self.dev {
+                    // Sample the private key of this node.
+                    Account::try_from({
+                        // Initialize the (fixed) RNG.
+                        let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
+                        // Iterate through 'dev' address instances to match the account.
+                        for _ in 0..dev {
+                            let _ = PrivateKey::<N>::new(&mut rng)?;
+                        }
+                        PrivateKey::<N>::new(&mut rng)?
+                    })
+                } else {
+                    bail!("Missing the '--private-key' or '--private-key-file' argument")
+                }
             }
-        }
-
-        // If a filesystem path to the private key is provided, attempt to
-        // read it and overwrite `self.private_key` in case of success.
-        if let Some(path) = &self.private_key_path {
-            let private_key = std::fs::read_to_string(path)?;
-            self.private_key = Some(private_key);
-            return Ok(());
-        }
-
-        // Only allow the private key to be missing if the node type is unspecified, in line with `parse_account`.
-        if self.beacon || self.validator || self.prover || self.client {
-            bail!("Misconfiguration; if the node type is provided, the private key must also be present.");
-        } else {
-            Ok(())
+            // Ensure only one private key flag is provided to the CLI.
+            (Some(_), Some(_)) => {
+                bail!("Cannot use '--private-key' and '--private-key-file' simultaneously, please use only one")
+            }
         }
     }
 
-    /// Updates the configurations if the node is in development mode, and returns the
-    /// alternative genesis block if the node is in development mode. Otherwise, returns the actual genesis block.
-    fn parse_development<N: Network>(&mut self, trusted_peers: &mut Vec<SocketAddr>) -> Result<Block<N>> {
+    /// Updates the configurations if the node is in development mode.
+    fn parse_development(
+        &mut self,
+        trusted_peers: &mut Vec<SocketAddr>,
+        trusted_validators: &mut Vec<SocketAddr>,
+    ) -> Result<()> {
         // If `--dev` is set, assume the dev nodes are initialized from 0 to `dev`,
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
         // and the REST IP to `3030 + dev`.
         if let Some(dev) = self.dev {
-            // Only one beacon node is allowed in testing. To avoid ambiguity, we require
-            // the beacon to be the first node in the dev network.
-            if dev > 0 && self.beacon {
-                bail!("At most one beacon at '--dev 0' is supported in development mode");
-            }
-
             // Add the dev nodes to the trusted peers.
             for i in 0..dev {
-                trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+                if i != dev {
+                    trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+                }
+            }
+            // To avoid ambiguity, we define the first few nodes to be the trusted validators to connect to.
+            for i in 0..2 {
+                if i != dev {
+                    trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
+                }
             }
             // Set the node IP to `4130 + dev`.
             self.node = SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?;
@@ -228,56 +260,62 @@ impl Start {
             if !self.norest {
                 self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
             }
+        }
+        Ok(())
+    }
 
-            // Initialize an (insecure) fixed RNG.
-            let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
-            // Initialize the beacon private key.
-            let beacon_private_key = PrivateKey::<N>::new(&mut rng)?;
-            // Initialize a new VM.
-            let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
-            // Initialize the genesis block.
-            let genesis = vm.genesis(&beacon_private_key, &mut rng)?;
+    /// Returns an alternative genesis block if the node is in development mode.
+    /// Otherwise, returns the actual genesis block.
+    fn parse_genesis<N: Network>(&self) -> Result<Block<N>> {
+        if self.dev.is_some() {
+            // Initialize the (fixed) RNG.
+            let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
+            // Initialize the development private keys.
+            let development_private_keys = (0..DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE)
+                .map(|_| PrivateKey::<N>::new(&mut rng))
+                .collect::<Result<Vec<_>>>()?;
 
-            // A helper method to set the account private key in the node type.
-            let sample_account = |node: &mut Option<String>, is_beacon: bool| -> Result<()> {
-                let account = match is_beacon {
-                    true => Account::<N>::try_from(beacon_private_key)?,
-                    false => Account::<N>::new(&mut rand::thread_rng())?,
-                };
-                *node = Some(account.private_key().to_string());
-                println!(
-                    "⚠️  Attention - Sampling a *one-time* account for this instance, please save this securely:\n\n{account}\n"
-                );
-                Ok(())
-            };
+            // Construct the committee members.
+            let members = development_private_keys
+                .iter()
+                .take(DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as usize)
+                .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_VALIDATOR_STAKE, true))))
+                .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+            // Construct the committee.
+            let committee = Committee::<N>::new_genesis(members)?;
 
-            // If the beacon type flag is set, override the private key.
-            if self.beacon {
-                sample_account(&mut self.private_key, true)?;
-            }
-            // If the node type flag is set, but no private key is provided, then sample one.
-            else if self.private_key.is_none() && (self.validator || self.prover || self.client) {
-                sample_account(&mut self.private_key, false)?;
-            }
+            // Determine the public balance per validator.
+            let public_balance_per_validator = (N::STARTING_SUPPLY
+                - (DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64 * MIN_VALIDATOR_STAKE))
+                / (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64);
+            assert_eq!(
+                N::STARTING_SUPPLY,
+                (DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64 * MIN_VALIDATOR_STAKE)
+                    + (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64 * public_balance_per_validator),
+                "The public balance per validator is not correct."
+            );
 
-            Ok(genesis)
+            // Construct the public balances.
+            let public_balances = development_private_keys
+                .iter()
+                .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
+                .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+
+            // Construct the genesis block.
+            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
         } else {
             Block::from_bytes_le(N::genesis_bytes())
         }
     }
 
-    /// Returns the node account and node type, from the given configurations.
-    fn parse_account<N: Network>(&self) -> Result<(Account<N>, NodeType)> {
-        // `parse_private_key` ensured that the private key, if provided, is stored in `self.private_key`.
-        let private_key = self.private_key.as_deref().unwrap_or_default();
-        // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
-        match (&self.beacon, &self.validator, &self.prover, &self.client) {
-            (true, false, false, false) => Ok((Account::<N>::from_str(private_key)?, NodeType::Beacon)),
-            (false, true, false, false) => Ok((Account::<N>::from_str(private_key)?, NodeType::Validator)),
-            (false, false, true, false) => Ok((Account::<N>::from_str(private_key)?, NodeType::Prover)),
-            (false, false, false, true) => Ok((Account::<N>::from_str(private_key)?, NodeType::Client)),
-            (false, false, false, false) => Ok((Account::<N>::new(&mut rand::thread_rng())?, NodeType::Client)),
-            _ => bail!("Unsupported node configuration"),
+    /// Returns the node type, from the given configurations.
+    const fn parse_node_type(&self) -> NodeType {
+        if self.validator {
+            NodeType::Validator
+        } else if self.prover {
+            NodeType::Prover
+        } else {
+            NodeType::Client
         }
     }
 
@@ -287,26 +325,28 @@ impl Start {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
 
-        // Parse the trusted IPs to connect to.
+        // Parse the trusted peers to connect to.
         let mut trusted_peers = self.parse_trusted_peers()?;
+        // Parse the trusted validators to connect to.
+        let mut trusted_validators = self.parse_trusted_validators()?;
+        // Parse the development configurations.
+        self.parse_development(&mut trusted_peers, &mut trusted_validators)?;
 
         // Parse the CDN.
         let cdn = self.parse_cdn();
 
-        // Parse the development configurations, and determine the genesis block.
-        let genesis = self.parse_development::<N>(&mut trusted_peers)?;
+        // Parse the genesis block.
+        let genesis = self.parse_genesis::<N>()?;
+        // Parse the private key of the node.
+        let account = self.parse_private_key::<N>()?;
+        // Parse the node type.
+        let node_type = self.parse_node_type();
 
         // Parse the REST IP.
         let rest_ip = match self.norest {
             true => None,
             false => Some(self.rest),
         };
-
-        // Parse the node's private key.
-        self.parse_private_key()?;
-
-        // Parse the node account and node type.
-        let (account, node_type) = self.parse_account::<N>()?;
 
         // If the display is not enabled, render the welcome message.
         if self.nodisplay {
@@ -322,7 +362,7 @@ impl Start {
             );
 
             // If the node is running a REST server, print the REST IP and JWT.
-            if node_type.is_beacon() || node_type.is_validator() {
+            if node_type.is_validator() {
                 if let Some(rest_ip) = rest_ip {
                     println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
 
@@ -333,37 +373,40 @@ impl Start {
             }
         }
 
-        // If the node is a beacon, check if the open files limit is lower than recommended.
-        if node_type.is_beacon() {
-            #[cfg(target_family = "unix")]
-            crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT_BEACON);
-        }
         // If the node is a validator, check if the open files limit is lower than recommended.
+        #[cfg(target_family = "unix")]
         if node_type.is_validator() {
-            #[cfg(target_family = "unix")]
-            crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR);
+            crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT);
         }
+        // Check if the machine meets the minimum requirements for a validator.
+        crate::helpers::check_validator_machine(node_type, self.dev.is_some());
 
         // Initialize the node.
         match node_type {
-            NodeType::Beacon => Node::new_beacon(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
-            NodeType::Client => Node::new_client(self.node, account, &trusted_peers, genesis, self.dev).await,
+            NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
         }
     }
 
     /// Returns a runtime for the node.
     fn runtime() -> Runtime {
-        // TODO (howardwu): Fix this.
-        // let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) = if !Self::node_type().is_beacon() {
-        //     ((num_cpus::get() / 8 * 2).max(1), num_cpus::get(), (num_cpus::get() / 8 * 5).max(1))
-        // } else {
-        //     (num_cpus::get(), 512, num_cpus::get()) // 512 is tokio's current default
-        // };
+        // Retrieve the number of cores.
+        let num_cores = num_cpus::get();
+        // Determine the number of main cores.
+        let main_cores = match num_cores {
+            // Insufficient
+            0..=3 => unreachable!("The number of cores is insufficient"),
+            // Efficiency mode
+            4..=8 => 2,
+            // Standard mode
+            9..=16 => 4,
+            // Performance mode
+            _ => 8,
+        };
+
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
-            // { ((num_cpus::get() / 2).max(1), num_cpus::get(), (num_cpus::get() / 4 * 3).max(1)) };
-            { (num_cpus::get().min(8), 512, num_cpus::get().saturating_sub(8).max(1)) };
+            { (num_cores.min(main_cores), 512, num_cores.saturating_sub(main_cores).max(1)) };
 
         // Initialize the parallelization parameters.
         rayon::ThreadPoolBuilder::new()
@@ -383,6 +426,50 @@ impl Start {
     }
 }
 
+/// Loads or computes the genesis block.
+fn load_or_compute_genesis<N: Network>(
+    genesis_private_key: PrivateKey<N>,
+    committee: Committee<N>,
+    public_balances: indexmap::IndexMap<Address<N>, u64>,
+    rng: &mut ChaChaRng,
+) -> Result<Block<N>> {
+    // Construct the preimage.
+    let bytes = to_bytes_le![genesis_private_key, committee, public_balances.iter().collect::<Vec<(_, _)>>()]?;
+    // Initialize the hasher.
+    let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
+    // Compute the hash.
+    let hash = hasher.hash(&bytes.to_bits_le())?.to_string();
+
+    // A closure to load the block.
+    let load_block = |file_path| -> Result<Block<N>> {
+        // Attempts to load the genesis block file locally.
+        let buffer = std::fs::read(file_path)?;
+        // Return the genesis block.
+        Block::from_bytes_le(&buffer)
+    };
+
+    // Construct the file path.
+    let file_path = std::env::temp_dir().join(hash);
+    // Check if the genesis block exists.
+    if file_path.exists() {
+        // If the block loads successfully, return it.
+        if let Ok(block) = load_block(&file_path) {
+            return Ok(block);
+        }
+    }
+
+    /* Otherwise, compute the genesis block and store it. */
+
+    // Initialize a new VM.
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
+    // Initialize the genesis block.
+    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng)?;
+    // Write the genesis block to the file.
+    std::fs::write(&file_path, block.to_bytes_le()?)?;
+    // Return the genesis block.
+    Ok(block)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -393,15 +480,15 @@ mod tests {
 
     #[test]
     fn test_parse_trusted_peers() {
-        let config = Start::try_parse_from(["snarkos", "--connect", ""].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--peers", ""].iter()).unwrap();
         assert!(config.parse_trusted_peers().is_ok());
         assert!(config.parse_trusted_peers().unwrap().is_empty());
 
-        let config = Start::try_parse_from(["snarkos", "--connect", "1.2.3.4:5"].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--peers", "1.2.3.4:5"].iter()).unwrap();
         assert!(config.parse_trusted_peers().is_ok());
         assert_eq!(config.parse_trusted_peers().unwrap(), vec![SocketAddr::from_str("1.2.3.4:5").unwrap()]);
 
-        let config = Start::try_parse_from(["snarkos", "--connect", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--peers", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
         assert!(config.parse_trusted_peers().is_ok());
         assert_eq!(config.parse_trusted_peers().unwrap(), vec![
             SocketAddr::from_str("1.2.3.4:5").unwrap(),
@@ -410,32 +497,25 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_trusted_validators() {
+        let config = Start::try_parse_from(["snarkos", "--validators", ""].iter()).unwrap();
+        assert!(config.parse_trusted_validators().is_ok());
+        assert!(config.parse_trusted_validators().unwrap().is_empty());
+
+        let config = Start::try_parse_from(["snarkos", "--validators", "1.2.3.4:5"].iter()).unwrap();
+        assert!(config.parse_trusted_validators().is_ok());
+        assert_eq!(config.parse_trusted_validators().unwrap(), vec![SocketAddr::from_str("1.2.3.4:5").unwrap()]);
+
+        let config = Start::try_parse_from(["snarkos", "--validators", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
+        assert!(config.parse_trusted_validators().is_ok());
+        assert_eq!(config.parse_trusted_validators().unwrap(), vec![
+            SocketAddr::from_str("1.2.3.4:5").unwrap(),
+            SocketAddr::from_str("6.7.8.9:0").unwrap()
+        ]);
+    }
+
+    #[test]
     fn test_parse_cdn() {
-        // Beacon (Prod)
-        let config = Start::try_parse_from(["snarkos", "--beacon", "--private-key", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_some());
-        let config =
-            Start::try_parse_from(["snarkos", "--beacon", "--private-key", "aleo1xx", "--cdn", "url"].iter()).unwrap();
-        assert!(config.parse_cdn().is_some());
-        let config =
-            Start::try_parse_from(["snarkos", "--beacon", "--private-key", "aleo1xx", "--cdn", ""].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
-
-        // Beacon (Dev)
-        let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "--private-key", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
-        let config = Start::try_parse_from(
-            ["snarkos", "--dev", "0", "--beacon", "--private-key", "aleo1xx", "--cdn", "url"].iter(),
-        )
-        .unwrap();
-        assert!(config.parse_cdn().is_none());
-        let config = Start::try_parse_from(
-            ["snarkos", "--dev", "0", "--beacon", "--private-key", "aleo1xx", "--cdn", ""].iter(),
-        )
-        .unwrap();
-        assert!(config.parse_cdn().is_none());
-
         // Validator (Prod)
         let config = Start::try_parse_from(["snarkos", "--validator", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_some());
@@ -489,10 +569,10 @@ mod tests {
 
         // Client (Prod)
         let config = Start::try_parse_from(["snarkos", "--client", "--private-key", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
+        assert!(config.parse_cdn().is_some());
         let config =
             Start::try_parse_from(["snarkos", "--client", "--private-key", "aleo1xx", "--cdn", "url"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
+        assert!(config.parse_cdn().is_some());
         let config =
             Start::try_parse_from(["snarkos", "--client", "--private-key", "aleo1xx", "--cdn", ""].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
@@ -530,81 +610,74 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_development() {
+    fn test_parse_development_and_genesis() {
         let prod_genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
 
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config = Start::try_parse_from(["snarkos"].iter()).unwrap();
-        let candidate_genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        let candidate_genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(trusted_peers.len(), 0);
+        assert_eq!(trusted_validators.len(), 0);
         assert_eq!(candidate_genesis, prod_genesis);
 
         let _config = Start::try_parse_from(["snarkos", "--dev", ""].iter()).unwrap_err();
 
-        // Remove this for Phase 3.
-        let mut config =
-            Start::try_parse_from(["snarkos", "--dev", "1", "--beacon", "--private-key", ""].iter()).unwrap();
-        config.parse_development::<CurrentNetwork>(&mut vec![]).unwrap_err();
-
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config = Start::try_parse_from(["snarkos", "--dev", "0"].iter()).unwrap();
-        let expected_genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        let expected_genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
-        assert!(!config.beacon);
+        assert_eq!(trusted_validators.len(), 1);
         assert!(!config.validator);
         assert!(!config.prover);
         assert!(!config.client);
         assert_ne!(expected_genesis, prod_genesis);
 
         let mut trusted_peers = vec![];
-        let mut config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "--private-key", ""].iter()).unwrap();
-        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
-        assert_eq!(trusted_peers.len(), 0);
-        assert!(config.beacon);
-        assert!(!config.validator);
-        assert!(!config.prover);
-        assert!(!config.client);
-        assert_eq!(genesis, expected_genesis);
-
-        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config =
             Start::try_parse_from(["snarkos", "--dev", "1", "--validator", "--private-key", ""].iter()).unwrap();
-        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4131").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
         assert_eq!(trusted_peers.len(), 1);
-        assert!(!config.beacon);
+        assert_eq!(trusted_validators.len(), 1);
         assert!(config.validator);
         assert!(!config.prover);
         assert!(!config.client);
         assert_eq!(genesis, expected_genesis);
 
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config =
             Start::try_parse_from(["snarkos", "--dev", "2", "--prover", "--private-key", ""].iter()).unwrap();
-        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4132").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
         assert_eq!(trusted_peers.len(), 2);
-        assert!(!config.beacon);
+        assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
         assert!(config.prover);
         assert!(!config.client);
         assert_eq!(genesis, expected_genesis);
 
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config =
             Start::try_parse_from(["snarkos", "--dev", "3", "--client", "--private-key", ""].iter()).unwrap();
-        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4133").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
         assert_eq!(trusted_peers.len(), 3);
-        assert!(!config.beacon);
+        assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
         assert!(!config.prover);
         assert!(config.client);
@@ -624,7 +697,9 @@ mod tests {
             "PRIVATE_KEY",
             "--cdn",
             "CDN",
-            "--connect",
+            "--peers",
+            "IP1,IP2,IP3",
+            "--validators",
             "IP1,IP2,IP3",
             "--rest",
             "127.0.0.1:3033",
@@ -639,7 +714,8 @@ mod tests {
             assert_eq!(start.cdn, "CDN");
             assert_eq!(start.rest, "127.0.0.1:3033".parse().unwrap());
             assert_eq!(start.network, 3);
-            assert_eq!(start.connect, "IP1,IP2,IP3");
+            assert_eq!(start.peers, "IP1,IP2,IP3");
+            assert_eq!(start.validators, "IP1,IP2,IP3");
         } else {
             panic!("Unexpected result of clap parsing!");
         }

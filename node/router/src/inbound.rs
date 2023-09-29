@@ -12,17 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Outbound, Peer};
-use snarkos_node_messages::{
-    BeaconPropose,
-    BlockRequest,
-    DataBlocks,
-    Message,
-    PeerResponse,
-    Ping,
-    Pong,
-    UnconfirmedSolution,
-    UnconfirmedTransaction,
+use crate::{
+    messages::{
+        BlockRequest,
+        BlockResponse,
+        DataBlocks,
+        Message,
+        PeerResponse,
+        Ping,
+        Pong,
+        UnconfirmedSolution,
+        UnconfirmedTransaction,
+    },
+    Outbound,
+    Peer,
 };
 use snarkos_node_tcp::{is_bogon_address, protocols::Reading};
 use snarkvm::prelude::{
@@ -31,7 +34,7 @@ use snarkvm::prelude::{
     Network,
 };
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{anyhow, bail, Result};
 use std::{net::SocketAddr, time::Instant};
 use tokio::task::spawn_blocking;
 
@@ -61,53 +64,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // This match statement handles the inbound message by deserializing the message,
         // checking the message is valid, and then calling the appropriate (trait) handler.
         match message {
-            Message::BeaconPropose(message) => {
-                // Ensure this node is a beacon.
-                ensure!(self.router().node_type().is_beacon(), "[BeaconPropose] This node is not a beacon");
-                // Ensure the peer is a beacon.
-                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconPropose] '{peer_ip}' is not a beacon");
-
-                // Clone the serialized message.
-                let serialized = message.clone();
-                // Perform the deferred non-blocking deserialization of the block.
-                let block = match message.block.deserialize().await {
-                    Ok(block) => block,
-                    Err(error) => bail!("[BeaconPropose] {error}"),
-                };
-                // Check that the block parameters match.
-                if message.round != block.round()
-                    || message.block_height != block.height()
-                    || message.block_hash != block.hash()
-                {
-                    bail!("Peer '{peer_ip}' is not following the 'BeaconPropose' protocol")
-                }
-                // TODO (howardwu): Preemptively check the block signature is valid against the peer's account address.
-                //  Only the block proposer should be able to send a valid block signature. This message type should not
-                //  be propagated by any other peers.
-                // Handle the block proposal.
-                match self.beacon_propose(peer_ip, serialized, block) {
-                    true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid block proposal"),
-                }
-            }
-            Message::BeaconTimeout(_message) => {
-                // Ensure this node is a beacon.
-                ensure!(self.router().node_type().is_beacon(), "[BeaconTimeout] This node is not a beacon");
-                // Ensure the peer is a beacon.
-                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconTimeout] '{peer_ip}' is not a beacon");
-                // TODO (howardwu): Add timeout handling.
-                // Disconnect as the peer is not following the protocol.
-                bail!("Peer '{peer_ip}' is not following the protocol")
-            }
-            Message::BeaconVote(_message) => {
-                // Ensure this node is a beacon.
-                ensure!(self.router().node_type().is_beacon(), "[BeaconVote] This node is not a beacon");
-                // Ensure the peer is a beacon.
-                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconVote] '{peer_ip}' is not a beacon");
-                // TODO (howardwu): Add vote handling.
-                // Disconnect as the peer is not following the protocol.
-                bail!("Peer '{peer_ip}' is not following the protocol")
-            }
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
 
@@ -127,33 +83,16 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::BlockResponse(message) => {
-                let request = message.request;
+                let BlockResponse { request, blocks } = message;
 
                 // Remove the block request, checking if this node previously sent a block request to this peer.
                 if !self.router().cache.remove_outbound_block_request(peer_ip, &request) {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
                 }
-
                 // Perform the deferred non-blocking deserialization of the blocks.
-                let blocks = match message.blocks.deserialize().await {
-                    Ok(blocks) => blocks,
-                    Err(error) => bail!("[PuzzleResponse] {error}"),
-                };
-
-                // Ensure the blocks are not empty.
-                ensure!(!blocks.is_empty(), "Peer '{peer_ip}' sent an empty block response (request = {request})");
-                // Check that the blocks are sequentially ordered.
-                if !blocks.windows(2).all(|w| w[0].height() + 1 == w[1].height()) {
-                    bail!("Peer '{peer_ip}' sent an invalid block response (blocks are not sequentially ordered)")
-                }
-
-                // Retrieve the start (inclusive) and end (exclusive) block height.
-                let start_height = blocks.first().map(|b| b.height()).unwrap_or(0);
-                let end_height = 1 + blocks.last().map(|b| b.height()).unwrap_or(0);
-                // Check that the range matches the block request.
-                if start_height != request.start_height || end_height != request.end_height {
-                    bail!("Peer '{peer_ip}' sent an invalid block response (range does not match the block request)")
-                }
+                let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+                // Ensure the block response is well-formed.
+                blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
 
                 // Process the block response.
                 let node = self.clone();
@@ -177,10 +116,51 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 true => Ok(()),
                 false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
             },
-            Message::Ping(message) => match self.ping(peer_ip, message) {
-                true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid ping"),
-            },
+            Message::Ping(message) => {
+                // Ensure the message protocol version is not outdated.
+                if message.version < Message::<N>::VERSION {
+                    bail!("Dropping '{peer_ip}' on message version {} (outdated)", message.version);
+                }
+
+                // If the peer is a client or validator, ensure there are block locators.
+                let is_client_or_validator = message.node_type.is_client() || message.node_type.is_validator();
+                if is_client_or_validator && message.block_locators.is_none() {
+                    bail!("Peer '{peer_ip}' is a {}, but no block locators were provided", message.node_type);
+                }
+                // If the peer is a prover, ensure there are no block locators.
+                else if message.node_type.is_prover() && message.block_locators.is_some() {
+                    bail!("Peer '{peer_ip}' is a prover or client, but block locators were provided");
+                }
+
+                // Update the connected peer.
+                if let Err(error) =
+                    self.router().update_connected_peer(peer_ip, message.node_type, |peer: &mut Peer<N>| {
+                        // Update the version of the peer.
+                        peer.set_version(message.version);
+                        // Update the node type of the peer.
+                        peer.set_node_type(message.node_type);
+                        // Update the last seen timestamp of the peer.
+                        peer.set_last_seen(Instant::now());
+                    })
+                {
+                    bail!("[Ping] {error}");
+                }
+
+                // TODO (howardwu): For this case, check that the peer is not within NUM_RECENTS, and disconnect.
+                //  As the validator, you should disconnect any node type that is not caught up.
+
+                // // If this node is a validator, the peer is not a validator and is syncing, proceed to disconnect.
+                // if self.node_type == NodeType::Validator && node_type != NodeType::Validator && peer_status == Status::Syncing {
+                //     warn!("Dropping '{peer_addr}' as this node is ahead");
+                //     return Some(DisconnectReason::INeedToSyncFirst);
+                // }
+
+                // Process the ping message.
+                match self.ping(peer_ip, message) {
+                    true => Ok(()),
+                    false => bail!("Peer '{peer_ip}' sent an invalid ping"),
+                }
+            }
             Message::Pong(message) => match self.pong(peer_ip, message) {
                 true => Ok(()),
                 false => bail!("Peer '{peer_ip}' sent an invalid pong"),
@@ -262,30 +242,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Peer '{peer_ip}' is not following the 'UnconfirmedTransaction' protocol")
                 }
                 // Handle the unconfirmed transaction.
-                match self.unconfirmed_transaction(peer_ip, serialized, transaction) {
+                match self.unconfirmed_transaction(peer_ip, serialized, transaction).await {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed transaction"),
                 }
             }
         }
-    }
-
-    /// Handles a `BeaconPropose` message.
-    fn beacon_propose(&self, _peer_ip: SocketAddr, _serialized: BeaconPropose<N>, _block: Block<N>) -> bool {
-        // pub const ALEO_MAXIMUM_FORK_DEPTH: u32 = (NUM_RECENTS as u32).saturating_sub(1);
-        //
-        // // Retrieve the connected peers by height.
-        // let mut peers = self.router().sync().get_sync_peers_by_height();
-        // // Retain the peers that 1) not the sender, and 2) are within the fork depth of the given block.
-        // peers.retain(|(ip, height)| *ip != peer_ip && *height < block.height() + ALEO_MAXIMUM_FORK_DEPTH);
-        //
-        // // Broadcast the `BeaconPropose` to the peers.
-        // if !peers.is_empty() {
-        //     for (peer_ip, _) in peers {
-        //         self.send(peer_ip, Message::BeaconPropose(serialized.clone()));
-        //     }
-        // }
-        false
     }
 
     /// Handles a `BlockRequest` message.
@@ -314,73 +276,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         true
     }
 
-    fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
-        // Ensure the message protocol version is not outdated.
-        if message.version < Message::<N>::VERSION {
-            warn!("Dropping '{peer_ip}' on version {} (outdated)", message.version);
-            return false;
-        }
-
-        // If the peer is a beacon or validator, ensure there are block locators.
-        if (message.node_type.is_beacon() || message.node_type.is_validator()) && message.block_locators.is_none() {
-            warn!("Peer '{peer_ip}' is a beacon or validator, but no block locators were provided");
-            return false;
-        }
-        // If the peer is a prover or client, ensure there are no block locators.
-        if (message.node_type.is_prover() || message.node_type.is_client()) && message.block_locators.is_some() {
-            warn!("Peer '{peer_ip}' is a prover or client, but block locators were provided");
-            return false;
-        }
-        // If block locators were provided, then update the peer in the sync pool.
-        if let Some(block_locators) = message.block_locators {
-            // Check the block locators are valid, and update the peer in the sync pool.
-            if let Err(error) = self.router().sync().update_peer_locators(peer_ip, block_locators) {
-                warn!("Peer '{peer_ip}' sent invalid block locators: {error}");
-                return false;
-            }
-        }
-
-        // Update the connected peer.
-        if let Err(error) = self.router().update_connected_peer(peer_ip, message.node_type, |peer: &mut Peer<N>| {
-            // Update the version of the peer.
-            peer.set_version(message.version);
-            // Update the node type of the peer.
-            peer.set_node_type(message.node_type);
-            // Update the last seen timestamp of the peer.
-            peer.set_last_seen(Instant::now());
-        }) {
-            warn!("[Ping] {error}");
-            return false;
-        }
-
-        // TODO (howardwu): For this case, if your canon height is not within NUM_RECENTS of the beacon,
-        //  then disconnect.
-
-        // // If this node is not a beacon and is syncing, the peer is a beacon, and this node is ahead, proceed to disconnect.
-        // if E::NODE_TYPE != NodeType::Beacon
-        //     && E::status().is_syncing()
-        //     && node_type == NodeType::Beacon
-        //     && state.ledger().reader().latest_cumulative_weight() > block_header.cumulative_weight()
-        // {
-        //     trace!("Disconnecting from {} (ahead of beacon)", peer_ip);
-        //     break;
-        // }
-
-        // TODO (howardwu): For this case, check that the peer is not within NUM_RECENTS, and disconnect.
-        //  As the beacon, you should disconnect any node type that is not caught up.
-
-        // // If this node is a beacon, the peer is not a beacon and is syncing, proceed to disconnect.
-        // if self.node_type == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
-        //     warn!("Dropping '{peer_addr}' as this node is ahead");
-        //     return Some(DisconnectReason::INeedToSyncFirst);
-        // }
-
-        let is_fork = Some(false);
-
-        // Send a `Pong` message to the peer.
-        self.send(peer_ip, Message::Pong(Pong { is_fork }));
-        true
-    }
+    /// Handles a `Ping` message.
+    fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool;
 
     /// Sleeps for a period and then sends a `Ping` message to the peer.
     fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool;
@@ -400,7 +297,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     ) -> bool;
 
     /// Handles an `UnconfirmedTransaction` message.
-    fn unconfirmed_transaction(
+    async fn unconfirmed_transaction(
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedTransaction<N>,

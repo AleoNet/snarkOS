@@ -24,12 +24,21 @@ use tracing_subscriber::{
 };
 
 /// Initializes the logger.
+///
+/// ```ignore
+/// 0 => info
+/// 1 => info, debug
+/// 2 => info, debug, trace
+/// 3 => info, debug, trace, snarkos_node_narwhal::gateway=trace
+/// 4 => info, debug, trace, snarkos_node_narwhal=trace
+/// 5 => info, debug, trace, snarkos_node_router=trace
+/// 6 => info, debug, trace, snarkos_node_tcp=trace
+/// ```
 pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile: P) -> mpsc::Receiver<Vec<u8>> {
     match verbosity {
         0 => std::env::set_var("RUST_LOG", "info"),
         1 => std::env::set_var("RUST_LOG", "debug"),
-        2..=4 => std::env::set_var("RUST_LOG", "trace"),
-        _ => std::env::set_var("RUST_LOG", "info"),
+        2.. => std::env::set_var("RUST_LOG", "trace"),
     };
 
     // Filter out undesirable logs. (unfortunately EnvFilter cannot be cloned)
@@ -42,7 +51,25 @@ pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile
             .add_directive("want=off".parse().unwrap())
             .add_directive("warp=off".parse().unwrap());
 
-        if verbosity > 3 {
+        let filter = if verbosity > 3 {
+            filter.add_directive("snarkos_node_narwhal::gateway=trace".parse().unwrap())
+        } else {
+            filter.add_directive("snarkos_node_narwhal::gateway=debug".parse().unwrap())
+        };
+
+        let filter = if verbosity > 4 {
+            filter.add_directive("snarkos_node_narwhal=trace".parse().unwrap())
+        } else {
+            filter.add_directive("snarkos_node_narwhal=debug".parse().unwrap())
+        };
+
+        let filter = if verbosity > 5 {
+            filter.add_directive("snarkos_node_router=trace".parse().unwrap())
+        } else {
+            filter.add_directive("snarkos_node_router=off".parse().unwrap())
+        };
+
+        if verbosity > 6 {
             filter.add_directive("snarkos_node_tcp=trace".parse().unwrap())
         } else {
             filter.add_directive("snarkos_node_tcp=off".parse().unwrap())

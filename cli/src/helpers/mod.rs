@@ -24,7 +24,8 @@ pub use logger::*;
 pub mod updater;
 pub use updater::*;
 
-#[cfg(target_family = "unix")]
+use snarkos_node::router::messages::NodeType;
+
 use colored::*;
 #[cfg(target_family = "unix")]
 use nix::sys::resource::{getrlimit, Resource};
@@ -39,27 +40,76 @@ pub fn check_open_files_limit(minimum: u64) {
             if soft_limit < minimum {
                 // Warn about too low limit.
                 let warning = [
-                    format!("⚠️  Current open files limit ({soft_limit}) for this process is lower than recommended."),
-                    format!("⚠️  Please raise it to at least {minimum} to ensure correct behavior of the node."),
-                    "⚠️  See `ulimit` command and `/etc/security/limits.conf` for more details.".to_owned(),
+                    format!("⚠️  The open files limit ({soft_limit}) for this process is lower than recommended."),
+                    format!("⚠️  To ensure correct behavior of the node, please raise it to at least {minimum}."),
+                    "⚠️  See the `ulimit` command and `/etc/security/limits.conf` for more details.".to_owned(),
                 ]
                 .join("\n")
                 .yellow()
                 .bold();
-                eprintln!("\n{warning}\n");
+                eprintln!("{warning}\n");
             }
         }
         Err(err) => {
             // Warn about unknown limit.
             let warning = [
-                format!("⚠️  Couldn't check process's open files limit due to {err}."),
-                format!("⚠️  Please make sure it's at least {minimum} to ensure correct behavior of the node."),
-                "⚠️  See `ulimit` command and `/etc/security/limits.conf` for more details.".to_owned(),
+                format!("⚠️  Unable to check the open files limit for this process due to {err}."),
+                format!("⚠️  To ensure correct behavior of the node, please ensure it is at least {minimum}."),
+                "⚠️  See the `ulimit` command and `/etc/security/limits.conf` for more details.".to_owned(),
             ]
             .join("\n")
             .yellow()
             .bold();
-            eprintln!("\n{warning}\n");
+            eprintln!("{warning}\n");
         }
     };
+}
+
+/// Returns the RAM memory in GiB.
+pub(crate) fn detect_ram_memory() -> Result<u64, sys_info::Error> {
+    let ram_kib = sys_info::mem_info()?.total;
+    let ram_mib = ram_kib / 1024;
+    Ok(ram_mib / 1024)
+}
+
+/// Ensures the current system meets the minimum requirements for a validator.
+/// Note: Some of the checks in this method are overly-permissive, in order to ensure
+/// future hardware architecture changes do not prevent validators from running a node.
+#[rustfmt::skip]
+pub(crate) fn check_validator_machine(node_type: NodeType, is_dev: bool) {
+    // If the node is a validator, ensure it meets the minimum requirements.
+    if node_type.is_validator() {
+        // Ensure the system is a Linux-based system.
+        // Note: While macOS is not officially supported, we allow it for development purposes.
+        if !cfg!(target_os = "linux") && !cfg!(target_os = "macos") {
+            let message = "⚠️  The operating system of this machine is not supported for a validator (Ubuntu required)\n".to_string();
+            match is_dev {
+                true => println!("{}", message.yellow().bold()),
+                false => panic!("{message} in production mode"),
+            }
+        }
+        // Retrieve the number of cores.
+        let num_cores = num_cpus::get();
+        // Enforce the minimum number of cores.
+        let min_num_cores = 32;
+        if num_cores < min_num_cores {
+            let message = format!("⚠️  The number of cores ({num_cores} cores) on this machine is insufficient for a validator (minimum {min_num_cores} cores)\n");
+            match is_dev {
+                true => println!("{}", message.yellow().bold()),
+                false => panic!("{message} in production mode"),
+            }
+        }
+        // Enforce the minimum amount of RAM.
+        if let Ok(ram) = crate::helpers::detect_ram_memory() {
+            let min_ram = 60;
+            if ram < min_ram {
+                let message = format!("⚠️  The amount of RAM ({ram} GiB) on this machine is insufficient for a validator (minimum {min_ram} GiB)\n");
+                match is_dev {
+                    true => println!("{}", message.yellow().bold()),
+                    false => panic!("{message} in production mode"),
+                }
+            }
+        }
+
+    }
 }

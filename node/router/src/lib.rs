@@ -19,6 +19,8 @@ extern crate async_trait;
 #[macro_use]
 extern crate tracing;
 
+pub use snarkos_node_router_messages as messages;
+
 mod helpers;
 pub use helpers::*;
 
@@ -37,17 +39,15 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
+use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_messages::NodeType;
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
-#[cfg(not(feature = "test"))]
-use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, str::FromStr, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -72,8 +72,6 @@ pub struct InnerRouter<N: Network> {
     cache: Cache<N>,
     /// The resolver.
     resolver: Resolver,
-    /// The sync pool.
-    sync: Sync<N>,
     /// The set of trusted peers.
     trusted_peers: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
@@ -122,7 +120,6 @@ impl<N: Network> Router<N> {
             account,
             cache: Default::default(),
             resolver: Default::default(),
-            sync: Default::default(),
             trusted_peers: trusted_peers.iter().copied().collect(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
@@ -132,7 +129,9 @@ impl<N: Network> Router<N> {
             is_dev,
         })))
     }
+}
 
+impl<N: Network> Router<N> {
     /// Attempts to connect to the given peer IP.
     pub fn connect(&self, peer_ip: SocketAddr) -> Option<JoinHandle<bool>> {
         // Return early if the attempt is against the protocol rules.
@@ -192,10 +191,10 @@ impl<N: Network> Router<N> {
             if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
                 // Disconnect from this peer.
                 let disconnected = router.tcp.disconnect(peer_addr).await;
-                // FIXME: this shouldn't be necessary; it's a double-check
-                // that the higher-level collection is cleaned up after the
-                // lower-level disconnect.
+                // FIXME (ljedrz): this shouldn't be necessary; it's a double-check
+                //  that the higher-level collection is cleaned up after the lower-level disconnect.
                 if router.is_connected(&peer_ip) && !router.tcp.is_connected(peer_addr) {
+                    warn!("Disconnecting with fallback safety (report this to @ljedrz)");
                     router.remove_connected_peer(peer_ip);
                 }
                 disconnected
@@ -236,11 +235,6 @@ impl<N: Network> Router<N> {
         self.account.address()
     }
 
-    /// Returns the sync pool.
-    pub fn sync(&self) -> &Sync<N> {
-        &self.sync
-    }
-
     /// Returns `true` if the node is in development mode.
     pub fn is_dev(&self) -> bool {
         self.is_dev
@@ -259,11 +253,6 @@ impl<N: Network> Router<N> {
     /// Returns `true` if the node is connected to the given peer IP.
     pub fn is_connected(&self, ip: &SocketAddr) -> bool {
         self.connected_peers.read().contains_key(ip)
-    }
-
-    /// Returns `true` if the given peer IP is a connected beacon.
-    pub fn is_connected_beacon(&self, peer_ip: &SocketAddr) -> bool {
-        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_beacon())
     }
 
     /// Returns `true` if the given peer IP is a connected validator.
@@ -303,11 +292,6 @@ impl<N: Network> Router<N> {
     /// Returns the number of connected peers.
     pub fn number_of_connected_peers(&self) -> usize {
         self.connected_peers.read().len()
-    }
-
-    /// Returns the number of connected beacons.
-    pub fn number_of_connected_beacons(&self) -> usize {
-        self.connected_peers.read().values().filter(|peer| peer.is_beacon()).count()
     }
 
     /// Returns the number of connected validators.
@@ -350,11 +334,6 @@ impl<N: Network> Router<N> {
         self.connected_peers.read().keys().copied().collect()
     }
 
-    /// Returns the list of connected beacons.
-    pub fn connected_beacons(&self) -> Vec<SocketAddr> {
-        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_beacon()).map(|(ip, _)| *ip).collect()
-    }
-
     /// Returns the list of connected validators.
     pub fn connected_validators(&self) -> Vec<SocketAddr> {
         self.connected_peers.read().iter().filter(|(_, peer)| peer.is_validator()).map(|(ip, _)| *ip).collect()
@@ -386,35 +365,15 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of bootstrap peers.
-    #[cfg(not(feature = "test"))]
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
-        if self.is_dev {
-            // In development mode, connect to the dedicated local beacon.
-            match self.node_type.is_beacon() {
-                true => vec![],
-                false => vec![SocketAddr::from(([127, 0, 0, 1], 4130))],
-            }
+        if cfg!(feature = "test") || self.is_dev {
+            vec![]
         } else {
-            // TODO (howardwu): Change this for Phase 3.
             vec![
-                SocketAddr::from_str("24.199.74.2:4133").unwrap(),
-                SocketAddr::from_str("167.172.14.86:4133").unwrap(),
-                SocketAddr::from_str("159.203.146.71:4133").unwrap(),
-                SocketAddr::from_str("188.166.201.188:4133").unwrap(),
-                SocketAddr::from_str("161.35.247.23:4133").unwrap(),
-                SocketAddr::from_str("144.126.245.162:4133").unwrap(),
-                SocketAddr::from_str("138.68.126.82:4133").unwrap(),
-                SocketAddr::from_str("170.64.252.58:4133").unwrap(),
-                SocketAddr::from_str("159.89.211.64:4133").unwrap(),
-                SocketAddr::from_str("143.244.211.239:4133").unwrap(),
+                SocketAddr::from_str("35.227.159.141:4133").unwrap(),
+                SocketAddr::from_str("34.139.203.87:4133").unwrap(),
             ]
         }
-    }
-
-    /// Returns the list of bootstrap peers.
-    #[cfg(feature = "test")]
-    pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
-        vec![]
     }
 
     /// Returns the list of metrics for the connected peers.
@@ -472,7 +431,6 @@ impl<N: Network> Router<N> {
     ) -> Result<()> {
         // Retrieve the peer.
         if let Some(peer) = self.connected_peers.write().get_mut(&peer_ip) {
-            // TODO (howardwu): Consider permitting a validator->beacon and beacon->validator change.
             // Ensure the node type has not changed.
             if peer.node_type() != node_type {
                 bail!("Peer '{peer_ip}' has changed node types from {} to {node_type}", peer.node_type())
@@ -487,8 +445,6 @@ impl<N: Network> Router<N> {
     pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(&peer_ip);
-        // Removes the peer from the sync pool.
-        self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.
@@ -512,7 +468,7 @@ impl<N: Network> Router<N> {
 
     /// Shuts down the router.
     pub async fn shut_down(&self) {
-        trace!("Shutting down the router...");
+        info!("Shutting down the router...");
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.

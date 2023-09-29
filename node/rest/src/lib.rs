@@ -23,8 +23,10 @@ pub use helpers::*;
 mod routes;
 
 use snarkos_node_consensus::Consensus;
-use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
-use snarkos_node_router::Routing;
+use snarkos_node_router::{
+    messages::{Data, Message, UnconfirmedTransaction},
+    Routing,
+};
 use snarkvm::{
     console::{program::ProgramID, types::Field},
     prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},
@@ -53,7 +55,7 @@ use tower_http::{
 #[derive(Clone)]
 pub struct Rest<N: Network, C: ConsensusStorage<N>, R: Routing<N>> {
     /// The consensus module.
-    consensus: Option<Consensus<N, C>>,
+    consensus: Option<Consensus<N>>,
     /// The ledger.
     ledger: Ledger<N, C>,
     /// The node (routing).
@@ -66,7 +68,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
     /// Initializes a new instance of the server.
     pub fn start(
         rest_ip: SocketAddr,
-        consensus: Option<Consensus<N, C>>,
+        consensus: Option<Consensus<N>>,
         ledger: Ledger<N, C>,
         routing: Arc<R>,
     ) -> Result<Self> {
@@ -106,6 +108,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/latest/hash", get(Self::latest_hash))
             .route("/testnet3/latest/block", get(Self::latest_block))
             .route("/testnet3/latest/stateRoot", get(Self::latest_state_root))
+            .route("/testnet3/latest/committee", get(Self::latest_committee))
 
             // GET ../block/..
             .route("/testnet3/block/:height_or_hash", get(Self::get_block))
@@ -136,9 +139,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             // GET misc endpoints.
             .route("/testnet3/blocks", get(Self::get_blocks))
             .route("/testnet3/height/:hash", get(Self::get_height))
+            .route("/testnet3/memoryPool/transmissions", get(Self::get_memory_pool_transmissions))
+            .route("/testnet3/memoryPool/solutions", get(Self::get_memory_pool_solutions))
             .route("/testnet3/memoryPool/transactions", get(Self::get_memory_pool_transactions))
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
-            .route("/testnet3/beacons", get(Self::get_beacons))
+            .route("/testnet3/committee/latest", get(Self::get_committee_latest))
             .route("/testnet3/node/address", get(Self::get_node_address))
 
             // Pass in `Rest` to make things convenient.

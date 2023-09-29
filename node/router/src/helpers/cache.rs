@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_messages::BlockRequest;
+use crate::messages::BlockRequest;
 use snarkvm::prelude::{coinbase::PuzzleCommitment, Network};
 
 use core::hash::Hash;
@@ -136,7 +136,7 @@ impl<N: Network> Cache<N> {
 
     /// Returns `true` if the cache contains a puzzle request from the given peer.
     pub fn contains_outbound_puzzle_request(&self, peer_ip: &SocketAddr) -> bool {
-        self.seen_outbound_puzzle_requests.read().contains_key(peer_ip)
+        self.seen_outbound_puzzle_requests.read().get(peer_ip).map(|r| *r > 0).unwrap_or(false)
     }
 
     /// Increment the peer IP's number of puzzle requests, returning the updated number of puzzle requests.
@@ -202,13 +202,19 @@ impl<N: Network> Cache<N> {
     }
 
     /// Decrements the key's counter in the map, returning the updated counter.
-    fn decrement_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, u16>>, key: K) -> u16 {
+    fn decrement_counter<K: Copy + Hash + Eq>(map: &RwLock<IndexMap<K, u16>>, key: K) -> u16 {
         let mut map_write = map.write();
         // Load the entry for the key, and decrement the counter.
         let entry = map_write.entry(key).or_default();
-        *entry = entry.saturating_sub(1);
+        let value = entry.saturating_sub(1);
+        // If the entry is 0, remove the entry.
+        if *entry == 0 {
+            map_write.remove(&key);
+        } else {
+            *entry = value;
+        }
         // Return the updated counter.
-        *entry
+        value
     }
 
     /// Updates the map by enforcing the maximum cache size.

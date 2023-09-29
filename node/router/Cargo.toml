@@ -40,16 +40,10 @@ features = [ "thread-pool" ]
 
 [dependencies.indexmap]
 version = "2.0"
-features = [ "rayon" ]
-
-[dependencies.itertools]
-version = "0.11"
+features = [ "serde", "rayon" ]
 
 [dependencies.linked-hash-map]
 version = "0.5"
-
-[dependencies.once_cell]
-version = "1"
 
 [dependencies.parking_lot]
 version = "0.12"
@@ -67,8 +61,12 @@ version = "1"
 path = "../../account"
 version = "=2.1.7"
 
-[dependencies.snarkos-node-messages]
-path = "../messages"
+[dependencies.snarkos-node-sync-locators]
+path = "../sync/locators"
+version = "=2.1.7"
+
+[dependencies.snarkos-node-router-messages]
+path = "messages"
 version = "=2.1.7"
 
 [dependencies.snarkos-node-tcp]
@@ -113,12 +111,16 @@ features = [ "sink" ]
 [dev-dependencies.peak_alloc]
 version = "0.2"
 
-[dev-dependencies.snarkos-node-messages]
-path = "../messages"
+[dev-dependencies.snarkos-node-sync]
+path = "../sync"
 features = [ "test" ]
 
 [dev-dependencies.snarkos-node-router]
 path = "."
+features = [ "test" ]
+
+[dev-dependencies.snarkos-node-router-messages]
+path = "messages"
 features = [ "test" ]
 
 [dev-dependencies.tracing-subscriber]

@@ -19,7 +19,4 @@ mod peer;
 pub use peer::*;
 
 mod resolver;
-pub(crate) use resolver::*;
-
-mod sync;
-pub use sync::*;
+pub use resolver::*;

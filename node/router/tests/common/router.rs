@@ -13,16 +13,23 @@
 // limitations under the License.
 
 use crate::common::sample_genesis_block;
-use snarkos_node_messages::{
-    BlockRequest,
-    DisconnectReason,
-    Message,
-    MessageCodec,
-    Pong,
-    UnconfirmedSolution,
-    UnconfirmedTransaction,
+use snarkos_node_router::{
+    messages::{
+        BlockRequest,
+        DisconnectReason,
+        Message,
+        MessageCodec,
+        Ping,
+        Pong,
+        UnconfirmedSolution,
+        UnconfirmedTransaction,
+    },
+    Heartbeat,
+    Inbound,
+    Outbound,
+    Router,
+    Routing,
 };
-use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Connection,
@@ -156,6 +163,11 @@ impl<N: Network> Inbound<N> for TestRouter<N> {
         true
     }
 
+    /// Handles an `Ping` message.
+    fn ping(&self, _peer_ip: SocketAddr, _message: Ping<N>) -> bool {
+        true
+    }
+
     /// Handles an `Pong` message.
     fn pong(&self, _peer_ip: SocketAddr, _message: Pong) -> bool {
         true
@@ -182,7 +194,7 @@ impl<N: Network> Inbound<N> for TestRouter<N> {
     }
 
     /// Handles an `UnconfirmedTransaction` message.
-    fn unconfirmed_transaction(
+    async fn unconfirmed_transaction(
         &self,
         _peer_ip: SocketAddr,
         _serialized: UnconfirmedTransaction<N>,

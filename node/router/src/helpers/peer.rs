@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_messages::{ChallengeRequest, NodeType};
+use crate::messages::{ChallengeRequest, NodeType};
 use snarkvm::prelude::{Address, Network};
 
 use std::{net::SocketAddr, time::Instant};
@@ -60,11 +60,6 @@ impl<N: Network> Peer<N> {
     /// Returns the node type.
     pub const fn node_type(&self) -> NodeType {
         self.node_type
-    }
-
-    /// Returns `true` if the peer is a beacon.
-    pub const fn is_beacon(&self) -> bool {
-        self.node_type.is_beacon()
     }
 
     /// Returns `true` if the peer is a validator.

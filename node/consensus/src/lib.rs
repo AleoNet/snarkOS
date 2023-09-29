@@ -17,174 +17,324 @@
 #[macro_use]
 extern crate tracing;
 
-mod memory_pool;
-pub use memory_pool::*;
-
-#[cfg(test)]
-mod tests;
-
-use snarkvm::prelude::{
-    block::{Block, Transaction},
-    coinbase::{CoinbasePuzzle, ProverSolution},
-    store::ConsensusStorage,
-    *,
+use snarkos_account::Account;
+use snarkos_node_narwhal::{
+    helpers::{
+        fmt_id,
+        init_consensus_channels,
+        ConsensusReceiver,
+        PrimaryReceiver,
+        PrimarySender,
+        Storage as NarwhalStorage,
+    },
+    BFT,
+    MAX_GC_ROUNDS,
+    MAX_TRANSMISSIONS_PER_BATCH,
+};
+use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkvm::{
+    ledger::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{Data, Subdag, Transmission, TransmissionID},
+    },
+    prelude::*,
 };
 
 use anyhow::Result;
+use indexmap::IndexMap;
+use parking_lot::Mutex;
+use std::{future::Future, net::SocketAddr, sync::Arc};
+use tokio::{
+    sync::{oneshot, OnceCell},
+    task::JoinHandle,
+};
 
 #[derive(Clone)]
-pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
+pub struct Consensus<N: Network> {
     /// The ledger.
-    ledger: Ledger<N, C>,
-    /// The memory pool.
-    memory_pool: MemoryPool<N>,
-    /// The boolean flag for the development mode.
-    #[allow(dead_code)]
-    is_dev: bool,
+    ledger: Arc<dyn LedgerService<N>>,
+    /// The BFT.
+    bft: BFT<N>,
+    /// The primary sender.
+    primary_sender: Arc<OnceCell<PrimarySender<N>>>,
+    /// The unconfirmed solutions queue.
+    solutions_queue: Arc<Mutex<IndexMap<PuzzleCommitment<N>, ProverSolution<N>>>>,
+    /// The unconfirmed transactions queue.
+    transactions_queue: Arc<Mutex<IndexMap<N::TransactionID, Transaction<N>>>>,
+    /// The spawned handles.
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+impl<N: Network> Consensus<N> {
     /// Initializes a new instance of consensus.
-    pub fn new(ledger: Ledger<N, C>, is_dev: bool) -> Result<Self> {
-        Ok(Self { ledger, memory_pool: Default::default(), is_dev })
+    pub fn new(
+        account: Account<N>,
+        ledger: Arc<dyn LedgerService<N>>,
+        ip: Option<SocketAddr>,
+        trusted_validators: &[SocketAddr],
+        dev: Option<u16>,
+    ) -> Result<Self> {
+        // Initialize the Narwhal storage.
+        let storage = NarwhalStorage::new(ledger.clone(), MAX_GC_ROUNDS);
+        // Initialize the BFT.
+        let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
+        // Return the consensus.
+        Ok(Self {
+            ledger,
+            bft,
+            primary_sender: Default::default(),
+            solutions_queue: Default::default(),
+            transactions_queue: Default::default(),
+            handles: Default::default(),
+        })
+    }
+
+    /// Run the consensus instance.
+    pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
+        info!("Starting the consensus instance...");
+        // Set the primary sender.
+        self.primary_sender.set(primary_sender.clone()).expect("Primary sender already set");
+
+        // First, initialize the consensus channels.
+        let (consensus_sender, consensus_receiver) = init_consensus_channels();
+        // Then, start the consensus handlers.
+        self.start_handlers(consensus_receiver);
+        // Lastly, the consensus.
+        self.bft.run(Some(consensus_sender), primary_sender, primary_receiver).await?;
+        Ok(())
     }
 
     /// Returns the ledger.
-    pub const fn ledger(&self) -> &Ledger<N, C> {
+    pub const fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
         &self.ledger
     }
 
-    /// Returns the coinbase puzzle.
-    pub const fn coinbase_puzzle(&self) -> &CoinbasePuzzle<N> {
-        self.ledger.coinbase_puzzle()
+    /// Returns the BFT.
+    pub const fn bft(&self) -> &BFT<N> {
+        &self.bft
     }
 
-    /// Returns the memory pool.
-    pub const fn memory_pool(&self) -> &MemoryPool<N> {
-        &self.memory_pool
+    /// Returns the primary sender.
+    pub fn primary_sender(&self) -> &PrimarySender<N> {
+        self.primary_sender.get().expect("Primary sender not set")
+    }
+}
+
+impl<N: Network> Consensus<N> {
+    /// Returns the number of unconfirmed transmissions.
+    pub fn num_unconfirmed_transmissions(&self) -> usize {
+        self.bft.num_unconfirmed_transmissions()
     }
 
-    /// Checks the given transaction is well-formed and unique.
-    pub fn check_transaction_basic(&self, transaction: &Transaction<N>, rejected_id: Option<Field<N>>) -> Result<()> {
-        self.ledger.check_transaction_basic(transaction, rejected_id)
+    /// Returns the number of unconfirmed ratifications.
+    pub fn num_unconfirmed_ratifications(&self) -> usize {
+        self.bft.num_unconfirmed_ratifications()
     }
 
-    /// Checks the given block is valid next block.
-    pub fn check_next_block(&self, block: &Block<N>) -> Result<()> {
-        self.ledger.check_next_block(block)
+    /// Returns the number of solutions.
+    pub fn num_unconfirmed_solutions(&self) -> usize {
+        self.bft.num_unconfirmed_solutions()
+    }
+
+    /// Returns the number of unconfirmed transactions.
+    pub fn num_unconfirmed_transactions(&self) -> usize {
+        self.bft.num_unconfirmed_transactions()
+    }
+}
+
+impl<N: Network> Consensus<N> {
+    /// Returns the unconfirmed transmission IDs.
+    pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.bft.unconfirmed_transmission_ids()
+    }
+
+    /// Returns the unconfirmed transmissions.
+    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.bft.unconfirmed_transmissions()
+    }
+
+    /// Returns the unconfirmed solutions.
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+        self.bft.unconfirmed_solutions()
+    }
+
+    /// Returns the unconfirmed transactions.
+    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.bft.unconfirmed_transactions()
+    }
+}
+
+impl<N: Network> Consensus<N> {
+    /// Adds the given unconfirmed solution to the memory pool.
+    pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
+        // Add the solution to the memory pool.
+        self.solutions_queue.lock().insert(solution.commitment(), solution);
+
+        // If the memory pool of this node is full, return early.
+        let num_unconfirmed = self.num_unconfirmed_transmissions();
+        if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+            return Ok(());
+        }
+        // Retrieve the solutions.
+        let solutions = {
+            // Determine the available capacity.
+            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+            // Acquire the lock on the queue.
+            let mut queue = self.solutions_queue.lock();
+            // Determine the number of solutions to send.
+            let num_solutions = queue.len().min(capacity);
+            // Drain the solutions from the queue.
+            queue.drain(..num_solutions).collect::<Vec<_>>()
+        };
+        // Iterate over the solutions.
+        for (_, solution) in solutions.into_iter() {
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
+            // Send the transaction to the primary.
+            self.primary_sender()
+                .tx_unconfirmed_solution
+                .send((solution.commitment(), Data::Object(solution), callback))
+                .await?;
+            // Ignore the result for the solutions.
+            let _ = callback_receiver.await?;
+        }
+        Ok(())
     }
 
     /// Adds the given unconfirmed transaction to the memory pool.
-    pub fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
-        // Ensure the transaction is not already in the memory pool.
-        if self.memory_pool.contains_unconfirmed_transaction(transaction.id()) {
-            bail!("Transaction is already in the memory pool.");
-        }
-        // Check that the transaction is well-formed and unique.
-        self.check_transaction_basic(&transaction, None)?;
-        // Insert the transaction to the memory pool.
-        self.memory_pool.add_unconfirmed_transaction(&transaction);
+    pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        // Add the transaction to the memory pool.
+        self.transactions_queue.lock().insert(transaction.id(), transaction);
 
+        // If the memory pool of this node is full, return early.
+        let num_unconfirmed = self.num_unconfirmed_transmissions();
+        if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+            return Ok(());
+        }
+        // Retrieve the transactions.
+        let transactions = {
+            // Determine the available capacity.
+            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+            // Acquire the lock on the queue.
+            let mut queue = self.transactions_queue.lock();
+            // Determine the number of transactions to send.
+            let num_transactions = queue.len().min(capacity);
+            // Drain the solutions from the queue.
+            queue.drain(..num_transactions).collect::<Vec<_>>()
+        };
+        // Iterate over the transactions.
+        for (_, transaction) in transactions.into_iter() {
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
+            // Send the transaction to the primary.
+            self.primary_sender()
+                .tx_unconfirmed_transaction
+                .send((transaction.id(), Data::Object(transaction), callback))
+                .await?;
+            // Ignore the result for the transactions.
+            let _ = callback_receiver.await?;
+        }
+        Ok(())
+    }
+}
+
+impl<N: Network> Consensus<N> {
+    /// Starts the consensus handlers.
+    fn start_handlers(&self, consensus_receiver: ConsensusReceiver<N>) {
+        let ConsensusReceiver { mut rx_consensus_subdag } = consensus_receiver;
+
+        // Process the committed subdag and transmissions from the BFT.
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some((committed_subdag, transmissions, callback)) = rx_consensus_subdag.recv().await {
+                self_.process_bft_subdag(committed_subdag, transmissions, callback).await;
+            }
+        });
+    }
+
+    /// Processes the committed subdag and transmissions from the BFT.
+    async fn process_bft_subdag(
+        &self,
+        subdag: Subdag<N>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        callback: oneshot::Sender<Result<()>>,
+    ) {
+        // Try to advance to the next block.
+        let result = self.try_advance_to_next_block(subdag, transmissions.clone());
+        // If the block failed to advance, reinsert the transmissions into the memory pool.
+        if let Err(e) = &result {
+            error!("Unable to advance to the next block - {e}");
+            // On failure, reinsert the transmissions into the memory pool.
+            self.reinsert_transmissions(transmissions).await;
+        }
+        // Send the callback **after** advancing to the next block.
+        // Note: We must await the block to be advanced before sending the callback.
+        callback.send(result).ok();
+    }
+
+    /// Attempts to advance to the next block.
+    fn try_advance_to_next_block(
+        &self,
+        subdag: Subdag<N>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<()> {
+        // Create the candidate next block.
+        let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
+        // Check that the block is well-formed.
+        self.ledger.check_next_block(&next_block)?;
+        // Advance to the next block.
+        self.ledger.advance_to_next_block(&next_block)?;
         Ok(())
     }
 
-    /// Adds the given unconfirmed solution to the memory pool.
-    pub fn add_unconfirmed_solution(&self, solution: &ProverSolution<N>) -> Result<()> {
-        // Ensure the prover solution is not already in the memory pool.
-        if self.memory_pool.contains_unconfirmed_solution(solution.commitment()) {
-            bail!("Prover solution is already in the memory pool.");
+    /// Reinserts the given transmissions into the memory pool.
+    async fn reinsert_transmissions(&self, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
+        // Iterate over the transmissions.
+        for (transmission_id, transmission) in transmissions.into_iter() {
+            // Reinsert the transmission into the memory pool.
+            if let Err(e) = self.reinsert_transmission(transmission_id, transmission).await {
+                warn!("Unable to reinsert transmission {} into the memory pool - {e}", fmt_id(transmission_id));
+            }
         }
-        // Ensure the prover solution is not already in the ledger.
-        if self.ledger.contains_puzzle_commitment(&solution.commitment())? {
-            bail!("Prover solution is already in the ledger.");
-        }
-
-        // Compute the current epoch challenge.
-        let epoch_challenge = self.ledger.latest_epoch_challenge()?;
-        // Retrieve the current proof target.
-        let proof_target = self.ledger.latest_proof_target();
-
-        // Ensure that the prover solution is valid for the given epoch.
-        if !solution.verify(self.coinbase_puzzle().coinbase_verifying_key(), &epoch_challenge, proof_target)? {
-            bail!("Invalid prover solution '{}' for the current epoch.", solution.commitment());
-        }
-
-        // Insert the solution to the memory pool.
-        self.memory_pool.add_unconfirmed_solution(solution)?;
-
-        Ok(())
     }
 
-    /// Returns `true` if the coinbase target is met.
-    pub fn is_coinbase_target_met(&self) -> Result<bool> {
-        // Retrieve the latest proof target.
-        let latest_proof_target = self.ledger.latest_proof_target();
-        // Compute the candidate coinbase target.
-        let cumulative_proof_target = self.memory_pool.candidate_coinbase_target(latest_proof_target)?;
-        // Retrieve the latest coinbase target.
-        let latest_coinbase_target = self.ledger.latest_coinbase_target();
-        // Check if the coinbase target is met.
-        Ok(cumulative_proof_target >= latest_coinbase_target as u128)
-    }
-
-    /// Returns a candidate for the next block in the ledger.
-    pub fn propose_next_block<R: Rng + CryptoRng>(&self, private_key: &PrivateKey<N>, rng: &mut R) -> Result<Block<N>> {
-        // Retrieve the latest block.
-        let latest_block = self.ledger.latest_block();
-        // Retrieve the latest height.
-        let latest_height = latest_block.height();
-        // Retrieve the latest proof target.
-        let latest_proof_target = latest_block.proof_target();
-        // Retrieve the latest coinbase target.
-        let latest_coinbase_target = latest_block.coinbase_target();
-
-        // Select the transactions from the memory pool.
-        let transactions = self.memory_pool.candidate_transactions(self);
-        // Select the prover solutions from the memory pool.
-        let prover_solutions =
-            self.memory_pool.candidate_solutions(self, latest_height, latest_proof_target, latest_coinbase_target)?;
-
-        // Prepare the next block.
-        self.ledger.prepare_advance_to_next_block(private_key, transactions, prover_solutions, rng)
-    }
-
-    /// Advances the ledger to the next block.
-    pub fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
-        // Adds the next block to the ledger.
-        let old_epoch = self.ledger.latest_epoch_number();
-        self.ledger.advance_to_next_block(block)?;
-
-        // Clear the memory pool of unconfirmed transactions that are now invalid.
-        self.memory_pool.clear_invalid_transactions(self);
-
-        // If this starts a new epoch, clear all unconfirmed solutions from the memory pool.
-        if block.epoch_number() > old_epoch {
-            self.memory_pool.clear_all_unconfirmed_solutions();
+    /// Reinserts the given transmission into the memory pool.
+    async fn reinsert_transmission(
+        &self,
+        transmission_id: TransmissionID<N>,
+        transmission: Transmission<N>,
+    ) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback, callback_receiver) = oneshot::channel();
+        // Send the transmission to the primary.
+        match (transmission_id, transmission) {
+            (TransmissionID::Ratification, Transmission::Ratification) => return Ok(()),
+            (TransmissionID::Solution(commitment), Transmission::Solution(solution)) => {
+                // Send the solution to the primary.
+                self.primary_sender().tx_unconfirmed_solution.send((commitment, solution, callback)).await?;
+            }
+            (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+                // Send the transaction to the primary.
+                self.primary_sender().tx_unconfirmed_transaction.send((transaction_id, transaction, callback)).await?;
+            }
+            _ => bail!("Mismatching `(transmission_id, transmission)` pair in consensus"),
         }
-        // Otherwise, if a new coinbase was produced, clear the memory pool of unconfirmed solutions that are now invalid.
-        else if block.coinbase().is_some() {
-            self.memory_pool.clear_invalid_solutions(self);
-        }
-
-        info!("Advanced to block {}", block.height());
-        Ok(())
+        // Await the callback.
+        callback_receiver.await?
     }
 
-    /// Clears the memory pool of invalid solutions and transactions.
-    pub fn refresh_memory_pool(&self) -> Result<()> {
-        // Clear the memory pool of unconfirmed solutions that are now invalid.
-        self.memory_pool.clear_invalid_solutions(self);
-        // Clear the memory pool of unconfirmed transactions that are now invalid.
-        self.memory_pool.clear_invalid_transactions(self);
-        Ok(())
+    /// Spawns a task with the given future; it should only be used for long-running tasks.
+    fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
+        self.handles.lock().push(tokio::spawn(future));
     }
 
-    /// Clears the memory pool of all solutions and transactions.
-    pub fn clear_memory_pool(&self) -> Result<()> {
-        // Clear the memory pool of unconfirmed solutions that are now invalid.
-        self.memory_pool.clear_all_unconfirmed_solutions();
-        // Clear the memory pool of unconfirmed transactions that are now invalid.
-        self.memory_pool.clear_unconfirmed_transactions();
-        Ok(())
+    /// Shuts down the BFT.
+    pub async fn shut_down(&self) {
+        info!("Shutting down consensus...");
+        // Shut down the BFT.
+        self.bft.shut_down().await;
+        // Abort the tasks.
+        self.handles.lock().iter().for_each(|handle| handle.abort());
     }
 }

@@ -93,25 +93,23 @@ impl Execute {
             // Load the program and it's imports into the process.
             load_program(&self.query, &mut vm.process().write(), &self.program_id)?;
 
-            // Prepare the fees.
-            let fee = match self.record {
-                Some(record_string) => {
-                    let fee_record = Developer::parse_record(&private_key, &record_string)?;
-                    Some((fee_record, self.fee.unwrap_or(0)))
-                }
-                None => {
-                    // Ensure that only the `credits.aleo/split` call can be created without a fee.
-                    if self.program_id != ProgramID::from_str("credits.aleo")?
-                        && self.function != Identifier::from_str("split")?
-                    {
-                        bail!("❌ A record must be provided to pay for the transaction fee.");
-                    }
-                    None
-                }
+            // Prepare the fee.
+            let fee_record = match self.record {
+                Some(record_string) => Some(Developer::parse_record(&private_key, &record_string)?),
+                None => None,
             };
+            let priority_fee = self.fee.unwrap_or(0);
 
             // Create a new transaction.
-            vm.execute(&private_key, (self.program_id, self.function), self.inputs.iter(), fee, Some(query), rng)?
+            vm.execute(
+                &private_key,
+                (self.program_id, self.function),
+                self.inputs.iter(),
+                fee_record,
+                priority_fee,
+                Some(query),
+                rng,
+            )?
         };
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 

@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Router;
-use snarkos_node_messages::{BlockLocators, Message, Ping};
+use crate::{
+    messages::{Message, Ping},
+    Router,
+};
+use snarkos_node_sync_locators::BlockLocators;
 use snarkos_node_tcp::protocols::Writing;
 use snarkvm::prelude::Network;
 use std::io;
@@ -74,13 +77,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     fn propagate(&self, message: Message<N>, excluded_peers: &[SocketAddr]) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
-        // if let Message::BeaconPropose(ref mut message) = message {
-        //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
-        //         let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
-        //     } else {
-        //         error!("Block serialization is bugged");
-        //     }
-        // } else if let Message::UnconfirmedSolution(ref mut message) = message {
+        // if let Message::UnconfirmedSolution(ref mut message) = message {
         //     if let Ok(serialized_solution) = Data::serialize(message.solution.clone()).await {
         //         let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
         //     } else {
@@ -104,51 +101,11 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         }
     }
 
-    /// Sends the given message to every connected beacon, excluding the sender and any specified IPs.
-    fn propagate_to_beacons(&self, message: Message<N>, excluded_peers: &[SocketAddr]) {
-        // TODO (howardwu): Serialize large messages once only.
-        // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
-        // if let Message::BeaconPropose(ref mut message) = message {
-        //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
-        //         let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
-        //     } else {
-        //         error!("Block serialization is bugged");
-        //     }
-        // } else if let Message::UnconfirmedSolution(ref mut message) = message {
-        //     if let Ok(serialized_solution) = Data::serialize(message.solution.clone()).await {
-        //         let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
-        //     } else {
-        //         error!("Solution serialization is bugged");
-        //     }
-        // } else if let Message::UnconfirmedTransaction(ref mut message) = message {
-        //     if let Ok(serialized_transaction) = Data::serialize(message.transaction.clone()).await {
-        //         let _ = std::mem::replace(&mut message.transaction, Data::Buffer(serialized_transaction));
-        //     } else {
-        //         error!("Transaction serialization is bugged");
-        //     }
-        // }
-
-        // Prepare the peers to send to.
-        let connected_beacons = self.router().connected_beacons();
-        let peers = connected_beacons.iter().filter(|peer_ip| !excluded_peers.contains(peer_ip));
-
-        // Iterate through all beacons that are not the sender and excluded beacons.
-        for peer_ip in peers {
-            self.send(*peer_ip, message.clone());
-        }
-    }
-
     /// Sends the given message to every connected validator, excluding the sender and any specified IPs.
     fn propagate_to_validators(&self, message: Message<N>, excluded_peers: &[SocketAddr]) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
-        // if let Message::BeaconPropose(ref mut message) = message {
-        //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
-        //         let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
-        //     } else {
-        //         error!("Block serialization is bugged");
-        //     }
-        // } else if let Message::UnconfirmedSolution(ref mut message) = message {
+        // if let Message::UnconfirmedSolution(ref mut message) = message {
         //     if let Ok(serialized_solution) = Data::serialize(message.solution.clone()).await {
         //         let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
         //     } else {
@@ -166,7 +123,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         let connected_validators = self.router().connected_validators();
         let peers = connected_validators.iter().filter(|peer_ip| !excluded_peers.contains(peer_ip));
 
-        // Iterate through all beacons that are not the sender and excluded beacons.
+        // Iterate through all validators that are not the sender and excluded validators.
         for peer_ip in peers {
             self.send(*peer_ip, message.clone());
         }
