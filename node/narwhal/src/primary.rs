@@ -51,6 +51,7 @@ use snarkvm::{
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
@@ -337,10 +338,10 @@ impl<N: Network> Primary<N> {
         for worker in self.workers.iter() {
             transmissions.extend(worker.take_candidates(num_transmissions_per_worker).await);
         }
-        // Determine if there are transmissions to propose.
-        let has_transmissions = !transmissions.is_empty();
+        // Determine if there is at least one transaction to propose.
+        let has_transactions = transmissions.par_keys().any(|id| matches!(id, TransmissionID::Transaction(..)));
         // If the batch is not ready to be proposed, return early.
-        match has_transmissions {
+        match has_transactions {
             true => info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len()),
             false => return Ok(()),
         }
