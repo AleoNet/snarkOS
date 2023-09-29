@@ -63,6 +63,6 @@ pub const MAX_TRANSMISSIONS_PER_WORKER_PING: usize = MAX_TRANSMISSIONS_PER_BATCH
 pub const MAX_WORKERS: u8 = 1; // workers
 
 /// The frequency at which each primary broadcasts a ping to every other node.
-pub const PRIMARY_PING_INTERVAL: u64 = MAX_BATCH_DELAY; // ms
+pub const PRIMARY_PING_INTERVAL: u64 = 2 * MAX_BATCH_DELAY; // ms
 /// The frequency at which each worker broadcasts a ping to every other node.
-pub const WORKER_PING_INTERVAL: u64 = 1500; // ms
+pub const WORKER_PING_INTERVAL: u64 = MAX_BATCH_DELAY; // ms
