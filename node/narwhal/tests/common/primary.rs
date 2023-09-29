@@ -27,6 +27,7 @@ use snarkos_node_narwhal::{
 };
 use snarkvm::{
     ledger::{
+        block::Block,
         committee::{Committee, MIN_VALIDATOR_STAKE},
         Ledger,
     },
@@ -37,8 +38,10 @@ use snarkvm::{
         PrivateKey,
         Rng,
         TestRng,
+        ToBytes,
         VM,
     },
+    utilities::to_bytes_le,
 };
 
 use std::{
@@ -295,18 +298,40 @@ fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<Curren
     (accounts, committee)
 }
 
+fn genesis_cache() -> &'static Mutex<HashMap<Vec<u8>, Block<CurrentNetwork>>> {
+    static CACHE: OnceLock<Mutex<HashMap<Vec<u8>, Block<CurrentNetwork>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn genesis_block(
+    genesis_private_key: PrivateKey<CurrentNetwork>,
+    committee: Committee<CurrentNetwork>,
+    public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    rng: &mut (impl Rng + CryptoRng),
+) -> Block<CurrentNetwork> {
+    // Initialize the store.
+    let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
+    // Initialize a new VM.
+    let vm = VM::from(store).unwrap();
+    // Initialize the genesis block.
+    vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng).unwrap()
+}
+
 fn genesis_ledger(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
     rng: &mut (impl Rng + CryptoRng),
 ) -> CurrentLedger {
-    // Initialize the store.
-    let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
-    // Initialize a new VM.
-    let vm = VM::from(store).unwrap();
-    // Initialize the genesis block.
-    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng).unwrap();
+    let cache_key =
+        to_bytes_le![genesis_private_key, committee, public_balances.iter().collect::<Vec<(_, _)>>()].unwrap();
+    // Initialize the genesis block on the first call; other callers
+    // will wait for it on the mutex.
+    let block = genesis_cache()
+        .lock()
+        .entry(cache_key)
+        .or_insert_with(|| genesis_block(genesis_private_key, committee, public_balances, rng))
+        .clone();
     // Initialize the ledger with the genesis block.
     CurrentLedger::load(block, None).unwrap()
 }
