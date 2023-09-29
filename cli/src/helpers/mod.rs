@@ -65,33 +65,6 @@ pub fn check_open_files_limit(minimum: u64) {
     };
 }
 
-#[cfg(target_family = "unix")]
-#[allow(clippy::upper_case_acronyms)]
-#[derive(Debug)]
-pub(crate) enum DriveType {
-    SSD,
-    HDD,
-    Unknown,
-}
-
-/// Returns the drive type of the given device.
-#[cfg(target_family = "unix")]
-pub(crate) fn detect_drive_type(device: &str) -> Result<DriveType, std::io::Error> {
-    let path = format!("/sys/block/{}/queue/rotational", device);
-    match std::fs::read_to_string(path)?.trim() {
-        "0" => Ok(DriveType::SSD),
-        "1" => Ok(DriveType::HDD),
-        _ => Ok(DriveType::Unknown),
-    }
-}
-
-/// Returns `true` if the current system is a NVMe system.
-#[cfg(target_family = "unix")]
-pub(crate) fn is_nvme() -> Result<bool, std::io::Error> {
-    let path = "/sys/class/nvme/";
-    Ok(std::fs::metadata(path)?.is_dir())
-}
-
 /// Returns the RAM memory in GiB.
 pub(crate) fn detect_ram_memory() -> Result<u64, sys_info::Error> {
     let ram_kib = sys_info::mem_info()?.total;
@@ -137,23 +110,6 @@ pub(crate) fn check_validator_machine(node_type: NodeType, is_dev: bool) {
                 }
             }
         }
-        // Enforce the required drive type.
-        #[cfg(target_family = "unix")]
-        if let Ok(crate::helpers::DriveType::HDD) = crate::helpers::detect_drive_type("sda") {
-            let message = "⚠️  The drive type of this machine is an HDD, and is insufficient for a validator (NVMe SSD required)\n".to_string();
-            match is_dev {
-                true => println!("{}", message.yellow().bold()),
-                false => println!("{message} in production mode"),
-            }
-        }
-        // Enforce the drive.
-        #[cfg(target_family = "unix")]
-        if let Ok(false) = crate::helpers::is_nvme() {
-            let message = "⚠️  This machine does not have an NVMe drive, and is insufficient for a validator (NVMe SSD required)\n".to_string();
-            match is_dev {
-                true => println!("{}", message.yellow().bold()),
-                false => println!("{message} in production mode"),
-            }
-        }
+
     }
 }
