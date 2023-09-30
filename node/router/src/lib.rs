@@ -47,7 +47,7 @@ use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 use anyhow::{bail, Result};
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, str::FromStr, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -366,22 +366,12 @@ impl<N: Network> Router<N> {
 
     /// Returns the list of bootstrap peers.
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
-        #[allow(clippy::if_same_then_else)]
         if cfg!(feature = "test") || self.is_dev {
             vec![]
         } else {
-            // TODO (howardwu): Change this for Phase 3.
             vec![
-                // SocketAddr::from_str("24.199.74.2:4133").unwrap(),
-                // SocketAddr::from_str("167.172.14.86:4133").unwrap(),
-                // SocketAddr::from_str("159.203.146.71:4133").unwrap(),
-                // SocketAddr::from_str("188.166.201.188:4133").unwrap(),
-                // SocketAddr::from_str("161.35.247.23:4133").unwrap(),
-                // SocketAddr::from_str("144.126.245.162:4133").unwrap(),
-                // SocketAddr::from_str("138.68.126.82:4133").unwrap(),
-                // SocketAddr::from_str("170.64.252.58:4133").unwrap(),
-                // SocketAddr::from_str("159.89.211.64:4133").unwrap(),
-                // SocketAddr::from_str("143.244.211.239:4133").unwrap(),
+                SocketAddr::from_str("35.227.159.141:4133").unwrap(),
+                SocketAddr::from_str("34.139.203.87:4133").unwrap(),
             ]
         }
     }
