@@ -174,7 +174,14 @@ pub async fn load_blocks<N: Network>(
                     // Prepare the URL.
                     let blocks_url = format!("{base_url}/{start}.{end}.blocks");
                     // Fetch the blocks.
-                    let blocks: Vec<Block<N>> = cdn_get(client, &blocks_url, &ctx).await?;
+                    let blocks: Vec<Block<N>> = match cdn_get(client, &blocks_url, &ctx).await {
+                        Ok(blocks) => blocks,
+                        Err(error) => {
+                            error!("Failed to request {ctx} - {error}");
+                            failed.write().replace(error);
+                            return std::future::ready(Ok(vec![])).await
+                        }
+                    };
                     // Return the blocks.
                     std::future::ready(Ok(blocks)).await
                 }
@@ -397,7 +404,7 @@ mod tests {
 
     type CurrentNetwork = Testnet3;
 
-    const TEST_BASE_URL: &str = "https://testnet3.blocks.aleo.org/phase3";
+    const TEST_BASE_URL: &str = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3";
 
     fn check_load_blocks(start: u32, end: Option<u32>, expected: usize) {
         let blocks = Arc::new(RwLock::new(Vec::new()));
