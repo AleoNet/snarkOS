@@ -344,11 +344,17 @@ impl<N: Network> Sync<N> {
     fn send_certificate_response(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
         // Attempt to retrieve the certificate.
         if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
-            // Send the certificate response to the peer.
-            let self_ = self.clone();
-            tokio::spawn(async move {
-                let _ = self_.gateway.send(peer_ip, Event::CertificateResponse(certificate.into())).await;
-            });
+            if self.ledger.current_committee().unwrap().get_leader(certificate.round()).unwrap()
+                != self.gateway.account().address()
+            {
+                // Send the certificate response to the peer.
+                let self_ = self.clone();
+                tokio::spawn(async move {
+                    let _ = self_.gateway.send(peer_ip, Event::CertificateResponse(certificate.into())).await;
+                });
+            } else {
+                println!("\n\nSKIPPING SENDING CERTIFICATE RESPONSE FOR ROUND {}\n\n", certificate.round());
+            }
         }
     }
 
