@@ -1249,8 +1249,12 @@ impl<N: Network> Primary<N> {
                 return Err(e);
             };
         }
-        // Broadcast the certified batch to all validators.
-        self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
+        if committee.get_leader(certificate.round())? != self.gateway.account().address() {
+            // Broadcast the certified batch to all validators.
+            self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
+        } else {
+            println!("\n\nSKIPPING SENDING CERTIFIED BATCH FOR ROUND {}\n\n", certificate.round());
+        }
         // Log the certified batch.
         let num_transmissions = certificate.transmission_ids().len();
         let round = certificate.round();
