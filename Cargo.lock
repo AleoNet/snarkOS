@@ -3275,7 +3275,6 @@ name = "snarkos-node-router-messages"
 version = "2.1.7"
 dependencies = [
  "anyhow",
- "bincode",
  "bytes",
  "indexmap 2.0.2",
  "rayon",
