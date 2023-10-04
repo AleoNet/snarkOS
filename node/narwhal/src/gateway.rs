@@ -661,6 +661,10 @@ impl<N: Network> Gateway<N> {
                             if self_.is_local_ip(validator_ip) {
                                 continue;
                             }
+                            // Ensure the validator address is not this node.
+                            if self_.account.address() == validator_address {
+                                continue;
+                            }
                             // Ensure the validator IP is not already connected or connecting.
                             if self_.is_connected_ip(validator_ip) || self_.is_connecting_ip(validator_ip) {
                                 continue;
