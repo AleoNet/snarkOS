@@ -13,9 +13,8 @@
 // limitations under the License.
 
 pub mod primary;
-pub mod trans;
 pub mod utils;
 
 pub type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-pub type MockLedgerService<N> = snarkos_node_narwhal_ledger_service::MockLedgerService<N>;
+pub type TranslucentLedgerService<N, C> = snarkos_node_narwhal_ledger_service::TranslucentLedgerService<N, C>;

@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crate::common::{
-    trans::TranslucentLedgerService,
     utils::{fire_unconfirmed_solutions, fire_unconfirmed_transactions, initialize_logger},
     CurrentNetwork,
+    TranslucentLedgerService,
 };
 use snarkos_account::Account;
 use snarkos_node_narwhal::{

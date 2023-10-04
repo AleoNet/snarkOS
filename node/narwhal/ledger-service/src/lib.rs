@@ -32,6 +32,11 @@ pub mod prover;
 #[cfg(feature = "prover")]
 pub use prover::*;
 
+#[cfg(feature = "test")]
+pub mod trans;
+#[cfg(feature = "test")]
+pub use trans::*;
+
 pub mod traits;
 pub use traits::*;
 
