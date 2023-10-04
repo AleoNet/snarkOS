@@ -54,7 +54,7 @@ impl<N: Network> ToBytes for WorkerPing<N> {
 impl<N: Network> FromBytes for WorkerPing<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_transmissions = u32::read_le(&mut reader)?;
-        let mut transmission_ids = IndexSet::with_capacity(num_transmissions as usize);
+        let mut transmission_ids = IndexSet::new();
         for _ in 0..num_transmissions {
             transmission_ids.insert(TransmissionID::read_le(&mut reader)?);
         }
