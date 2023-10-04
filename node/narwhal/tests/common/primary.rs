@@ -279,7 +279,7 @@ impl TestNetwork {
             }
         }
 
-        return true;
+        true
     }
 
     // Checks if the certificates are coherent in storage for all nodes (not quorum) over a range
