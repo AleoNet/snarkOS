@@ -260,8 +260,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             puzzle_commitment: prover_solution.commitment(),
             solution: Data::Object(prover_solution),
         });
-        // Propagate the "UnconfirmedSolution" to the connected validators.
-        self.propagate_to_validators(message, &[]);
+        // Propagate the "UnconfirmedSolution".
+        self.propagate(message, &[]);
     }
 
     /// Returns the current number of puzzle instances.
