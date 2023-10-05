@@ -58,3 +58,25 @@ impl FromBytes for BlockRequest {
         Ok(Self::new(start_height, end_height))
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::BlockRequest;
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use snarkvm::utilities::{FromBytes, ToBytes};
+    use test_strategy::proptest;
+
+    pub fn any_block_request() -> BoxedStrategy<BlockRequest> {
+        any::<(u32, u32)>().prop_map(|(start_height, end_height)| BlockRequest::new(start_height, end_height)).boxed()
+    }
+
+    #[proptest]
+    fn block_request_roundtrip(#[strategy(any_block_request())] block_request: BlockRequest) {
+        let mut bytes = BytesMut::default().writer();
+        block_request.write_le(&mut bytes).unwrap();
+        let decoded = BlockRequest::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq![decoded, block_request];
+    }
+}

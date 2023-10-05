@@ -76,17 +76,14 @@ pub(crate) fn detect_ram_memory() -> Result<u64, sys_info::Error> {
 /// Note: Some of the checks in this method are overly-permissive, in order to ensure
 /// future hardware architecture changes do not prevent validators from running a node.
 #[rustfmt::skip]
-pub(crate) fn check_validator_machine(node_type: NodeType, is_dev: bool) {
+pub(crate) fn check_validator_machine(node_type: NodeType) {
     // If the node is a validator, ensure it meets the minimum requirements.
     if node_type.is_validator() {
         // Ensure the system is a Linux-based system.
         // Note: While macOS is not officially supported, we allow it for development purposes.
         if !cfg!(target_os = "linux") && !cfg!(target_os = "macos") {
             let message = "⚠️  The operating system of this machine is not supported for a validator (Ubuntu required)\n".to_string();
-            match is_dev {
-                true => println!("{}", message.yellow().bold()),
-                false => panic!("{message} in production mode"),
-            }
+            println!("{}", message.yellow().bold());
         }
         // Retrieve the number of cores.
         let num_cores = num_cpus::get();
@@ -94,22 +91,15 @@ pub(crate) fn check_validator_machine(node_type: NodeType, is_dev: bool) {
         let min_num_cores = 32;
         if num_cores < min_num_cores {
             let message = format!("⚠️  The number of cores ({num_cores} cores) on this machine is insufficient for a validator (minimum {min_num_cores} cores)\n");
-            match is_dev {
-                true => println!("{}", message.yellow().bold()),
-                false => panic!("{message} in production mode"),
-            }
+            println!("{}", message.yellow().bold());
         }
         // Enforce the minimum amount of RAM.
         if let Ok(ram) = crate::helpers::detect_ram_memory() {
             let min_ram = 60;
             if ram < min_ram {
                 let message = format!("⚠️  The amount of RAM ({ram} GiB) on this machine is insufficient for a validator (minimum {min_ram} GiB)\n");
-                match is_dev {
-                    true => println!("{}", message.yellow().bold()),
-                    false => panic!("{message} in production mode"),
-                }
+                println!("{}", message.yellow().bold());
             }
         }
-
     }
 }

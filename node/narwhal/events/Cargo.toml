@@ -50,7 +50,7 @@ features = [ "codec" ]
 version = "0.1"
 
 [dev-dependencies.proptest]
-version = "1.0.0"
+version = "1.3.1"
 
 [dev-dependencies.snarkvm]
 workspace = true
@@ -61,3 +61,8 @@ version = "0.3.1"
 
 [dev-dependencies.time]
 version = "0.3"
+
+[dev-dependencies.snarkos-node-sync-locators]
+path = "../../sync/locators"
+version = "=2.1.7"
+features = [ "test" ]

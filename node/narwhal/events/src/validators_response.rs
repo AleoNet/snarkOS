@@ -54,3 +54,47 @@ impl<N: Network> FromBytes for ValidatorsResponse<N> {
         Ok(Self { validators })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{challenge_request::prop_tests::any_valid_address, ValidatorsResponse};
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use indexmap::IndexMap;
+    use proptest::{
+        collection::hash_map,
+        prelude::{any, BoxedStrategy, Strategy},
+    };
+    use snarkvm::{
+        prelude::Address,
+        utilities::{FromBytes, ToBytes},
+    };
+    use std::net::{IpAddr, SocketAddr};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_valid_socket_addr() -> BoxedStrategy<SocketAddr> {
+        any::<(IpAddr, u16)>().prop_map(|(ip_addr, port)| SocketAddr::new(ip_addr, port)).boxed()
+    }
+
+    pub fn any_index_map() -> BoxedStrategy<IndexMap<SocketAddr, Address<CurrentNetwork>>> {
+        hash_map(any_valid_socket_addr(), any_valid_address(), 0..50)
+            .prop_map(|map| map.iter().map(|(k, v)| (*k, *v)).collect())
+            .boxed()
+    }
+
+    pub fn any_validators_response() -> BoxedStrategy<ValidatorsResponse<CurrentNetwork>> {
+        any_index_map().prop_map(|map| ValidatorsResponse { validators: map }).boxed()
+    }
+
+    #[proptest]
+    fn validators_response_roundtrip(
+        #[strategy(any_validators_response())] validators_response: ValidatorsResponse<CurrentNetwork>,
+    ) {
+        let mut bytes = BytesMut::default().writer();
+        validators_response.write_le(&mut bytes).unwrap();
+        let decoded = ValidatorsResponse::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq![decoded, validators_response];
+    }
+}
