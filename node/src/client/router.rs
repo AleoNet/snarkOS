@@ -277,9 +277,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
             match is_valid {
                 // If the solution is valid, propagate the `UnconfirmedSolution`.
                 Ok(Ok(true)) => {
-                    let message = Message::UnconfirmedSolution(serialized);
+                    let _message = Message::UnconfirmedSolution(serialized);
                     // Propagate the "UnconfirmedSolution".
-                    self.propagate(message, &[peer_ip]);
+                    // self.propagate(message, &[peer_ip]);
                 }
                 Ok(Ok(false)) | Ok(Err(_)) => {
                     trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
