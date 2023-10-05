@@ -74,6 +74,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
+        narwhal_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
@@ -101,7 +102,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service.clone());
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger_service, None, trusted_validators, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger_service, narwhal_ip, trusted_validators, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
@@ -474,6 +475,7 @@ mod tests {
         let validator = Validator::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
             node,
             Some(rest),
+            None,
             account,
             &[],
             &[],

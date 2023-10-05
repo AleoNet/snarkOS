@@ -143,9 +143,9 @@ impl<N: Network> Gateway<N> {
     ) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match (ip, dev) {
-            (_, Some(dev)) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev))?,
+            (None, Some(dev)) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev))?,
             (None, None) => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT))?,
-            (Some(ip), None) => ip,
+            (Some(ip), _) => ip,
         };
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));

@@ -132,3 +132,45 @@ impl<N: Network> FromBytes for DataBlocks<N> {
         Ok(Self(blocks))
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{block_request::prop_tests::any_block_request, BlockResponse, DataBlocks};
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::{
+        collection::vec,
+        prelude::{BoxedStrategy, Strategy},
+        strategy::Just,
+    };
+    use snarkvm::{
+        prelude::{block::Block, narwhal::Data, Network},
+        utilities::{FromBytes, ToBytes},
+    };
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    // TODO: create a random block, not always the same one.
+    pub fn any_block() -> BoxedStrategy<Block<CurrentNetwork>> {
+        Just(Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap()).boxed()
+    }
+
+    pub fn any_data_blocks() -> BoxedStrategy<DataBlocks<CurrentNetwork>> {
+        vec(any_block(), 0..=1).prop_map(DataBlocks).boxed()
+    }
+
+    pub fn any_block_response() -> BoxedStrategy<BlockResponse<CurrentNetwork>> {
+        (any_block_request(), any_data_blocks())
+            .prop_map(|(request, data_blocks)| BlockResponse { request, blocks: Data::Object(data_blocks) })
+            .boxed()
+    }
+
+    #[proptest]
+    fn block_response_roundtrip(#[strategy(any_block_response())] block_response: BlockResponse<CurrentNetwork>) {
+        let mut bytes = BytesMut::default().writer();
+        block_response.write_le(&mut bytes).unwrap();
+        let decoded = BlockResponse::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq!(block_response, decoded);
+    }
+}
