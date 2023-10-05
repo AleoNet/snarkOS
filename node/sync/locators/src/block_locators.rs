@@ -264,7 +264,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
         // Read the number of recent block hashes.
         let num_recents = u32::read_le(&mut reader)?;
         // Read the recent block hashes.
-        let mut recents = IndexMap::with_capacity(num_recents as usize);
+        let mut recents = IndexMap::new();
         for _ in 0..num_recents {
             let height = u32::read_le(&mut reader)?;
             let hash = N::BlockHash::read_le(&mut reader)?;
@@ -274,7 +274,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
         // Read the number of checkpoints.
         let num_checkpoints = u32::read_le(&mut reader)?;
         // Read the checkpoints.
-        let mut checkpoints = IndexMap::with_capacity(num_checkpoints as usize);
+        let mut checkpoints = IndexMap::new();
         for _ in 0..num_checkpoints {
             let height = u32::read_le(&mut reader)?;
             let hash = N::BlockHash::read_le(&mut reader)?;
