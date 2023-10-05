@@ -143,3 +143,28 @@ pub fn welcome_message() -> String {
     output += &"👋 Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
     output
 }
+
+/// Returns the notification message as a string.
+pub fn notification_message() -> String {
+    use colored::Colorize;
+
+    let mut output = String::new();
+    output += &r#"
+
+ ==================================================================================================
+
+                        Welcome to Aleo Testnet 3 - 🚧 Calibration Period 🚧
+
+ ==================================================================================================
+
+     This network is currently undergoing a calibration period.
+
+     Users may experience frequent network resets to ensure optimal performance.
+
+ ==================================================================================================
+"#
+    .white()
+    .bold();
+
+    output
+}

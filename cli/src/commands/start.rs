@@ -332,6 +332,9 @@ impl Start {
     async fn parse_node<N: Network>(&mut self) -> Result<Node<N>> {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
+        // Print the notification.
+        println!("{}", crate::helpers::notification_message());
+
 
         // Parse the trusted peers to connect to.
         let mut trusted_peers = self.parse_trusted_peers()?;
