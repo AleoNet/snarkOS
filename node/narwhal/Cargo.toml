@@ -137,7 +137,7 @@ version = "1"
 [dev-dependencies.snarkos-node-narwhal-ledger-service]
 path = "./ledger-service"
 default-features = false
-features = [ "mock" ]
+features = [ "test" ]
 
 [dev-dependencies.snarkvm]
 workspace = true
