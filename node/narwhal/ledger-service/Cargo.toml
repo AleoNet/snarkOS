@@ -22,7 +22,8 @@ ledger = [ "tokio", "tracing" ]
 ledger-write = [ ]
 mock = [ "parking_lot", "tracing" ]
 prover = [ ]
-test = [ "mock" ]
+test = [ "mock", "translucent" ]
+translucent = [ "ledger" ]
 
 [dependencies.async-trait]
 version = "0.1"
