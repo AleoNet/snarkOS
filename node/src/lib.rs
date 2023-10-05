@@ -60,7 +60,10 @@ use snarkvm::{
 use anyhow::{bail, Result};
 
 // TODO: Remove me after Phase 3.
-pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(ledger: &Ledger<N, C>, dev: Option<u16>) -> Result<String> {
+pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
+    ledger: Ledger<N, C>,
+    dev: Option<u16>,
+) -> Result<Ledger<N, C>> {
     use core::str::FromStr;
 
     /// Removes the specified ledger from storage.
@@ -89,16 +92,25 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(ledger: &Ledger<N, C>, 
 
     if let Ok(block) = ledger.get_block(28250) {
         if *block.hash() == *ID::<N>::from_str("ab1fxetqjm0ppruay8vlg6gtt52d5fkeydmrk0talp04ymjm65acg9sh8d0r5")? {
-            return remove_ledger(N::ID, dev);
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}", remove_ledger(N::ID, dev)?);
+            return Ledger::<N, C>::load(genesis.clone(), dev);
         }
     } else if let Ok(block) = ledger.get_block(28251) {
         if *block.hash() == *ID::<N>::from_str("ab1ngmc9wf3kz73lxg9ylx75vday82a26xqthjykzrwyhngnr25uvqqau9eyh")? {
-            return remove_ledger(N::ID, dev);
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}", remove_ledger(N::ID, dev)?);
+            return Ledger::<N, C>::load(genesis.clone(), dev);
         }
     } else if let Ok(block) = ledger.get_block(28252) {
         if *block.hash() == *ID::<N>::from_str("ab1k6msq00mzrlmm3e0xzgynks5mqh2zrhd35akqqts24sd9u5x9yxs355qgv")? {
-            return remove_ledger(N::ID, dev);
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}", remove_ledger(N::ID, dev)?);
+            return Ledger::<N, C>::load(genesis.clone(), dev);
         }
     }
-    Ok("".to_string())
+    Ok(ledger)
 }
