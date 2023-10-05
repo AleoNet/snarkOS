@@ -94,21 +94,27 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
         if *block.hash() == *ID::<N>::from_str("ab1fxetqjm0ppruay8vlg6gtt52d5fkeydmrk0talp04ymjm65acg9sh8d0r5")? {
             let genesis = ledger.get_block(0)?;
             drop(ledger);
-            println!("{}", remove_ledger(N::ID, dev)?);
+            println!("{}. REBOOT YOUR NODE.", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
             return Ledger::<N, C>::load(genesis.clone(), dev);
         }
     } else if let Ok(block) = ledger.get_block(28251) {
         if *block.hash() == *ID::<N>::from_str("ab1ngmc9wf3kz73lxg9ylx75vday82a26xqthjykzrwyhngnr25uvqqau9eyh")? {
             let genesis = ledger.get_block(0)?;
             drop(ledger);
-            println!("{}", remove_ledger(N::ID, dev)?);
+            println!("{}. REBOOT YOUR NODE.", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
             return Ledger::<N, C>::load(genesis.clone(), dev);
         }
     } else if let Ok(block) = ledger.get_block(28252) {
         if *block.hash() == *ID::<N>::from_str("ab1k6msq00mzrlmm3e0xzgynks5mqh2zrhd35akqqts24sd9u5x9yxs355qgv")? {
             let genesis = ledger.get_block(0)?;
             drop(ledger);
-            println!("{}", remove_ledger(N::ID, dev)?);
+            println!("{}. REBOOT YOUR NODE.", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
             return Ledger::<N, C>::load(genesis.clone(), dev);
         }
     }
