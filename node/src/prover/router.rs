@@ -217,7 +217,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
     /// Propagates the unconfirmed solution to all connected validators.
     async fn unconfirmed_solution(
         &self,
-        peer_ip: SocketAddr,
+        _peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
     ) -> bool {

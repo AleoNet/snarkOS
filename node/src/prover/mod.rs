@@ -256,12 +256,12 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Broadcasts the prover solution to the network.
     fn broadcast_prover_solution(&self, prover_solution: ProverSolution<N>) {
         // Prepare the unconfirmed solution message.
-        let message = Message::UnconfirmedSolution(UnconfirmedSolution {
+        let _message = Message::UnconfirmedSolution(UnconfirmedSolution {
             puzzle_commitment: prover_solution.commitment(),
             solution: Data::Object(prover_solution),
         });
         // Propagate the "UnconfirmedSolution".
-        self.propagate(message, &[]);
+        // self.propagate(message, &[]);
     }
 
     /// Returns the current number of puzzle instances.
