@@ -179,6 +179,11 @@ pub fn notification_message() -> String {
     Network Resets:
     - IMPORTANT: EXPECT MULTIPLE NETWORK RESETS.
     - If participating, BE PREPARED TO RESET YOUR NODE AT ANY TIME.
+    - When a reset occurs, RUN THE FOLLOWING TO RESET YOUR NODE:
+        - git checkout testnet3 && git pull
+        - cargo install --path .
+        - snarkos clean
+        - snarkos start --nodisplay --client
 
     Communication:
     - Stay ONLINE and MONITOR our Discord and Twitter for community updates.
