@@ -231,12 +231,37 @@ impl TestNetwork {
         }
     }
 
+    // Connects a specific node to all other nodes.
+    pub async fn connect_one(&self, id: u16) {
+        let target_validator = self.validators.get(&id).unwrap();
+        let target_ip = target_validator.primary.gateway().local_ip();
+        for validator in self.validators.values() {
+            if validator.id != id {
+                // Connect to the node.
+                validator.primary.gateway().connect(target_ip);
+                // Give the connection time to be established.
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        }
+    }
+
     // Disconnects N nodes from all other nodes.
     pub async fn disconnect(&self, num_nodes: u16) {
         for validator in self.validators.values().take(num_nodes as usize) {
             for peer_ip in validator.primary.gateway().connected_peers().read().iter() {
                 validator.primary.gateway().disconnect(*peer_ip);
             }
+        }
+
+        // Give the connections time to be closed.
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    // Disconnects a specific node from all other nodes.
+    pub async fn disconnect_one(&self, id: u16) {
+        let target_validator = self.validators.get(&id).unwrap();
+        for peer_ip in target_validator.primary.gateway().connected_peers().read().iter() {
+            target_validator.primary.gateway().disconnect(*peer_ip);
         }
 
         // Give the connections time to be closed.
