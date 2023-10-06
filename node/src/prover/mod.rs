@@ -43,7 +43,6 @@ use core::{marker::PhantomData, time::Duration};
 use parking_lot::{Mutex, RwLock};
 use rand::{rngs::OsRng, CryptoRng, Rng};
 use std::{
-    future::Future,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, AtomicU8, Ordering},
