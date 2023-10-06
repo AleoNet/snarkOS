@@ -127,6 +127,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         node.initialize_routing().await;
         // Initialize the coinbase puzzle.
         node.initialize_coinbase_puzzle().await;
+        // Initialize the notification message loop.
+        node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.
