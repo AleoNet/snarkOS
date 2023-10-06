@@ -26,6 +26,7 @@ use snarkos_node_narwhal::{
     MAX_GC_ROUNDS,
 };
 use snarkvm::{
+    console::algorithms::BHP256,
     ledger::{
         block::Block,
         committee::{Committee, MIN_VALIDATOR_STAKE},
@@ -35,9 +36,12 @@ use snarkvm::{
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
         Address,
         CryptoRng,
+        FromBytes,
+        Hash,
         PrivateKey,
         Rng,
         TestRng,
+        ToBits,
         ToBytes,
         VM,
     },
@@ -368,8 +372,20 @@ fn genesis_ledger(
     // will wait for it on the mutex.
     let block = genesis_cache()
         .lock()
-        .entry(cache_key)
-        .or_insert_with(|| genesis_block(genesis_private_key, committee, public_balances, rng))
+        .entry(cache_key.clone())
+        .or_insert_with(|| {
+            let hasher = BHP256::<CurrentNetwork>::setup("aleo.dev.block").unwrap();
+            let file_name = hasher.hash(&cache_key.to_bits_le()).unwrap().to_string() + ".genesis";
+            let file_path = std::env::temp_dir().join(file_name);
+            if file_path.exists() {
+                let buffer = std::fs::read(file_path).unwrap();
+                return Block::from_bytes_le(&buffer).unwrap();
+            }
+
+            let block = genesis_block(genesis_private_key, committee, public_balances, rng);
+            std::fs::write(&file_path, block.to_bytes_le().unwrap()).unwrap();
+            block
+        })
         .clone();
     // Initialize the ledger with the genesis block.
     CurrentLedger::load(block, None).unwrap()
