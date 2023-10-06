@@ -261,7 +261,14 @@ impl<N: Network> Consensus<N> {
         callback: oneshot::Sender<Result<()>>,
     ) {
         // Try to advance to the next block.
-        let result = self.try_advance_to_next_block(subdag, transmissions.clone());
+        let result = match subdag.anchor_round() {
+            // Artificially fail to create blocks between rounds 10 and 12.
+            10..=12 => Err(anyhow!(format!(
+                "\n\nARTIFICIALLY SIMULATING BLOCK PRODUCTION FAILURE FOR ROUND {}\n\n",
+                subdag.anchor_round()
+            ))),
+            _ => self.try_advance_to_next_block(subdag, transmissions.clone()),
+        };
         // If the block failed to advance, reinsert the transmissions into the memory pool.
         if let Err(e) = &result {
             error!("Unable to advance to the next block - {e}");
