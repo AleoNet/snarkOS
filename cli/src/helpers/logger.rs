@@ -163,7 +163,7 @@ pub fn notification_message() -> String {
      During this period, the objective is to assess, adjust, and align validators' performance,
      stability, and interoperability under varying network conditions.
 
-     There will be possibly several network resets. With each network reset, software updates will
+     Please expect several network resets. With each network reset, software updates will
      be performed to address potential bottlenecks, vulnerabilities, and/or inefficiencies, which
      will ensure optimal performance for the ecosystem of validators, provers, and developers.
 
