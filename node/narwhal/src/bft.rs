@@ -441,7 +441,9 @@ impl<N: Network> BFT<N> {
         // Start from the oldest leader certificate.
         for certificate in commit_subdag.values().flatten() {
             // Update the DAG.
-            self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+            if IS_SYNCING {
+                self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+            }
             // Retrieve the transmissions.
             for transmission_id in certificate.transmission_ids() {
                 // If the transmission already exists in the map, skip it.
@@ -464,7 +466,7 @@ impl<N: Network> BFT<N> {
         // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
         if !IS_SYNCING {
             // Construct the subdag.
-            let subdag = Subdag::from(commit_subdag)?;
+            let subdag = Subdag::from(commit_subdag.clone())?;
             info!(
                 "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
                 transmissions.len(),
@@ -481,6 +483,12 @@ impl<N: Network> BFT<N> {
                 // Await the callback to continue.
                 if let Err(e) = callback_receiver.await {
                     error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                } else {
+                    // Update the DAG only if the subdag was successfully added to a block.
+                    for certificate in commit_subdag.values().flatten() {
+                        // Update the DAG.
+                        self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+                    }
                 }
             }
         }
