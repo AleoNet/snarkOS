@@ -171,7 +171,7 @@ pub fn notification_message() -> String {
 
     Duration:
     - Start Date: September 27, 2023
-    - End Date: October 18, 2023
+    - End Date: October 18, 2023 (subject to change)
 
     Participation:
     - Node operators are NOT REQUIRED to participate during this calibration period.
