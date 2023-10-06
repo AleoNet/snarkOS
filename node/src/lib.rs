@@ -123,3 +123,73 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
     }
     Ok(ledger)
 }
+
+/// Starts the notification message loop.
+pub fn start_notification_message_loop() -> tokio::task::JoinHandle<()> {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(180));
+    tokio::spawn(async move {
+        loop {
+            interval.tick().await;
+            info!("{}", notification_message());
+        }
+    })
+}
+
+/// Returns the notification message as a string.
+pub fn notification_message() -> String {
+    use colored::Colorize;
+
+    let mut output = String::new();
+    output += &r#"
+
+ ==================================================================================================
+
+                     🚧 Welcome to Aleo Testnet 3 Phase 3 - Calibration Period 🚧
+
+ ==================================================================================================
+
+     During the calibration period, the network will be running in limited capacity.
+
+     This calibration period is to ensure validators are stable and ready for mainnet launch.
+     During this period, the objective is to assess, adjust, and align validators' performance,
+     stability, and interoperability under varying network conditions.
+
+     Please expect several network resets. With each network reset, software updates will
+     be performed to address potential bottlenecks, vulnerabilities, and/or inefficiencies, which
+     will ensure optimal performance for the ecosystem of validators, provers, and developers.
+
+ ==================================================================================================
+
+    Duration:
+    - Start Date: September 27, 2023
+    - End Date: October 18, 2023 (subject to change)
+
+    Participation:
+    - Node operators are NOT REQUIRED to participate during this calibration period.
+
+    Network Resets:
+    - IMPORTANT: EXPECT MULTIPLE NETWORK RESETS.
+    - If participating, BE PREPARED TO RESET YOUR NODE AT ANY TIME.
+    - When a reset occurs, RUN THE FOLLOWING TO RESET YOUR NODE:
+        - git checkout testnet3 && git pull
+        - cargo install --path .
+        - snarkos clean
+        - snarkos start --nodisplay --client
+
+    Communication:
+    - Stay ONLINE and MONITOR our Discord and Twitter for community updates.
+
+    Purpose:
+    - This period is STRICTLY FOR NETWORK CALIBRATION.
+    - This period is NOT INTENDED for general-purpose usage by developers and provers.
+
+    Incentives:
+    - There are NO INCENTIVES during this calibration period.
+
+ ==================================================================================================
+"#
+    .white()
+    .bold();
+
+    output
+}

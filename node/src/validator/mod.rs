@@ -140,6 +140,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         }
         // Initialize the routing.
         node.initialize_routing().await;
+        // Initialize the notification message loop.
+        node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.
