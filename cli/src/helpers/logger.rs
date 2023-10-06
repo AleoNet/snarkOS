@@ -153,13 +153,42 @@ pub fn notification_message() -> String {
 
  ==================================================================================================
 
-                        Welcome to Aleo Testnet 3 - 🚧 Calibration Period 🚧
+                     🚧 Welcome to Aleo Testnet 3 Phase 3 - Calibration Period 🚧
 
  ==================================================================================================
 
-     This network is currently undergoing a calibration period.
+     During the calibration period, the network will be running in limited capacity.
 
-     Users may experience frequent network resets to ensure optimal performance.
+     This calibration period is to ensure validators are stable and ready for mainnet launch.
+     During this period, the objective is to assess, adjust, and align validators' performance,
+     stability, and interoperability under varying network conditions.
+
+     There will be possibly several network resets. With each network reset, software updates will
+     be performed to address potential bottlenecks, vulnerabilities, and/or inefficiencies, which
+     will ensure optimal performance for the ecosystem of validators, provers, and developers.
+
+ ==================================================================================================
+
+    Duration:
+    - Start Date: September 27, 2023
+    - End Date: October 18, 2023
+
+    Participation:
+    - Node operators are NOT REQUIRED to participate during this calibration period.
+
+    Network Resets:
+    - IMPORTANT: EXPECT MULTIPLE NETWORK RESETS.
+    - If participating, BE PREPARED TO RESET YOUR NODE AT ANY TIME.
+
+    Communication:
+    - Stay ONLINE and MONITOR our Discord and Twitter for community updates.
+
+    Purpose:
+    - This period is STRICTLY FOR NETWORK CALIBRATION.
+    - This period is NOT INTENDED for general-purpose usage by developers and provers.
+
+    Incentives:
+    - There are NO INCENTIVES during this calibration period.
 
  ==================================================================================================
 "#
