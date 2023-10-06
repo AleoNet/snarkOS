@@ -333,7 +333,7 @@ impl Start {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
         // Print the notification.
-        println!("{}", crate::helpers::notification_message());
+        println!("{}", snarkos_node::notification_message());
 
 
         // Parse the trusted peers to connect to.

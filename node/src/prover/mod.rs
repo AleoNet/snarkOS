@@ -43,6 +43,7 @@ use core::{marker::PhantomData, time::Duration};
 use parking_lot::{Mutex, RwLock};
 use rand::{rngs::OsRng, CryptoRng, Rng};
 use std::{
+    future::Future,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, AtomicU8, Ordering},
@@ -127,6 +128,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         node.initialize_routing().await;
         // Initialize the coinbase puzzle.
         node.initialize_coinbase_puzzle().await;
+        // Initialize the notification message loop.
+        node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.
