@@ -37,7 +37,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, ensure, Field, Network, Result},
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -482,7 +482,9 @@ impl<N: Network> BFT<N> {
         // Start from the oldest leader certificate.
         for certificate in commit_subdag.values().flatten() {
             // Update the DAG.
-            self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+            if IS_SYNCING {
+                self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+            }
             // Retrieve the transmissions.
             for transmission_id in certificate.transmission_ids() {
                 // If the transmission already exists in the map, skip it.
@@ -505,24 +507,46 @@ impl<N: Network> BFT<N> {
         // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
         if !IS_SYNCING {
             // Construct the subdag.
-            let subdag = Subdag::from(commit_subdag)?;
-            info!(
-                "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
-                transmissions.len(),
-                subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
+            let subdag = Subdag::from(commit_subdag.clone())?;
+            // Retrieve the anchor round.
+            let anchor_round = subdag.anchor_round();
+            // Retrieve the number of transmissions.
+            let num_transmissions = transmissions.len();
+            // Retrieve metadata about the subdag.
+            let subdag_metadata = subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
+
+            // Ensure the subdag anchor round matches the leader round.
+            ensure!(
+                anchor_round == leader_round,
+                "BFT failed to commit - the subdag anchor round {anchor_round} does not match the leader round {leader_round}",
             );
+
             // Trigger consensus.
             if let Some(consensus_sender) = self.consensus_sender.get() {
-                // Retrieve the anchor round.
-                let anchor_round = subdag.anchor_round();
                 // Initialize a callback sender and receiver.
                 let (callback_sender, callback_receiver) = oneshot::channel();
                 // Send the subdag and transmissions to consensus.
                 consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
                 // Await the callback to continue.
-                if let Err(e) = callback_receiver.await {
-                    error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                match callback_receiver.await {
+                    Ok(Ok(())) => (), // continue
+                    Ok(Err(e)) => {
+                        error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        error!("BFT failed to receive the callback for round {anchor_round} - {e}");
+                        return Ok(());
+                    }
                 }
+            }
+
+            info!(
+                "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
+            );
+            // Update the DAG, as the subdag was successfully included into a block.
+            for certificate in commit_subdag.values().flatten() {
+                self.dag.write().commit(certificate, self.storage().max_gc_rounds());
             }
         }
         Ok(())
