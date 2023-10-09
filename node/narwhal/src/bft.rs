@@ -481,14 +481,16 @@ impl<N: Network> BFT<N> {
                 // Send the subdag and transmissions to consensus.
                 consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
                 // Await the callback to continue.
-                if let Err(e) = callback_receiver.await {
-                    error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
-                } else {
-                    // Update the DAG only if the subdag was successfully added to a block.
-                    for certificate in commit_subdag.values().flatten() {
-                        // Update the DAG.
-                        self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+                match callback_receiver.await {
+                    Ok(Ok(())) => {
+                        // Update the DAG only if the subdag was successfully added to a block.
+                        for certificate in commit_subdag.values().flatten() {
+                            // Update the DAG.
+                            self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+                        }
                     }
+                    Ok(Err(e)) => bail!("BFT failed to advance the subdag for round {anchor_round} - {e}"),
+                    Err(e) => bail!("BFT failed to receive the callback for round {anchor_round} - {e}"),
                 }
             }
         }
