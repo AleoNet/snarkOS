@@ -343,17 +343,8 @@ impl<N: Network> BFT<N> {
         };
 
         // Compute the stake for the leader certificate.
-        let (stake_with_leader, stake_without_leader) = match self.compute_stake_for_leader_certificate(
-            leader_certificate_id,
-            current_certificates,
-            &previous_committee,
-        ) {
-            Ok(stakes) => stakes,
-            Err(e) => {
-                error!("BFT failed to compute the stake for the leader certificate - {e}");
-                return false;
-            }
-        };
+        let (stake_with_leader, stake_without_leader) =
+            self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &previous_committee);
         // Return 'true' if any of the following conditions hold:
         stake_with_leader >= previous_committee.availability_threshold()
             || stake_without_leader >= previous_committee.quorum_threshold()
@@ -366,10 +357,10 @@ impl<N: Network> BFT<N> {
         leader_certificate_id: Field<N>,
         current_certificates: IndexSet<BatchCertificate<N>>,
         current_committee: &Committee<N>,
-    ) -> Result<(u64, u64)> {
+    ) -> (u64, u64) {
         // If there are no current certificates, return early.
         if current_certificates.is_empty() {
-            return Ok((0, 0));
+            return (0, 0);
         }
 
         // Initialize a tracker for the stake with the leader.
@@ -389,7 +380,7 @@ impl<N: Network> BFT<N> {
             }
         }
         // Return the stake with the leader, and the stake without the leader.
-        Ok((stake_with_leader, stake_without_leader))
+        (stake_with_leader, stake_without_leader)
     }
 }
 
