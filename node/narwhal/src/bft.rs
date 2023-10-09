@@ -470,8 +470,6 @@ impl<N: Network> BFT<N> {
         &self,
         leader_certificate: BatchCertificate<N>,
     ) -> Result<()> {
-        // Retrieve the leader certificate round.
-        let leader_round = leader_certificate.round();
         // Compute the commit subdag.
         let commit_subdag = match self.order_dag_with_dfs::<ALLOW_LEDGER_ACCESS>(leader_certificate) {
             Ok(subdag) => subdag,
@@ -508,31 +506,39 @@ impl<N: Network> BFT<N> {
         if !IS_SYNCING {
             // Construct the subdag.
             let subdag = Subdag::from(commit_subdag.clone())?;
-            info!(
-                "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
-                transmissions.len(),
-                subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
-            );
+            // Retrieve the anchor round.
+            let anchor_round = subdag.anchor_round();
+            // Retrieve the number of transmissions.
+            let num_transmissions = transmissions.len();
+            // Retrieve metadata about the subdag.
+            let subdag_metadata = subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
+
             // Trigger consensus.
             if let Some(consensus_sender) = self.consensus_sender.get() {
-                // Retrieve the anchor round.
-                let anchor_round = subdag.anchor_round();
                 // Initialize a callback sender and receiver.
                 let (callback_sender, callback_receiver) = oneshot::channel();
                 // Send the subdag and transmissions to consensus.
                 consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
                 // Await the callback to continue.
                 match callback_receiver.await {
-                    Ok(Ok(())) => {
-                        // Update the DAG only if the subdag was successfully added to a block.
-                        for certificate in commit_subdag.values().flatten() {
-                            // Update the DAG.
-                            self.dag.write().commit(certificate, self.storage().max_gc_rounds());
-                        }
+                    Ok(Ok(())) => (), // continue
+                    Ok(Err(e)) => {
+                        error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                        return Ok(());
                     }
-                    Ok(Err(e)) => error!("BFT failed to advance the subdag for round {anchor_round} - {e}"),
-                    Err(e) => error!("BFT failed to receive the callback for round {anchor_round} - {e}"),
+                    Err(e) => {
+                        error!("BFT failed to receive the callback for round {anchor_round} - {e}");
+                        return Ok(());
+                    }
                 }
+            }
+
+            info!(
+                "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
+            );
+            // Update the DAG, as the subdag was successfully included into a block.
+            for certificate in commit_subdag.values().flatten() {
+                self.dag.write().commit(certificate, self.storage().max_gc_rounds());
             }
         }
         Ok(())
