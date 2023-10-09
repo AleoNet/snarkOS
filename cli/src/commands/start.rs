@@ -299,7 +299,7 @@ impl Start {
                 .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_VALIDATOR_STAKE, true))))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
             // Construct the committee.
-            let committee = Committee::<N>::new_genesis(members)?;
+            let committee = Committee::<N>::new(0u64, members)?;
 
             // Determine the public balance per validator.
             let public_balance_per_validator = (N::STARTING_SUPPLY
