@@ -103,7 +103,7 @@ version = "0.1"
 version = "0.6"
 
 [dev-dependencies.axum-extra]
-version = "0.7.4"
+version = "0.8.0"
 default-features = false
 features = [ "erased-json" ]
 
@@ -153,6 +153,9 @@ features = [ "fs", "trace" ]
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter" ]
+
+[dev-dependencies.tracing-test]
+version = "0.1"
 
 [dev-dependencies.mockall]
 version = "0.11.4"

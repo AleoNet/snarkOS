@@ -26,6 +26,7 @@ pub use snarkos_node_consensus as consensus;
 pub use snarkos_node_narwhal as narwhal;
 pub use snarkos_node_rest as rest;
 pub use snarkos_node_router as router;
+pub use snarkos_node_sync as sync;
 pub use snarkos_node_tcp as tcp;
 pub use snarkvm;
 
