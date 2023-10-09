@@ -37,7 +37,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, Field, Network, Result},
+    prelude::{bail, Field, Network, Result},
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -189,31 +189,54 @@ impl<N: Network> BFT<N> {
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    async fn update_to_next_round(&self, current_round: u64) -> Result<()> {
+    async fn update_to_next_round(&self, current_round: u64) {
         // Acquire the BFT lock.
         let _lock = self.lock.lock().await;
 
+        // Ensure the current round is at least the storage round (this is a sanity check).
+        let storage_round = self.storage().current_round();
+        if current_round < storage_round {
+            warn!("BFT is safely skipping an update for round {current_round}, as storage is at round {storage_round}");
+            return;
+        }
+
         // Determine if the BFT is ready to update to the next round.
         let is_ready = match current_round % 2 == 0 {
-            true => self.update_leader_certificate_to_even_round(current_round)?,
-            false => self.is_leader_quorum_or_nonleaders_available(current_round)?,
+            true => self.update_leader_certificate_to_even_round(current_round),
+            false => self.is_leader_quorum_or_nonleaders_available(current_round),
         };
 
-        // Log the leader election.
+        // Log whether the round is going to update.
         if current_round % 2 == 0 {
+            // Determine if there is a leader certificate.
             if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
-                info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author());
+                // Ensure the state of the leader certificate is consistent with the BFT being ready.
+                if !is_ready {
+                    error!(is_ready, "BFT - A leader certificate was found, but 'is_ready' is false");
+                }
+                // Log the leader election.
+                let leader_round = leader_certificate.round();
+                match leader_round == current_round {
+                    true => info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author()),
+                    false => warn!("BFT failed to elect a leader for round {current_round} (!= {leader_round})"),
+                }
+            } else {
+                match is_ready {
+                    true => info!("\n\nRound {current_round} reached quorum without a leader\n"),
+                    false => info!("\n\nRound {current_round} did not elect a leader\n"),
+                }
             }
         }
 
         // If the BFT is ready, then update to the next round.
         if is_ready {
             // Update to the next round in storage.
-            self.storage().increment_to_next_round()?;
+            if let Err(e) = self.storage().increment_to_next_round() {
+                warn!("BFT failed to increment to the next round from round {current_round} - {e}");
+            }
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
         }
-        Ok(())
     }
 
     /// Updates the leader certificate to the current even round,
@@ -221,17 +244,19 @@ impl<N: Network> BFT<N> {
     ///
     /// This method runs on every even round, by determining the leader of the current even round,
     /// and setting the leader certificate to their certificate in the round, if they were present.
-    fn update_leader_certificate_to_even_round(&self, even_round: u64) -> Result<bool> {
+    fn update_leader_certificate_to_even_round(&self, even_round: u64) -> bool {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
-        ensure!(
-            current_round == even_round,
-            "BFT storage (at round {current_round}) is out of sync with the current even round {even_round}"
-        );
-        // If the current round is odd, throw an error.
+        if current_round != even_round {
+            warn!("BFT storage (at round {current_round}) is out of sync with the current even round {even_round}");
+            return false;
+        }
+
+        // If the current round is odd, return false.
         if current_round % 2 != 0 || current_round < 2 {
-            bail!("BFT cannot update the leader certificate in an odd round")
+            error!("BFT cannot update the leader certificate in an odd round");
+            return false;
         }
 
         // Retrieve the certificates for the current round.
@@ -240,20 +265,30 @@ impl<N: Network> BFT<N> {
         if current_certificates.is_empty() {
             // Set the leader certificate to 'None'.
             *self.leader_certificate.write() = None;
-            return Ok(false);
+            return false;
         }
 
-        // Retrieve the previous committee for the current round.
-        let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(current_round) else {
-            bail!("BFT failed to retrieve the committee for the even round")
+        // Retrieve the previous committee of the current round.
+        let previous_committee = match self.ledger().get_previous_committee_for_round(current_round) {
+            Ok(committee) => committee,
+            Err(e) => {
+                error!("BFT failed to retrieve the previous committee for the even round {current_round} - {e}");
+                return false;
+            }
         };
         // Determine the leader of the current round.
-        let leader = previous_committee.get_leader(current_round)?;
+        let leader = match previous_committee.get_leader(current_round) {
+            Ok(leader) => leader,
+            Err(e) => {
+                error!("BFT failed to compute the leader for the even round {current_round} - {e}");
+                return false;
+            }
+        };
         // Find and set the leader certificate, if the leader was present in the current even round.
         let leader_certificate = current_certificates.iter().find(|certificate| certificate.author() == leader);
         *self.leader_certificate.write() = leader_certificate.cloned();
 
-        Ok(self.is_even_round_ready_for_next_round(current_certificates, previous_committee))
+        self.is_even_round_ready_for_next_round(current_certificates, previous_committee, current_round)
     }
 
     /// Returns 'true' under one of the following conditions:
@@ -264,13 +299,17 @@ impl<N: Network> BFT<N> {
         &self,
         certificates: IndexSet<BatchCertificate<N>>,
         committee: Committee<N>,
+        current_round: u64,
     ) -> bool {
         // If the leader certificate is set for the current even round, return 'true'.
-        if self.leader_certificate.read().is_some() {
-            return true;
+        if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
+            if leader_certificate.round() == current_round {
+                return true;
+            }
         }
         // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
         if self.is_timer_expired() {
+            debug!("BFT - timer expired for the leader, checking for quorum threshold (without the leader)");
             // Retrieve the certificate authors.
             let authors = certificates.into_iter().map(|c| c.author()).collect();
             // Determine if the quorum threshold is reached.
@@ -290,43 +329,45 @@ impl<N: Network> BFT<N> {
     ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round).
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.
-    fn is_leader_quorum_or_nonleaders_available(&self, odd_round: u64) -> Result<bool> {
+    fn is_leader_quorum_or_nonleaders_available(&self, odd_round: u64) -> bool {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
-        ensure!(
-            current_round == odd_round,
-            "BFT storage (at round {current_round}) is out of sync with the current odd round {odd_round}"
-        );
-        // If the current round is even, throw an error.
+        if current_round != odd_round {
+            warn!("BFT storage (at round {current_round}) is out of sync with the current odd round {odd_round}");
+            return false;
+        }
+        // If the current round is even, return false.
         if current_round % 2 != 1 {
-            bail!("BFT does not compute stakes for the leader certificate in an even round")
+            error!("BFT does not compute stakes for the leader certificate in an even round");
+            return false;
         }
 
         // Retrieve the leader certificate.
         let Some(leader_certificate) = self.leader_certificate.read().clone() else {
             // If there is no leader certificate for the previous round, return 'true'.
-            return Ok(true);
+            return true;
         };
         // Retrieve the leader certificate ID.
         let leader_certificate_id = leader_certificate.certificate_id();
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
         // Retrieve the previous committee of the current round.
-        let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(current_round) else {
-            bail!("BFT failed to retrieve the previous committee for the current round")
+        let previous_committee = match self.ledger().get_previous_committee_for_round(current_round) {
+            Ok(committee) => committee,
+            Err(e) => {
+                error!("BFT failed to retrieve the previous committee for the odd round {current_round} - {e}");
+                return false;
+            }
         };
 
         // Compute the stake for the leader certificate.
-        let (stake_with_leader, stake_without_leader) = self.compute_stake_for_leader_certificate(
-            leader_certificate_id,
-            current_certificates,
-            &previous_committee,
-        )?;
+        let (stake_with_leader, stake_without_leader) =
+            self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &previous_committee);
         // Return 'true' if any of the following conditions hold:
-        Ok(stake_with_leader >= previous_committee.availability_threshold()
+        stake_with_leader >= previous_committee.availability_threshold()
             || stake_without_leader >= previous_committee.quorum_threshold()
-            || self.is_timer_expired())
+            || self.is_timer_expired()
     }
 
     /// Computes the amount of stake that has & has not signed for the leader certificate.
@@ -335,10 +376,10 @@ impl<N: Network> BFT<N> {
         leader_certificate_id: Field<N>,
         current_certificates: IndexSet<BatchCertificate<N>>,
         current_committee: &Committee<N>,
-    ) -> Result<(u64, u64)> {
+    ) -> (u64, u64) {
         // If there are no current certificates, return early.
         if current_certificates.is_empty() {
-            return Ok((0, 0));
+            return (0, 0);
         }
 
         // Initialize a tracker for the stake with the leader.
@@ -358,7 +399,7 @@ impl<N: Network> BFT<N> {
             }
         }
         // Return the stake with the leader, and the stake without the leader.
-        Ok((stake_with_leader, stake_without_leader))
+        (stake_with_leader, stake_without_leader)
     }
 }
 
@@ -582,7 +623,8 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((current_round, callback)) = rx_primary_round.recv().await {
-                callback.send(self_.update_to_next_round(current_round).await).ok();
+                self_.update_to_next_round(current_round).await;
+                callback.send(()).ok();
             }
         });
 
@@ -695,7 +737,6 @@ mod tests {
         ledger::narwhal::batch_certificate::test_helpers::{
             sample_batch_certificate,
             sample_batch_certificate_for_round,
-            sample_batch_certificate_for_round_with_previous_certificate_ids,
         },
         utilities::TestRng,
     };
@@ -705,6 +746,7 @@ mod tests {
     use std::sync::{atomic::Ordering, Arc};
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_is_leader_quorum_odd() -> Result<()> {
         let rng = &mut TestRng::default();
 
@@ -719,8 +761,7 @@ mod tests {
 
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
-        assert!(result.is_ok()); // no previous leader certificate
-        assert!(result.unwrap());
+        assert!(result); // no previous leader certificate
 
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate(rng);
@@ -728,8 +769,7 @@ mod tests {
 
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
-        assert!(result.is_ok()); // should now fall through to end of function
-        assert!(result.unwrap());
+        assert!(result); // should now fall through to end of function
 
         // Set the timer to now().
         bft.leader_certificate_timer.store(now(), Ordering::SeqCst);
@@ -737,13 +777,13 @@ mod tests {
 
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
-        assert!(result.is_ok()); // should now fall through to end of function
         // Should now return false, as the timer is not expired.
-        assert!(!result.unwrap());
+        assert!(!result); // should now fall through to end of function
         Ok(())
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_is_leader_quorum_even_out_of_sync() -> Result<()> {
         let rng = &mut TestRng::default();
 
@@ -760,15 +800,12 @@ mod tests {
         // Store is at round 1, and we are checking for round 2.
         // Ensure this call fails on an even round.
         let result = bft.is_leader_quorum_or_nonleaders_available(2);
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "BFT storage (at round 1) is out of sync with the current odd round 2"
-        );
+        assert!(!result);
         Ok(())
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_is_leader_quorum_even() -> Result<()> {
         let rng = &mut TestRng::default();
 
@@ -784,15 +821,12 @@ mod tests {
 
         // Ensure this call fails on an even round.
         let result = bft.is_leader_quorum_or_nonleaders_available(2);
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "BFT does not compute stakes for the leader certificate in an even round"
-        );
+        assert!(!result);
         Ok(())
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_is_even_round_ready() -> Result<()> {
         let rng = &mut TestRng::default();
 
@@ -804,20 +838,21 @@ mod tests {
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
-        let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee.clone());
+        let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee.clone(), 2);
         assert!(!result);
 
         // Set the leader certificate.
-        let leader_certificate = sample_batch_certificate(rng);
+        let leader_certificate = sample_batch_certificate_for_round(2, rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
 
-        let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee);
+        let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee, 2);
         // If leader certificate is set, we should be ready for next round.
         assert!(result);
         Ok(())
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_update_leader_certificate_odd() -> Result<()> {
         let rng = &mut TestRng::default();
 
@@ -831,12 +866,12 @@ mod tests {
 
         // Ensure this call fails on an odd round.
         let result = bft.update_leader_certificate_to_even_round(1);
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "BFT cannot update the leader certificate in an odd round");
+        assert!(!result);
         Ok(())
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_update_leader_certificate_bad_round() -> Result<()> {
         let rng = &mut TestRng::default();
 
@@ -850,46 +885,69 @@ mod tests {
 
         // Ensure this call succeeds on an even round.
         let result = bft.update_leader_certificate_to_even_round(6);
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "BFT storage (at round 1) is out of sync with the current even round 6"
-        );
+        assert!(!result);
         Ok(())
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_update_leader_certificate_even() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
-        let account = Account::new(rng)?;
-        let ledger = Arc::new(MockLedgerService::new(committee));
+        // Set the current round.
+        let current_round = 3;
+
+        // Sample the certificates.
+        let (_, certificates) = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_with_previous_certificates(
+            current_round,
+            rng,
+        );
+
+        // Initialize the committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+            2,
+            vec![
+                certificates[0].author(),
+                certificates[1].author(),
+                certificates[2].author(),
+                certificates[3].author(),
+            ],
+            rng,
+        );
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+
+        // Initialize the storage.
         let storage = Storage::new(ledger.clone(), 10);
+        storage.testing_only_insert_certificate_testing_only(certificates[0].clone());
+        storage.testing_only_insert_certificate_testing_only(certificates[1].clone());
+        storage.testing_only_insert_certificate_testing_only(certificates[2].clone());
+        storage.testing_only_insert_certificate_testing_only(certificates[3].clone());
         assert_eq!(storage.current_round(), 2);
 
+        // Retrieve the leader certificate.
+        let leader = committee.get_leader(2).unwrap();
+        let leader_certificate = storage.get_certificate_for_round_with_author(2, leader).unwrap();
+
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
+        let account = Account::new(rng)?;
+        let bft = BFT::new(account, storage.clone(), ledger, None, &[], None)?;
 
         // Set the leader certificate.
-        let leader_certificate = sample_batch_certificate(rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
 
         // Update the leader certificate.
         // Ensure this call succeeds on an even round.
         let result = bft.update_leader_certificate_to_even_round(2);
-        assert!(result.is_ok());
+        assert!(result);
 
         Ok(())
     }
 
     #[tokio::test]
+    #[tracing_test::traced_test]
     async fn test_order_dag_with_dfs() -> Result<()> {
-        use snarkvm::ledger::narwhal::batch_certificate::test_helpers::{
-            sample_batch_certificate_for_round,
-            sample_batch_certificate_for_round_with_previous_certificate_ids,
-        };
-
         let rng = &mut TestRng::default();
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(1, rng);
@@ -900,18 +958,9 @@ mod tests {
         let previous_round = 2; // <- This must be an even number, for `BFT::update_dag` to behave correctly below.
         let current_round = previous_round + 1;
 
-        // Sample the previous certificates.
-        let previous_certificates = vec![
-            sample_batch_certificate_for_round(previous_round, rng),
-            sample_batch_certificate_for_round(previous_round, rng),
-            sample_batch_certificate_for_round(previous_round, rng),
-        ];
-        // Construct the previous certificate IDs.
-        let previous_certificate_ids: IndexSet<_> = previous_certificates.iter().map(|c| c.certificate_id()).collect();
-        // Sample the leader certificate.
-        let certificate = sample_batch_certificate_for_round_with_previous_certificate_ids(
+        // Sample the current certificate and previous certificates.
+        let (certificate, previous_certificates) = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_with_previous_certificates(
             current_round,
-            previous_certificate_ids.clone(),
             rng,
         );
 
@@ -966,11 +1015,12 @@ mod tests {
             let result = bft.order_dag_with_dfs::<false>(certificate.clone());
             assert!(result.is_ok());
             let candidate_certificates = result.unwrap().into_values().flatten().collect::<Vec<_>>();
-            assert_eq!(candidate_certificates.len(), 4);
+            assert_eq!(candidate_certificates.len(), 5);
             let expected_certificates = vec![
                 previous_certificates[0].clone(),
                 previous_certificates[1].clone(),
                 previous_certificates[2].clone(),
+                previous_certificates[3].clone(),
                 certificate,
             ];
             assert_eq!(
@@ -984,6 +1034,7 @@ mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn test_order_dag_with_dfs_fails_on_missing_previous_certificate() -> Result<()> {
         let rng = &mut TestRng::default();
 
@@ -995,20 +1046,13 @@ mod tests {
         let previous_round = 2; // <- This must be an even number, for `BFT::update_dag` to behave correctly below.
         let current_round = previous_round + 1;
 
-        // Sample the previous certificates.
-        let previous_certificates = vec![
-            sample_batch_certificate_for_round(previous_round, rng),
-            sample_batch_certificate_for_round(previous_round, rng),
-            sample_batch_certificate_for_round(previous_round, rng),
-        ];
-        // Construct the previous certificate IDs.
-        let previous_certificate_ids: IndexSet<_> = previous_certificates.iter().map(|c| c.certificate_id()).collect();
-        // Sample the leader certificate.
-        let certificate = sample_batch_certificate_for_round_with_previous_certificate_ids(
+        // Sample the current certificate and previous certificates.
+        let (certificate, previous_certificates) = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_with_previous_certificates(
             current_round,
-            previous_certificate_ids.clone(),
             rng,
         );
+        // Construct the previous certificate IDs.
+        let previous_certificate_ids: IndexSet<_> = previous_certificates.iter().map(|c| c.certificate_id()).collect();
 
         /* Test missing previous certificate. */
 
@@ -1020,7 +1064,7 @@ mod tests {
         // The expected error message.
         let error_msg = format!(
             "Missing previous certificate {} for round {previous_round}",
-            crate::helpers::fmt_id(previous_certificate_ids[2]),
+            crate::helpers::fmt_id(previous_certificate_ids[3]),
         );
 
         // Ensure this call fails on a missing previous certificate.
