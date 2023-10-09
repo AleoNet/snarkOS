@@ -44,6 +44,52 @@ async fn test_state_coherence() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "fails"]
+async fn test_resync() {
+    // Start N nodes, connect them and start the cannons for each.
+    const N: u16 = 4;
+    const TRANSMISSION_INTERVAL_MS: u64 = 10;
+    let mut network = TestNetwork::new(TestNetworkConfig {
+        num_nodes: N,
+        bft: true,
+        connect_all: true,
+        fire_transmissions: Some(TRANSMISSION_INTERVAL_MS),
+        // Set this to Some(0..=4) to see the logs.
+        log_level: Some(0),
+        log_connections: false,
+    });
+    network.start().await;
+
+    // Let the nodes advance through the rounds.
+    const BREAK_ROUND: u64 = 4;
+    let network_clone = network.clone();
+    deadline!(Duration::from_secs(20), move || { network_clone.is_round_reached(BREAK_ROUND) });
+
+    network.disconnect(N).await;
+
+    let mut spare_network = TestNetwork::new(TestNetworkConfig {
+        num_nodes: N,
+        bft: true,
+        connect_all: false,
+        fire_transmissions: None,
+        log_level: None,
+        log_connections: false,
+    });
+    spare_network.start().await;
+
+    for i in 1..N {
+        let spare_validator = spare_network.validators.get(&i).cloned().unwrap();
+        network.validators.insert(i, spare_validator);
+    }
+
+    network.connect_all().await;
+
+    const RECOVERY_ROUND: u64 = 8;
+    let network_clone = network.clone();
+    deadline!(Duration::from_secs(20), move || { network_clone.is_round_reached(RECOVERY_ROUND) });
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_quorum_threshold() {
     // Start N nodes but don't connect them.
     const N: u16 = 4;
