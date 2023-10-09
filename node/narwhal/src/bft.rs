@@ -37,7 +37,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, Field, Network, Result},
+    prelude::{bail, Field, Network, Result},
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -189,14 +189,21 @@ impl<N: Network> BFT<N> {
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    async fn update_to_next_round(&self, current_round: u64) -> Result<()> {
+    async fn update_to_next_round(&self, current_round: u64) {
         // Acquire the BFT lock.
         let _lock = self.lock.lock().await;
 
+        // Ensure the current round is at least the storage round (this is a sanity check).
+        let storage_round = self.storage().current_round();
+        if current_round < storage_round {
+            warn!("BFT is safely skipping an update for round {current_round}, as storage is at round {storage_round}");
+            return;
+        }
+
         // Determine if the BFT is ready to update to the next round.
         let is_ready = match current_round % 2 == 0 {
-            true => self.update_leader_certificate_to_even_round(current_round)?,
-            false => self.is_leader_quorum_or_nonleaders_available(current_round)?,
+            true => self.update_leader_certificate_to_even_round(current_round),
+            false => self.is_leader_quorum_or_nonleaders_available(current_round),
         };
 
         // Log the leader election.
@@ -209,11 +216,12 @@ impl<N: Network> BFT<N> {
         // If the BFT is ready, then update to the next round.
         if is_ready {
             // Update to the next round in storage.
-            self.storage().increment_to_next_round()?;
+            if let Err(e) = self.storage().increment_to_next_round() {
+                warn!("BFT failed to increment to the next round from round {current_round} - {e}");
+            }
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
         }
-        Ok(())
     }
 
     /// Updates the leader certificate to the current even round,
@@ -221,17 +229,19 @@ impl<N: Network> BFT<N> {
     ///
     /// This method runs on every even round, by determining the leader of the current even round,
     /// and setting the leader certificate to their certificate in the round, if they were present.
-    fn update_leader_certificate_to_even_round(&self, even_round: u64) -> Result<bool> {
+    fn update_leader_certificate_to_even_round(&self, even_round: u64) -> bool {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
-        ensure!(
-            current_round == even_round,
-            "BFT storage (at round {current_round}) is out of sync with the current even round {even_round}"
-        );
-        // If the current round is odd, throw an error.
+        if current_round != even_round {
+            warn!("BFT storage (at round {current_round}) is out of sync with the current even round {even_round}");
+            return false;
+        }
+
+        // If the current round is odd, return false.
         if current_round % 2 != 0 || current_round < 2 {
-            bail!("BFT cannot update the leader certificate in an odd round")
+            error!("BFT cannot update the leader certificate in an odd round");
+            return false;
         }
 
         // Retrieve the certificates for the current round.
@@ -240,20 +250,30 @@ impl<N: Network> BFT<N> {
         if current_certificates.is_empty() {
             // Set the leader certificate to 'None'.
             *self.leader_certificate.write() = None;
-            return Ok(false);
+            return false;
         }
 
-        // Retrieve the previous committee for the current round.
-        let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(current_round) else {
-            bail!("BFT failed to retrieve the committee for the even round")
+        // Retrieve the previous committee of the current round.
+        let previous_committee = match self.ledger().get_previous_committee_for_round(current_round) {
+            Ok(committee) => committee,
+            Err(e) => {
+                error!("BFT failed to retrieve the previous committee for the even round {current_round} - {e}");
+                return false;
+            }
         };
         // Determine the leader of the current round.
-        let leader = previous_committee.get_leader(current_round)?;
+        let leader = match previous_committee.get_leader(current_round) {
+            Ok(leader) => leader,
+            Err(e) => {
+                error!("BFT failed to compute the leader for the even round {current_round} - {e}");
+                return false;
+            }
+        };
         // Find and set the leader certificate, if the leader was present in the current even round.
         let leader_certificate = current_certificates.iter().find(|certificate| certificate.author() == leader);
         *self.leader_certificate.write() = leader_certificate.cloned();
 
-        Ok(self.is_even_round_ready_for_next_round(current_certificates, previous_committee))
+        self.is_even_round_ready_for_next_round(current_certificates, previous_committee)
     }
 
     /// Returns 'true' under one of the following conditions:
@@ -290,43 +310,54 @@ impl<N: Network> BFT<N> {
     ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round).
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.
-    fn is_leader_quorum_or_nonleaders_available(&self, odd_round: u64) -> Result<bool> {
+    fn is_leader_quorum_or_nonleaders_available(&self, odd_round: u64) -> bool {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
-        ensure!(
-            current_round == odd_round,
-            "BFT storage (at round {current_round}) is out of sync with the current odd round {odd_round}"
-        );
-        // If the current round is even, throw an error.
+        if current_round != odd_round {
+            warn!("BFT storage (at round {current_round}) is out of sync with the current odd round {odd_round}");
+            return false;
+        }
+        // If the current round is even, return false.
         if current_round % 2 != 1 {
-            bail!("BFT does not compute stakes for the leader certificate in an even round")
+            error!("BFT does not compute stakes for the leader certificate in an even round");
+            return false;
         }
 
         // Retrieve the leader certificate.
         let Some(leader_certificate) = self.leader_certificate.read().clone() else {
             // If there is no leader certificate for the previous round, return 'true'.
-            return Ok(true);
+            return true;
         };
         // Retrieve the leader certificate ID.
         let leader_certificate_id = leader_certificate.certificate_id();
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
         // Retrieve the previous committee of the current round.
-        let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(current_round) else {
-            bail!("BFT failed to retrieve the previous committee for the current round")
+        let previous_committee = match self.ledger().get_previous_committee_for_round(current_round) {
+            Ok(committee) => committee,
+            Err(e) => {
+                error!("BFT failed to retrieve the previous committee for the odd round {current_round} - {e}");
+                return false;
+            }
         };
 
         // Compute the stake for the leader certificate.
-        let (stake_with_leader, stake_without_leader) = self.compute_stake_for_leader_certificate(
+        let (stake_with_leader, stake_without_leader) = match self.compute_stake_for_leader_certificate(
             leader_certificate_id,
             current_certificates,
             &previous_committee,
-        )?;
+        ) {
+            Ok(stakes) => stakes,
+            Err(e) => {
+                error!("BFT failed to compute the stake for the leader certificate - {e}");
+                return false;
+            }
+        };
         // Return 'true' if any of the following conditions hold:
-        Ok(stake_with_leader >= previous_committee.availability_threshold()
+        stake_with_leader >= previous_committee.availability_threshold()
             || stake_without_leader >= previous_committee.quorum_threshold()
-            || self.is_timer_expired())
+            || self.is_timer_expired()
     }
 
     /// Computes the amount of stake that has & has not signed for the leader certificate.
@@ -582,7 +613,8 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((current_round, callback)) = rx_primary_round.recv().await {
-                callback.send(self_.update_to_next_round(current_round).await).ok();
+                self_.update_to_next_round(current_round).await;
+                callback.send(()).ok();
             }
         });
 
@@ -719,8 +751,7 @@ mod tests {
 
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
-        assert!(result.is_ok()); // no previous leader certificate
-        assert!(result.unwrap());
+        assert!(result); // no previous leader certificate
 
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate(rng);
@@ -728,8 +759,7 @@ mod tests {
 
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
-        assert!(result.is_ok()); // should now fall through to end of function
-        assert!(result.unwrap());
+        assert!(result); // should now fall through to end of function
 
         // Set the timer to now().
         bft.leader_certificate_timer.store(now(), Ordering::SeqCst);
@@ -737,9 +767,8 @@ mod tests {
 
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
-        assert!(result.is_ok()); // should now fall through to end of function
         // Should now return false, as the timer is not expired.
-        assert!(!result.unwrap());
+        assert!(!result); // should now fall through to end of function
         Ok(())
     }
 
@@ -760,11 +789,7 @@ mod tests {
         // Store is at round 1, and we are checking for round 2.
         // Ensure this call fails on an even round.
         let result = bft.is_leader_quorum_or_nonleaders_available(2);
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "BFT storage (at round 1) is out of sync with the current odd round 2"
-        );
+        assert!(!result);
         Ok(())
     }
 
@@ -784,11 +809,7 @@ mod tests {
 
         // Ensure this call fails on an even round.
         let result = bft.is_leader_quorum_or_nonleaders_available(2);
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "BFT does not compute stakes for the leader certificate in an even round"
-        );
+        assert!(!result);
         Ok(())
     }
 
@@ -831,8 +852,7 @@ mod tests {
 
         // Ensure this call fails on an odd round.
         let result = bft.update_leader_certificate_to_even_round(1);
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "BFT cannot update the leader certificate in an odd round");
+        assert!(!result);
         Ok(())
     }
 
@@ -850,11 +870,7 @@ mod tests {
 
         // Ensure this call succeeds on an even round.
         let result = bft.update_leader_certificate_to_even_round(6);
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "BFT storage (at round 1) is out of sync with the current even round 6"
-        );
+        assert!(!result);
         Ok(())
     }
 
@@ -878,7 +894,7 @@ mod tests {
         // Update the leader certificate.
         // Ensure this call succeeds on an even round.
         let result = bft.update_leader_certificate_to_even_round(2);
-        assert!(result.is_ok());
+        assert!(result);
 
         Ok(())
     }
