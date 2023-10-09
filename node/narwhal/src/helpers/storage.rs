@@ -257,6 +257,21 @@ impl<N: Network> Storage<N> {
         self.certificates.read().get(&certificate_id).cloned()
     }
 
+    /// Returns the certificate for the given `round` and `author`.
+    /// If the round does not exist in storage, `None` is returned.
+    /// If the author for the round does not exist in storage, `None` is returned.
+    pub fn get_certificate_for_round_with_author(&self, round: u64, author: Address<N>) -> Option<BatchCertificate<N>> {
+        // Retrieve the certificates.
+        if let Some(entries) = self.rounds.read().get(&round) {
+            let certificates = self.certificates.read();
+            entries.iter().find_map(
+                |(certificate_id, _, a)| if a == &author { certificates.get(certificate_id).cloned() } else { None },
+            )
+        } else {
+            Default::default()
+        }
+    }
+
     /// Returns the certificates for the given `round`.
     /// If the round does not exist in storage, `None` is returned.
     pub fn get_certificates_for_round(&self, round: u64) -> IndexSet<BatchCertificate<N>> {
@@ -709,6 +724,47 @@ impl<N: Network> Storage<N> {
     ) -> impl Iterator<Item = (TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>))> {
         self.transmissions.read().clone().into_iter()
     }
+
+    /// Inserts the given `certificate` into storage.
+    ///
+    /// Note: Do NOT use this in production. This is for **testing only**.
+    #[doc(hidden)]
+    pub(crate) fn testing_only_insert_certificate_testing_only(&self, certificate: BatchCertificate<N>) {
+        // Retrieve the round.
+        let round = certificate.round();
+        // Retrieve the certificate ID.
+        let certificate_id = certificate.certificate_id();
+        // Retrieve the batch ID.
+        let batch_id = certificate.batch_id();
+        // Retrieve the author of the batch.
+        let author = certificate.author();
+
+        // Insert the round to certificate ID entry.
+        self.rounds.write().entry(round).or_default().insert((certificate_id, batch_id, author));
+        // Obtain the certificate's transmission ids.
+        let transmission_ids = certificate.transmission_ids().clone();
+        // Insert the certificate.
+        self.certificates.write().insert(certificate_id, certificate);
+        // Insert the batch ID.
+        self.batch_ids.write().insert(batch_id, round);
+        // Acquire the transmissions write lock.
+        let mut transmissions = self.transmissions.write();
+        // Inserts the following:
+        //   - Inserts **only the missing** transmissions from storage.
+        //   - Inserts the certificate ID into the corresponding set for **all** transmissions.
+        for transmission_id in transmission_ids {
+            // Retrieve the transmission entry.
+            transmissions.entry(transmission_id)
+                // Insert **only the missing** transmissions from storage.
+                .or_insert_with( || {
+                    // Return the transmission and an empty set of certificate IDs.
+                    let dummy = snarkvm::ledger::narwhal::Data::Buffer(bytes::Bytes::new());
+                    (Transmission::Transaction(dummy), Default::default())
+                })
+                // Insert the certificate ID into the corresponding set for **all** transmissions.
+                .1.insert(certificate_id);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -820,6 +876,8 @@ mod tests {
         assert!(storage.contains_certificate(certificate_id));
         // Ensure the certificate is stored in the correct round.
         assert_eq!(storage.get_certificates_for_round(round), indexset! { certificate.clone() });
+        // Ensure the certificate is stored for the correct round and author.
+        assert_eq!(storage.get_certificate_for_round_with_author(round, author), Some(certificate.clone()));
 
         // Check that the underlying storage representation is correct.
         {
@@ -844,6 +902,8 @@ mod tests {
         assert!(!storage.contains_certificate(certificate_id));
         // Ensure the certificate is no longer stored in the round.
         assert!(storage.get_certificates_for_round(round).is_empty());
+        // Ensure the certificate is no longer stored for the round and author.
+        assert_eq!(storage.get_certificate_for_round_with_author(round, author), None);
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());
     }
