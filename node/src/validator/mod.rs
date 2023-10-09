@@ -87,6 +87,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
+        // TODO: Remove me after Phase 3.
+        let ledger = crate::phase_3_reset(ledger, dev)?;
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
@@ -138,6 +140,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         }
         // Initialize the routing.
         node.initialize_routing().await;
+        // Initialize the notification message loop.
+        node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.

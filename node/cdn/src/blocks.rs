@@ -303,8 +303,8 @@ async fn cdn_height<const BLOCKS_PER_FILE: u32>(base_url: &str) -> Result<u32> {
     };
     // Decrement the tip by a few blocks to ensure the CDN is caught up.
     let tip = tip.saturating_sub(10);
-    // Round the tip down to the nearest multiple.
-    Ok(tip - (tip % BLOCKS_PER_FILE))
+    // Adjust the tip to the closest subsequent multiple of BLOCKS_PER_FILE.
+    Ok(tip - (tip % BLOCKS_PER_FILE) + BLOCKS_PER_FILE)
 }
 
 /// Retrieves the objects from the CDN with the given URL.
