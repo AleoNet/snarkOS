@@ -489,8 +489,8 @@ impl<N: Network> BFT<N> {
                             self.dag.write().commit(certificate, self.storage().max_gc_rounds());
                         }
                     }
-                    Ok(Err(e)) => bail!("BFT failed to advance the subdag for round {anchor_round} - {e}"),
-                    Err(e) => bail!("BFT failed to receive the callback for round {anchor_round} - {e}"),
+                    Ok(Err(e)) => error!("BFT failed to advance the subdag for round {anchor_round} - {e}"),
+                    Err(e) => error!("BFT failed to receive the callback for round {anchor_round} - {e}"),
                 }
             }
         }
