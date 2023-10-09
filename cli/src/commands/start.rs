@@ -321,6 +321,11 @@ impl Start {
             // Construct the genesis block.
             load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
         } else {
+            // If the `dev_num_validators` flag is set, inform the user that it is ignored.
+            if self.dev_num_validators.is_some() {
+                eprintln!("The '--dev-num-validators' flag is ignored because '--dev' is not set");
+            }
+
             Block::from_bytes_le(N::genesis_bytes())
         }
     }
