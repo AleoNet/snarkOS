@@ -113,6 +113,9 @@ pub struct Start {
     /// Enables development mode, specify a unique ID for this node
     #[clap(long)]
     pub dev: Option<u16>,
+    /// If development mode is enabled, specify the number of genesis validators (default: 4)
+    #[clap(long)]
+    pub dev_num_validators: Option<u16>,
 }
 
 impl Start {
@@ -276,6 +279,12 @@ impl Start {
     /// Otherwise, returns the actual genesis block.
     fn parse_genesis<N: Network>(&self) -> Result<Block<N>> {
         if self.dev.is_some() {
+            // Determine the number of genesis committee members.
+            let num_genesis_committee_members = match self.dev_num_validators {
+                Some(num_genesis_committee_members) => num_genesis_committee_members,
+                None => DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
+            };
+
             // Initialize the (fixed) RNG.
             let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
             // Initialize the development private keys.
@@ -286,7 +295,7 @@ impl Start {
             // Construct the committee members.
             let members = development_private_keys
                 .iter()
-                .take(DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as usize)
+                .take(num_genesis_committee_members as usize)
                 .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_VALIDATOR_STAKE, true))))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
             // Construct the committee.
@@ -294,11 +303,11 @@ impl Start {
 
             // Determine the public balance per validator.
             let public_balance_per_validator = (N::STARTING_SUPPLY
-                - (DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64 * MIN_VALIDATOR_STAKE))
+                - (num_genesis_committee_members as u64 * MIN_VALIDATOR_STAKE))
                 / (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64);
             assert_eq!(
                 N::STARTING_SUPPLY,
-                (DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64 * MIN_VALIDATOR_STAKE)
+                (num_genesis_committee_members as u64 * MIN_VALIDATOR_STAKE)
                     + (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64 * public_balance_per_validator),
                 "The public balance per validator is not correct."
             );
