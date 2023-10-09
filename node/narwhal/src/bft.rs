@@ -37,7 +37,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, ensure, Field, Network, Result},
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -470,6 +470,8 @@ impl<N: Network> BFT<N> {
         &self,
         leader_certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        // Retrieve the leader certificate round.
+        let leader_round = leader_certificate.round();
         // Compute the commit subdag.
         let commit_subdag = match self.order_dag_with_dfs::<ALLOW_LEDGER_ACCESS>(leader_certificate) {
             Ok(subdag) => subdag,
@@ -512,6 +514,12 @@ impl<N: Network> BFT<N> {
             let num_transmissions = transmissions.len();
             // Retrieve metadata about the subdag.
             let subdag_metadata = subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
+
+            // Ensure the subdag anchor round matches the leader round.
+            ensure!(
+                anchor_round == leader_round,
+                "BFT failed to commit - the subdag anchor round {anchor_round} does not match the leader round {leader_round}",
+            );
 
             // Trigger consensus.
             if let Some(consensus_sender) = self.consensus_sender.get() {
