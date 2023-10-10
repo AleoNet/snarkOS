@@ -65,8 +65,8 @@ use tokio::{
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
-/// TODO (howardwu): Remove me and switch to dynamic.
-const MAX_COMMITTEE_SIZE: u16 = 100;
+/// TODO (howardwu): Move this to snarkVM.
+const MAX_COMMITTEE_SIZE: u16 = 200;
 
 /// The maximum interval of events to cache.
 const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
@@ -120,36 +120,6 @@ pub struct Gateway<N: Network> {
     sync_sender: Arc<OnceCell<SyncSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
-}
-
-// Dynamic rate limiting.
-impl<N: Network> Gateway<N> {
-    /// The current maxiumum committee size.
-    fn max_committee_size(&self) -> usize {
-        self.ledger
-            .current_committee()
-            .map_or_else(|_e| MAX_COMMITTEE_SIZE as usize, |committee| committee.num_members())
-    }
-
-    /// The maxixmum number of events to cache.
-    fn max_cache_events(&self) -> usize {
-        self.max_cache_transmissions()
-    }
-
-    /// The maximum number of certificate requests to cache.
-    fn max_cache_certificates(&self) -> usize {
-        2 * MAX_GC_ROUNDS as usize * self.max_committee_size()
-    }
-
-    /// Thne maximum number of transmission requests to cache.
-    fn max_cache_transmissions(&self) -> usize {
-        self.max_cache_certificates() * MAX_TRANSMISSIONS_PER_BATCH
-    }
-
-    /// The maximum number of duplicates for any particular request.
-    fn max_cache_duplicates(&self) -> usize {
-        self.max_committee_size() * self.max_committee_size()
-    }
 }
 
 impl<N: Network> Gateway<N> {
@@ -219,6 +189,36 @@ impl<N: Network> Gateway<N> {
         self.initialize_heartbeat();
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
+    }
+}
+
+// Dynamic rate limiting.
+impl<N: Network> Gateway<N> {
+    /// The current maxiumum committee size.
+    fn max_committee_size(&self) -> usize {
+        self.ledger
+            .current_committee()
+            .map_or_else(|_e| MAX_COMMITTEE_SIZE as usize, |committee| committee.num_members())
+    }
+
+    /// The maxixmum number of events to cache.
+    fn max_cache_events(&self) -> usize {
+        self.max_cache_transmissions()
+    }
+
+    /// The maximum number of certificate requests to cache.
+    fn max_cache_certificates(&self) -> usize {
+        2 * MAX_GC_ROUNDS as usize * self.max_committee_size()
+    }
+
+    /// Thne maximum number of transmission requests to cache.
+    fn max_cache_transmissions(&self) -> usize {
+        self.max_cache_certificates() * MAX_TRANSMISSIONS_PER_BATCH
+    }
+
+    /// The maximum number of duplicates for any particular request.
+    fn max_cache_duplicates(&self) -> usize {
+        self.max_committee_size() * self.max_committee_size()
     }
 }
 
