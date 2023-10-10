@@ -73,15 +73,6 @@ const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
 /// The maximum interval of requests to cache.
 const CACHE_REQUESTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
 
-/// The maximum number of events to cache.
-const CACHE_EVENTS: usize = CACHE_TRANSMISSIONS;
-/// The maximum number of certificate requests to cache.
-const CACHE_CERTIFICATES: usize = 2 * MAX_GC_ROUNDS as usize * MAX_COMMITTEE_SIZE as usize;
-/// The maximum number of transmission requests to cache.
-const CACHE_TRANSMISSIONS: usize = CACHE_CERTIFICATES * MAX_TRANSMISSIONS_PER_BATCH;
-/// The maximum number of duplicates for any particular request.
-const CACHE_MAX_DUPLICATES: usize = MAX_COMMITTEE_SIZE as usize * MAX_COMMITTEE_SIZE as usize;
-
 /// The maximum number of connection attempts in an interval.
 const MAX_CONNECTION_ATTEMPTS: usize = 10;
 /// The maximum interval to restrict a peer.
@@ -129,6 +120,36 @@ pub struct Gateway<N: Network> {
     sync_sender: Arc<OnceCell<SyncSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+}
+
+// Dynamic rate limiting.
+impl<N: Network> Gateway<N> {
+    /// The current maxiumum committee size.
+    fn max_committee_size(&self) -> usize {
+        self.ledger
+            .current_committee()
+            .map_or_else(|_e| MAX_COMMITTEE_SIZE as usize, |committee| committee.num_members())
+    }
+
+    /// The maxixmum number of events to cache.
+    fn max_cache_events(&self) -> usize {
+        self.max_cache_transmissions()
+    }
+
+    /// The maximum number of certificate requests to cache.
+    fn max_cache_certificates(&self) -> usize {
+        2 * MAX_GC_ROUNDS as usize * self.max_committee_size()
+    }
+
+    /// Thne maximum number of transmission requests to cache.
+    fn max_cache_transmissions(&self) -> usize {
+        self.max_cache_certificates() * MAX_TRANSMISSIONS_PER_BATCH
+    }
+
+    /// The maximum number of duplicates for any particular request.
+    fn max_cache_duplicates(&self) -> usize {
+        self.max_committee_size() * self.max_committee_size()
+    }
 }
 
 impl<N: Network> Gateway<N> {
@@ -458,7 +479,7 @@ impl<N: Network> Gateway<N> {
         }
         // Drop the peer, if they have exceeded the rate limit (i.e. they are requesting too much from us).
         let num_events = self.cache.insert_inbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
-        if num_events >= CACHE_EVENTS {
+        if num_events >= self.max_cache_events() {
             bail!("Dropping '{peer_ip}' for spamming events (num_events = {num_events})")
         }
         // Rate limit for duplicate requests.
@@ -471,7 +492,7 @@ impl<N: Network> Gateway<N> {
             };
             // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
             let num_events = self.cache.insert_inbound_certificate(certificate_id, CACHE_REQUESTS_INTERVAL);
-            if num_events >= CACHE_MAX_DUPLICATES {
+            if num_events >= self.max_cache_duplicates() {
                 return Ok(());
             }
         } else if matches!(&event, &Event::TransmissionRequest(_) | Event::TransmissionResponse(_)) {
@@ -483,7 +504,7 @@ impl<N: Network> Gateway<N> {
             };
             // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
             let num_events = self.cache.insert_inbound_transmission(transmission_id, CACHE_REQUESTS_INTERVAL);
-            if num_events >= CACHE_MAX_DUPLICATES {
+            if num_events >= self.max_cache_duplicates() {
                 return Ok(());
             }
         }
@@ -864,9 +885,9 @@ impl<N: Network> Transport<N> for Gateway<N> {
     /// which can be used to determine when and whether the event has been delivered.
     async fn send(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
         macro_rules! send {
-            ($self:ident, $cache_map:ident, $interval:expr, $freq:expr) => {{
+            ($self:ident, $cache_map:ident, $interval:expr, $freq:ident) => {{
                 // Rate limit the number of certificate requests sent to the peer.
-                while $self.cache.$cache_map(peer_ip, $interval) > $freq {
+                while $self.cache.$cache_map(peer_ip, $interval) > $self.$freq() {
                     // Sleep for a short period of time to allow the cache to clear.
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
@@ -880,19 +901,19 @@ impl<N: Network> Transport<N> for Gateway<N> {
             // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
             self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
             // Send the event to the peer.
-            send!(self, insert_outbound_certificate, CACHE_REQUESTS_INTERVAL, CACHE_CERTIFICATES)
+            send!(self, insert_outbound_certificate, CACHE_REQUESTS_INTERVAL, max_cache_certificates)
         }
         // If the event type is a transmission request, increment the cache.
         else if matches!(event, Event::TransmissionRequest(_)) | matches!(event, Event::TransmissionResponse(_)) {
             // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
             self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
             // Send the event to the peer.
-            send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, CACHE_TRANSMISSIONS)
+            send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, max_cache_transmissions)
         }
         // Otherwise, employ a general rate limit.
         else {
             // Send the event to the peer.
-            send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, CACHE_EVENTS)
+            send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, max_cache_events)
         }
     }
 
@@ -928,7 +949,8 @@ impl<N: Network> Reading for Gateway<N> {
     type Message = Event<N>;
 
     /// The maximum queue depth of incoming messages for a single peer.
-    const MESSAGE_QUEUE_DEPTH: usize = CACHE_TRANSMISSIONS;
+    const MESSAGE_QUEUE_DEPTH: usize =
+        2 * MAX_GC_ROUNDS as usize * MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
 
     /// Creates a [`Decoder`] used to interpret messages from the network.
     /// The `side` param indicates the connection side **from the node's perspective**.
@@ -960,7 +982,8 @@ impl<N: Network> Writing for Gateway<N> {
     type Message = Event<N>;
 
     /// The maximum queue depth of outgoing messages for a single peer.
-    const MESSAGE_QUEUE_DEPTH: usize = CACHE_TRANSMISSIONS;
+    const MESSAGE_QUEUE_DEPTH: usize =
+        2 * MAX_GC_ROUNDS as usize * MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
 
     /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
     /// The `side` parameter indicates the connection side **from the node's perspective**.
