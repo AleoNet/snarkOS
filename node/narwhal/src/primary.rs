@@ -590,6 +590,11 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        // Ensure storage does not already contain the certificate.
+        if self.storage.contains_certificate(certificate.certificate_id()) {
+            return Ok(());
+        }
+
         // Acquire the lock.
         let _lock = self.lock.lock().await;
 
@@ -651,6 +656,7 @@ impl<N: Network> Primary<N> {
             mut rx_batch_propose,
             mut rx_batch_signature,
             mut rx_batch_certified,
+            mut rx_primary_ping,
             mut rx_unconfirmed_solution,
             mut rx_unconfirmed_transaction,
         } = primary_receiver;
@@ -660,20 +666,82 @@ impl<N: Network> Primary<N> {
             let self_ = self.clone();
             self.spawn(async move {
                 loop {
+                    // Sleep briefly.
                     tokio::time::sleep(Duration::from_millis(PRIMARY_PING_INTERVAL)).await;
-                    // Construct the primary ping.
-                    let primary_ping = match self_.sync.get_block_locators() {
-                        Ok(block_locators) => PrimaryPing::new(<Event<N>>::VERSION, block_locators),
+
+                    // Retrieve the block locators.
+                    let block_locators = match self_.sync.get_block_locators() {
+                        Ok(block_locators) => block_locators,
                         Err(e) => {
                             warn!("Failed to retrieve block locators - {e}");
                             continue;
                         }
                     };
+
+                    // Retrieve the latest certificate of the primary.
+                    let primary_certificate = {
+                        // Retrieve the primary address.
+                        let primary_address = self_.gateway.account().address();
+
+                        // Iterate backwards from the latest round to find the primary certificate.
+                        let mut certificate = None;
+                        let mut current_round = self_.current_round();
+                        while certificate.is_none() {
+                            // If the current round is 0, then break the while loop.
+                            if current_round == 0 {
+                                break;
+                            }
+                            // Retrieve the certificates.
+                            let certificates = self_.storage.get_certificates_for_round(current_round);
+                            // Retrieve the primary certificate.
+                            certificate =
+                                certificates.into_iter().find(|certificate| certificate.author() == primary_address);
+                            // If the primary certificate was not found, decrement the round.
+                            if certificate.is_none() {
+                                current_round = current_round.saturating_sub(1);
+                            }
+                        }
+
+                        // Determine if the primary certificate was found.
+                        match certificate {
+                            Some(certificate) => certificate,
+                            // Skip this iteration of the loop (do not send a primary ping).
+                            None => continue,
+                        }
+                    };
+
+                    // Construct the primary ping.
+                    let primary_ping = PrimaryPing::from((<Event<N>>::VERSION, block_locators, primary_certificate));
                     // Broadcast the event.
                     self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
                 }
             });
         }
+
+        // Start the primary ping handler.
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some((peer_ip, batch_certificate)) = rx_primary_ping.recv().await {
+                // If the primary is not synced, then do not process the primary ping.
+                if !self_.sync.is_synced() {
+                    trace!("Skipping a primary ping from '{peer_ip}' - node is syncing");
+                    continue;
+                }
+
+                // Deserialize the batch certificate in the primary ping.
+                let Ok(Ok(batch_certificate)) =
+                    task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
+                else {
+                    warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
+                    continue;
+                };
+
+                // Process the batch certificate.
+                if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
+                    warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
+                }
+            }
+        });
 
         // Start the worker ping(s).
         if self.sync.is_gateway_mode() {

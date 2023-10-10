@@ -18,19 +18,31 @@ use super::*;
 pub struct PrimaryPing<N: Network> {
     pub version: u32,
     pub block_locators: BlockLocators<N>,
+    pub batch_certificate: Data<BatchCertificate<N>>,
 }
 
 impl<N: Network> PrimaryPing<N> {
     /// Initializes a new ping event.
-    pub const fn new(version: u32, block_locators: BlockLocators<N>) -> Self {
-        Self { version, block_locators }
+    pub const fn new(
+        version: u32,
+        block_locators: BlockLocators<N>,
+        batch_certificate: Data<BatchCertificate<N>>,
+    ) -> Self {
+        Self { version, block_locators, batch_certificate }
     }
 }
 
-impl<N: Network> From<(u32, BlockLocators<N>)> for PrimaryPing<N> {
+impl<N: Network> From<(u32, BlockLocators<N>, BatchCertificate<N>)> for PrimaryPing<N> {
     /// Initializes a new ping event.
-    fn from((version, block_locators): (u32, BlockLocators<N>)) -> Self {
-        Self::new(version, block_locators)
+    fn from((version, block_locators, batch_certificate): (u32, BlockLocators<N>, BatchCertificate<N>)) -> Self {
+        Self::new(version, block_locators, Data::Object(batch_certificate))
+    }
+}
+
+impl<N: Network> From<(u32, BlockLocators<N>, Data<BatchCertificate<N>>)> for PrimaryPing<N> {
+    /// Initializes a new ping event.
+    fn from((version, block_locators, batch_certificate): (u32, BlockLocators<N>, Data<BatchCertificate<N>>)) -> Self {
+        Self::new(version, block_locators, batch_certificate)
     }
 }
 
@@ -45,7 +57,8 @@ impl<N: Network> EventTrait for PrimaryPing<N> {
 impl<N: Network> ToBytes for PrimaryPing<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.version.write_le(&mut writer)?;
-        self.block_locators.write_le(&mut writer)
+        self.block_locators.write_le(&mut writer)?;
+        self.batch_certificate.write_le(&mut writer)
     }
 }
 
@@ -53,7 +66,8 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let version = u32::read_le(&mut reader)?;
         let block_locators = BlockLocators::read_le(&mut reader)?;
-        Ok(Self::new(version, block_locators))
+        let batch_certificate = Data::read_le(&mut reader)?;
+        Ok(Self::new(version, block_locators, batch_certificate))
     }
 }
 
@@ -61,6 +75,7 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
 pub mod prop_tests {
     use crate::PrimaryPing;
 
+    use crate::certificate_response::prop_tests::any_batch_certificate;
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use snarkos_node_sync_locators::{test_helpers::sample_block_locators, BlockLocators};
@@ -74,8 +89,10 @@ pub mod prop_tests {
     }
 
     pub fn any_primary_ping() -> BoxedStrategy<PrimaryPing<CurrentNetwork>> {
-        (any::<u32>(), any_block_locators())
-            .prop_map(|(version, block_locators)| PrimaryPing { version, block_locators })
+        (any::<u32>(), any_block_locators(), any_batch_certificate())
+            .prop_map(|(version, block_locators, batch_certificate)| {
+                PrimaryPing::from((version, block_locators, batch_certificate))
+            })
             .boxed()
     }
 
