@@ -189,10 +189,7 @@ impl<N: Network> BFT<N> {
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    async fn update_to_next_round(&self, current_round: u64) {
-        // Acquire the BFT lock.
-        let _lock = self.lock.lock().await;
-
+    fn update_to_next_round(&self, current_round: u64) {
         // Ensure the current round is at least the storage round (this is a sanity check).
         let storage_round = self.storage().current_round();
         if current_round < storage_round {
@@ -647,7 +644,7 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((current_round, callback)) = rx_primary_round.recv().await {
-                self_.update_to_next_round(current_round).await;
+                self_.update_to_next_round(current_round);
                 callback.send(()).ok();
             }
         });
