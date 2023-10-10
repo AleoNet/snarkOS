@@ -223,6 +223,9 @@ impl<N: Network> Sync<N> {
                 }
             })
             .collect::<Vec<_>>();
+        if leader_certificates.is_empty() {
+            return Ok(());
+        }
 
         // Construct a list of the certificates.
         let certificates = blocks
@@ -243,7 +246,7 @@ impl<N: Network> Sync<N> {
             // Await the callback to continue.
             if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send((leader_certificates, certificates)).await {
                 bail!("Failed to update the BFT DAG from sync: {e}");
-            };
+            }
         }
 
         Ok(())

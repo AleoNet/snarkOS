@@ -127,6 +127,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         node.initialize_routing().await;
         // Initialize the coinbase puzzle.
         node.initialize_coinbase_puzzle().await;
+        // Initialize the notification message loop.
+        node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.
@@ -256,12 +258,12 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Broadcasts the prover solution to the network.
     fn broadcast_prover_solution(&self, prover_solution: ProverSolution<N>) {
         // Prepare the unconfirmed solution message.
-        let message = Message::UnconfirmedSolution(UnconfirmedSolution {
+        let _message = Message::UnconfirmedSolution(UnconfirmedSolution {
             puzzle_commitment: prover_solution.commitment(),
             solution: Data::Object(prover_solution),
         });
-        // Propagate the "UnconfirmedSolution" to the connected validators.
-        self.propagate_to_validators(message, &[]);
+        // Propagate the "UnconfirmedSolution".
+        // self.propagate(message, &[]);
     }
 
     /// Returns the current number of puzzle instances.

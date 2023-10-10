@@ -36,3 +36,20 @@ impl FromBytes for ValidatorsRequest {
         Ok(Self)
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use crate::ValidatorsRequest;
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use snarkvm::utilities::{FromBytes, ToBytes};
+
+    #[test]
+    fn validators_request_roundtrip() {
+        let validators_request = ValidatorsRequest;
+        let mut bytes = BytesMut::default().writer();
+        validators_request.write_le(&mut bytes).unwrap();
+        let decoded = ValidatorsRequest::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq![decoded, validators_request];
+    }
+}

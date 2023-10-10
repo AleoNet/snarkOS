@@ -143,9 +143,9 @@ impl<N: Network> Gateway<N> {
     ) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match (ip, dev) {
-            (_, Some(dev)) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev))?,
+            (None, Some(dev)) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev))?,
             (None, None) => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT))?,
-            (Some(ip), None) => ip,
+            (Some(ip), _) => ip,
         };
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));
@@ -659,6 +659,10 @@ impl<N: Network> Gateway<N> {
                         for (validator_ip, validator_address) in validators {
                             // Ensure the validator IP is not this node.
                             if self_.is_local_ip(validator_ip) {
+                                continue;
+                            }
+                            // Ensure the validator address is not this node.
+                            if self_.account.address() == validator_address {
                                 continue;
                             }
                             // Ensure the validator IP is not already connected or connecting.

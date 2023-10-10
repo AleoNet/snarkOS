@@ -74,6 +74,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
+        narwhal_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
@@ -86,6 +87,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
+        // TODO: Remove me after Phase 3.
+        let ledger = crate::phase_3_reset(ledger, dev)?;
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
@@ -101,7 +104,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service.clone());
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger_service, None, trusted_validators, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger_service, narwhal_ip, trusted_validators, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
@@ -137,6 +140,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         }
         // Initialize the routing.
         node.initialize_routing().await;
+        // Initialize the notification message loop.
+        node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
         // Return the node.
@@ -474,6 +479,7 @@ mod tests {
         let validator = Validator::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
             node,
             Some(rest),
+            None,
             account,
             &[],
             &[],

@@ -86,6 +86,10 @@ pub struct Start {
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
 
+    // Specify the IP address and port for narwhal.
+    #[clap(long = "narwhal")]
+    pub narwhal: Option<SocketAddr>,
+
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
     pub rest: SocketAddr,
@@ -109,6 +113,9 @@ pub struct Start {
     /// Enables development mode, specify a unique ID for this node
     #[clap(long)]
     pub dev: Option<u16>,
+    /// If development mode is enabled, specify the number of genesis validators (default: 4)
+    #[clap(long)]
+    pub dev_num_validators: Option<u16>,
 }
 
 impl Start {
@@ -243,15 +250,19 @@ impl Start {
         // and the REST IP to `3030 + dev`.
         if let Some(dev) = self.dev {
             // Add the dev nodes to the trusted peers.
-            for i in 0..dev {
-                if i != dev {
-                    trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+            if trusted_peers.is_empty() {
+                for i in 0..dev {
+                    if i != dev {
+                        trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+                    }
                 }
             }
-            // To avoid ambiguity, we define the first few nodes to be the trusted validators to connect to.
-            for i in 0..2 {
-                if i != dev {
-                    trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
+            if trusted_validators.is_empty() {
+                // To avoid ambiguity, we define the first few nodes to be the trusted validators to connect to.
+                for i in 0..2 {
+                    if i != dev {
+                        trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
+                    }
                 }
             }
             // Set the node IP to `4130 + dev`.
@@ -268,6 +279,12 @@ impl Start {
     /// Otherwise, returns the actual genesis block.
     fn parse_genesis<N: Network>(&self) -> Result<Block<N>> {
         if self.dev.is_some() {
+            // Determine the number of genesis committee members.
+            let num_genesis_committee_members = match self.dev_num_validators {
+                Some(num_genesis_committee_members) => num_genesis_committee_members,
+                None => DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
+            };
+
             // Initialize the (fixed) RNG.
             let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
             // Initialize the development private keys.
@@ -278,19 +295,19 @@ impl Start {
             // Construct the committee members.
             let members = development_private_keys
                 .iter()
-                .take(DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as usize)
+                .take(num_genesis_committee_members as usize)
                 .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_VALIDATOR_STAKE, true))))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
             // Construct the committee.
-            let committee = Committee::<N>::new_genesis(members)?;
+            let committee = Committee::<N>::new(0u64, members)?;
 
             // Determine the public balance per validator.
             let public_balance_per_validator = (N::STARTING_SUPPLY
-                - (DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64 * MIN_VALIDATOR_STAKE))
+                - (num_genesis_committee_members as u64 * MIN_VALIDATOR_STAKE))
                 / (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64);
             assert_eq!(
                 N::STARTING_SUPPLY,
-                (DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64 * MIN_VALIDATOR_STAKE)
+                (num_genesis_committee_members as u64 * MIN_VALIDATOR_STAKE)
                     + (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64 * public_balance_per_validator),
                 "The public balance per validator is not correct."
             );
@@ -304,6 +321,11 @@ impl Start {
             // Construct the genesis block.
             load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
         } else {
+            // If the `dev_num_validators` flag is set, inform the user that it is ignored.
+            if self.dev_num_validators.is_some() {
+                eprintln!("The '--dev-num-validators' flag is ignored because '--dev' is not set");
+            }
+
             Block::from_bytes_le(N::genesis_bytes())
         }
     }
@@ -379,11 +401,12 @@ impl Start {
             crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT);
         }
         // Check if the machine meets the minimum requirements for a validator.
-        crate::helpers::check_validator_machine(node_type, self.dev.is_some());
+        crate::helpers::check_validator_machine(node_type);
 
         // Initialize the node.
+        let narwhal_ip = if self.dev.is_some() { self.narwhal } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, narwhal_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
         }
