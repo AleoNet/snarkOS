@@ -423,8 +423,6 @@ impl<N: Network> Primary<N> {
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
         let BatchPropose { round: batch_round, batch_header } = batch_propose;
 
-        // TODO (howardwu): Ensure I have not signed this round for this author before. If so, do not sign.
-
         // Deserialize the batch header.
         let batch_header = task::spawn_blocking(move || batch_header.deserialize_blocking()).await??;
         // Ensure the round matches in the batch header.
