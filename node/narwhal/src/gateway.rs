@@ -56,8 +56,7 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rand::seq::{IteratorRandom, SliceRandom};
-
-use std::{future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashSet, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
@@ -319,6 +318,11 @@ impl<N: Network> Gateway<N> {
     /// Returns the number of connected peers.
     pub fn number_of_connected_peers(&self) -> usize {
         self.connected_peers.read().len()
+    }
+
+    /// Returns the list of connected addresses.
+    pub fn connected_addresses(&self) -> HashSet<Address<N>> {
+        self.connected_peers.read().iter().filter_map(|peer_ip| self.resolver.get_address(*peer_ip)).collect()
     }
 
     /// Returns the list of connected peers.

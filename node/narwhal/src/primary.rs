@@ -49,6 +49,7 @@ use snarkvm::{
     prelude::committee::Committee,
 };
 
+use colored::Colorize;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
@@ -262,7 +263,10 @@ impl<N: Network> Primary<N> {
     /// 4. Broadcast the batch header to all validators for signing.
     pub async fn propose_batch(&self) -> Result<()> {
         // Check if the proposed batch has expired, and clear it if it has expired.
-        self.check_proposed_batch_for_expiration().await?;
+        if let Err(e) = self.check_proposed_batch_for_expiration().await {
+            warn!("Failed to check the proposed batch for expiration - {e}");
+            return Ok(());
+        }
 
         // If there is a batch being proposed already,
         // rebroadcast the batch header to the non-signers, and return early.
@@ -287,7 +291,7 @@ impl<N: Network> Primary<N> {
                     None => continue,
                 }
             }
-            // Return early.
+            debug!("Proposed batch for round {} is still valid", proposal.round());
             return Ok(());
         }
 
@@ -313,6 +317,25 @@ impl<N: Network> Primary<N> {
             bail!("Primary is safely skipping (round {round} was already certified)");
         }
 
+        // Check if the primary is connected to enough validators to reach quorum threshold.
+        {
+            // Retrieve the committee to check against.
+            let committee = self.ledger.get_previous_committee_for_round(round)?;
+            // Retrieve the connected validator addresses.
+            let mut connected_validators = self.gateway.connected_addresses();
+            // Append the primary to the set.
+            connected_validators.insert(self.gateway.account().address());
+            // If quorum threshold is not reached, return early.
+            if !committee.is_quorum_threshold_reached(&connected_validators) {
+                debug!(
+                    "Primary is safely skipping a batch proposal {}",
+                    "(please connect to more validators)".dimmed()
+                );
+                trace!("Primary is connected to {} validators", connected_validators.len() - 1);
+                return Ok(());
+            }
+        }
+
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
         // Retrieve the previous certificates.
@@ -336,6 +359,10 @@ impl<N: Network> Primary<N> {
         }
         // If the batch is not ready to be proposed, return early.
         if !is_ready {
+            debug!(
+                "Primary is safely skipping a batch proposal {}",
+                format!("(previous round {previous_round} has not reached quorum)").dimmed()
+            );
             return Ok(());
         }
 
@@ -353,7 +380,10 @@ impl<N: Network> Primary<N> {
         // If the batch is not ready to be proposed, return early.
         match has_unconfirmed_transaction {
             true => info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len()),
-            false => return Ok(()),
+            false => {
+                debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transactions)".dimmed());
+                return Ok(());
+            }
         }
 
         /* Proceeding to sign & propose the batch. */
