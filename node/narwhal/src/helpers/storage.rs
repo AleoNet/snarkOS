@@ -33,6 +33,17 @@ use std::{
     },
 };
 
+#[derive(Clone, Debug)]
+pub struct Storage<N: Network>(Arc<StorageInner<N>>);
+
+impl<N: Network> std::ops::Deref for Storage<N> {
+    type Target = Arc<StorageInner<N>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// The storage for the memory pool.
 ///
 /// The storage is used to store the following:
@@ -52,29 +63,29 @@ use std::{
 ///   - The certificate ID is inserted into the `transmissions` map.
 /// 3. After a `round` reaches quorum threshold:
 ///  - The next round is inserted into the `current_round`.
-#[derive(Clone, Debug)]
-pub struct Storage<N: Network> {
+#[derive(Debug)]
+pub struct StorageInner<N: Network> {
     /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
     /* Once per block */
     /// The current height.
-    current_height: Arc<AtomicU32>,
+    current_height: AtomicU32,
     /* Once per round */
     /// The current round.
-    current_round: Arc<AtomicU64>,
+    current_round: AtomicU64,
     /// The `round` for which garbage collection has occurred **up to** (inclusive).
-    gc_round: Arc<AtomicU64>,
+    gc_round: AtomicU64,
     /// The maximum number of rounds to keep in storage.
     max_gc_rounds: u64,
     /* Once per batch */
     /// The map of `round` to a list of `(certificate ID, batch ID, author)` entries.
-    rounds: Arc<RwLock<IndexMap<u64, IndexSet<(Field<N>, Field<N>, Address<N>)>>>>,
+    rounds: RwLock<IndexMap<u64, IndexSet<(Field<N>, Field<N>, Address<N>)>>>,
     /// The map of `certificate ID` to `certificate`.
-    certificates: Arc<RwLock<IndexMap<Field<N>, BatchCertificate<N>>>>,
+    certificates: RwLock<IndexMap<Field<N>, BatchCertificate<N>>>,
     /// The map of `batch ID` to `round`.
-    batch_ids: Arc<RwLock<IndexMap<Field<N>, u64>>>,
+    batch_ids: RwLock<IndexMap<Field<N>, u64>>,
     /// The map of `transmission ID` to `(transmission, certificate IDs)` entries.
-    transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>>>,
+    transmissions: RwLock<IndexMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>>,
 }
 
 impl<N: Network> Storage<N> {
@@ -86,7 +97,7 @@ impl<N: Network> Storage<N> {
         let current_round = committee.starting_round().max(1);
 
         // Return the storage.
-        let storage = Self {
+        let storage = Self(Arc::new(StorageInner {
             ledger,
             current_height: Default::default(),
             current_round: Default::default(),
@@ -96,7 +107,7 @@ impl<N: Network> Storage<N> {
             certificates: Default::default(),
             batch_ids: Default::default(),
             transmissions: Default::default(),
-        };
+        }));
         // Update the storage to the current round.
         storage.update_current_round(current_round);
         // Return the storage.
@@ -126,7 +137,7 @@ impl<N: Network> Storage<N> {
     }
 
     /// Returns the maximum number of rounds to keep in storage.
-    pub const fn max_gc_rounds(&self) -> u64 {
+    pub fn max_gc_rounds(&self) -> u64 {
         self.max_gc_rounds
     }
 
@@ -707,7 +718,7 @@ impl<N: Network> Storage<N> {
 #[cfg(test)]
 impl<N: Network> Storage<N> {
     /// Returns the ledger service.
-    pub const fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
+    pub fn ledger(&self) -> &Arc<dyn LedgerService<N>> {
         &self.ledger
     }
 
