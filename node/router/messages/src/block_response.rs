@@ -47,12 +47,8 @@ impl<N: Network> MessageTrait for BlockResponse<N> {
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-        let request = BlockRequest {
-            start_height: bincode::deserialize_from(&mut reader)?,
-            end_height: bincode::deserialize_from(&mut reader)?,
-        };
-        let blocks = Data::Buffer(reader.into_inner().freeze());
+        let request = BlockRequest::deserialize(bytes.clone())?;
+        let blocks = Data::Buffer(bytes.freeze());
         Ok(Self { request, blocks })
     }
 }

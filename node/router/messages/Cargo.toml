@@ -23,9 +23,6 @@ test = [ ]
 [dependencies.anyhow]
 version = "1.0"
 
-[dependencies.bincode]
-version = "1.0"
-
 [dependencies.bytes]
 version = "1"
 
