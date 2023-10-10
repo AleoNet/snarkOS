@@ -26,6 +26,7 @@ use crate::{
         Proposal,
         Storage,
     },
+    spawn_blocking,
     Gateway,
     Sync,
     Transport,
@@ -314,7 +315,7 @@ impl<N: Network> Primary<N> {
                     }
                 }
             }
-            bail!("Primary is safely skipping (round {round} was already certified)");
+            bail!("Primary is safely skipping {}", format!("(round {round} was already certified)").dimmed());
         }
 
         // Check if the primary is connected to enough validators to reach quorum threshold.
@@ -466,14 +467,14 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to sign the batch. */
 
-        // Initialize an RNG.
-        let rng = &mut rand::thread_rng();
         // Retrieve the batch ID.
         let batch_id = batch_header.batch_id();
         // Generate a timestamp.
         let timestamp = now();
         // Sign the batch ID.
-        let signature = self.gateway.account().sign(&[batch_id, Field::from_u64(timestamp as u64)], rng)?;
+        let account = self.gateway.account().clone();
+        let signature =
+            spawn_blocking!(account.sign(&[batch_id, Field::from_u64(now() as u64)], &mut rand::thread_rng()))?;
         // Broadcast the signature back to the validator.
         let self_ = self.clone();
         tokio::spawn(async move {
@@ -506,7 +507,7 @@ impl<N: Network> Primary<N> {
         let BatchSignature { batch_id, signature, timestamp } = batch_signature;
 
         // Retrieve the signer.
-        let signer = signature.to_address();
+        let signer = spawn_blocking!(Ok(signature.to_address()))?;
 
         // Ensure the batch signature is signed by the validator.
         if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != signer) {
