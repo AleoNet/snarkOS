@@ -298,9 +298,16 @@ impl<N: Network> Primary<N> {
         if self.storage.contains_certificate_in_round_from(round, self.gateway.account().address()) {
             // If a BFT sender was provided, attempt to advance the current round.
             if let Some(bft_sender) = self.bft_sender.get() {
-                if let Err(e) = bft_sender.send_primary_round_to_bft(self.current_round()).await {
-                    warn!("Failed to update the BFT to the next round - {e}");
-                    return Err(e);
+                match bft_sender.send_primary_round_to_bft(self.current_round()).await {
+                    // 'is_ready' is true if the primary is ready to propose a batch for the next round.
+                    Ok(true) => (), // continue,
+                    // 'is_ready' is false if the primary is not ready to propose a batch for the next round.
+                    Ok(false) => return Ok(()),
+                    // An error occurred while attempting to advance the current round.
+                    Err(e) => {
+                        warn!("Failed to update the BFT to the next round - {e}");
+                        return Err(e);
+                    }
                 }
             }
             bail!("Primary is safely skipping (round {round} was already certified)");
@@ -811,19 +818,27 @@ impl<N: Network> Primary<N> {
         // Attempt to advance to the next round.
         if self.current_round() < next_round {
             // If a BFT sender was provided, send the current round to the BFT.
-            if let Some(bft_sender) = self.bft_sender.get() {
-                if let Err(e) = bft_sender.send_primary_round_to_bft(self.current_round()).await {
-                    warn!("Failed to update the BFT to the next round - {e}");
-                    return Err(e);
+            let is_ready = if let Some(bft_sender) = self.bft_sender.get() {
+                match bft_sender.send_primary_round_to_bft(self.current_round()).await {
+                    Ok(is_ready) => is_ready,
+                    Err(e) => {
+                        warn!("Failed to update the BFT to the next round - {e}");
+                        return Err(e);
+                    }
                 }
             }
             // Otherwise, handle the Narwhal case.
             else {
                 // Update to the next round in storage.
                 self.storage.increment_to_next_round()?;
+                // Set 'is_ready' to 'true'.
+                true
+            };
+
+            // If the node is ready, propose a batch for the next round.
+            if is_ready {
+                self.propose_batch().await?;
             }
-            // Propose a batch for the next round.
-            self.propose_batch().await?;
         }
         Ok(())
     }
