@@ -56,8 +56,7 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rand::seq::{IteratorRandom, SliceRandom};
-
-use std::{future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashSet, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
@@ -321,6 +320,11 @@ impl<N: Network> Gateway<N> {
         self.connected_peers.read().len()
     }
 
+    /// Returns the list of connected addresses.
+    pub fn connected_addresses(&self) -> HashSet<Address<N>> {
+        self.connected_peers.read().iter().filter_map(|peer_ip| self.resolver.get_address(*peer_ip)).collect()
+    }
+
     /// Returns the list of connected peers.
     pub fn connected_peers(&self) -> &RwLock<IndexSet<SocketAddr>> {
         &self.connected_peers
@@ -573,7 +577,7 @@ impl<N: Network> Gateway<N> {
                 bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
             }
             Event::Disconnect(disconnect) => {
-                bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
+                bail!("{CONTEXT} {:?}", disconnect.reason)
             }
             Event::PrimaryPing(ping) => {
                 // Ensure the event version is not outdated.

@@ -40,6 +40,7 @@ use snarkvm::{
     prelude::{bail, ensure, Field, Network, Result},
 };
 
+use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use std::{
@@ -189,15 +190,12 @@ impl<N: Network> BFT<N> {
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    async fn update_to_next_round(&self, current_round: u64) {
-        // Acquire the BFT lock.
-        let _lock = self.lock.lock().await;
-
+    fn update_to_next_round(&self, current_round: u64) -> bool {
         // Ensure the current round is at least the storage round (this is a sanity check).
         let storage_round = self.storage().current_round();
         if current_round < storage_round {
             warn!("BFT is safely skipping an update for round {current_round}, as storage is at round {storage_round}");
-            return;
+            return false;
         }
 
         // Determine if the BFT is ready to update to the next round.
@@ -223,7 +221,7 @@ impl<N: Network> BFT<N> {
             } else {
                 match is_ready {
                     true => info!("\n\nRound {current_round} reached quorum without a leader\n"),
-                    false => info!("\n\nRound {current_round} did not elect a leader\n"),
+                    false => info!("{}", format!("\n\nRound {current_round} did not elect a leader\n").dimmed()),
                 }
             }
         }
@@ -231,12 +229,14 @@ impl<N: Network> BFT<N> {
         // If the BFT is ready, then update to the next round.
         if is_ready {
             // Update to the next round in storage.
-            if let Err(e) = self.storage().increment_to_next_round() {
+            if let Err(e) = self.storage().increment_to_next_round(current_round) {
                 warn!("BFT failed to increment to the next round from round {current_round} - {e}");
             }
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
         }
+
+        is_ready
     }
 
     /// Updates the leader certificate to the current even round,
@@ -309,7 +309,7 @@ impl<N: Network> BFT<N> {
         }
         // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
         if self.is_timer_expired() {
-            debug!("BFT - timer expired for the leader, checking for quorum threshold (without the leader)");
+            debug!("BFT (timer expired) - Checking for quorum threshold (without the leader)");
             // Retrieve the certificate authors.
             let authors = certificates.into_iter().map(|c| c.author()).collect();
             // Determine if the quorum threshold is reached.
@@ -647,8 +647,7 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((current_round, callback)) = rx_primary_round.recv().await {
-                self_.update_to_next_round(current_round).await;
-                callback.send(()).ok();
+                callback.send(self_.update_to_next_round(current_round)).ok();
             }
         });
 

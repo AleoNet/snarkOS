@@ -64,7 +64,7 @@ pub fn init_consensus_channels<N: Network>() -> (ConsensusSender<N>, ConsensusRe
 
 #[derive(Clone, Debug)]
 pub struct BFTSender<N: Network> {
-    pub tx_primary_round: mpsc::Sender<(u64, oneshot::Sender<()>)>,
+    pub tx_primary_round: mpsc::Sender<(u64, oneshot::Sender<bool>)>,
     pub tx_primary_certificate: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
     pub tx_sync_bft_dag_at_bootup: mpsc::Sender<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
     pub tx_sync_bft: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
@@ -72,7 +72,7 @@ pub struct BFTSender<N: Network> {
 
 impl<N: Network> BFTSender<N> {
     /// Sends the current round to the BFT.
-    pub async fn send_primary_round_to_bft(&self, current_round: u64) -> Result<()> {
+    pub async fn send_primary_round_to_bft(&self, current_round: u64) -> Result<bool> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the current round to the BFT.
@@ -104,7 +104,7 @@ impl<N: Network> BFTSender<N> {
 
 #[derive(Debug)]
 pub struct BFTReceiver<N: Network> {
-    pub rx_primary_round: mpsc::Receiver<(u64, oneshot::Sender<()>)>,
+    pub rx_primary_round: mpsc::Receiver<(u64, oneshot::Sender<bool>)>,
     pub rx_primary_certificate: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
     pub rx_sync_bft_dag_at_bootup: mpsc::Receiver<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
     pub rx_sync_bft: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,

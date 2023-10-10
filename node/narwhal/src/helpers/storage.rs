@@ -132,12 +132,18 @@ impl<N: Network> Storage<N> {
 
     /// Increments storage to the next round, updating the current round.
     /// Note: This method is only called once per round, upon certification of the primary's batch.
-    pub fn increment_to_next_round(&self) -> Result<()> {
+    pub fn increment_to_next_round(&self, current_round: u64) -> Result<u64> {
         // Determine the next round.
-        let mut next_round = self.current_round() + 1;
-        // Increment the round until there are no certificates for the next round.
-        while self.contains_certificates_for_round(next_round) {
-            next_round = next_round.saturating_add(1);
+        let next_round = current_round + 1;
+
+        // Check if the next round is less than the current round in storage.
+        {
+            // Retrieve the storage round.
+            let storage_round = self.current_round();
+            // If the next round is less than the current round in storage, return early with the storage round.
+            if next_round < storage_round {
+                return Ok(storage_round);
+            }
         }
 
         // Retrieve the current committee.
@@ -153,18 +159,18 @@ impl<N: Network> Storage<N> {
         // Update the storage to the next round.
         self.update_current_round(next_round);
 
-        // Retrieve the current round.
-        let current_round = self.current_round();
+        // Retrieve the storage round.
+        let storage_round = self.current_round();
         // Retrieve the GC round.
         let gc_round = self.gc_round();
         // Ensure the next round matches in storage.
-        ensure!(next_round == current_round, "The next round {next_round} does not match in storage ({current_round})");
+        ensure!(next_round == storage_round, "The next round {next_round} does not match in storage ({storage_round})");
         // Ensure the next round is greater than or equal to the GC round.
         ensure!(next_round >= gc_round, "The next round {next_round} is behind the GC round {gc_round}");
 
         // Log the updated round.
         info!("Starting round {next_round}...");
-        Ok(())
+        Ok(next_round)
     }
 
     /// Updates the storage to the next round.
