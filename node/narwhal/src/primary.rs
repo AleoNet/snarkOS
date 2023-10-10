@@ -382,7 +382,7 @@ impl<N: Network> Primary<N> {
         match has_unconfirmed_transaction {
             true => info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len()),
             false => {
-                debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transactions)".dimmed());
+                debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transmissions)".dimmed());
                 return Ok(());
             }
         }
