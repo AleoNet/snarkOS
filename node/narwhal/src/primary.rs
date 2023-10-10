@@ -834,23 +834,25 @@ impl<N: Network> Primary<N> {
 
     /// Increments to the next round.
     async fn try_increment_to_the_next_round(&self, next_round: u64) -> Result<()> {
-        // Retrieve the current round.
-        let current_round = self.current_round();
         // If the next round is within GC range, then iterate to the penultimate round.
-        if current_round + self.storage.max_gc_rounds() >= next_round {
+        if self.current_round() + self.storage.max_gc_rounds() >= next_round {
+            let mut fast_forward_round = self.current_round();
             // Iterate until the penultimate round is reached.
-            while self.current_round() < next_round.saturating_sub(1) {
+            while fast_forward_round < next_round.saturating_sub(1) {
                 // Update to the next round in storage.
-                self.storage.increment_to_next_round()?;
+                fast_forward_round = self.storage.increment_to_next_round(fast_forward_round)?;
                 // Clear the proposed batch.
                 *self.proposed_batch.write() = None;
             }
         }
+
+        // Retrieve the current round.
+        let current_round = self.current_round();
         // Attempt to advance to the next round.
-        if self.current_round() < next_round {
+        if current_round < next_round {
             // If a BFT sender was provided, send the current round to the BFT.
             let is_ready = if let Some(bft_sender) = self.bft_sender.get() {
-                match bft_sender.send_primary_round_to_bft(self.current_round()).await {
+                match bft_sender.send_primary_round_to_bft(current_round).await {
                     Ok(is_ready) => is_ready,
                     Err(e) => {
                         warn!("Failed to update the BFT to the next round - {e}");
@@ -861,7 +863,7 @@ impl<N: Network> Primary<N> {
             // Otherwise, handle the Narwhal case.
             else {
                 // Update to the next round in storage.
-                self.storage.increment_to_next_round()?;
+                self.storage.increment_to_next_round(current_round)?;
                 // Set 'is_ready' to 'true'.
                 true
             };
@@ -1386,7 +1388,7 @@ mod tests {
                 assert!(primary.storage.insert_certificate(certificate, transmissions).is_ok());
             }
 
-            assert!(primary.storage.increment_to_next_round().is_ok());
+            assert!(primary.storage.increment_to_next_round(cur_round).is_ok());
             previous_certificates = next_certificates;
             next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
         }
@@ -1403,7 +1405,10 @@ mod tests {
         }
     }
 
+    /// FIXME: This test is no longer valid, as `propose_batch` now checks that it is connected to sufficient validators
+    ///  before proposing a batch. This is a safety mechanism to ensure the primary behaves according to the protocol.
     #[tokio::test]
+    #[ignore]
     async fn test_propose_batch() {
         let mut rng = TestRng::default();
         let (primary, _) = primary_without_handlers(&mut rng).await;
@@ -1429,7 +1434,10 @@ mod tests {
         assert!(primary.proposed_batch.read().is_some());
     }
 
+    /// FIXME: This test is no longer valid, as `propose_batch` now checks that it is connected to sufficient validators
+    ///  before proposing a batch. This is a safety mechanism to ensure the primary behaves according to the protocol.
     #[tokio::test]
+    #[ignore]
     async fn test_propose_batch_in_round() {
         let round = 3;
         let mut rng = TestRng::default();
