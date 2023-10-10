@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{Deserialize, Serialize};
+use snarkvm::prelude::{error, FromBytes, ToBytes};
+
+use std::io;
 
 /// The reason behind the node disconnecting from a peer.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DisconnectReason {
     /// The fork length limit was exceeded.
     ExceededForkRange,
@@ -47,4 +49,58 @@ pub enum DisconnectReason {
     YouNeedToSyncFirst,
     /// The peer's listening port is closed.
     YourPortIsClosed(u16),
+}
+
+impl ToBytes for DisconnectReason {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        match self {
+            Self::ExceededForkRange => 0u8.write_le(writer),
+            Self::InvalidChallengeResponse => 1u8.write_le(writer),
+            Self::InvalidForkDepth => 2u8.write_le(writer),
+            Self::INeedToSyncFirst => 3u8.write_le(writer),
+            Self::NoReasonGiven => 4u8.write_le(writer),
+            Self::ProtocolViolation => 5u8.write_le(writer),
+            Self::OutdatedClientVersion => 6u8.write_le(writer),
+            Self::PeerHasDisconnected => 7u8.write_le(writer),
+            Self::PeerRefresh => 8u8.write_le(writer),
+            Self::ShuttingDown => 9u8.write_le(writer),
+            Self::SyncComplete => 10u8.write_le(writer),
+            Self::TooManyFailures => 11u8.write_le(writer),
+            Self::TooManyPeers => 12u8.write_le(writer),
+            Self::YouNeedToSyncFirst => 13u8.write_le(writer),
+            Self::YourPortIsClosed(port) => {
+                14u8.write_le(&mut writer)?;
+                port.write_le(writer)
+            }
+        }
+    }
+}
+
+impl FromBytes for DisconnectReason {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
+    where
+        Self: Sized,
+    {
+        match u8::read_le(&mut reader)? {
+            0 => Ok(Self::ExceededForkRange),
+            1 => Ok(Self::InvalidChallengeResponse),
+            2 => Ok(Self::InvalidForkDepth),
+            3 => Ok(Self::INeedToSyncFirst),
+            4 => Ok(Self::NoReasonGiven),
+            5 => Ok(Self::ProtocolViolation),
+            6 => Ok(Self::OutdatedClientVersion),
+            7 => Ok(Self::PeerHasDisconnected),
+            8 => Ok(Self::PeerRefresh),
+            9 => Ok(Self::ShuttingDown),
+            10 => Ok(Self::SyncComplete),
+            11 => Ok(Self::TooManyFailures),
+            12 => Ok(Self::TooManyPeers),
+            13 => Ok(Self::YouNeedToSyncFirst),
+            14 => {
+                let port = u16::read_le(reader)?;
+                Ok(Self::YourPortIsClosed(port))
+            }
+            _ => Err(error("Invalid disconnect reason")),
+        }
+    }
 }

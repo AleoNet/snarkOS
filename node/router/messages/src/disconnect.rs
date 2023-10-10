@@ -37,18 +37,13 @@ impl MessageTrait for Disconnect {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &self.reason)?)
+        Ok(self.reason.write_le(writer)?)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        if bytes.remaining() == 0 {
-            Ok(Self { reason: DisconnectReason::NoReasonGiven })
-        } else if let Ok(reason) = bincode::deserialize_from(&mut bytes.reader()) {
-            Ok(Self { reason })
-        } else {
-            bail!("Invalid 'Disconnect' message");
-        }
+        let mut reader = bytes.reader();
+        Ok(Disconnect { reason: DisconnectReason::read_le(&mut reader)? })
     }
 }

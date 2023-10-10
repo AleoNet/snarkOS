@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    events::EventCodec,
+    events::{EventCodec, PrimaryPing},
     helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
     CONTEXT,
     MAX_BATCH_DELAY,
@@ -56,8 +56,7 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rand::seq::{IteratorRandom, SliceRandom};
-
-use std::{future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashSet, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
@@ -321,6 +320,11 @@ impl<N: Network> Gateway<N> {
         self.connected_peers.read().len()
     }
 
+    /// Returns the list of connected addresses.
+    pub fn connected_addresses(&self) -> HashSet<Address<N>> {
+        self.connected_peers.read().iter().filter_map(|peer_ip| self.resolver.get_address(*peer_ip)).collect()
+    }
+
     /// Returns the list of connected peers.
     pub fn connected_peers(&self) -> &RwLock<IndexSet<SocketAddr>> {
         &self.connected_peers
@@ -573,20 +577,26 @@ impl<N: Network> Gateway<N> {
                 bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
             }
             Event::Disconnect(disconnect) => {
-                bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
+                bail!("{CONTEXT} {:?}", disconnect.reason)
             }
             Event::PrimaryPing(ping) => {
+                let PrimaryPing { version, block_locators, batch_certificate } = ping;
+
                 // Ensure the event version is not outdated.
-                if ping.version < Event::<N>::VERSION {
-                    bail!("Dropping '{peer_ip}' on event version {} (outdated)", ping.version);
+                if version < Event::<N>::VERSION {
+                    bail!("Dropping '{peer_ip}' on event version {version} (outdated)");
                 }
+
                 // If a sync sender was provided, update the peer locators.
                 if let Some(sync_sender) = self.sync_sender.get() {
                     // Check the block locators are valid, and update the validators in the sync module.
-                    if let Err(error) = sync_sender.update_peer_locators(peer_ip, ping.block_locators).await {
+                    if let Err(error) = sync_sender.update_peer_locators(peer_ip, block_locators).await {
                         bail!("Validator '{peer_ip}' sent invalid block locators - {error}");
                     }
                 }
+
+                // Send the batch certificate to the primary.
+                let _ = self.primary_sender().tx_primary_ping.send((peer_ip, batch_certificate)).await;
                 Ok(())
             }
             Event::TransmissionRequest(request) => {
