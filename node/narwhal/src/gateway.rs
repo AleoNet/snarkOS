@@ -573,7 +573,7 @@ impl<N: Network> Gateway<N> {
                 bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
             }
             Event::Disconnect(disconnect) => {
-                bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
+                bail!("{CONTEXT} {:?}", disconnect.reason)
             }
             Event::PrimaryPing(ping) => {
                 // Ensure the event version is not outdated.

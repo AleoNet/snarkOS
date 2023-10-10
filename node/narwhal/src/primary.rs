@@ -835,6 +835,12 @@ impl<N: Network> Primary<N> {
                 true
             };
 
+            // Log whether the next round is ready.
+            match is_ready {
+                true => debug!("Primary is ready to propose the next round"),
+                false => debug!("Primary is not ready to propose the next round"),
+            }
+
             // If the node is ready, propose a batch for the next round.
             if is_ready {
                 self.propose_batch().await?;

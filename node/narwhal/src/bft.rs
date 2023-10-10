@@ -309,7 +309,7 @@ impl<N: Network> BFT<N> {
         }
         // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
         if self.is_timer_expired() {
-            debug!("BFT - timer expired for the leader, checking for quorum threshold (without the leader)");
+            debug!("BFT (timer expired) - Checking for quorum threshold (without the leader)");
             // Retrieve the certificate authors.
             let authors = certificates.into_iter().map(|c| c.author()).collect();
             // Determine if the quorum threshold is reached.
