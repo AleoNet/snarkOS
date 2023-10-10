@@ -26,24 +26,20 @@ pub use stats::Stats;
 
 use tracing::{debug_span, error_span, info_span, trace_span, warn_span, Span};
 
-// FIXME: this can probably be done more elegantly
 /// Creates the Tcp's tracing span based on its name.
 pub fn create_span(tcp_name: &str) -> Span {
     let mut span = trace_span!("tcp", name = tcp_name);
-    if !span.is_disabled() {
-        return span;
-    } else {
+    if span.is_disabled() {
         span = debug_span!("tcp", name = tcp_name);
     }
-    if !span.is_disabled() {
-        return span;
-    } else {
+    if span.is_disabled() {
         span = info_span!("tcp", name = tcp_name);
     }
-    if !span.is_disabled() {
-        return span;
-    } else {
+    if span.is_disabled() {
         span = warn_span!("tcp", name = tcp_name);
     }
-    if !span.is_disabled() { span } else { error_span!("tcp", name = tcp_name) }
+    if span.is_disabled() {
+        span = error_span!("tcp", name = tcp_name);
+    }
+    span
 }

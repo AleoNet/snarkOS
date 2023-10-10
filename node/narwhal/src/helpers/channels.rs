@@ -64,7 +64,7 @@ pub fn init_consensus_channels<N: Network>() -> (ConsensusSender<N>, ConsensusRe
 
 #[derive(Clone, Debug)]
 pub struct BFTSender<N: Network> {
-    pub tx_primary_round: mpsc::Sender<(u64, oneshot::Sender<Result<()>>)>,
+    pub tx_primary_round: mpsc::Sender<(u64, oneshot::Sender<bool>)>,
     pub tx_primary_certificate: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
     pub tx_sync_bft_dag_at_bootup: mpsc::Sender<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
     pub tx_sync_bft: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
@@ -72,13 +72,13 @@ pub struct BFTSender<N: Network> {
 
 impl<N: Network> BFTSender<N> {
     /// Sends the current round to the BFT.
-    pub async fn send_primary_round_to_bft(&self, current_round: u64) -> Result<()> {
+    pub async fn send_primary_round_to_bft(&self, current_round: u64) -> Result<bool> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the current round to the BFT.
         self.tx_primary_round.send((current_round, callback_sender)).await?;
         // Await the callback to continue.
-        callback_receiver.await?
+        Ok(callback_receiver.await?)
     }
 
     /// Sends the batch certificate to the BFT.
@@ -104,7 +104,7 @@ impl<N: Network> BFTSender<N> {
 
 #[derive(Debug)]
 pub struct BFTReceiver<N: Network> {
-    pub rx_primary_round: mpsc::Receiver<(u64, oneshot::Sender<Result<()>>)>,
+    pub rx_primary_round: mpsc::Receiver<(u64, oneshot::Sender<bool>)>,
     pub rx_primary_certificate: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
     pub rx_sync_bft_dag_at_bootup: mpsc::Receiver<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
     pub rx_sync_bft: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
@@ -128,6 +128,7 @@ pub struct PrimarySender<N: Network> {
     pub tx_batch_propose: mpsc::Sender<(SocketAddr, BatchPropose<N>)>,
     pub tx_batch_signature: mpsc::Sender<(SocketAddr, BatchSignature<N>)>,
     pub tx_batch_certified: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>,
+    pub tx_primary_ping: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>,
     pub tx_unconfirmed_solution:
         mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>, oneshot::Sender<Result<()>>)>,
     pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>, oneshot::Sender<Result<()>>)>,
@@ -138,6 +139,7 @@ pub struct PrimaryReceiver<N: Network> {
     pub rx_batch_propose: mpsc::Receiver<(SocketAddr, BatchPropose<N>)>,
     pub rx_batch_signature: mpsc::Receiver<(SocketAddr, BatchSignature<N>)>,
     pub rx_batch_certified: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
+    pub rx_primary_ping: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
     pub rx_unconfirmed_solution:
         mpsc::Receiver<(PuzzleCommitment<N>, Data<ProverSolution<N>>, oneshot::Sender<Result<()>>)>,
     pub rx_unconfirmed_transaction:
@@ -149,6 +151,7 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
     let (tx_batch_propose, rx_batch_propose) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_batch_signature, rx_batch_signature) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_batch_certified, rx_batch_certified) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_primary_ping, rx_primary_ping) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_unconfirmed_solution, rx_unconfirmed_solution) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_unconfirmed_transaction, rx_unconfirmed_transaction) = mpsc::channel(MAX_CHANNEL_SIZE);
 
@@ -156,6 +159,7 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
         tx_batch_propose,
         tx_batch_signature,
         tx_batch_certified,
+        tx_primary_ping,
         tx_unconfirmed_solution,
         tx_unconfirmed_transaction,
     };
@@ -163,6 +167,7 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
         rx_batch_propose,
         rx_batch_signature,
         rx_batch_certified,
+        rx_primary_ping,
         rx_unconfirmed_solution,
         rx_unconfirmed_transaction,
     };
