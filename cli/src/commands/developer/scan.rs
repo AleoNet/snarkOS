@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(clippy::type_complexity)]
+
 use super::CurrentNetwork;
 
 use snarkvm::prelude::{block::Block, Ciphertext, Field, Network, Plaintext, PrivateKey, Record, ViewKey};
@@ -179,8 +181,8 @@ impl Scan {
             end_height,
             cdn.to_string(),
             endpoint.to_string(),
-            private_key.clone(),
-            view_key.clone(),
+            private_key,
+            *view_key,
             address_x_coordinate,
             records.clone(),
         )?;
@@ -204,7 +206,7 @@ impl Scan {
 
             // Scan the blocks for owned records.
             for block in &blocks {
-                Self::scan_block(&block, &endpoint, private_key, &view_key, &address_x_coordinate, records.clone())?;
+                Self::scan_block(block, endpoint, private_key, view_key, &address_x_coordinate, records.clone())?;
             }
 
             request_start = request_start.saturating_add(num_blocks_to_request);
@@ -219,6 +221,7 @@ impl Scan {
     }
 
     /// Scan the blocks from the CDN.
+    #[allow(clippy::too_many_arguments)]
     fn scan_from_cdn(
         start_height: u32,
         end_height: u32,
