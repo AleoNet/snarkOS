@@ -20,6 +20,7 @@ edition = "2021"
 default = [ "parallel" ]
 parallel = [ "rayon" ]
 timer = [ "aleo-std/timer" ]
+metrics = [ "dep:snarkos-node-metrics", "snarkvm/metrics" ]
 
 [dependencies.aleo-std]
 version = "0.1.18"
@@ -77,6 +78,11 @@ version = "=2.2.4"
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
 version = "=2.2.4"
+
+[dependencies.snarkos-node-metrics]
+path = "./metrics"
+version = "=2.2.4"
+optional = true
 
 [dependencies.snarkos-node-rest]
 path = "./rest"

@@ -41,9 +41,9 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-#git = "https://github.com/AleoHQ/snarkVM.git"
-#rev = "9124c31"
-version = "=0.16.10"
+git = "https://github.com/joske/snarkVM.git"
+branch = "metrics-rebased"
+#version = "=0.16.10"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
@@ -52,6 +52,16 @@ path = "snarkos/main.rs"
 
 [features]
 jemalloc = [ "tikv-jemallocator" ]
+metrics = [
+  "snarkos-node/metrics",
+  "snarkos-node-tcp/metrics",
+  "snarkos-node-bft/metrics",
+  "snarkos-node-consensus/metrics",
+  "snarkos-node-router/metrics",
+  "snarkos-cli/metrics",
+  "snarkos-account/metrics",
+  "snarkos-display/metrics",
+]
 
 [dependencies.anyhow]
 version = "1.0.75"
@@ -74,6 +84,11 @@ version = "=2.2.4"
 [dependencies.snarkos-display]
 path = "./display"
 version = "=2.2.4"
+
+[dependencies.snarkos-node-metrics]
+path = "./node/metrics"
+version = "=2.2.4"
+optional = true
 
 [dependencies.snarkos-node]
 path = "./node"

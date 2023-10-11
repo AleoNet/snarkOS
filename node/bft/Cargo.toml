@@ -16,6 +16,10 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = [ ]
+metrics = [ "snarkvm/metrics", "dep:snarkos-node-metrics", "dep:metrics" ]
+
 [dependencies.anyhow]
 version = "1.0.70"
 
@@ -81,6 +85,11 @@ version = "=2.2.4"
 path = "../tcp"
 version = "=2.2.4"
 
+[dependencies.snarkos-node-metrics]
+path = "../metrics"
+version = "=2.2.4"
+optional = true
+
 [dependencies.snarkvm]
 workspace = true
 
@@ -103,6 +112,10 @@ features = [ "codec" ]
 
 [dependencies.tracing]
 version = "0.1"
+
+[dependencies.metrics]
+version = "0.21"
+optional = true
 
 [dev-dependencies.axum]
 version = "0.6"

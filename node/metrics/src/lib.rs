@@ -35,6 +35,9 @@ pub fn initialize() -> tokio::task::JoinHandle<()> {
     // Register the metrics so they exist on init.
     register_metrics();
 
+    // Register the snarkVM metrics.
+    snarkvm::metrics::register_metrics();
+
     // Return the exporter's task handle to be tracked by the node's task handling.
     metrics_exporter_task
 }
@@ -42,5 +45,11 @@ pub fn initialize() -> tokio::task::JoinHandle<()> {
 fn register_metrics() {
     for name in GAUGE_NAMES {
         register_gauge!(name);
+    }
+    for name in COUNTER_NAMES {
+        register_counter!(name);
+    }
+    for name in HISTOGRAM_NAMES {
+        register_histogram!(name);
     }
 }

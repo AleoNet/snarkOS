@@ -16,6 +16,9 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+metrics = [ "snarkvm/metrics" ]
+
 [dependencies.aleo-std]
 version = "0.1.18"
 default-features = false

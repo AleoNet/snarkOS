@@ -27,8 +27,12 @@ use crate::{
     Primary,
     MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
 };
+#[cfg(feature = "metrics")]
+use metrics::{histogram, increment_counter};
 use snarkos_account::Account;
 use snarkos_node_bft_ledger_service::LedgerService;
+#[cfg(feature = "metrics")]
+use snarkos_node_metrics::consensus::LEADERS_ELECTED;
 use snarkvm::{
     console::account::Address,
     ledger::{
@@ -43,6 +47,8 @@ use snarkvm::{
 use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
+#[cfg(feature = "metrics")]
+use std::time::Duration;
 use std::{
     collections::{BTreeMap, HashSet},
     future::Future,
@@ -204,6 +210,17 @@ impl<N: Network> BFT<N> {
             false => self.is_leader_quorum_or_nonleaders_available(current_round),
         };
 
+        #[cfg(feature = "metrics")]
+        {
+            let start = self.leader_certificate_timer.load(Ordering::SeqCst);
+            if start > 0 {
+                // only log if the timer is set, otherwise we get a time difference since the EPOCH
+                let end = now();
+                let elapsed = Duration::from_secs((end - start) as u64);
+                histogram!(snarkos_node_metrics::consensus::COMMIT_ROUNDS_LATENCY, elapsed.as_secs_f64());
+            }
+        }
+
         // Log whether the round is going to update.
         if current_round % 2 == 0 {
             // Determine if there is a leader certificate.
@@ -215,7 +232,11 @@ impl<N: Network> BFT<N> {
                 // Log the leader election.
                 let leader_round = leader_certificate.round();
                 match leader_round == current_round {
-                    true => info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author()),
+                    true => {
+                        info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author());
+                        #[cfg(feature = "metrics")]
+                        increment_counter!(LEADERS_ELECTED);
+                    }
                     false => warn!("BFT failed to elect a leader for round {current_round} (!= {leader_round})"),
                 }
             } else {

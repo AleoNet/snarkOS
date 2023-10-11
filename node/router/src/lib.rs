@@ -44,6 +44,11 @@ use snarkos_account::Account;
 use snarkos_node_tcp::{is_bogon_ip, is_unspecified_ip, Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
+#[cfg(feature = "metrics")]
+use metrics::gauge;
+#[cfg(feature = "metrics")]
+use snarkos_node_metrics::peers::{CANDIDATE, CONNECTED, RESTRICTED};
+
 use anyhow::{bail, Result};
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
@@ -388,6 +393,13 @@ impl<N: Network> Router<N> {
         self.connected_peers.read().iter().map(|(ip, peer)| (*ip, peer.node_type())).collect()
     }
 
+    #[cfg(feature = "metrics")]
+    fn update_metrics(&self) {
+        gauge!(CONNECTED, self.connected_peers.read().len() as f64);
+        gauge!(CANDIDATE, self.candidate_peers.read().len() as f64);
+        gauge!(RESTRICTED, self.restricted_peers.read().len() as f64);
+    }
+
     /// Inserts the given peer into the connected peers.
     pub fn insert_connected_peer(&self, peer: Peer<N>, peer_addr: SocketAddr) {
         let peer_ip = peer.ip();
@@ -399,6 +411,8 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().remove(&peer_ip);
         // Remove this peer from the restricted peers, if it exists.
         self.restricted_peers.write().remove(&peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Inserts the given peer IPs to the set of candidate peers.
@@ -419,6 +433,8 @@ impl<N: Network> Router<N> {
 
         // Proceed to insert the eligible candidate peer IPs.
         self.candidate_peers.write().extend(eligible_peers);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Inserts the given peer into the restricted peers.
@@ -427,6 +443,8 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().remove(&peer_ip);
         // Add the peer to the restricted peers.
         self.restricted_peers.write().insert(peer_ip, Instant::now());
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Updates the connected peer with the given function.
@@ -456,16 +474,22 @@ impl<N: Network> Router<N> {
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.
         self.candidate_peers.write().insert(peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     #[cfg(feature = "test")]
     pub fn clear_candidate_peers(&self) {
         self.candidate_peers.write().clear();
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Removes the given address from the candidate peers, if it exists.
     pub fn remove_candidate_peer(&self, peer_ip: SocketAddr) {
         self.candidate_peers.write().remove(&peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
