@@ -2992,6 +2992,7 @@ dependencies = [
  "snarkos-account",
  "snarkos-display",
  "snarkos-node",
+ "snarkos-node-cdn",
  "snarkos-node-rest",
  "snarkvm",
  "sys-info",
