@@ -14,6 +14,8 @@
 
 use super::*;
 
+use snarkvm::prelude::{FromBytes, ToBytes};
+
 use std::borrow::Cow;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -36,19 +38,21 @@ impl MessageTrait for BlockRequest {
         }
         .into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.start_height.write_le(&mut *writer)?;
-        self.end_height.write_le(writer)?;
+impl ToBytes for BlockRequest {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.start_height.write_le(&mut writer)?;
+        self.end_height.write_le(&mut writer)?;
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
+impl FromBytes for BlockRequest {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
+    where
+        Self: Sized,
+    {
         let start_height = u32::read_le(&mut reader)?;
         let end_height = u32::read_le(&mut reader)?;
         Ok(Self { start_height, end_height })

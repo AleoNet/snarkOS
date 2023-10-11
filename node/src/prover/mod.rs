@@ -18,7 +18,7 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_narwhal::ledger_service::ProverLedgerService;
 use snarkos_node_router::{
-    messages::{Data, Message, NodeType, UnconfirmedSolution},
+    messages::{Message, NodeType, UnconfirmedSolution},
     Heartbeat,
     Inbound,
     Outbound,
@@ -30,11 +30,14 @@ use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
 };
-use snarkvm::prelude::{
-    block::{Block, Header},
-    coinbase::{CoinbasePuzzle, EpochChallenge, ProverSolution},
-    store::ConsensusStorage,
-    Network,
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{
+        block::{Block, Header},
+        coinbase::{CoinbasePuzzle, EpochChallenge, ProverSolution},
+        store::ConsensusStorage,
+        Network,
+    },
 };
 
 use anyhow::Result;
