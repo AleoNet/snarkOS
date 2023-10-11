@@ -49,6 +49,10 @@ pub struct Scan {
     /// The endpoint to scan blocks from.
     #[clap(long)]
     endpoint: String,
+
+    /// Enables the node to prefetch initial blocks from a CDN
+    #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
+    cdn: String,
 }
 
 impl Scan {
@@ -60,7 +64,7 @@ impl Scan {
         let (start_height, end_height) = self.parse_block_range()?;
 
         // Fetch the records from the network.
-        let records = Self::fetch_records(private_key, &view_key, &self.endpoint, start_height, end_height)?;
+        let records = Self::fetch_records(private_key, &view_key, &self.cdn, &self.endpoint, start_height, end_height)?;
 
         // Output the decrypted records associated with the view key.
         if records.is_empty() {
@@ -142,6 +146,7 @@ impl Scan {
     fn fetch_records(
         private_key: Option<PrivateKey<CurrentNetwork>>,
         view_key: &ViewKey<CurrentNetwork>,
+        cdn: &str,
         endpoint: &str,
         start_height: u32,
         end_height: u32,
@@ -162,7 +167,7 @@ impl Scan {
         let total_blocks = end_height.saturating_sub(start_height);
 
         // Scan the endpoint starting from the start height
-        let mut request_start = start_height;
+        let mut request_start = start_height.saturating_sub(start_height % MAX_BLOCK_RANGE);
         while request_start <= end_height {
             // Log the progress.
             let percentage_complete = request_start.saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
@@ -173,11 +178,26 @@ impl Scan {
                 std::cmp::min(MAX_BLOCK_RANGE, end_height.saturating_sub(request_start).saturating_add(1));
             let request_end = request_start.saturating_add(num_blocks_to_request);
 
-            // Establish the endpoint.
-            let blocks_endpoint = format!("{endpoint}/testnet3/blocks?start={request_start}&end={request_end}");
-
-            // Fetch blocks
-            let blocks: Vec<Block<CurrentNetwork>> = ureq::get(&blocks_endpoint).call()?.into_json()?;
+            // Attempt to fetch the blocks from the CDN first.
+            let cdn_request_end = request_start.saturating_add(MAX_BLOCK_RANGE);
+            let cdn_blocks_url = format!("{cdn}/{request_start}.{cdn_request_end}.blocks");
+            let mut blocks: Vec<Block<CurrentNetwork>> = match ureq::get(&cdn_blocks_url).call() {
+                Ok(response) => {
+                    // Read the bytes from the response.
+                    let mut bytes = Vec::new();
+                    response.into_reader().read_to_end(&mut bytes)?;
+                    // Deserialize the blocks.
+                    bincode::deserialize(&bytes)?
+                }
+                Err(_) => {
+                    // Establish the endpoint.
+                    let blocks_endpoint = format!("{endpoint}/testnet3/blocks?start={request_start}&end={request_end}");
+                    // Fetch blocks
+                    ureq::get(&blocks_endpoint).call()?.into_json()?
+                }
+            };
+            // Only keep the blocks that are in the requested range.
+            blocks.retain(|block| block.height() >= start_height && block.height() <= end_height);
 
             // Scan the blocks for owned records.
             for block in &blocks {

@@ -2975,6 +2975,7 @@ dependencies = [
  "aleo-std",
  "anstyle",
  "anyhow",
+ "bincode",
  "clap",
  "colored",
  "crossterm 0.27.0",
