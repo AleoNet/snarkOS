@@ -12,16 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(clippy::type_complexity)]
+
 use super::CurrentNetwork;
 
 use snarkvm::prelude::{block::Block, Ciphertext, Field, Network, Plaintext, PrivateKey, Record, ViewKey};
 
 use anyhow::{bail, ensure, Result};
 use clap::Parser;
+use parking_lot::RwLock;
 use std::{
     io::{stdout, Write},
     str::FromStr,
+    sync::Arc,
 };
+
+const MAX_BLOCK_RANGE: u32 = 50;
 
 /// Scan the snarkOS node for records.
 #[derive(Debug, Parser)]
@@ -49,6 +55,10 @@ pub struct Scan {
     /// The endpoint to scan blocks from.
     #[clap(long)]
     endpoint: String,
+
+    /// Enables the node to prefetch initial blocks from a CDN
+    #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
+    cdn: String,
 }
 
 impl Scan {
@@ -60,7 +70,7 @@ impl Scan {
         let (start_height, end_height) = self.parse_block_range()?;
 
         // Fetch the records from the network.
-        let records = Self::fetch_records(private_key, &view_key, &self.endpoint, start_height, end_height)?;
+        let records = Self::fetch_records(private_key, &view_key, &self.cdn, &self.endpoint, start_height, end_height)?;
 
         // Output the decrypted records associated with the view key.
         if records.is_empty() {
@@ -142,6 +152,7 @@ impl Scan {
     fn fetch_records(
         private_key: Option<PrivateKey<CurrentNetwork>>,
         view_key: &ViewKey<CurrentNetwork>,
+        cdn: &str,
         endpoint: &str,
         start_height: u32,
         end_height: u32,
@@ -154,15 +165,30 @@ impl Scan {
         // Derive the x-coordinate of the address corresponding to the given view key.
         let address_x_coordinate = view_key.to_address().to_x_coordinate();
 
-        const MAX_BLOCK_RANGE: u32 = 50;
-
-        let mut records = Vec::new();
+        // Initialize a vector to store the records.
+        let records = Arc::new(RwLock::new(Vec::new()));
 
         // Calculate the number of blocks to scan.
         let total_blocks = end_height.saturating_sub(start_height);
 
-        // Scan the endpoint starting from the start height
-        let mut request_start = start_height;
+        // Log the initial progress.
+        print!("\rScanning {total_blocks} blocks for records (0% complete)...");
+        stdout().flush()?;
+
+        // Scan the CDN first for records.
+        Self::scan_from_cdn(
+            start_height,
+            end_height,
+            cdn.to_string(),
+            endpoint.to_string(),
+            private_key,
+            *view_key,
+            address_x_coordinate,
+            records.clone(),
+        )?;
+
+        // Scan the endpoint for the remaining blocks.
+        let mut request_start = end_height.saturating_sub(start_height % MAX_BLOCK_RANGE);
         while request_start <= end_height {
             // Log the progress.
             let percentage_complete = request_start.saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
@@ -175,23 +201,12 @@ impl Scan {
 
             // Establish the endpoint.
             let blocks_endpoint = format!("{endpoint}/testnet3/blocks?start={request_start}&end={request_end}");
-
             // Fetch blocks
             let blocks: Vec<Block<CurrentNetwork>> = ureq::get(&blocks_endpoint).call()?.into_json()?;
 
             // Scan the blocks for owned records.
             for block in &blocks {
-                for (commitment, ciphertext_record) in block.records() {
-                    // Check if the record is owned by the given view key.
-                    if ciphertext_record.is_owner_with_address_x_coordinate(view_key, &address_x_coordinate) {
-                        // Decrypt and optionally filter the records.
-                        if let Some(record) =
-                            Self::decrypt_record(private_key, view_key, endpoint, *commitment, ciphertext_record)?
-                        {
-                            records.push(record);
-                        }
-                    }
-                }
+                Self::scan_block(block, endpoint, private_key, view_key, &address_x_coordinate, records.clone())?;
             }
 
             request_start = request_start.saturating_add(num_blocks_to_request);
@@ -201,7 +216,79 @@ impl Scan {
         println!("\rScanning {total_blocks} blocks for records (100% complete)...   \n");
         stdout().flush()?;
 
-        Ok(records)
+        let result = records.read().clone();
+        Ok(result)
+    }
+
+    /// Scan the blocks from the CDN.
+    #[allow(clippy::too_many_arguments)]
+    fn scan_from_cdn(
+        start_height: u32,
+        end_height: u32,
+        cdn: String,
+        endpoint: String,
+        private_key: Option<PrivateKey<CurrentNetwork>>,
+        view_key: ViewKey<CurrentNetwork>,
+        address_x_coordinate: Field<CurrentNetwork>,
+        records: Arc<RwLock<Vec<Record<CurrentNetwork, Plaintext<CurrentNetwork>>>>>,
+    ) -> Result<()> {
+        // Calculate the number of blocks to scan.
+        let total_blocks = end_height.saturating_sub(start_height);
+
+        // Get the start_height with
+        let cdn_request_start = start_height.saturating_sub(start_height % MAX_BLOCK_RANGE);
+        let cdn_request_end = end_height.saturating_sub(start_height % MAX_BLOCK_RANGE);
+
+        // Construct the runtime.
+        let rt = tokio::runtime::Runtime::new()?;
+
+        // Scan the blocks via the CDN.
+        rt.block_on(async move {
+            let _ = snarkos_node_cdn::load_blocks(&cdn, cdn_request_start, Some(cdn_request_end), move |block| {
+                // Check if the block is within the requested range.
+                if block.height() < start_height || block.height() > end_height {
+                    return Ok(());
+                }
+
+                // Log the progress.
+                let percentage_complete =
+                    block.height().saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
+                print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
+                stdout().flush()?;
+
+                // Scan the block for records.
+                Self::scan_block(&block, &endpoint, private_key, &view_key, &address_x_coordinate, records.clone())?;
+
+                Ok(())
+            })
+            .await;
+        });
+
+        Ok(())
+    }
+
+    /// Scan a block for owned records.
+    fn scan_block(
+        block: &Block<CurrentNetwork>,
+        endpoint: &str,
+        private_key: Option<PrivateKey<CurrentNetwork>>,
+        view_key: &ViewKey<CurrentNetwork>,
+        address_x_coordinate: &Field<CurrentNetwork>,
+        records: Arc<RwLock<Vec<Record<CurrentNetwork, Plaintext<CurrentNetwork>>>>>,
+    ) -> Result<()> {
+        for (commitment, ciphertext_record) in block.records() {
+            // Check if the record is owned by the given view key.
+            if ciphertext_record.is_owner_with_address_x_coordinate(view_key, address_x_coordinate) {
+                // Decrypt and optionally filter the records.
+                if let Some(record) =
+                    Self::decrypt_record(private_key, view_key, endpoint, *commitment, ciphertext_record)?
+                {
+                    records.write().push(record);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Decrypts the ciphertext record and filters spend record if a private key was provided.
