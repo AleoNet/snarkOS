@@ -140,20 +140,19 @@ pub mod prop_tests {
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::vec,
-        prelude::{BoxedStrategy, Strategy},
-        strategy::Just,
+        prelude::{any, BoxedStrategy, Strategy},
     };
     use snarkvm::{
-        prelude::{block::Block, narwhal::Data, Network},
-        utilities::{FromBytes, ToBytes},
+        prelude::{block::Block, narwhal::Data},
+        utilities::{FromBytes, TestRng, ToBytes},
     };
+    use snarkvm_ledger_test_helpers::sample_genesis_block;
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    // TODO: create a random block, not always the same one.
     pub fn any_block() -> BoxedStrategy<Block<CurrentNetwork>> {
-        Just(Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap()).boxed()
+        any::<u64>().prop_map(|seed| sample_genesis_block(&mut TestRng::fixed(seed))).boxed()
     }
 
     pub fn any_data_blocks() -> BoxedStrategy<DataBlocks<CurrentNetwork>> {
