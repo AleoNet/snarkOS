@@ -246,6 +246,7 @@ To clean up the node storage, run:
 ```
 cargo run --release -- clean --dev <NODE_ID>
 ```
+If you need to clean up the dev node storage, please remove the snarkos/.ledger-3-*
 
 ## 7. Contributors
 Thank you for helping make SnarkOS better!  
