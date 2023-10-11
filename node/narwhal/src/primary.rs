@@ -1290,6 +1290,9 @@ mod tests {
             primary.proposed_batch.clone(),
         )
         .unwrap()]);
+        for a in accounts.iter() {
+            primary.gateway.insert_connected_peer(a.0, a.0, a.1.address());
+        }
 
         (primary, accounts)
     }
@@ -1469,10 +1472,7 @@ mod tests {
         }
     }
 
-    /// FIXME: This test is no longer valid, as `propose_batch` now checks that it is connected to sufficient validators
-    ///  before proposing a batch. This is a safety mechanism to ensure the primary behaves according to the protocol.
     #[tokio::test]
-    #[ignore]
     async fn test_propose_batch() {
         let mut rng = TestRng::default();
         let (primary, _) = primary_without_handlers(&mut rng).await;
@@ -1498,10 +1498,7 @@ mod tests {
         assert!(primary.proposed_batch.read().is_some());
     }
 
-    /// FIXME: This test is no longer valid, as `propose_batch` now checks that it is connected to sufficient validators
-    ///  before proposing a batch. This is a safety mechanism to ensure the primary behaves according to the protocol.
     #[tokio::test]
-    #[ignore]
     async fn test_propose_batch_in_round() {
         let round = 3;
         let mut rng = TestRng::default();
