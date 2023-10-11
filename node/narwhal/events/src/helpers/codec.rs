@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crate::Event;
-use snarkvm::prelude::Network;
+use snarkvm::prelude::{FromBytes, Network, ToBytes};
 
-use ::bytes::{BufMut, BytesMut};
+use ::bytes::{Buf, BufMut, BytesMut};
 use bytes::Bytes;
 use core::marker::PhantomData;
 use rayon::{
@@ -64,7 +64,7 @@ impl<N: Network> Encoder<Event<N>> for EventCodec<N> {
     fn encode(&mut self, event: Event<N>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // Serialize the payload directly into dst.
         event
-            .serialize(&mut dst.writer())
+            .write_le(&mut dst.writer())
             // This error should never happen, the conversion is for greater compatibility.
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "serialization error"))?;
 
@@ -86,7 +86,8 @@ impl<N: Network> Decoder for EventCodec<N> {
         };
 
         // Convert the bytes to a event, or fail if it is not valid.
-        match Event::deserialize(bytes) {
+        let reader = bytes.reader();
+        match Event::read_le(reader) {
             Ok(event) => Ok(Some(event)),
             Err(error) => {
                 error!("Failed to deserialize a event: {}", error);

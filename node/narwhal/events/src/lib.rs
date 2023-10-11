@@ -75,11 +75,10 @@ use snarkvm::{
     prelude::{Address, Field, Signature},
 };
 
-use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, ensure, Result};
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
-pub use std::io::Result as IoResult;
+pub use std::io::{self, Result as IoResult};
 use std::{borrow::Cow, net::SocketAddr};
 
 pub trait EventTrait: ToBytes + FromBytes {
@@ -162,11 +161,11 @@ impl<N: Network> Event<N> {
             Self::WorkerPing(..) => 15,
         }
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    pub fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
-        self.id().write_le(&mut *writer)?;
+impl<N: Network> ToBytes for Event<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> IoResult<()> {
+        self.id().write_le(&mut writer)?;
 
         match self {
             Self::BatchPropose(event) => event.write_le(writer),
@@ -187,20 +186,15 @@ impl<N: Network> Event<N> {
             Self::WorkerPing(event) => event.write_le(writer),
         }
     }
+}
 
-    /// Deserializes the given buffer into a event.
-    #[inline]
-    pub fn deserialize(mut bytes: BytesMut) -> Result<Self> {
-        // Ensure there is at least a event ID in the buffer.
-        if bytes.remaining() < 2 {
-            bail!("Missing event ID");
-        }
-
+impl<N: Network> FromBytes for Event<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
+    where
+        Self: Sized,
+    {
         // Read the event ID.
-        let id: u16 = bytes.get_u16_le();
-
-        // Prepare a reader.
-        let reader = bytes.reader();
+        let id = u16::read_le(&mut reader).map_err(|_| error("Unknown event ID"))?;
 
         // Deserialize the data field.
         let event = match id {
@@ -220,7 +214,7 @@ impl<N: Network> Event<N> {
             13 => Self::ValidatorsRequest(ValidatorsRequest::read_le(reader)?),
             14 => Self::ValidatorsResponse(ValidatorsResponse::read_le(reader)?),
             15 => Self::WorkerPing(WorkerPing::read_le(reader)?),
-            16.. => bail!("Unknown event ID {id}"),
+            16.. => return Err(error("Unknown event ID {id}")),
         };
 
         Ok(event)
@@ -230,25 +224,18 @@ impl<N: Network> Event<N> {
 #[cfg(test)]
 mod tests {
     use crate::Event;
-    use bytes::{BufMut, BytesMut};
-    use snarkvm::console::prelude::ToBytes;
+    use bytes::{Buf, BufMut, BytesMut};
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     #[test]
-    #[should_panic(expected = "Missing event ID")]
-    fn deserializing_empty_defaults_no_reason() {
-        let buf = BytesMut::default().writer();
-        Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap();
-    }
-
-    #[test]
     fn deserializing_invalid_data_panics() {
-        let mut buf = BytesMut::default().writer();
+        let buf = BytesMut::default();
         let invalid_id = u16::MAX;
-        invalid_id.write_le(&mut buf).unwrap();
+        invalid_id.write_le(&mut buf.clone().writer()).unwrap();
         assert_eq!(
-            Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap_err().to_string(),
-            format!("Unknown event ID {invalid_id}")
+            Event::<CurrentNetwork>::read_le(buf.reader()).unwrap_err().to_string(),
+            format!("Unknown event ID")
         );
     }
 }
@@ -273,10 +260,9 @@ pub mod prop_tests {
     use snarkvm::{
         console::{network::Network, types::Field},
         ledger::{coinbase::PuzzleCommitment, narwhal::TransmissionID},
-        prelude::{Rng, Uniform},
+        prelude::{FromBytes, Rng, ToBytes, Uniform},
     };
 
-    use bytes::{BufMut, BytesMut};
     use proptest::{
         prelude::{any, BoxedStrategy, Just, Strategy},
         prop_oneof,
@@ -337,10 +323,10 @@ pub mod prop_tests {
 
     #[proptest]
     fn serialize_deserialize(#[strategy(any_event())] original: Event<CurrentNetwork>) {
-        let mut buf = BytesMut::default().writer();
-        Event::serialize(&original, &mut buf).unwrap();
+        let mut buf = Vec::new();
+        Event::write_le(&original, &mut buf).unwrap();
 
-        let deserialized: Event<CurrentNetwork> = Event::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized: Event<CurrentNetwork> = Event::read_le(&*buf).unwrap();
         assert_eq!(original.id(), deserialized.id());
         assert_eq!(original.name(), deserialized.name());
     }
