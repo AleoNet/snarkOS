@@ -103,14 +103,26 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         let router = {
             axum::Router::new()
 
-            // GET ../latest/..
+            // ----------------- DEPRECATED ROUTES -----------------
+            // The following `GET ../latest/..` routes will be removed before mainnet.
+            // Please refer to the recommended routes for each endpoint:
+
+            // Deprecated: use `/testnet3/block/height/latest` instead.
             .route("/testnet3/latest/height", get(Self::latest_height))
+            // Deprecated: use `/testnet3/block/hash/latest` instead.
             .route("/testnet3/latest/hash", get(Self::latest_hash))
+            // Deprecated: use `/testnet3/latest/block/height` instead.
             .route("/testnet3/latest/block", get(Self::latest_block))
+            // Deprecated: use `/testnet3/stateRoot/latest` instead.
             .route("/testnet3/latest/stateRoot", get(Self::latest_state_root))
+            // Deprecated: use `/testnet3/committee/latest` instead.
             .route("/testnet3/latest/committee", get(Self::latest_committee))
+            // ------------------------------------------------------
 
             // GET ../block/..
+            .route("/testnet3/block/height/latest", get(Self::get_block_height_latest))
+            .route("/testnet3/block/hash/latest", get(Self::get_block_hash_latest))
+            .route("/testnet3/block/latest", get(Self::get_block_latest))
             .route("/testnet3/block/:height_or_hash", get(Self::get_block))
             // The path param here is actually only the height, but the name must match the route
             // above, otherwise there'll be a conflict at runtime.
@@ -144,6 +156,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/memoryPool/transactions", get(Self::get_memory_pool_transactions))
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
             .route("/testnet3/committee/latest", get(Self::get_committee_latest))
+            .route("/testnet3/stateRoot/latest", get(Self::get_state_root_latest))
             .route("/testnet3/node/address", get(Self::get_node_address))
 
             // Pass in `Rest` to make things convenient.
