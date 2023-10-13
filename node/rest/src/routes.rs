@@ -29,29 +29,55 @@ pub(crate) struct BlockRange {
 }
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
+    // ----------------- DEPRECATED FUNCTIONS -----------------
+    // The functions below are associated with deprecated routes.
+    // Please use the recommended alternatives when implementing new features or refactoring.
+
+    // Deprecated: Use `get_block_height_latest` instead.
     // GET /testnet3/latest/height
     pub(crate) async fn latest_height(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_height())
     }
 
+    // Deprecated: Use `get_block_hash_latest` instead.
     // GET /testnet3/latest/hash
     pub(crate) async fn latest_hash(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_hash())
     }
 
+    // Deprecated: Use `get_block_latest` instead.
     // GET /testnet3/latest/block
     pub(crate) async fn latest_block(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_block())
     }
 
+    // Deprecated: Use `get_state_root_latest` instead.
     // GET /testnet3/latest/stateRoot
     pub(crate) async fn latest_state_root(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_state_root())
     }
 
+    // Deprecated: Use `get_committee_latest` instead.
     // GET /testnet3/latest/committee
     pub(crate) async fn latest_committee(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
+    }
+
+    // ---------------------------------------------------------
+
+    // GET /testnet3/block/height/latest
+    pub(crate) async fn get_block_height_latest(State(rest): State<Self>) -> ErasedJson {
+        ErasedJson::pretty(rest.ledger.latest_height())
+    }
+
+    // GET /testnet3/block/hash/latest
+    pub(crate) async fn get_block_hash_latest(State(rest): State<Self>) -> ErasedJson {
+        ErasedJson::pretty(rest.ledger.latest_hash())
+    }
+
+    // GET /testnet3/block/latest
+    pub(crate) async fn get_block_latest(State(rest): State<Self>) -> ErasedJson {
+        ErasedJson::pretty(rest.ledger.latest_block())
     }
 
     // GET /testnet3/block/{height}
@@ -185,6 +211,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Path(commitment): Path<Field<N>>,
     ) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.get_state_path_for_commitment(&commitment)?))
+    }
+
+    // GET /testnet3/stateRoot/latest
+    pub(crate) async fn get_state_root_latest(State(rest): State<Self>) -> ErasedJson {
+        ErasedJson::pretty(rest.ledger.latest_state_root())
     }
 
     // GET /testnet3/committee/latest
