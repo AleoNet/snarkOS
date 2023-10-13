@@ -135,15 +135,27 @@ impl<N: Network> Cache<N> {
         let mut map_write = map.write();
         // Insert the new timestamp and increment the frequency for the key.
         *map_write.entry(now).or_default().entry(key).or_default() += 1;
-        // Extract the subtree after interval (i.e. non-expired entries)
-        let retained = map_write.split_off(&now.saturating_sub(interval_in_secs));
-        // Clear all the expired entries.
-        map_write.clear();
-        // Reinsert the entries into map and sum the frequency of recent requests for `key` while looping.
+        // Calculate the cutoff time for the entries to retain.
+        let cutoff = now.saturating_sub(interval_in_secs);
+        // Obtain the oldest timestamp from the map; it's guaranteed to exist at this point.
+        let (oldest, _) = map_write.first_key_value().unwrap();
+        // Track the number of cache hits of the key.
         let mut cache_hits = 0;
-        for (time, cache_keys) in retained {
-            cache_hits += *cache_keys.get(&key).unwrap_or(&0);
-            map_write.insert(time, cache_keys);
+        // If the oldest timestamp is above the cutoff value, all the entries can be retained.
+        if cutoff <= *oldest {
+            for cache_keys in map_write.values() {
+                cache_hits += *cache_keys.get(&key).unwrap_or(&0);
+            }
+        } else {
+            // Extract the subtree after interval (i.e. non-expired entries)
+            let retained = map_write.split_off(&cutoff);
+            // Clear all the expired entries.
+            map_write.clear();
+            // Reinsert the entries into map and sum the frequency of recent requests for `key` while looping.
+            for (time, cache_keys) in retained {
+                cache_hits += *cache_keys.get(&key).unwrap_or(&0);
+                map_write.insert(time, cache_keys);
+            }
         }
         // Return the frequency.
         cache_hits as usize
