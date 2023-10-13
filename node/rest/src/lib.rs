@@ -155,9 +155,9 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/memoryPool/solutions", get(Self::get_memory_pool_solutions))
             .route("/testnet3/memoryPool/transactions", get(Self::get_memory_pool_transactions))
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
-            .route("/testnet3/committee/latest", get(Self::get_committee_latest))
             .route("/testnet3/stateRoot/latest", get(Self::get_state_root_latest))
-            .route("/testnet3/node/address", get(Self::get_node_address))
+                .route("/testnet3/committee/latest", get(Self::get_committee_latest))
+                .route("/testnet3/node/address", get(Self::get_node_address))
 
             // Pass in `Rest` to make things convenient.
             .with_state(self.clone())

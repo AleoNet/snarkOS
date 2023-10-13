@@ -213,14 +213,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_state_path_for_commitment(&commitment)?))
     }
 
-    // GET /testnet3/committee/latest
-    pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
-    }
-
     // GET /testnet3/stateRoot/latest
     pub(crate) async fn get_state_root_latest(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_state_root())
+    }
+
+    // GET /testnet3/committee/latest
+    pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
     // GET /testnet3/peers/count
