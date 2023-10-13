@@ -49,7 +49,7 @@ pub struct Execute {
     query: String,
     /// The priority fee in microcredits.
     #[clap(short, long)]
-    fee: Option<u64>,
+    priority_fee: Option<u64>,
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: Option<String>,
@@ -99,7 +99,7 @@ impl Execute {
                 Some(record_string) => Some(Developer::parse_record(&private_key, record_string)?),
                 None => None,
             };
-            let priority_fee = self.fee.unwrap_or(0);
+            let priority_fee = self.priority_fee.unwrap_or(0);
 
             // Create a new transaction.
             vm.execute(
@@ -128,7 +128,7 @@ impl Execute {
             // Calculate the base fee.
             // This fee is the minimum fee required to pay for the transaction,
             // excluding any finalize fees that the execution may incur.
-            let base_fee = storage_cost.saturating_add(self.fee.unwrap_or(0));
+            let base_fee = storage_cost.saturating_add(self.priority_fee.unwrap_or(0));
 
             // If the public balance is insufficient, return an error.
             if public_balance < base_fee {
@@ -193,7 +193,7 @@ mod tests {
             "PRIVATE_KEY",
             "--query",
             "QUERY",
-            "--fee",
+            "--priority-fee",
             "77",
             "--record",
             "RECORD",
@@ -207,7 +207,7 @@ mod tests {
         if let Command::Developer(Developer::Execute(execute)) = cli.command {
             assert_eq!(execute.private_key, "PRIVATE_KEY");
             assert_eq!(execute.query, "QUERY");
-            assert_eq!(execute.fee, Some(77));
+            assert_eq!(execute.priority_fee, Some(77));
             assert_eq!(execute.record, Some("RECORD".into()));
             assert_eq!(execute.program_id, "hello.aleo".try_into().unwrap());
             assert_eq!(execute.function, "hello".try_into().unwrap());
