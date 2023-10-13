@@ -806,7 +806,7 @@ impl<N: Network> Gateway<N> {
         // Construct the connections message.
         let connections_msg = match validators.len() {
             0 => "No connected validators".to_string(),
-            num_connected => format!("Connected to {num_connected}/{validators_total} validators"),
+            num_connected => format!("Connected to {num_connected} (of {validators_total}) validators"),
         };
         // Log the connected validators.
         info!("{connections_msg}");
