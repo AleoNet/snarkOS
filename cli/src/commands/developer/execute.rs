@@ -17,6 +17,7 @@ use super::{CurrentNetwork, Developer};
 use snarkvm::prelude::{
     query::Query,
     store::{helpers::memory::ConsensusMemory, ConsensusStore},
+    Address,
     Identifier,
     Locator,
     PrivateKey,
@@ -26,7 +27,7 @@ use snarkvm::prelude::{
     VM,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
@@ -47,8 +48,8 @@ pub struct Execute {
     #[clap(short, long)]
     query: String,
     /// The priority fee in microcredits.
-    #[clap(short, long)]
-    fee: Option<u64>,
+    #[clap(long)]
+    priority_fee: Option<u64>,
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: Option<String>,
@@ -94,11 +95,11 @@ impl Execute {
             load_program(&self.query, &mut vm.process().write(), &self.program_id)?;
 
             // Prepare the fee.
-            let fee_record = match self.record {
-                Some(record_string) => Some(Developer::parse_record(&private_key, &record_string)?),
+            let fee_record = match &self.record {
+                Some(record_string) => Some(Developer::parse_record(&private_key, record_string)?),
                 None => None,
             };
-            let priority_fee = self.fee.unwrap_or(0);
+            let priority_fee = self.priority_fee.unwrap_or(0);
 
             // Create a new transaction.
             vm.execute(
@@ -111,6 +112,34 @@ impl Execute {
                 rng,
             )?
         };
+
+        // Check if the public balance is sufficient.
+        if self.record.is_none() {
+            // Fetch the public balance.
+            let address = Address::try_from(&private_key)?;
+            let public_balance = Developer::get_public_balance(&address, &self.query)?;
+
+            // Check if the public balance is sufficient.
+            let storage_cost = transaction
+                .execution()
+                .ok_or_else(|| anyhow!("The transaction does not contain an execution"))?
+                .size_in_bytes()?;
+
+            // Calculate the base fee.
+            // This fee is the minimum fee required to pay for the transaction,
+            // excluding any finalize fees that the execution may incur.
+            let base_fee = storage_cost.saturating_add(self.priority_fee.unwrap_or(0));
+
+            // If the public balance is insufficient, return an error.
+            if public_balance < base_fee {
+                bail!(
+                    "❌ The public balance of {} is insufficient to pay the base fee for `{}`",
+                    public_balance,
+                    locator.to_string().bold()
+                );
+            }
+        }
+
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
@@ -164,7 +193,7 @@ mod tests {
             "PRIVATE_KEY",
             "--query",
             "QUERY",
-            "--fee",
+            "--priority-fee",
             "77",
             "--record",
             "RECORD",
@@ -178,7 +207,7 @@ mod tests {
         if let Command::Developer(Developer::Execute(execute)) = cli.command {
             assert_eq!(execute.private_key, "PRIVATE_KEY");
             assert_eq!(execute.query, "QUERY");
-            assert_eq!(execute.fee, Some(77));
+            assert_eq!(execute.priority_fee, Some(77));
             assert_eq!(execute.record, Some("RECORD".into()));
             assert_eq!(execute.program_id, "hello.aleo".try_into().unwrap());
             assert_eq!(execute.function, "hello".try_into().unwrap());

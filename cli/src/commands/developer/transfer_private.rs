@@ -47,8 +47,8 @@ pub struct TransferPrivate {
     #[clap(short, long)]
     query: String,
     /// The priority fee in microcredits.
-    #[clap(short, long)]
-    fee: u64,
+    #[clap(long)]
+    priority_fee: u64,
     /// The record to spend the fee from.
     #[clap(long)]
     fee_record: String,
@@ -91,7 +91,7 @@ impl TransferPrivate {
 
             // Prepare the fee.
             let fee_record = Developer::parse_record(&private_key, &self.fee_record)?;
-            let priority_fee = self.fee;
+            let priority_fee = self.priority_fee;
 
             // Prepare the inputs for a transfer.
             let input_record = Developer::parse_record(&private_key, &self.input_record)?;

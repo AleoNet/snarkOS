@@ -29,7 +29,21 @@ pub use transfer_private::*;
 
 use snarkvm::{
     package::Package,
-    prelude::{block::Transaction, Ciphertext, Plaintext, PrivateKey, Program, ProgramID, Record, ToBytes, ViewKey},
+    prelude::{
+        block::Transaction,
+        Address,
+        Ciphertext,
+        Identifier,
+        Literal,
+        Plaintext,
+        PrivateKey,
+        Program,
+        ProgramID,
+        Record,
+        ToBytes,
+        Value,
+        ViewKey,
+    },
 };
 
 use anyhow::{bail, ensure, Result};
@@ -118,6 +132,36 @@ impl Developer {
                 }
                 err => bail!(err),
             },
+        }
+    }
+
+    /// Fetch the public balance in microcredits associated with the address from the given endpoint.
+    fn get_public_balance(address: &Address<CurrentNetwork>, endpoint: &str) -> Result<u64> {
+        // Initialize the program id and account identifier.
+        let credits = ProgramID::<CurrentNetwork>::from_str("credits.aleo")?;
+        let account_mapping = Identifier::<CurrentNetwork>::from_str("account")?;
+
+        // Send a request to the query node.
+        let response =
+            ureq::get(&format!("{endpoint}/testnet3/program/{credits}/mapping/{account_mapping}/{address}")).call();
+
+        // Deserialize the balance.
+        let balance: Result<Option<Value<CurrentNetwork>>> = match response {
+            Ok(response) => response.into_json().map_err(|err| err.into()),
+            Err(err) => match err {
+                ureq::Error::Status(_status, response) => {
+                    bail!(response.into_string().unwrap_or("Response too large!".to_owned()))
+                }
+                err => bail!(err),
+            },
+        };
+
+        // Return the balance in microcredits.
+        match balance {
+            Ok(Some(Value::Plaintext(Plaintext::Literal(Literal::<CurrentNetwork>::U64(amount), _)))) => Ok(*amount),
+            Ok(None) => Ok(0),
+            Ok(Some(..)) => bail!("Failed to deserialize balance for {address}"),
+            Err(err) => bail!("Failed to fetch balance for {address}: {err}"),
         }
     }
 
