@@ -17,6 +17,7 @@ use super::{CurrentNetwork, Developer};
 use snarkvm::prelude::{
     query::Query,
     store::{helpers::memory::ConsensusMemory, ConsensusStore},
+    Address,
     Identifier,
     Locator,
     PrivateKey,
@@ -26,7 +27,7 @@ use snarkvm::prelude::{
     VM,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
@@ -94,8 +95,8 @@ impl Execute {
             load_program(&self.query, &mut vm.process().write(), &self.program_id)?;
 
             // Prepare the fee.
-            let fee_record = match self.record {
-                Some(record_string) => Some(Developer::parse_record(&private_key, &record_string)?),
+            let fee_record = match &self.record {
+                Some(record_string) => Some(Developer::parse_record(&private_key, record_string)?),
                 None => None,
             };
             let priority_fee = self.fee.unwrap_or(0);
@@ -111,6 +112,34 @@ impl Execute {
                 rng,
             )?
         };
+
+        // Check if the public balance is sufficient.
+        if self.record.is_none() {
+            // Fetch the public balance.
+            let address = Address::try_from(&private_key)?;
+            let public_balance = Developer::get_public_balance(&address, &self.query)?;
+
+            // Check if the public balance is sufficient.
+            let storage_cost = transaction
+                .execution()
+                .ok_or_else(|| anyhow!("The transaction does not contain an execution"))?
+                .size_in_bytes()?;
+
+            // Calculate the base fee.
+            // This fee is the minimum fee required to pay for the transaction,
+            // excluding any finalize fees that the execution may incur.
+            let base_fee = storage_cost.saturating_add(self.fee.unwrap_or(0));
+
+            // If the public balance is insufficient, return an error.
+            if public_balance < base_fee {
+                bail!(
+                    "❌ The public balance of {} is insufficient to pay the base fee for `{}`",
+                    public_balance,
+                    locator.to_string().bold()
+                );
+            }
+        }
+
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
