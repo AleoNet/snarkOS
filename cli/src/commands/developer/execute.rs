@@ -48,7 +48,7 @@ pub struct Execute {
     #[clap(short, long)]
     query: String,
     /// The priority fee in microcredits.
-    #[clap(short, long)]
+    #[clap(long)]
     priority_fee: Option<u64>,
     /// The record to spend the fee from.
     #[clap(short, long)]

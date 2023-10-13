@@ -47,7 +47,7 @@ pub struct TransferPrivate {
     #[clap(short, long)]
     query: String,
     /// The priority fee in microcredits.
-    #[clap(short, long)]
+    #[clap(long)]
     priority_fee: u64,
     /// The record to spend the fee from.
     #[clap(long)]
