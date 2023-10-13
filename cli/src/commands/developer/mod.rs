@@ -159,7 +159,9 @@ impl Developer {
         // Return the balance in microcredits.
         match balance {
             Ok(Some(Value::Plaintext(Plaintext::Literal(Literal::<CurrentNetwork>::U64(amount), _)))) => Ok(*amount),
-            _ => Ok(0),
+            Ok(None) => Ok(0),
+            Ok(Some(..)) => bail!("Failed to deserialize balance for {address}"),
+            Err(err) => bail!("Failed to fetch balance for {address}: {err}"),
         }
     }
 
