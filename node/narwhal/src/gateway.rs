@@ -218,7 +218,7 @@ impl<N: Network> Gateway<N> {
 
     /// The maximum number of duplicates for any particular request.
     fn max_cache_duplicates(&self) -> usize {
-        self.max_committee_size() * self.max_committee_size()
+        self.max_committee_size().pow(2)
     }
 }
 
