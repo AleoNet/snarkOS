@@ -880,15 +880,13 @@ impl<N: Network> Primary<N> {
 
     /// Checks if the proposed batch is expired, and clears the proposed batch if it has expired.
     async fn check_proposed_batch_for_expiration(&self) -> Result<()> {
-        // Check if the proposed batch is timed out.
-        let is_timed_out = self.proposed_batch.read().as_ref().map_or(false, Proposal::is_timed_out);
-        // Check if the proposed batch is stale.
-        let is_round_stale = match self.proposed_batch.read().as_ref() {
-            Some(proposal) => proposal.round() < self.current_round(),
+        // Check if the proposed batch is timed out or stale.
+        let is_expired = match self.proposed_batch.read().as_ref() {
+            Some(proposal) => proposal.is_timed_out() || proposal.round() < self.current_round(),
             None => false,
         };
         // If the batch is expired, clear the proposed batch.
-        if is_timed_out || is_round_stale {
+        if is_expired {
             // Reset the proposed batch.
             let proposal = self.proposed_batch.write().take();
             if let Some(proposal) = proposal {
