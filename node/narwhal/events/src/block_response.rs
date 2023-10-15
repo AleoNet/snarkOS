@@ -59,7 +59,7 @@ impl<N: Network> std::fmt::Debug for BlockResponse<N> {
 }
 
 /// A wrapper for a list of blocks.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct DataBlocks<N: Network>(pub Vec<Block<N>>);
 
 impl<N: Network> DataBlocks<N> {

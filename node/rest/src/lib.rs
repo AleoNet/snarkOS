@@ -24,11 +24,12 @@ mod routes;
 
 use snarkos_node_consensus::Consensus;
 use snarkos_node_router::{
-    messages::{Data, Message, UnconfirmedTransaction},
+    messages::{Message, UnconfirmedTransaction},
     Routing,
 };
 use snarkvm::{
     console::{program::ProgramID, types::Field},
+    ledger::narwhal::Data,
     prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},
 };
 

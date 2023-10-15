@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crate::Message;
-use snarkvm::prelude::Network;
+use snarkvm::prelude::{FromBytes, Network, ToBytes};
 
-use ::bytes::{BufMut, BytesMut};
+use ::bytes::{Buf, BufMut, BytesMut};
 use core::marker::PhantomData;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
@@ -54,7 +54,7 @@ impl<N: Network> Encoder<Message<N>> for MessageCodec<N> {
     fn encode(&mut self, message: Message<N>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // Serialize the payload directly into dst.
         message
-            .serialize(&mut dst.writer())
+            .write_le(&mut dst.writer())
             // This error should never happen, the conversion is for greater compatibility.
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "serialization error"))?;
 
@@ -76,7 +76,8 @@ impl<N: Network> Decoder for MessageCodec<N> {
         };
 
         // Convert the bytes to a message, or fail if it is not valid.
-        match Message::deserialize(bytes) {
+        let reader = bytes.reader();
+        match Message::read_le(reader) {
             Ok(message) => Ok(Some(message)),
             Err(error) => {
                 error!("Failed to deserialize a message: {}", error);

@@ -14,6 +14,11 @@
 
 use super::*;
 
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{FromBytes, ToBytes},
+};
+
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,21 +33,20 @@ impl<N: Network> MessageTrait for UnconfirmedSolution<N> {
     fn name(&self) -> Cow<'static, str> {
         "UnconfirmedSolution".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.puzzle_commitment.write_le(&mut *writer)?;
-        self.solution.serialize_blocking_into(writer)
+impl<N: Network> ToBytes for UnconfirmedSolution<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.puzzle_commitment.write_le(&mut writer)?;
+        self.solution.write_le(&mut writer)
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-        Ok(Self {
-            puzzle_commitment: PuzzleCommitment::read_le(&mut reader)?,
-            solution: Data::Buffer(reader.into_inner().freeze()),
-        })
+impl<N: Network> FromBytes for UnconfirmedSolution<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(Self { puzzle_commitment: PuzzleCommitment::read_le(&mut reader)?, solution: Data::read_le(reader)? })
     }
 }

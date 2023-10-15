@@ -17,7 +17,6 @@ use snarkos_node_router::{
     messages::{
         BlockRequest,
         BlockResponse,
-        Data,
         DataBlocks,
         DisconnectReason,
         MessageCodec,
@@ -29,7 +28,10 @@ use snarkos_node_router::{
     Routing,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{block::Transaction, Network};
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{block::Transaction, Network},
+};
 
 use snarkos_node_sync::communication_service::CommunicationService;
 use std::{io, net::SocketAddr, time::Duration};

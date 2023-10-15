@@ -15,9 +15,6 @@
 mod codec;
 pub use codec::MessageCodec;
 
-mod data;
-pub use data::Data;
-
 mod disconnect;
 pub use disconnect::DisconnectReason;
 

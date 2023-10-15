@@ -14,6 +14,8 @@
 
 use super::*;
 
+use snarkvm::prelude::{FromBytes, ToBytes};
+
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -27,34 +29,30 @@ impl MessageTrait for Pong {
     fn name(&self) -> Cow<'static, str> {
         "Pong".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+impl ToBytes for Pong {
+    fn write_le<W: io::Write>(&self, writer: W) -> io::Result<()> {
         let serialized_is_fork: u8 = match self.is_fork {
             Some(true) => 0,
             Some(false) => 1,
             None => 2,
         };
 
-        Ok(writer.write_all(&[serialized_is_fork])?)
+        serialized_is_fork.write_le(writer)
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(mut bytes: BytesMut) -> Result<Self> {
-        // Make sure a byte for the fork flag is available.
-        if bytes.remaining() == 0 {
-            bail!("Missing fork flag in a 'Pong'");
-        }
-
-        let fork_flag = bytes.get_u8();
-
-        let is_fork = match fork_flag {
+impl FromBytes for Pong {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
+    where
+        Self: Sized,
+    {
+        let is_fork = match u8::read_le(&mut reader)? {
             0 => Some(true),
             1 => Some(false),
             2 => None,
-            _ => bail!("Invalid 'Pong' message"),
+            _ => return Err(error("Invalid 'Pong' message")),
         };
 
         Ok(Self { is_fork })
