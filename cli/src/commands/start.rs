@@ -372,8 +372,13 @@ impl Start {
 
         // If the display is not enabled, render the welcome message.
         if self.nodisplay {
-            // Print the Aleo address.
-            println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
+            if self.dev.is_some() {
+                // Print the Aleo account in dev mode.
+                println!("🪪 Your Aleo account is {}.\n", account.to_string().bold());
+            }else {
+                // Print the Aleo address in product mode.
+                println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
+            }
             // Print the node type and network.
             println!(
                 "🧭 Starting {} on {} {} at {}.\n",
