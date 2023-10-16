@@ -601,7 +601,7 @@ impl<N: Network> Primary<N> {
         // Retrieve the batch certificate author.
         let author = certificate.author();
 
-        // Ensure the batch certificate is from the validator
+        // Ensure the batch certificate is from the validator.
         if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != author) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
@@ -613,7 +613,7 @@ impl<N: Network> Primary<N> {
             self.gateway.disconnect(peer_ip);
             bail!("Malicious peer - Received a batch certificate from a non-committee member ({author})");
         }
-        // Ensure the batch proposal is not from the current primary.
+        // Ensure the batch certificate is not from the current primary.
         if self.gateway.account().address() == author {
             bail!("Received a batch certificate for myself ({author})");
         }
@@ -645,6 +645,40 @@ impl<N: Network> Primary<N> {
             // If we have reached the quorum threshold, then proceed to the next round.
             self.try_increment_to_the_next_round(current_round + 1).await?;
         }
+        Ok(())
+    }
+
+    /// Processes a batch certificate from a primary ping.
+    ///
+    /// This method performs the following steps:
+    /// 1. Stores the given batch certificate, after ensuring it is valid.
+    /// 2. If there are enough certificates to reach quorum threshold for the current round,
+    ///  then proceed to advance to the next round.
+    async fn process_batch_certificate_from_ping(
+        &self,
+        peer_ip: SocketAddr,
+        certificate: BatchCertificate<N>,
+    ) -> Result<()> {
+        // Ensure storage does not already contain the certificate.
+        if self.storage.contains_certificate(certificate.certificate_id()) {
+            return Ok(());
+        }
+
+        // Acquire the lock.
+        let _lock = self.lock.lock().await;
+
+        // Retrieve the batch certificate author.
+        let author = certificate.author();
+
+        // Ensure the batch certificate is authored by a current committee member.
+        if !self.gateway.is_authorized_validator_address(author) {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!("Malicious peer - Received a batch certificate from a non-committee member ({author})");
+        }
+
+        // Store the certificate, after ensuring it is valid.
+        self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
         Ok(())
     }
 }
@@ -710,8 +744,15 @@ impl<N: Network> Primary<N> {
                         }
                     };
 
+                    // Retrieve the batch certificates for the current round.
+                    let current_round = self_.current_round();
+                    let mut batch_certificates = Vec::new();
+                    batch_certificates.extend(self_.storage.get_certificates_for_round(current_round - 1));
+                    batch_certificates.extend(self_.storage.get_certificates_for_round(current_round));
+                    batch_certificates.push(primary_certificate.clone());
+
                     // Construct the primary ping.
-                    let primary_ping = PrimaryPing::from((<Event<N>>::VERSION, block_locators, primary_certificate));
+                    let primary_ping = PrimaryPing::from((<Event<N>>::VERSION, block_locators, batch_certificates));
                     // Broadcast the event.
                     self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
                 }
@@ -737,7 +778,7 @@ impl<N: Network> Primary<N> {
                 };
 
                 // Process the batch certificate.
-                if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
+                if let Err(e) = self_.process_batch_certificate_from_ping(peer_ip, batch_certificate).await {
                     warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
                 }
             }
