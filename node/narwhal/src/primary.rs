@@ -15,7 +15,7 @@
 use crate::{
     events::{BatchPropose, BatchSignature, Event},
     helpers::{
-        assign_to_worker,
+        assign_to_worker,fmt_id,
         assign_to_workers,
         init_sync_channels,
         init_worker_channels,
@@ -374,6 +374,7 @@ impl<N: Network> Primary<N> {
         for worker in self.workers.iter() {
             transmissions.extend(worker.take_candidates(num_transmissions_per_worker).await);
         }
+        trace!("Proposing - {} transmissions", transmissions.len());
         // Determine if there is at least one unconfirmed transaction to propose.
         let has_unconfirmed_transaction = transmissions.par_keys().any(|id| {
             matches!(id, TransmissionID::Transaction(..)) && !self.ledger.contains_transmission(id).unwrap_or(true)
@@ -860,6 +861,7 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((transaction_id, transaction, callback)) = rx_unconfirmed_transaction.recv().await {
+                trace!("Primary - Received an unconfirmed transaction '{}'", fmt_id(transaction_id));
                 // Compute the worker ID.
                 let Ok(worker_id) = assign_to_worker::<N>(&transaction_id, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");

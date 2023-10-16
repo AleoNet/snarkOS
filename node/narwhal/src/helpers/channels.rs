@@ -134,6 +134,28 @@ pub struct PrimarySender<N: Network> {
     pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>, oneshot::Sender<Result<()>>)>,
 }
 
+impl<N: Network> PrimarySender<N> {
+    /// Sends the unconfirmed solution to the primary.
+    pub async fn send_unconfirmed_solution(&self, solution_id: PuzzleCommitment<N>, solution: Data<ProverSolution<N>>) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Send the unconfirmed solution to the primary.
+        self.tx_unconfirmed_solution.send((solution_id, solution, callback_sender)).await?;
+        // Await the callback to continue.
+        callback_receiver.await?
+    }
+
+    /// Sends the unconfirmed transaction to the primary.
+    pub async fn send_unconfirmed_transaction(&self, transaction_id: N::TransactionID, transaction: Data<Transaction<N>>) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Send the unconfirmed transaction to the primary.
+        self.tx_unconfirmed_transaction.send((transaction_id, transaction, callback_sender)).await?;
+        // Await the callback to continue.
+        callback_receiver.await?
+    }
+}
+
 #[derive(Debug)]
 pub struct PrimaryReceiver<N: Network> {
     pub rx_batch_propose: mpsc::Receiver<(SocketAddr, BatchPropose<N>)>,
