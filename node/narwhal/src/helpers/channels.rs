@@ -136,7 +136,11 @@ pub struct PrimarySender<N: Network> {
 
 impl<N: Network> PrimarySender<N> {
     /// Sends the unconfirmed solution to the primary.
-    pub async fn send_unconfirmed_solution(&self, solution_id: PuzzleCommitment<N>, solution: Data<ProverSolution<N>>) -> Result<()> {
+    pub async fn send_unconfirmed_solution(
+        &self,
+        solution_id: PuzzleCommitment<N>,
+        solution: Data<ProverSolution<N>>,
+    ) -> Result<()> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the unconfirmed solution to the primary.
@@ -146,7 +150,11 @@ impl<N: Network> PrimarySender<N> {
     }
 
     /// Sends the unconfirmed transaction to the primary.
-    pub async fn send_unconfirmed_transaction(&self, transaction_id: N::TransactionID, transaction: Data<Transaction<N>>) -> Result<()> {
+    pub async fn send_unconfirmed_transaction(
+        &self,
+        transaction_id: N::TransactionID,
+        transaction: Data<Transaction<N>>,
+    ) -> Result<()> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the unconfirmed transaction to the primary.

@@ -44,8 +44,9 @@ use snarkvm::{
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use lru::LruCache;
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -63,6 +64,10 @@ pub struct Consensus<N: Network> {
     solutions_queue: Arc<Mutex<IndexMap<PuzzleCommitment<N>, ProverSolution<N>>>>,
     /// The unconfirmed transactions queue.
     transactions_queue: Arc<Mutex<IndexMap<N::TransactionID, Transaction<N>>>>,
+    /// The recently-seen unconfirmed solutions.
+    seen_solutions: Arc<Mutex<LruCache<PuzzleCommitment<N>, ()>>>,
+    /// The recently-seen unconfirmed transactions.
+    seen_transactions: Arc<Mutex<LruCache<N::TransactionID, ()>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -87,6 +92,8 @@ impl<N: Network> Consensus<N> {
             primary_sender: Default::default(),
             solutions_queue: Default::default(),
             transactions_queue: Default::default(),
+            seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
+            seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             handles: Default::default(),
         })
     }
@@ -173,6 +180,11 @@ impl<N: Network> Consensus<N> {
         {
             let solution_id = solution.commitment();
 
+            // Check if the transaction was recently seen.
+            if self.seen_solutions.lock().put(solution_id, ()).is_some() {
+                // If the transaction was recently seen, return early.
+                return Ok(());
+            }
             // Check if the solution already exists in the ledger.
             if self.ledger.contains_transmission(&TransmissionID::from(solution_id))? {
                 bail!("Solution '{}' already exists in the ledger", fmt_id(solution_id));
@@ -218,6 +230,11 @@ impl<N: Network> Consensus<N> {
         {
             let transaction_id = transaction.id();
 
+            // Check if the transaction was recently seen.
+            if self.seen_transactions.lock().put(transaction_id, ()).is_some() {
+                // If the transaction was recently seen, return early.
+                return Ok(());
+            }
             // Check if the transaction already exists in the ledger.
             if self.ledger.contains_transmission(&TransmissionID::from(&transaction_id))? {
                 bail!("Transaction '{}' already exists in the ledger", fmt_id(transaction_id));
@@ -250,7 +267,9 @@ impl<N: Network> Consensus<N> {
             let transaction_id = transaction.id();
             trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
             // Send the unconfirmed transaction to the primary.
-            if let Err(e) = self.primary_sender().send_unconfirmed_transaction(transaction_id, Data::Object(transaction)).await {
+            if let Err(e) =
+                self.primary_sender().send_unconfirmed_transaction(transaction_id, Data::Object(transaction)).await
+            {
                 warn!("Failed to add unconfirmed transaction '{}' to the memory pool - {e}", fmt_id(transaction_id));
             }
         }

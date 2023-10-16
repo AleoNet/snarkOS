@@ -15,8 +15,9 @@
 use crate::{
     events::{BatchPropose, BatchSignature, Event},
     helpers::{
-        assign_to_worker,fmt_id,
+        assign_to_worker,
         assign_to_workers,
+        fmt_id,
         init_sync_channels,
         init_worker_channels,
         now,

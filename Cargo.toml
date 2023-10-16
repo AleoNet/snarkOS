@@ -42,7 +42,7 @@ members = [
 [workspace.dependencies.snarkvm]
 #path = "../snarkvm"
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "a5fe915"
+rev = "9558c41"
 #version = "=0.15.4"
 features = [ "circuit", "console", "rocks" ]
 
