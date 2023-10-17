@@ -33,8 +33,9 @@ impl MessageTrait for PeerResponse {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        // Restrict the maximum number of peers to share.
         (self.peers.len().min(u8::MAX as usize) as u8).write_le(&mut *writer)?;
-        for peer in &self.peers {
+        for peer in self.peers.iter().take(u8::MAX as usize) {
             peer.write_le(&mut *writer)?;
         }
 
