@@ -23,20 +23,32 @@ use snarkos_node_bft::{
     MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
-use snarkos_node_bft_ledger_service::MockLedgerService;
+use snarkos_node_bft_ledger_service::TranslucentLedgerService;
 use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
+    console::algorithms::BHP256,
     ledger::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
         narwhal::Data,
     },
     prelude::{
-        block::Transaction,
+        block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        Address,
         Field,
+        FromBytes,
+        Hash,
+        Ledger,
         Network,
+        PrivateKey,
+        TestRng,
+        ToBits,
+        ToBytes,
         Uniform,
+        VM,
     },
+    utilities::to_bytes_le,
 };
 
 use ::bytes::Bytes;
@@ -51,8 +63,15 @@ use axum::{
 use axum_extra::response::ErasedJson;
 use clap::{Parser, ValueEnum};
 use indexmap::IndexMap;
-use rand::{Rng, SeedableRng};
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
+use parking_lot::Mutex;
+use rand::{CryptoRng, Rng, SeedableRng};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    path::PathBuf,
+    str::FromStr,
+    sync::{Arc, OnceLock},
+};
 use tokio::sync::oneshot;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -113,8 +132,17 @@ pub async fn start_bft(
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (committee, account) = initialize_components(node_id, num_nodes)?;
-    // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the translucent ledger service.
+    let gen_key = account.private_key();
+    let public_balance_per_validator =
+        (1_500_000_000_000_000 - (num_nodes as u64) * 1_000_000_000_000) / (num_nodes as u64);
+    let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
+    for address in committee.members().keys() {
+        balances.insert(*address, public_balance_per_validator);
+    }
+    let mut rng = TestRng::default();
+    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), &mut rng);
+    let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger));
     // Initialize the storage.
     let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
@@ -142,10 +170,11 @@ pub async fn start_bft(
 
 /// Starts the primary instance.
 pub async fn start_primary(
-    node_id: u16,
-    num_nodes: u16,
-    peers: HashMap<u16, SocketAddr>,
+    _node_id: u16,
+    _num_nodes: u16,
+    _peers: HashMap<u16, SocketAddr>,
 ) -> Result<(Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
+    /*
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
@@ -169,6 +198,60 @@ pub async fn start_primary(
     handle_signals(&primary);
     // Return the primary instance.
     Ok((primary, sender))
+    */
+    todo!()
+}
+
+pub type CurrentLedger = Ledger<CurrentNetwork, ConsensusMemory<CurrentNetwork>>;
+
+fn genesis_cache() -> &'static Mutex<HashMap<Vec<u8>, Block<CurrentNetwork>>> {
+    static CACHE: OnceLock<Mutex<HashMap<Vec<u8>, Block<CurrentNetwork>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn genesis_block(
+    genesis_private_key: PrivateKey<CurrentNetwork>,
+    committee: Committee<CurrentNetwork>,
+    public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    rng: &mut (impl Rng + CryptoRng),
+) -> Block<CurrentNetwork> {
+    // Initialize the store.
+    let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
+    // Initialize a new VM.
+    let vm = VM::from(store).unwrap();
+    // Initialize the genesis block.
+    vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng).unwrap()
+}
+
+fn genesis_ledger(
+    genesis_private_key: PrivateKey<CurrentNetwork>,
+    committee: Committee<CurrentNetwork>,
+    public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    rng: &mut (impl Rng + CryptoRng),
+) -> CurrentLedger {
+    let cache_key =
+        to_bytes_le![genesis_private_key, committee, public_balances.iter().collect::<Vec<(_, _)>>()].unwrap();
+    // Initialize the genesis block on the first call; other callers
+    // will wait for it on the mutex.
+    let block = genesis_cache()
+        .lock()
+        .entry(cache_key.clone())
+        .or_insert_with(|| {
+            let hasher = BHP256::<CurrentNetwork>::setup("aleo.dev.block").unwrap();
+            let file_name = hasher.hash(&cache_key.to_bits_le()).unwrap().to_string() + ".genesis";
+            let file_path = std::env::temp_dir().join(file_name);
+            if file_path.exists() {
+                let buffer = std::fs::read(file_path).unwrap();
+                return Block::from_bytes_le(&buffer).unwrap();
+            }
+
+            let block = genesis_block(genesis_private_key, committee, public_balances, rng);
+            std::fs::write(&file_path, block.to_bytes_le().unwrap()).unwrap();
+            block
+        })
+        .clone();
+    // Initialize the ledger with the genesis block.
+    CurrentLedger::load(block, None).unwrap()
 }
 
 /// Initializes the components of the node.
