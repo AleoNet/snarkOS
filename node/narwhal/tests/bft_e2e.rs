@@ -173,6 +173,38 @@ async fn test_quorum_break() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_partially_connected() {
+    // Start N nodes but don't connect them.
+    const N: u16 = 4;
+    const TRANSMISSION_INTERVAL_MS: u64 = 10;
+
+    let mut network = TestNetwork::new(TestNetworkConfig {
+        num_nodes: N,
+        bft: true,
+        connect_all: false,
+        fire_transmissions: Some(TRANSMISSION_INTERVAL_MS),
+        // Set this to Some(0..=4) to see the logs.
+        log_level: None,
+        log_connections: true,
+    });
+    network.start().await;
+
+    // Check each node is still at round 1.
+    for validator in network.validators.values() {
+        assert_eq!(validator.primary.current_round(), 1);
+    }
+
+    // Connect each but not to their neighbors
+    network.connect_validators(0, 2).await;
+    network.connect_validators(0, 3).await;
+    network.connect_validators(1, 3).await;
+
+    // Check the nodes reach quorum and advance through the rounds.
+    const TARGET_ROUND: u64 = 4;
+    deadline!(Duration::from_secs(20), move || { network.is_round_reached(TARGET_ROUND) });
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_leader_election_consistency() {
     // The minimum and maximum rounds to check for leader consistency.
     // From manual experimentation, the minimum round that works is 4.
