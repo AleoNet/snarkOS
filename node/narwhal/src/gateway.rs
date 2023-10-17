@@ -79,9 +79,9 @@ const MAX_CONNECTION_ATTEMPTS: usize = 10;
 const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DELAY / 1000) as i64; // seconds
 
 /// The minimum number of validators to maintain a connection to.
-const MIN_CONNECTED_VALIDATORS: usize = 50;
+const MIN_CONNECTED_VALIDATORS: usize = 175;
 /// The maximum number of validators to send in a validators response event.
-const MAX_VALIDATORS_TO_SEND: usize = 100;
+const MAX_VALIDATORS_TO_SEND: usize = 200;
 
 /// Part of the Gateway API that deals with networking.
 /// This is a separate trait to allow for easier testing/mocking.
