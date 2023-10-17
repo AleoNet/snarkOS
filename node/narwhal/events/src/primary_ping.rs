@@ -18,6 +18,7 @@ use super::*;
 pub struct PrimaryPing<N: Network> {
     pub version: u32,
     pub block_locators: BlockLocators<N>,
+    pub primary_certificate: Data<BatchCertificate<N>>,
     pub batch_certificates: Vec<Data<BatchCertificate<N>>>,
 }
 
@@ -26,25 +27,29 @@ impl<N: Network> PrimaryPing<N> {
     pub const fn new(
         version: u32,
         block_locators: BlockLocators<N>,
+        primary_certificate: Data<BatchCertificate<N>>,
         batch_certificates: Vec<Data<BatchCertificate<N>>>,
     ) -> Self {
-        Self { version, block_locators, batch_certificates }
+        Self { version, block_locators, primary_certificate, batch_certificates }
     }
 }
 
-impl<N: Network> From<(u32, BlockLocators<N>, Vec<BatchCertificate<N>>)> for PrimaryPing<N> {
-    /// Initializes a new ping event.
-    fn from((version, block_locators, batch_certificates): (u32, BlockLocators<N>, Vec<BatchCertificate<N>>)) -> Self {
-        Self::new(version, block_locators, batch_certificates.into_iter().map(Data::Object).collect())
-    }
-}
-
-impl<N: Network> From<(u32, BlockLocators<N>, Vec<Data<BatchCertificate<N>>>)> for PrimaryPing<N> {
+impl<N: Network> From<(u32, BlockLocators<N>, BatchCertificate<N>, Vec<BatchCertificate<N>>)> for PrimaryPing<N> {
     /// Initializes a new ping event.
     fn from(
-        (version, block_locators, batch_certificates): (u32, BlockLocators<N>, Vec<Data<BatchCertificate<N>>>),
+        (version, block_locators, primary_certificate, batch_certificates): (
+            u32,
+            BlockLocators<N>,
+            BatchCertificate<N>,
+            Vec<BatchCertificate<N>>,
+        ),
     ) -> Self {
-        Self::new(version, block_locators, batch_certificates)
+        Self::new(
+            version,
+            block_locators,
+            Data::Object(primary_certificate),
+            batch_certificates.into_iter().map(Data::Object).collect(),
+        )
     }
 }
 
@@ -60,8 +65,12 @@ impl<N: Network> ToBytes for PrimaryPing<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.version.write_le(&mut writer)?;
         self.block_locators.write_le(&mut writer)?;
+        self.primary_certificate.write_le(&mut writer)?;
         u16::try_from(self.batch_certificates.len()).map_err(error)?.write_le(&mut writer)?;
-        self.batch_certificates.write_le(&mut writer)
+        for batch_certificate in &self.batch_certificates {
+            batch_certificate.write_le(&mut writer)?;
+        }
+        Ok(())
     }
 }
 
@@ -69,13 +78,14 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let version = u32::read_le(&mut reader)?;
         let block_locators = BlockLocators::read_le(&mut reader)?;
+        let primary_certificate = Data::read_le(&mut reader)?;
         let num_certificates = u16::read_le(&mut reader)?;
         // TODO: Limit to the number of MAX_COMMITTEE + 1 (self).
         let mut batch_certificates = Vec::with_capacity(usize::from(num_certificates));
         for _ in 0..num_certificates {
             batch_certificates.push(Data::read_le(&mut reader)?);
         }
-        Ok(Self::new(version, block_locators, batch_certificates))
+        Ok(Self::new(version, block_locators, primary_certificate, batch_certificates))
     }
 }
 
@@ -83,10 +93,7 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
 pub mod prop_tests {
     use crate::{certificate_response::prop_tests::any_batch_certificate, PrimaryPing};
     use snarkos_node_sync_locators::{test_helpers::sample_block_locators, BlockLocators};
-    use snarkvm::{
-        ledger::narwhal::Data,
-        utilities::{FromBytes, ToBytes},
-    };
+    use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
@@ -100,8 +107,8 @@ pub mod prop_tests {
 
     pub fn any_primary_ping() -> BoxedStrategy<PrimaryPing<CurrentNetwork>> {
         (any::<u32>(), any_block_locators(), any_batch_certificate())
-            .prop_map(|(version, block_locators, batch_certificates)| {
-                PrimaryPing::from((version, block_locators, vec![Data::Object(batch_certificates)]))
+            .prop_map(|(version, block_locators, batch_certificate)| {
+                PrimaryPing::from((version, block_locators, batch_certificate.clone(), vec![batch_certificate]))
             })
             .boxed()
     }

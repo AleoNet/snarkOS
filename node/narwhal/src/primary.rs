@@ -747,12 +747,17 @@ impl<N: Network> Primary<N> {
                     // Retrieve the batch certificates for the current round.
                     let current_round = self_.current_round();
                     let mut batch_certificates = Vec::new();
-                    batch_certificates.extend(self_.storage.get_certificates_for_round(current_round - 1));
+                    batch_certificates
+                        .extend(self_.storage.get_certificates_for_round(current_round.saturating_sub(1)));
                     batch_certificates.extend(self_.storage.get_certificates_for_round(current_round));
-                    batch_certificates.push(primary_certificate.clone());
 
                     // Construct the primary ping.
-                    let primary_ping = PrimaryPing::from((<Event<N>>::VERSION, block_locators, batch_certificates));
+                    let primary_ping = PrimaryPing::from((
+                        <Event<N>>::VERSION,
+                        block_locators,
+                        primary_certificate,
+                        batch_certificates,
+                    ));
                     // Broadcast the event.
                     self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
                 }
@@ -762,24 +767,38 @@ impl<N: Network> Primary<N> {
         // Start the primary ping handler.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((peer_ip, batch_certificate)) = rx_primary_ping.recv().await {
+            while let Some((peer_ip, primary_certificate, batch_certificates)) = rx_primary_ping.recv().await {
                 // If the primary is not synced, then do not process the primary ping.
                 if !self_.sync.is_synced() {
                     trace!("Skipping a primary ping from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
-                // Deserialize the batch certificate in the primary ping.
-                let Ok(Ok(batch_certificate)) =
-                    task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
+                // Deserialize the primary certificate in the primary ping.
+                let Ok(Ok(primary_certificate)) =
+                    task::spawn_blocking(move || primary_certificate.deserialize_blocking()).await
                 else {
-                    warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
+                    warn!("Failed to deserialize primary certificate in a primary ping from '{peer_ip}'");
                     continue;
                 };
+                // Process the primary certificate.
+                if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, primary_certificate).await {
+                    warn!("Cannot process a primary certificate in a primary ping from '{peer_ip}' - {e}");
+                }
 
-                // Process the batch certificate.
-                if let Err(e) = self_.process_batch_certificate_from_ping(peer_ip, batch_certificate).await {
-                    warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
+                // Iterate through the batch certificates.
+                for batch_certificate in batch_certificates {
+                    // Deserialize the batch certificate in the primary ping.
+                    let Ok(Ok(batch_certificate)) =
+                        task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
+                    else {
+                        warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
+                        continue;
+                    };
+                    // Process the batch certificate.
+                    if let Err(e) = self_.process_batch_certificate_from_ping(peer_ip, batch_certificate).await {
+                        warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
+                    }
                 }
             }
         });
