@@ -457,11 +457,31 @@ fn load_or_compute_genesis<N: Network>(
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
-    let bytes = to_bytes_le![genesis_private_key, committee, public_balances.iter().collect::<Vec<(_, _)>>()]?;
+    let mut preimage = Vec::new();
+
+    // Input the genesis private key, committee, and public balances.
+    preimage.extend(genesis_private_key.to_bytes_le()?);
+    preimage.extend(committee.to_bytes_le()?);
+    preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
+
+    // Input the parameters.
+    preimage.extend(snarkvm::parameters::testnet3::BondPublicVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::UnbondPublicVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::UnbondDelegatorAsValidatorVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::ClaimUnbondPublicVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::SetValidatorStateVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::TransferPublicVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateToPublicVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::TransferPublicToPrivateVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::FeePrivateVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::FeePublicVerifier::load_bytes()?);
+    preimage.extend(snarkvm::parameters::testnet3::InclusionVerifier::load_bytes()?);
+
     // Initialize the hasher.
     let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
     // Compute the hash.
-    let hash = hasher.hash(&bytes.to_bits_le())?.to_string();
+    let hash = hasher.hash(&preimage.to_bits_le())?.to_string();
 
     // A closure to load the block.
     let load_block = |file_path| -> Result<Block<N>> {
