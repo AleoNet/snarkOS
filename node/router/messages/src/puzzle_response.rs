@@ -50,3 +50,48 @@ impl<N: Network> FromBytes for PuzzleResponse<N> {
         Ok(Self { epoch_challenge: EpochChallenge::read_le(&mut reader)?, block_header: Data::read_le(reader)? })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{challenge_response::prop_tests::any_genesis_header, EpochChallenge, PuzzleResponse};
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::narwhal::Data,
+        prelude::{Rng, TestRng},
+    };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_epoch_challenge() -> BoxedStrategy<EpochChallenge<CurrentNetwork>> {
+        any::<u64>()
+            .prop_map(|seed| {
+                let mut rng = TestRng::fixed(seed);
+                let degree: u16 = rng.gen_range(1..=u16::MAX);
+                EpochChallenge::<CurrentNetwork>::new(rng.gen(), rng.gen(), degree as u32).unwrap()
+            })
+            .boxed()
+    }
+
+    pub fn any_puzzle_response() -> BoxedStrategy<PuzzleResponse<CurrentNetwork>> {
+        (any_epoch_challenge(), any_genesis_header())
+            .prop_map(|(epoch_challenge, bh)| PuzzleResponse { epoch_challenge, block_header: Data::Object(bh) })
+            .boxed()
+    }
+
+    #[proptest]
+    fn puzzle_response_roundtrip(#[strategy(any_puzzle_response())] original: PuzzleResponse<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        PuzzleResponse::write_le(&original, &mut buf).unwrap();
+
+        let deserialized: PuzzleResponse<CurrentNetwork> = PuzzleResponse::read_le(buf.into_inner().reader()).unwrap();
+        assert_eq!(original.epoch_challenge, deserialized.epoch_challenge);
+        assert_eq!(
+            original.block_header.deserialize_blocking().unwrap(),
+            deserialized.block_header.deserialize_blocking().unwrap(),
+        );
+    }
+}

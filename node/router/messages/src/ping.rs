@@ -99,3 +99,35 @@ impl<N: Network> Ping<N> {
         Self { version: <Message<N>>::VERSION, node_type, block_locators }
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::Ping;
+
+    use crate::challenge_request::prop_tests::any_node_type;
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use snarkos_node_sync_locators::{test_helpers::sample_block_locators, BlockLocators};
+    use snarkvm::utilities::{FromBytes, ToBytes};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_block_locators() -> BoxedStrategy<BlockLocators<CurrentNetwork>> {
+        any::<u32>().prop_map(sample_block_locators).boxed()
+    }
+
+    pub fn any_ping() -> BoxedStrategy<Ping<CurrentNetwork>> {
+        (any::<u32>(), any_block_locators(), any_node_type())
+            .prop_map(|(version, bls, node_type)| Ping { version, block_locators: Some(bls), node_type })
+            .boxed()
+    }
+
+    #[proptest]
+    fn ping_roundtrip(#[strategy(any_ping())] ping: Ping<CurrentNetwork>) {
+        let mut bytes = BytesMut::default().writer();
+        ping.write_le(&mut bytes).unwrap();
+        let decoded = Ping::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq!(ping, decoded);
+    }
+}

@@ -51,3 +51,53 @@ impl FromBytes for Disconnect {
         Ok(Disconnect { reason: DisconnectReason::read_le(&mut reader)? })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{Disconnect, DisconnectReason};
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        prelude::{Rng, TestRng},
+    };
+
+    use bytes::{Buf, BufMut, BytesMut};
+
+    #[test]
+    fn disconnect_roundtrip() {
+        // TODO switch to an iteration method that doesn't require manually updating this vec if variants are added
+        let all_reasons = [
+            DisconnectReason::ExceededForkRange,
+            DisconnectReason::InvalidChallengeResponse,
+            DisconnectReason::InvalidForkDepth,
+            DisconnectReason::INeedToSyncFirst,
+            DisconnectReason::NoReasonGiven,
+            DisconnectReason::ProtocolViolation,
+            DisconnectReason::OutdatedClientVersion,
+            DisconnectReason::PeerHasDisconnected,
+            DisconnectReason::PeerRefresh,
+            DisconnectReason::ShuttingDown,
+            DisconnectReason::SyncComplete,
+            DisconnectReason::TooManyFailures,
+            DisconnectReason::TooManyPeers,
+            DisconnectReason::YouNeedToSyncFirst,
+            DisconnectReason::YourPortIsClosed(TestRng::default().gen()),
+        ];
+
+        for reason in all_reasons.iter() {
+            let disconnect = Disconnect::from(*reason);
+            let mut buf = BytesMut::default().writer();
+            Disconnect::write_le(&disconnect, &mut buf).unwrap();
+
+            let disconnect = Disconnect::read_le(buf.into_inner().reader()).unwrap();
+            assert_eq!(reason, &disconnect.reason);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn disconnect_invalid_data_panics() {
+        let mut buf = BytesMut::default().writer();
+        "not a DisconnectReason-value".as_bytes().write_le(&mut buf).unwrap();
+        let _disconnect = Disconnect::read_le(buf.into_inner().reader()).unwrap();
+    }
+}

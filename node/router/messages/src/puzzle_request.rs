@@ -43,3 +43,20 @@ impl FromBytes for PuzzleRequest {
         Ok(Self)
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use crate::PuzzleRequest;
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use snarkvm::utilities::{FromBytes, ToBytes};
+
+    #[test]
+    fn puzzle_request_roundtrip() {
+        let puzzle_request = PuzzleRequest;
+        let mut bytes = BytesMut::default().writer();
+        puzzle_request.write_le(&mut bytes).unwrap();
+        let decoded = PuzzleRequest::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq!(decoded, puzzle_request);
+    }
+}

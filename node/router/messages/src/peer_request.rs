@@ -43,3 +43,20 @@ impl FromBytes for PeerRequest {
         Ok(Self)
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use crate::PeerRequest;
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use snarkvm::utilities::{FromBytes, ToBytes};
+
+    #[test]
+    fn peer_request_roundtrip() {
+        let peer_request = PeerRequest;
+        let mut bytes = BytesMut::default().writer();
+        peer_request.write_le(&mut bytes).unwrap();
+        let decoded = PeerRequest::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq!(decoded, peer_request);
+    }
+}

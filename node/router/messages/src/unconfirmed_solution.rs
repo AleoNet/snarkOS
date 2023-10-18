@@ -50,3 +50,59 @@ impl<N: Network> FromBytes for UnconfirmedSolution<N> {
         Ok(Self { puzzle_commitment: PuzzleCommitment::read_le(&mut reader)?, solution: Data::read_le(reader)? })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{ProverSolution, PuzzleCommitment, UnconfirmedSolution};
+    use snarkvm::{
+        algorithms::polycommit::kzg10::{KZGCommitment, KZGProof},
+        ledger::{coinbase::PartialSolution, narwhal::Data},
+        prelude::{Address, FromBytes, PrivateKey, Rng, TestRng, ToBytes},
+    };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_puzzle_commitment() -> BoxedStrategy<PuzzleCommitment<CurrentNetwork>> {
+        any::<u64>()
+            .prop_map(|seed| PuzzleCommitment::<CurrentNetwork>::new(KZGCommitment(TestRng::fixed(seed).gen())))
+            .boxed()
+    }
+
+    pub fn any_prover_solution() -> BoxedStrategy<ProverSolution<CurrentNetwork>> {
+        any::<u64>()
+            .prop_map(|seed| {
+                let mut rng = TestRng::fixed(seed);
+                let private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
+                let address = Address::try_from(private_key).unwrap();
+                let partial_solution = PartialSolution::new(address, rng.gen(), KZGCommitment(rng.gen()));
+                ProverSolution::new(partial_solution, KZGProof { w: rng.gen(), random_v: None })
+            })
+            .boxed()
+    }
+
+    pub fn any_unconfirmed_solution() -> BoxedStrategy<UnconfirmedSolution<CurrentNetwork>> {
+        (any_puzzle_commitment(), any_prover_solution())
+            .prop_map(|(puzzle_commitment, ps)| UnconfirmedSolution { puzzle_commitment, solution: Data::Object(ps) })
+            .boxed()
+    }
+
+    #[proptest]
+    fn unconfirmed_solution_roundtrip(
+        #[strategy(any_unconfirmed_solution())] original: UnconfirmedSolution<CurrentNetwork>,
+    ) {
+        let mut buf = BytesMut::default().writer();
+        UnconfirmedSolution::write_le(&original, &mut buf).unwrap();
+
+        let deserialized: UnconfirmedSolution<CurrentNetwork> =
+            UnconfirmedSolution::read_le(buf.into_inner().reader()).unwrap();
+        assert_eq!(original.puzzle_commitment, deserialized.puzzle_commitment);
+        assert_eq!(
+            original.solution.deserialize_blocking().unwrap(),
+            deserialized.solution.deserialize_blocking().unwrap(),
+        );
+    }
+}

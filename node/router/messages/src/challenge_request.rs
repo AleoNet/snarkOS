@@ -66,3 +66,55 @@ impl<N: Network> ChallengeRequest<N> {
         Self { version: Message::<N>::VERSION, listener_port, node_type, address, nonce }
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{ChallengeRequest, NodeType};
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        prelude::{Address, TestRng, Uniform},
+    };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_valid_address() -> BoxedStrategy<Address<CurrentNetwork>> {
+        any::<u64>().prop_map(|seed| Address::rand(&mut TestRng::fixed(seed))).boxed()
+    }
+
+    pub fn any_node_type() -> BoxedStrategy<NodeType> {
+        (0..=2)
+            .prop_map(|id| match id {
+                0 => NodeType::Client,
+                1 => NodeType::Prover,
+                2 => NodeType::Validator,
+                _ => unreachable!(),
+            })
+            .boxed()
+    }
+
+    pub fn any_challenge_request() -> BoxedStrategy<ChallengeRequest<CurrentNetwork>> {
+        (any_valid_address(), any::<u64>(), any::<u32>(), any::<u16>(), any_node_type())
+            .prop_map(|(address, nonce, version, listener_port, node_type)| ChallengeRequest {
+                address,
+                nonce,
+                version,
+                listener_port,
+                node_type,
+            })
+            .boxed()
+    }
+
+    #[proptest]
+    fn challenge_request_roundtrip(#[strategy(any_challenge_request())] original: ChallengeRequest<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        ChallengeRequest::write_le(&original, &mut buf).unwrap();
+
+        let deserialized: ChallengeRequest<CurrentNetwork> =
+            ChallengeRequest::read_le(buf.into_inner().reader()).unwrap();
+        assert_eq!(original, deserialized);
+    }
+}
