@@ -159,7 +159,7 @@ mod tests {
             assert_eq!(deploy.private_key, "PRIVATE_KEY");
             assert_eq!(deploy.query, "QUERY");
             assert_eq!(deploy.priority_fee, 77);
-            assert_eq!(deploy.record, "RECORD");
+            assert_eq!(deploy.record, Some("RECORD".to_string()));
         } else {
             panic!("Unexpected result of clap parsing!");
         }
