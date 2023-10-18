@@ -3165,7 +3165,6 @@ dependencies = [
  "serde",
  "snarkos-node-sync-locators",
  "snarkvm",
- "snarkvm-ledger-test-helpers",
  "snow",
  "test-strategy",
  "time",
@@ -3250,12 +3249,14 @@ dependencies = [
  "anyhow",
  "bytes",
  "indexmap 2.0.2",
+ "proptest",
  "rayon",
  "serde",
  "snarkos-node-narwhal-events",
  "snarkos-node-sync-locators",
  "snarkvm",
  "snow",
+ "test-strategy",
  "tokio",
  "tokio-util",
  "tracing",
@@ -3332,6 +3333,7 @@ dependencies = [
  "rayon",
  "self_update",
  "serde_json",
+ "snarkvm-algorithms",
  "snarkvm-circuit",
  "snarkvm-console",
  "snarkvm-ledger",
@@ -4048,22 +4050,6 @@ dependencies = [
  "snarkvm-synthesizer-program",
  "snarkvm-synthesizer-snark",
  "tracing",
-]
-
-[[package]]
-name = "snarkvm-ledger-test-helpers"
-version = "0.15.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76907e67ef6e49fb32e578ecbd4c5b2adbef8f2962e2856aec165fec8b7bfcdc"
-dependencies = [
- "once_cell",
- "snarkvm-circuit",
- "snarkvm-console",
- "snarkvm-ledger-block",
- "snarkvm-ledger-query",
- "snarkvm-ledger-store",
- "snarkvm-synthesizer-process",
- "snarkvm-synthesizer-program",
 ]
 
 [[package]]
