@@ -945,7 +945,7 @@ impl<N: Network> Primary<N> {
     async fn check_proposed_batch_for_expiration(&self) -> Result<()> {
         // Check if the proposed batch is timed out or stale.
         let is_expired = match self.proposed_batch.read().as_ref() {
-            Some(proposal) => proposal.is_timed_out() || proposal.round() < self.current_round(),
+            Some(proposal) => proposal.round() < self.current_round(),
             None => false,
         };
         // If the batch is expired, clear the proposed batch.
@@ -1304,7 +1304,6 @@ impl<N: Network> Primary<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MAX_EXPIRATION_TIME_IN_SECS;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkvm::{
         ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
@@ -1807,79 +1806,6 @@ mod tests {
         assert!(primary.storage.contains_certificate_in_round_from(round, primary.gateway.account().address()));
         // Check the round was incremented.
         assert_eq!(primary.current_round(), round + 1);
-    }
-
-    #[tokio::test]
-    async fn test_batch_signature_from_peer_expired() {
-        let mut rng = TestRng::default();
-        let (primary, accounts) = primary_without_handlers(&mut rng).await;
-        map_account_addresses(&primary, &accounts);
-
-        // Create an expired proposal.
-        let round = 1;
-        let timestamp = now() - (MAX_EXPIRATION_TIME_IN_SECS + 1);
-        let proposal = create_test_proposal(
-            primary.gateway.account(),
-            primary.ledger.current_committee().unwrap(),
-            round,
-            Default::default(),
-            timestamp,
-            &mut rng,
-        );
-
-        // Store the proposal on the primary.
-        *primary.proposed_batch.write() = Some(proposal);
-
-        // Each committee member signs the batch.
-        let signatures = peer_signatures_for_proposal(&primary, &accounts, &mut rng);
-
-        // Have the primary process the signatures.
-        for (socket_addr, signature) in signatures {
-            primary.process_batch_signature_from_peer(socket_addr, signature).await.unwrap();
-        }
-
-        // Check the certificate was not created and stored by the primary.
-        assert!(!primary.storage.contains_certificate_in_round_from(round, primary.gateway.account().address()));
-        // Check the round was incremented.
-        assert_eq!(primary.current_round(), round);
-    }
-
-    #[tokio::test]
-    async fn test_batch_signature_from_peer_in_round_expired() {
-        let round = 6;
-        let mut rng = TestRng::default();
-        let (primary, accounts) = primary_without_handlers(&mut rng).await;
-        map_account_addresses(&primary, &accounts);
-
-        // Generate certificates.
-        let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
-
-        // Create an expired proposal.
-        let timestamp = now() - (MAX_EXPIRATION_TIME_IN_SECS + 1);
-        let proposal = create_test_proposal(
-            primary.gateway.account(),
-            primary.ledger.current_committee().unwrap(),
-            round,
-            previous_certificates,
-            timestamp,
-            &mut rng,
-        );
-
-        // Store the proposal on the primary.
-        *primary.proposed_batch.write() = Some(proposal);
-
-        // Each committee member signs the batch.
-        let signatures = peer_signatures_for_proposal(&primary, &accounts, &mut rng);
-
-        // Have the primary process the signatures.
-        for (socket_addr, signature) in signatures {
-            primary.process_batch_signature_from_peer(socket_addr, signature).await.unwrap();
-        }
-
-        // Check the certificate was not created and stored by the primary.
-        assert!(!primary.storage.contains_certificate_in_round_from(round, primary.gateway.account().address()));
-        // Check the round was incremented.
-        assert_eq!(primary.current_round(), round);
     }
 
     #[tokio::test]
