@@ -63,10 +63,9 @@ impl<N: Network> FromBytes for UnconfirmedTransaction<N> {
 pub mod prop_tests {
     use crate::{Transaction, UnconfirmedTransaction};
     use snarkvm::{
-        ledger::narwhal::Data,
+        ledger::{ledger_test_helpers::sample_fee_public_transaction, narwhal::Data},
         prelude::{FromBytes, TestRng, ToBytes},
     };
-    use snarkvm_ledger_test_helpers::sample_fee_public_transaction;
 
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};

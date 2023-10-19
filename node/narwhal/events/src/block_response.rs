@@ -143,10 +143,10 @@ pub mod prop_tests {
         prelude::{any, BoxedStrategy, Strategy},
     };
     use snarkvm::{
+        ledger::ledger_test_helpers::sample_genesis_block,
         prelude::{block::Block, narwhal::Data},
         utilities::{FromBytes, TestRng, ToBytes},
     };
-    use snarkvm_ledger_test_helpers::sample_genesis_block;
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;

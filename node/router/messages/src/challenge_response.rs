@@ -56,11 +56,10 @@ pub mod prop_tests {
     use crate::ChallengeResponse;
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
-        ledger::narwhal::Data,
+        ledger::{ledger_test_helpers::sample_genesis_block, narwhal::Data},
         prelude::{block::Header, PrivateKey, Signature},
         utilities::rand::{TestRng, Uniform},
     };
-    use snarkvm_ledger_test_helpers::sample_genesis_block;
 
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
