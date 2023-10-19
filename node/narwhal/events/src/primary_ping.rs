@@ -118,6 +118,12 @@ pub mod prop_tests {
         let mut bytes = BytesMut::default().writer();
         primary_ping.write_le(&mut bytes).unwrap();
         let decoded = PrimaryPing::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
-        assert_eq!(primary_ping, decoded);
+        assert_eq!(primary_ping.version, decoded.version);
+        assert_eq!(primary_ping.block_locators, decoded.block_locators);
+        assert_eq!(
+            primary_ping.primary_certificate.deserialize_blocking().unwrap(),
+            decoded.primary_certificate.deserialize_blocking().unwrap(),
+        );
+        assert_eq!(primary_ping.batch_certificates, decoded.batch_certificates);
     }
 }
