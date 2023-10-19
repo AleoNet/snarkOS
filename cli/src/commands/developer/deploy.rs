@@ -27,7 +27,7 @@ use snarkvm::{
     },
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
