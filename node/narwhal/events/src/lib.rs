@@ -114,7 +114,7 @@ impl<N: Network> From<DisconnectReason> for Event<N> {
 
 impl<N: Network> Event<N> {
     /// The version of the event protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 2;
+    pub const VERSION: u32 = 3;
 
     /// Returns the event name.
     #[inline]
