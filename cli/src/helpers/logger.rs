@@ -51,25 +51,25 @@ pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile
             .add_directive("want=off".parse().unwrap())
             .add_directive("warp=off".parse().unwrap());
 
-        let filter = if verbosity > 3 {
+        let filter = if verbosity >= 3 {
             filter.add_directive("snarkos_node_narwhal::gateway=trace".parse().unwrap())
         } else {
             filter.add_directive("snarkos_node_narwhal::gateway=debug".parse().unwrap())
         };
 
-        let filter = if verbosity > 4 {
+        let filter = if verbosity >= 4 {
             filter.add_directive("snarkos_node_narwhal=trace".parse().unwrap())
         } else {
             filter.add_directive("snarkos_node_narwhal=debug".parse().unwrap())
         };
 
-        let filter = if verbosity > 5 {
+        let filter = if verbosity >= 5 {
             filter.add_directive("snarkos_node_router=trace".parse().unwrap())
         } else {
             filter.add_directive("snarkos_node_router=off".parse().unwrap())
         };
 
-        if verbosity > 6 {
+        if verbosity >= 6 {
             filter.add_directive("snarkos_node_tcp=trace".parse().unwrap())
         } else {
             filter.add_directive("snarkos_node_tcp=off".parse().unwrap())

@@ -652,7 +652,7 @@ impl<N: Network> Storage<N> {
 
         // Reconstruct the unconfirmed transactions.
         let mut unconfirmed_transactions = cfg_iter!(block.transactions())
-            .filter_map(|tx| tx.unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok())
+            .filter_map(|tx| tx.to_unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok())
             .collect::<IndexMap<_, _>>();
 
         // Iterate over the transmission IDs.

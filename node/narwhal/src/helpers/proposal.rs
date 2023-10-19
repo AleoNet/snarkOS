@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    helpers::{check_timestamp_for_liveness, now},
-    MAX_EXPIRATION_TIME_IN_SECS,
-};
+use crate::helpers::check_timestamp_for_liveness;
 use snarkvm::{
     console::{
         account::{Address, Signature},
@@ -116,11 +113,6 @@ impl<N: Network> Proposal<N> {
         }
         // Return the non-signers.
         nonsigners
-    }
-
-    /// Returns `true` if the proposal has timed out.
-    pub fn is_timed_out(&self) -> bool {
-        now().saturating_sub(self.timestamp()) > MAX_EXPIRATION_TIME_IN_SECS
     }
 
     /// Returns `true` if the quorum threshold has been reached for the proposed batch.
