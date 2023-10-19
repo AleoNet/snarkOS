@@ -39,19 +39,19 @@ members = [
   ".integration"
 ]
 
-[workspace.dependencies.snarkvm]
-#path = "../snarkvm"
-#git = "https://github.com/AleoHQ/snarkVM.git"
-#rev = "6aec633"
-version = "=0.16.0"
-features = [ "circuit", "console", "rocks" ]
-
 [[bin]]
 name = "snarkos"
 path = "snarkos/main.rs"
 
 [features]
 jemalloc = [ "tikv-jemallocator" ]
+
+[workspace.dependencies.snarkvm]
+#path = "../snarkvm"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "1068c12"
+#version = "=0.16.0"
+features = [ "circuit", "console", "rocks" ]
 
 [dependencies.anyhow]
 version = "1.0.75"
