@@ -193,7 +193,7 @@ mod tests {
     use super::*;
     use snarkvm::prelude::Testnet3;
 
-    use std::net::Ipv4Addr;
+    use std::{net::Ipv4Addr, thread, time::Duration};
 
     type CurrentNetwork = Testnet3;
 
@@ -241,21 +241,36 @@ mod tests {
 
                         // Insert an input, recent events should be 1.
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 1);
-                        std::thread::sleep(std::time::Duration::from_secs(1));
+                        // Wait for 1s so that the next entry doesn't overwrite the first one.
+                        thread::sleep(Duration::from_secs(1));
                         // Insert an input, recent events should be 2.
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 2);
-                        std::thread::sleep(std::time::Duration::from_secs(1));
+                        // Wait for 1s so that the next entry doesn't overwrite the first one.
+                        thread::sleep(Duration::from_secs(1));
                         // Insert an input, recent events should be 3.
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 3);
 
                         // Check that the cache contains the input for 3 entries.
                         assert_eq!(cache.[<seen_ $name s>].read().len(), 3);
 
+                        // Insert the input again with a small interval, causing one entry to be removed.
+                        cache.[<insert_ $name>](input, 1);
+                        // Check that the cache contains the input for 2 entries.
+                        assert_eq!(cache.[<seen_ $name s>].read().len(), 2);
+
+                        // Insert the input again with a large interval, causing nothing to be removed.
+                        cache.[<insert_ $name>](input, 10);
+                        // Check that the cache contains the input for 2 entries.
+                        assert_eq!(cache.[<seen_ $name s>].read().len(), 2);
+
                         // Wait for the input to expire.
-                        std::thread::sleep(std::time::Duration::from_secs(INTERVAL_IN_SECS as u64 + 1));
+                        thread::sleep(Duration::from_secs(INTERVAL_IN_SECS as u64 + 1));
 
                         // Insert an input again, recent events should be 1.
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 1);
+
+                        // Check that the cache contains the input for 1 entry.
+                        assert_eq!(cache.[<seen_ $name s>].read().len(), 1);
 
                         // Check that the cache still contains the input.
                         let counts: u32 = cache.[<seen_ $name s>].read().values().map(|hash_map| hash_map.get(&input).unwrap_or(&0)).cloned().sum();

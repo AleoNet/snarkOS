@@ -201,8 +201,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Clone the serialized message.
                 let serialized = message.clone();
                 // Update the timestamp for the unconfirmed solution.
-                let seen_before =
-                    self.router().cache.insert_inbound_solution(peer_ip, message.puzzle_commitment).is_some();
+                let seen_before = self.router().cache.insert_inbound_solution(peer_ip, message.solution_id).is_some();
                 // Determine whether to propagate the solution.
                 if seen_before {
                     bail!("Skipping 'UnconfirmedSolution' from '{peer_ip}'")
@@ -213,7 +212,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     Err(error) => bail!("[UnconfirmedSolution] {error}"),
                 };
                 // Check that the solution parameters match.
-                if message.puzzle_commitment != solution.commitment() {
+                if message.solution_id != solution.commitment() {
                     bail!("Peer '{peer_ip}' is not following the 'UnconfirmedSolution' protocol")
                 }
                 // Handle the unconfirmed solution.

@@ -47,10 +47,7 @@ impl<N: Network> ToBytes for ChallengeRequest<N> {
 }
 
 impl<N: Network> FromBytes for ChallengeRequest<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let version = u32::read_le(&mut reader)?;
         let listener_port = u16::read_le(&mut reader)?;
         let node_type = NodeType::read_le(&mut reader)?;

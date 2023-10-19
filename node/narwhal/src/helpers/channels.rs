@@ -128,10 +128,40 @@ pub struct PrimarySender<N: Network> {
     pub tx_batch_propose: mpsc::Sender<(SocketAddr, BatchPropose<N>)>,
     pub tx_batch_signature: mpsc::Sender<(SocketAddr, BatchSignature<N>)>,
     pub tx_batch_certified: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>,
-    pub tx_primary_ping: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>,
+    pub tx_primary_ping: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>, Vec<Data<BatchCertificate<N>>>)>,
     pub tx_unconfirmed_solution:
         mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>, oneshot::Sender<Result<()>>)>,
     pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>, oneshot::Sender<Result<()>>)>,
+}
+
+impl<N: Network> PrimarySender<N> {
+    /// Sends the unconfirmed solution to the primary.
+    pub async fn send_unconfirmed_solution(
+        &self,
+        solution_id: PuzzleCommitment<N>,
+        solution: Data<ProverSolution<N>>,
+    ) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Send the unconfirmed solution to the primary.
+        self.tx_unconfirmed_solution.send((solution_id, solution, callback_sender)).await?;
+        // Await the callback to continue.
+        callback_receiver.await?
+    }
+
+    /// Sends the unconfirmed transaction to the primary.
+    pub async fn send_unconfirmed_transaction(
+        &self,
+        transaction_id: N::TransactionID,
+        transaction: Data<Transaction<N>>,
+    ) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Send the unconfirmed transaction to the primary.
+        self.tx_unconfirmed_transaction.send((transaction_id, transaction, callback_sender)).await?;
+        // Await the callback to continue.
+        callback_receiver.await?
+    }
 }
 
 #[derive(Debug)]
@@ -139,7 +169,7 @@ pub struct PrimaryReceiver<N: Network> {
     pub rx_batch_propose: mpsc::Receiver<(SocketAddr, BatchPropose<N>)>,
     pub rx_batch_signature: mpsc::Receiver<(SocketAddr, BatchSignature<N>)>,
     pub rx_batch_certified: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
-    pub rx_primary_ping: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
+    pub rx_primary_ping: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>, Vec<Data<BatchCertificate<N>>>)>,
     pub rx_unconfirmed_solution:
         mpsc::Receiver<(PuzzleCommitment<N>, Data<ProverSolution<N>>, oneshot::Sender<Result<()>>)>,
     pub rx_unconfirmed_transaction:

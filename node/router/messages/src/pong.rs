@@ -44,10 +44,7 @@ impl ToBytes for Pong {
 }
 
 impl FromBytes for Pong {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let is_fork = match u8::read_le(&mut reader)? {
             0 => Some(true),
             1 => Some(false),
@@ -62,7 +59,6 @@ impl FromBytes for Pong {
 #[cfg(test)]
 pub mod tests {
     use crate::Pong;
-
     use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};

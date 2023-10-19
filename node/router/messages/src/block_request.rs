@@ -49,10 +49,7 @@ impl ToBytes for BlockRequest {
 }
 
 impl FromBytes for BlockRequest {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let start_height = u32::read_le(&mut reader)?;
         let end_height = u32::read_le(&mut reader)?;
         Ok(Self { start_height, end_height })
@@ -68,10 +65,10 @@ impl Display for BlockRequest {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::BlockRequest;
+    use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
-    use snarkvm::utilities::{FromBytes, ToBytes};
     use test_strategy::proptest;
 
     pub fn any_block_request() -> BoxedStrategy<BlockRequest> {

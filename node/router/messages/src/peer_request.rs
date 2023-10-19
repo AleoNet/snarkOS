@@ -36,10 +36,7 @@ impl ToBytes for PeerRequest {
 }
 
 impl FromBytes for PeerRequest {
-    fn read_le<R: io::Read>(_reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(_reader: R) -> io::Result<Self> {
         Ok(Self)
     }
 }
@@ -47,9 +44,9 @@ impl FromBytes for PeerRequest {
 #[cfg(test)]
 pub mod tests {
     use crate::PeerRequest;
+    use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
-    use snarkvm::utilities::{FromBytes, ToBytes};
 
     #[test]
     fn peer_request_roundtrip() {

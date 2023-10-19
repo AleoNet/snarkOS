@@ -44,8 +44,9 @@ use snarkvm::{
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use lru::LruCache;
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -63,6 +64,10 @@ pub struct Consensus<N: Network> {
     solutions_queue: Arc<Mutex<IndexMap<PuzzleCommitment<N>, ProverSolution<N>>>>,
     /// The unconfirmed transactions queue.
     transactions_queue: Arc<Mutex<IndexMap<N::TransactionID, Transaction<N>>>>,
+    /// The recently-seen unconfirmed solutions.
+    seen_solutions: Arc<Mutex<LruCache<PuzzleCommitment<N>, ()>>>,
+    /// The recently-seen unconfirmed transactions.
+    seen_transactions: Arc<Mutex<LruCache<N::TransactionID, ()>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -87,6 +92,8 @@ impl<N: Network> Consensus<N> {
             primary_sender: Default::default(),
             solutions_queue: Default::default(),
             transactions_queue: Default::default(),
+            seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
+            seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             handles: Default::default(),
         })
     }
@@ -169,18 +176,35 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
-        // Add the solution to the memory pool.
-        self.solutions_queue.lock().insert(solution.commitment(), solution);
+        // Process the unconfirmed solution.
+        {
+            let solution_id = solution.commitment();
+
+            // Check if the transaction was recently seen.
+            if self.seen_solutions.lock().put(solution_id, ()).is_some() {
+                // If the transaction was recently seen, return early.
+                return Ok(());
+            }
+            // Check if the solution already exists in the ledger.
+            if self.ledger.contains_transmission(&TransmissionID::from(solution_id))? {
+                bail!("Solution '{}' already exists in the ledger", fmt_id(solution_id));
+            }
+            // Add the solution to the memory pool.
+            trace!("Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
+            if self.solutions_queue.lock().insert(solution_id, solution).is_some() {
+                bail!("Solution '{}' already exists in the memory pool", fmt_id(solution_id));
+            }
+        }
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > N::MAX_PROVER_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         // Retrieve the solutions.
         let solutions = {
             // Determine the available capacity.
-            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+            let capacity = N::MAX_PROVER_SOLUTIONS.saturating_sub(num_unconfirmed);
             // Acquire the lock on the queue.
             let mut queue = self.solutions_queue.lock();
             // Determine the number of solutions to send.
@@ -190,23 +214,37 @@ impl<N: Network> Consensus<N> {
         };
         // Iterate over the solutions.
         for (_, solution) in solutions.into_iter() {
-            // Initialize a callback sender and receiver.
-            let (callback, callback_receiver) = oneshot::channel();
-            // Send the transaction to the primary.
-            self.primary_sender()
-                .tx_unconfirmed_solution
-                .send((solution.commitment(), Data::Object(solution), callback))
-                .await?;
-            // Ignore the result for the solutions.
-            let _ = callback_receiver.await?;
+            let solution_id = solution.commitment();
+            trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
+            // Send the unconfirmed solution to the primary.
+            if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
+                warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+            }
         }
         Ok(())
     }
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
-        // Add the transaction to the memory pool.
-        self.transactions_queue.lock().insert(transaction.id(), transaction);
+        // Process the unconfirmed transaction.
+        {
+            let transaction_id = transaction.id();
+
+            // Check if the transaction was recently seen.
+            if self.seen_transactions.lock().put(transaction_id, ()).is_some() {
+                // If the transaction was recently seen, return early.
+                return Ok(());
+            }
+            // Check if the transaction already exists in the ledger.
+            if self.ledger.contains_transmission(&TransmissionID::from(&transaction_id))? {
+                bail!("Transaction '{}' already exists in the ledger", fmt_id(transaction_id));
+            }
+            // Add the transaction to the memory pool.
+            trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
+            if self.transactions_queue.lock().insert(transaction_id, transaction).is_some() {
+                bail!("Transaction '{}' already exists in the memory pool", fmt_id(transaction_id));
+            }
+        }
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
@@ -226,15 +264,14 @@ impl<N: Network> Consensus<N> {
         };
         // Iterate over the transactions.
         for (_, transaction) in transactions.into_iter() {
-            // Initialize a callback sender and receiver.
-            let (callback, callback_receiver) = oneshot::channel();
-            // Send the transaction to the primary.
-            self.primary_sender()
-                .tx_unconfirmed_transaction
-                .send((transaction.id(), Data::Object(transaction), callback))
-                .await?;
-            // Ignore the result for the transactions.
-            let _ = callback_receiver.await?;
+            let transaction_id = transaction.id();
+            trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
+            // Send the unconfirmed transaction to the primary.
+            if let Err(e) =
+                self.primary_sender().send_unconfirmed_transaction(transaction_id, Data::Object(transaction)).await
+            {
+                warn!("Failed to add unconfirmed transaction '{}' to the memory pool - {e}", fmt_id(transaction_id));
+            }
         }
         Ok(())
     }

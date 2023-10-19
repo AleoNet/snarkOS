@@ -136,16 +136,15 @@ impl<N: Network> FromBytes for DataBlocks<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{block_request::prop_tests::any_block_request, BlockResponse, DataBlocks};
+    use snarkvm::{
+        ledger::ledger_test_helpers::sample_genesis_block,
+        prelude::{block::Block, narwhal::Data, FromBytes, TestRng, ToBytes},
+    };
 
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::vec,
         prelude::{any, BoxedStrategy, Strategy},
-    };
-    use snarkvm::{
-        ledger::ledger_test_helpers::sample_genesis_block,
-        prelude::{block::Block, narwhal::Data},
-        utilities::{FromBytes, TestRng, ToBytes},
     };
     use test_strategy::proptest;
 
@@ -170,6 +169,10 @@ pub mod prop_tests {
         let mut bytes = BytesMut::default().writer();
         block_response.write_le(&mut bytes).unwrap();
         let decoded = BlockResponse::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
-        assert_eq!(block_response, decoded);
+        assert_eq!(block_response.request, decoded.request);
+        assert_eq!(
+            block_response.blocks.deserialize_blocking().unwrap(),
+            decoded.blocks.deserialize_blocking().unwrap(),
+        );
     }
 }

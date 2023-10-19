@@ -202,7 +202,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Path((id, name, key)): Path<(ProgramID<N>, Identifier<N>, Plaintext<N>)>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_confirmed(&id, &name, &key)?))
+        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_confirmed(id, name, &key)?))
     }
 
     // GET /testnet3/statePath/{commitment}

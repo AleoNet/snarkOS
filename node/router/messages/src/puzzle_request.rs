@@ -36,10 +36,7 @@ impl ToBytes for PuzzleRequest {
 }
 
 impl FromBytes for PuzzleRequest {
-    fn read_le<R: io::Read>(_reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(_reader: R) -> io::Result<Self> {
         Ok(Self)
     }
 }
@@ -47,9 +44,9 @@ impl FromBytes for PuzzleRequest {
 #[cfg(test)]
 pub mod tests {
     use crate::PuzzleRequest;
+    use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
-    use snarkvm::utilities::{FromBytes, ToBytes};
 
     #[test]
     fn puzzle_request_roundtrip() {

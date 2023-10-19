@@ -17,6 +17,7 @@ use crate::{
     helpers::{
         assign_to_worker,
         assign_to_workers,
+        fmt_id,
         init_sync_channels,
         init_worker_channels,
         now,
@@ -374,6 +375,7 @@ impl<N: Network> Primary<N> {
         for worker in self.workers.iter() {
             transmissions.extend(worker.take_candidates(num_transmissions_per_worker).await);
         }
+        trace!("Proposing - {} transmissions", transmissions.len());
         // Determine if there is at least one unconfirmed transaction to propose.
         let has_unconfirmed_transaction = transmissions.par_keys().any(|id| {
             matches!(id, TransmissionID::Transaction(..)) && !self.ledger.contains_transmission(id).unwrap_or(true)
@@ -389,10 +391,8 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to sign & propose the batch. */
 
-        // Initialize the RNG.
-        let rng = &mut rand::thread_rng();
         // Retrieve the private key.
-        let private_key = self.gateway.account().private_key();
+        let private_key = *self.gateway.account().private_key();
         // Generate the local timestamp for batch
         let timestamp = now();
         // Prepare the transmission IDs.
@@ -400,7 +400,14 @@ impl<N: Network> Primary<N> {
         // Prepare the certificate IDs.
         let certificate_ids = previous_certificates.into_iter().map(|c| c.certificate_id()).collect();
         // Sign the batch header.
-        let batch_header = BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng)?;
+        let batch_header = spawn_blocking!(BatchHeader::new(
+            &private_key,
+            round,
+            timestamp,
+            transmission_ids,
+            certificate_ids,
+            &mut rand::thread_rng()
+        ))?;
         // Construct the proposal.
         let proposal =
             Proposal::new(self.ledger.get_previous_committee_for_round(round)?, batch_header.clone(), transmissions)?;
@@ -599,7 +606,7 @@ impl<N: Network> Primary<N> {
         // Retrieve the batch certificate author.
         let author = certificate.author();
 
-        // Ensure the batch certificate is from the validator
+        // Ensure the batch certificate is from the validator.
         if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != author) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
@@ -611,7 +618,7 @@ impl<N: Network> Primary<N> {
             self.gateway.disconnect(peer_ip);
             bail!("Malicious peer - Received a batch certificate from a non-committee member ({author})");
         }
-        // Ensure the batch proposal is not from the current primary.
+        // Ensure the batch certificate is not from the current primary.
         if self.gateway.account().address() == author {
             bail!("Received a batch certificate for myself ({author})");
         }
@@ -643,6 +650,40 @@ impl<N: Network> Primary<N> {
             // If we have reached the quorum threshold, then proceed to the next round.
             self.try_increment_to_the_next_round(current_round + 1).await?;
         }
+        Ok(())
+    }
+
+    /// Processes a batch certificate from a primary ping.
+    ///
+    /// This method performs the following steps:
+    /// 1. Stores the given batch certificate, after ensuring it is valid.
+    /// 2. If there are enough certificates to reach quorum threshold for the current round,
+    ///  then proceed to advance to the next round.
+    async fn process_batch_certificate_from_ping(
+        &self,
+        peer_ip: SocketAddr,
+        certificate: BatchCertificate<N>,
+    ) -> Result<()> {
+        // Ensure storage does not already contain the certificate.
+        if self.storage.contains_certificate(certificate.certificate_id()) {
+            return Ok(());
+        }
+
+        // Acquire the lock.
+        let _lock = self.lock.lock().await;
+
+        // Retrieve the batch certificate author.
+        let author = certificate.author();
+
+        // Ensure the batch certificate is authored by a current committee member.
+        if !self.gateway.is_authorized_validator_address(author) {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!("Malicious peer - Received a batch certificate from a non-committee member ({author})");
+        }
+
+        // Store the certificate, after ensuring it is valid.
+        self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
         Ok(())
     }
 }
@@ -708,8 +749,20 @@ impl<N: Network> Primary<N> {
                         }
                     };
 
+                    // Retrieve the batch certificates for the current round.
+                    let current_round = self_.current_round();
+                    let mut batch_certificates = Vec::new();
+                    batch_certificates
+                        .extend(self_.storage.get_certificates_for_round(current_round.saturating_sub(1)));
+                    batch_certificates.extend(self_.storage.get_certificates_for_round(current_round));
+
                     // Construct the primary ping.
-                    let primary_ping = PrimaryPing::from((<Event<N>>::VERSION, block_locators, primary_certificate));
+                    let primary_ping = PrimaryPing::from((
+                        <Event<N>>::VERSION,
+                        block_locators,
+                        primary_certificate,
+                        batch_certificates,
+                    ));
                     // Broadcast the event.
                     self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
                 }
@@ -719,24 +772,38 @@ impl<N: Network> Primary<N> {
         // Start the primary ping handler.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((peer_ip, batch_certificate)) = rx_primary_ping.recv().await {
+            while let Some((peer_ip, primary_certificate, batch_certificates)) = rx_primary_ping.recv().await {
                 // If the primary is not synced, then do not process the primary ping.
                 if !self_.sync.is_synced() {
                     trace!("Skipping a primary ping from '{peer_ip}' - node is syncing");
                     continue;
                 }
 
-                // Deserialize the batch certificate in the primary ping.
-                let Ok(Ok(batch_certificate)) =
-                    task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
+                // Deserialize the primary certificate in the primary ping.
+                let Ok(Ok(primary_certificate)) =
+                    task::spawn_blocking(move || primary_certificate.deserialize_blocking()).await
                 else {
-                    warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
+                    warn!("Failed to deserialize primary certificate in a primary ping from '{peer_ip}'");
                     continue;
                 };
+                // Process the primary certificate.
+                if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, primary_certificate).await {
+                    warn!("Cannot process a primary certificate in a primary ping from '{peer_ip}' - {e}");
+                }
 
-                // Process the batch certificate.
-                if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
-                    warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
+                // Iterate through the batch certificates.
+                for batch_certificate in batch_certificates {
+                    // Deserialize the batch certificate in the primary ping.
+                    let Ok(Ok(batch_certificate)) =
+                        task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
+                    else {
+                        warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
+                        continue;
+                    };
+                    // Process the batch certificate.
+                    if let Err(e) = self_.process_batch_certificate_from_ping(peer_ip, batch_certificate).await {
+                        warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
+                    }
                 }
             }
         });
@@ -860,6 +927,7 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((transaction_id, transaction, callback)) = rx_unconfirmed_transaction.recv().await {
+                trace!("Primary - Received an unconfirmed transaction '{}'", fmt_id(transaction_id));
                 // Compute the worker ID.
                 let Ok(worker_id) = assign_to_worker::<N>(&transaction_id, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");
@@ -882,7 +950,7 @@ impl<N: Network> Primary<N> {
     async fn check_proposed_batch_for_expiration(&self) -> Result<()> {
         // Check if the proposed batch is timed out or stale.
         let is_expired = match self.proposed_batch.read().as_ref() {
-            Some(proposal) => proposal.is_timed_out() || proposal.round() < self.current_round(),
+            Some(proposal) => proposal.round() < self.current_round(),
             None => false,
         };
         // If the batch is expired, clear the proposed batch.
@@ -1241,7 +1309,6 @@ impl<N: Network> Primary<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MAX_EXPIRATION_TIME_IN_SECS;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkvm::{
         ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
@@ -1744,79 +1811,6 @@ mod tests {
         assert!(primary.storage.contains_certificate_in_round_from(round, primary.gateway.account().address()));
         // Check the round was incremented.
         assert_eq!(primary.current_round(), round + 1);
-    }
-
-    #[tokio::test]
-    async fn test_batch_signature_from_peer_expired() {
-        let mut rng = TestRng::default();
-        let (primary, accounts) = primary_without_handlers(&mut rng).await;
-        map_account_addresses(&primary, &accounts);
-
-        // Create an expired proposal.
-        let round = 1;
-        let timestamp = now() - (MAX_EXPIRATION_TIME_IN_SECS + 1);
-        let proposal = create_test_proposal(
-            primary.gateway.account(),
-            primary.ledger.current_committee().unwrap(),
-            round,
-            Default::default(),
-            timestamp,
-            &mut rng,
-        );
-
-        // Store the proposal on the primary.
-        *primary.proposed_batch.write() = Some(proposal);
-
-        // Each committee member signs the batch.
-        let signatures = peer_signatures_for_proposal(&primary, &accounts, &mut rng);
-
-        // Have the primary process the signatures.
-        for (socket_addr, signature) in signatures {
-            primary.process_batch_signature_from_peer(socket_addr, signature).await.unwrap();
-        }
-
-        // Check the certificate was not created and stored by the primary.
-        assert!(!primary.storage.contains_certificate_in_round_from(round, primary.gateway.account().address()));
-        // Check the round was incremented.
-        assert_eq!(primary.current_round(), round);
-    }
-
-    #[tokio::test]
-    async fn test_batch_signature_from_peer_in_round_expired() {
-        let round = 6;
-        let mut rng = TestRng::default();
-        let (primary, accounts) = primary_without_handlers(&mut rng).await;
-        map_account_addresses(&primary, &accounts);
-
-        // Generate certificates.
-        let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
-
-        // Create an expired proposal.
-        let timestamp = now() - (MAX_EXPIRATION_TIME_IN_SECS + 1);
-        let proposal = create_test_proposal(
-            primary.gateway.account(),
-            primary.ledger.current_committee().unwrap(),
-            round,
-            previous_certificates,
-            timestamp,
-            &mut rng,
-        );
-
-        // Store the proposal on the primary.
-        *primary.proposed_batch.write() = Some(proposal);
-
-        // Each committee member signs the batch.
-        let signatures = peer_signatures_for_proposal(&primary, &accounts, &mut rng);
-
-        // Have the primary process the signatures.
-        for (socket_addr, signature) in signatures {
-            primary.process_batch_signature_from_peer(socket_addr, signature).await.unwrap();
-        }
-
-        // Check the certificate was not created and stored by the primary.
-        assert!(!primary.storage.contains_certificate_in_round_from(round, primary.gateway.account().address()));
-        // Check the round was incremented.
-        assert_eq!(primary.current_round(), round);
     }
 
     #[tokio::test]

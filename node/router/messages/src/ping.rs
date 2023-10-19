@@ -61,10 +61,7 @@ impl<N: Network> ToBytes for Ping<N> {
 }
 
 impl<N: Network> FromBytes for Ping<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let version = u32::read_le(&mut reader)?;
         let node_type = NodeType::read_le(&mut reader)?;
 
@@ -102,13 +99,12 @@ impl<N: Network> Ping<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::Ping;
-
-    use crate::challenge_request::prop_tests::any_node_type;
-    use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use crate::{challenge_request::prop_tests::any_node_type, Ping};
     use snarkos_node_sync_locators::{test_helpers::sample_block_locators, BlockLocators};
     use snarkvm::utilities::{FromBytes, ToBytes};
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;

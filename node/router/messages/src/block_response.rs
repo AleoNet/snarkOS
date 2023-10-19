@@ -51,10 +51,7 @@ impl<N: Network> ToBytes for BlockResponse<N> {
 }
 
 impl<N: Network> FromBytes for BlockResponse<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let request = BlockRequest::read_le(&mut reader)?;
         let blocks = Data::read_le(reader)?;
         Ok(Self { request, blocks })
@@ -64,16 +61,16 @@ impl<N: Network> FromBytes for BlockResponse<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{block_request::prop_tests::any_block_request, BlockResponse, DataBlocks};
+    use snarkvm::{
+        ledger::ledger_test_helpers::sample_genesis_block,
+        prelude::{block::Block, narwhal::Data},
+        utilities::{FromBytes, TestRng, ToBytes},
+    };
 
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::vec,
         prelude::{any, BoxedStrategy, Strategy},
-    };
-    use snarkvm::{
-        ledger::ledger_test_helpers::sample_genesis_block,
-        prelude::{block::Block, narwhal::Data},
-        utilities::{FromBytes, TestRng, ToBytes},
     };
     use test_strategy::proptest;
 

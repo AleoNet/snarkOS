@@ -189,10 +189,7 @@ impl<N: Network> ToBytes for Event<N> {
 }
 
 impl<N: Network> FromBytes for Event<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         // Read the event ID.
         let id = u16::read_le(&mut reader).map_err(|_| error("Unknown event ID"))?;
 

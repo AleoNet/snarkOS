@@ -545,8 +545,9 @@ impl<N: Network> BFT<N> {
                 "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
             );
             // Update the DAG, as the subdag was successfully included into a block.
+            let mut dag_write = self.dag.write();
             for certificate in commit_subdag.values().flatten() {
-                self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+                dag_write.commit(certificate, self.storage().max_gc_rounds());
             }
         }
         Ok(())

@@ -39,7 +39,7 @@ version = "2.0"
 features = [ "serde", "rayon" ]
 
 [dependencies.jsonwebtoken]
-version = "8.3"
+version = "9.0"
 
 [dependencies.once_cell]
 version = "1.18"
