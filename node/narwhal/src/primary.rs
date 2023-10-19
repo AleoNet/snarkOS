@@ -391,10 +391,8 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to sign & propose the batch. */
 
-        // Initialize the RNG.
-        let rng = &mut rand::thread_rng();
         // Retrieve the private key.
-        let private_key = self.gateway.account().private_key();
+        let private_key = *self.gateway.account().private_key();
         // Generate the local timestamp for batch
         let timestamp = now();
         // Prepare the transmission IDs.
@@ -402,7 +400,14 @@ impl<N: Network> Primary<N> {
         // Prepare the certificate IDs.
         let certificate_ids = previous_certificates.into_iter().map(|c| c.certificate_id()).collect();
         // Sign the batch header.
-        let batch_header = BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng)?;
+        let batch_header = spawn_blocking!(BatchHeader::new(
+            &private_key,
+            round,
+            timestamp,
+            transmission_ids,
+            certificate_ids,
+            &mut rand::thread_rng()
+        ))?;
         // Construct the proposal.
         let proposal =
             Proposal::new(self.ledger.get_previous_committee_for_round(round)?, batch_header.clone(), transmissions)?;
