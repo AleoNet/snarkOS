@@ -79,9 +79,9 @@ const MAX_CONNECTION_ATTEMPTS: usize = 10;
 const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DELAY / 1000) as i64; // seconds
 
 /// The minimum number of validators to maintain a connection to.
-const MIN_CONNECTED_VALIDATORS: usize = 50;
+const MIN_CONNECTED_VALIDATORS: usize = 175;
 /// The maximum number of validators to send in a validators response event.
-const MAX_VALIDATORS_TO_SEND: usize = 100;
+const MAX_VALIDATORS_TO_SEND: usize = 200;
 
 /// Part of the Gateway API that deals with networking.
 /// This is a separate trait to allow for easier testing/mocking.
@@ -612,7 +612,7 @@ impl<N: Network> Gateway<N> {
                 bail!("{CONTEXT} {:?}", disconnect.reason)
             }
             Event::PrimaryPing(ping) => {
-                let PrimaryPing { version, block_locators, batch_certificate } = ping;
+                let PrimaryPing { version, block_locators, primary_certificate, batch_certificates } = ping;
 
                 // Ensure the event version is not outdated.
                 if version < Event::<N>::VERSION {
@@ -627,8 +627,12 @@ impl<N: Network> Gateway<N> {
                     }
                 }
 
-                // Send the batch certificate to the primary.
-                let _ = self.primary_sender().tx_primary_ping.send((peer_ip, batch_certificate)).await;
+                // Send the batch certificates to the primary.
+                let _ = self
+                    .primary_sender()
+                    .tx_primary_ping
+                    .send((peer_ip, primary_certificate, batch_certificates))
+                    .await;
                 Ok(())
             }
             Event::TransmissionRequest(request) => {
@@ -814,10 +818,12 @@ impl<N: Network> Gateway<N> {
         let validators = self.connected_peers().read().clone();
         // Resolve the total number of connectable validators.
         let validators_total = self.ledger.current_committee().map_or(0, |c| c.num_members().saturating_sub(1));
+        // Format the total validators message.
+        let total_validators = format!("(of {validators_total} bonded validators)").dimmed();
         // Construct the connections message.
         let connections_msg = match validators.len() {
             0 => "No connected validators".to_string(),
-            num_connected => format!("Connected to {num_connected} (of {validators_total}) validators"),
+            num_connected => format!("Connected to {num_connected} validators {total_validators}"),
         };
         // Log the connected validators.
         info!("{connections_msg}");

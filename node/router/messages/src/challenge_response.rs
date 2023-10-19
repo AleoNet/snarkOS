@@ -43,10 +43,7 @@ impl<N: Network> ToBytes for ChallengeResponse<N> {
 }
 
 impl<N: Network> FromBytes for ChallengeResponse<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         Ok(Self { genesis_header: Header::read_le(&mut reader)?, signature: Data::read_le(reader)? })
     }
 }

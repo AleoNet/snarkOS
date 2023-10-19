@@ -47,8 +47,6 @@ pub const MEMORY_POOL_PORT: u16 = 5000; // port
 
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY: u64 = 2500; // ms
-/// The maximum number of seconds before a proposed batch is considered expired.
-pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
 /// The maximum number of rounds to store before garbage collecting.
 pub const MAX_GC_ROUNDS: u64 = 50; // rounds
 /// The maximum number of seconds allowed for the leader to send their certificate.

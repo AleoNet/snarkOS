@@ -51,10 +51,7 @@ impl<N: Network> ToBytes for UnconfirmedTransaction<N> {
 }
 
 impl<N: Network> FromBytes for UnconfirmedTransaction<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         Ok(Self { transaction_id: N::TransactionID::read_le(&mut reader)?, transaction: Data::read_le(reader)? })
     }
 }

@@ -43,10 +43,7 @@ impl<N: Network> ToBytes for UnconfirmedSolution<N> {
 }
 
 impl<N: Network> FromBytes for UnconfirmedSolution<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         Ok(Self { puzzle_commitment: PuzzleCommitment::read_le(&mut reader)?, solution: Data::read_le(reader)? })
     }
 }

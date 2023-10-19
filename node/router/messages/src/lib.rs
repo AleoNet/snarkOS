@@ -177,10 +177,7 @@ impl<N: Network> ToBytes for Message<N> {
 }
 
 impl<N: Network> FromBytes for Message<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         // Read the event ID.
         let mut id_bytes = [0u8; 2];
         reader.read_exact(&mut id_bytes)?;

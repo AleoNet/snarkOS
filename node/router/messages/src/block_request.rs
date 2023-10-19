@@ -49,10 +49,7 @@ impl ToBytes for BlockRequest {
 }
 
 impl FromBytes for BlockRequest {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let start_height = u32::read_le(&mut reader)?;
         let end_height = u32::read_le(&mut reader)?;
         Ok(Self { start_height, end_height })

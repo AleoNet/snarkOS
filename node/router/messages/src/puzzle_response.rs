@@ -43,10 +43,7 @@ impl<N: Network> ToBytes for PuzzleResponse<N> {
 }
 
 impl<N: Network> FromBytes for PuzzleResponse<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         Ok(Self { epoch_challenge: EpochChallenge::read_le(&mut reader)?, block_header: Data::read_le(reader)? })
     }
 }

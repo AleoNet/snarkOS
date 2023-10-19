@@ -44,10 +44,7 @@ impl ToBytes for Disconnect {
 }
 
 impl FromBytes for Disconnect {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         Ok(Disconnect { reason: DisconnectReason::read_le(&mut reader)? })
     }
 }

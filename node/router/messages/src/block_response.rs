@@ -51,10 +51,7 @@ impl<N: Network> ToBytes for BlockResponse<N> {
 }
 
 impl<N: Network> FromBytes for BlockResponse<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let request = BlockRequest::read_le(&mut reader)?;
         let blocks = Data::read_le(reader)?;
         Ok(Self { request, blocks })

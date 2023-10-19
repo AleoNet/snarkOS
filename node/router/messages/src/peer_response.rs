@@ -33,20 +33,17 @@ impl MessageTrait for PeerResponse {
 
 impl ToBytes for PeerResponse {
     fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        // Restrict the maximum number of peers to share.
         (self.peers.len().min(u8::MAX as usize) as u8).write_le(&mut writer)?;
-        for peer in &self.peers {
+        for peer in self.peers.iter().take(u8::MAX as usize) {
             peer.write_le(&mut writer)?;
         }
-
         Ok(())
     }
 }
 
 impl FromBytes for PeerResponse {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let count = u8::read_le(&mut reader)?;
         let mut peers = Vec::with_capacity(count as usize);
         for _ in 0..count {

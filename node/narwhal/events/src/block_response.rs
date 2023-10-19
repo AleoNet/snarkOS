@@ -143,10 +143,9 @@ pub mod prop_tests {
         prelude::{any, BoxedStrategy, Strategy},
     };
     use snarkvm::{
-        prelude::{block::Block, narwhal::Data},
-        utilities::{FromBytes, TestRng, ToBytes},
+        ledger::ledger_test_helpers::sample_genesis_block,
+        prelude::{block::Block, narwhal::Data, FromBytes, TestRng, ToBytes},
     };
-    use snarkvm_ledger_test_helpers::sample_genesis_block;
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -170,6 +169,10 @@ pub mod prop_tests {
         let mut bytes = BytesMut::default().writer();
         block_response.write_le(&mut bytes).unwrap();
         let decoded = BlockResponse::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
-        assert_eq!(block_response, decoded);
+        assert_eq!(block_response.request, decoded.request);
+        assert_eq!(
+            block_response.blocks.deserialize_blocking().unwrap(),
+            decoded.blocks.deserialize_blocking().unwrap(),
+        );
     }
 }
