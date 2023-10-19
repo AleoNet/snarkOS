@@ -23,7 +23,7 @@ use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnconfirmedSolution<N: Network> {
-    pub puzzle_commitment: PuzzleCommitment<N>,
+    pub solution_id: PuzzleCommitment<N>,
     pub solution: Data<ProverSolution<N>>,
 }
 
@@ -37,13 +37,13 @@ impl<N: Network> MessageTrait for UnconfirmedSolution<N> {
 
 impl<N: Network> ToBytes for UnconfirmedSolution<N> {
     fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
-        self.puzzle_commitment.write_le(&mut writer)?;
+        self.solution_id.write_le(&mut writer)?;
         self.solution.write_le(&mut writer)
     }
 }
 
 impl<N: Network> FromBytes for UnconfirmedSolution<N> {
     fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
-        Ok(Self { puzzle_commitment: PuzzleCommitment::read_le(&mut reader)?, solution: Data::read_le(reader)? })
+        Ok(Self { solution_id: PuzzleCommitment::read_le(&mut reader)?, solution: Data::read_le(reader)? })
     }
 }

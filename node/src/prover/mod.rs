@@ -262,7 +262,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     fn broadcast_prover_solution(&self, prover_solution: ProverSolution<N>) {
         // Prepare the unconfirmed solution message.
         let message = Message::UnconfirmedSolution(UnconfirmedSolution {
-            puzzle_commitment: prover_solution.commitment(),
+            solution_id: prover_solution.commitment(),
             solution: Data::Object(prover_solution),
         });
         // Propagate the "UnconfirmedSolution".
