@@ -47,3 +47,56 @@ impl<N: Network> FromBytes for ChallengeResponse<N> {
         Ok(Self { genesis_header: Header::read_le(&mut reader)?, signature: Data::read_le(reader)? })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::ChallengeResponse;
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::{ledger_test_helpers::sample_genesis_block, narwhal::Data},
+        prelude::{block::Header, PrivateKey, Signature},
+        utilities::rand::{TestRng, Uniform},
+    };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
+        (0..64)
+            .prop_map(|message_size| {
+                let rng = &mut TestRng::default();
+                let message: Vec<_> = (0..message_size).map(|_| Uniform::rand(rng)).collect();
+                let private_key = PrivateKey::new(rng).unwrap();
+                Signature::sign(&private_key, &message, rng).unwrap()
+            })
+            .boxed()
+    }
+
+    pub fn any_genesis_header() -> BoxedStrategy<Header<CurrentNetwork>> {
+        any::<u64>().prop_map(|seed| *sample_genesis_block(&mut TestRng::fixed(seed)).header()).boxed()
+    }
+
+    pub fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
+        (any_signature(), any_genesis_header())
+            .prop_map(|(sig, genesis_header)| ChallengeResponse { signature: Data::Object(sig), genesis_header })
+            .boxed()
+    }
+
+    #[proptest]
+    fn challenge_response_roundtrip(#[strategy(any_challenge_response())] original: ChallengeResponse<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        ChallengeResponse::write_le(&original, &mut buf).unwrap();
+
+        let deserialized: ChallengeResponse<CurrentNetwork> =
+            ChallengeResponse::read_le(buf.into_inner().reader()).unwrap();
+
+        assert_eq!(original.genesis_header, deserialized.genesis_header);
+        assert_eq!(
+            original.signature.deserialize_blocking().unwrap(),
+            deserialized.signature.deserialize_blocking().unwrap()
+        );
+    }
+}

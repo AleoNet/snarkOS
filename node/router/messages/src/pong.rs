@@ -55,3 +55,28 @@ impl FromBytes for Pong {
         Ok(Self { is_fork })
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use crate::Pong;
+    use snarkvm::utilities::{FromBytes, ToBytes};
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::{
+        option::of,
+        prelude::{any, BoxedStrategy, Strategy},
+    };
+    use test_strategy::proptest;
+
+    pub fn any_pong() -> BoxedStrategy<Pong> {
+        of(any::<bool>()).prop_map(|is_fork| Pong { is_fork }).boxed()
+    }
+
+    #[proptest]
+    fn pong_roundtrip(#[strategy(any_pong())] pong: Pong) {
+        let mut bytes = BytesMut::default().writer();
+        pong.write_le(&mut bytes).unwrap();
+        let decoded = Pong::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq!(pong, decoded);
+    }
+}
