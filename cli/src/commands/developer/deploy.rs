@@ -97,15 +97,17 @@ impl Deploy {
 
             // Compute the minimum deployment cost.
             let (minimum_deployment_cost, (_, _)) = deployment_cost(&deployment)?;
-            // Determine the fee.
-            let fee_in_microcredits = minimum_deployment_cost
-                .checked_add(self.priority_fee)
-                .ok_or_else(|| anyhow!("Fee overflowed for a deployment transaction"))?;
 
             // Prepare the fees.
             let fee_record = Developer::parse_record(&private_key, &self.record)?;
-            let fee_authorization =
-                vm.authorize_fee_private(&private_key, fee_record, fee_in_microcredits, deployment_id, rng)?;
+            let fee_authorization = vm.authorize_fee_private(
+                &private_key,
+                fee_record,
+                minimum_deployment_cost,
+                self.priority_fee,
+                deployment_id,
+                rng,
+            )?;
             let fee = vm.execute_fee_authorization(fee_authorization, Some(query), rng)?;
 
             // Construct the owner.
