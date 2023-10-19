@@ -91,7 +91,8 @@ pub mod prop_tests {
                 let signer = selector.select(validators);
                 let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
 
-                BatchHeader::new(&signer.private_key, 0, now(), transmission_ids, Default::default(), &mut rng).unwrap()
+                BatchHeader::new(&signer.private_key, 0, 0, now(), transmission_ids, Default::default(), &mut rng)
+                    .unwrap()
             })
             .boxed()
     }

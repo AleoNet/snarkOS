@@ -1168,6 +1168,7 @@ pub mod prop_tests {
         let batch_header = BatchHeader::new(
             &signer.private_key,
             0,
+            0,
             now(),
             transmission_map.keys().cloned().collect(),
             Default::default(),

@@ -637,11 +637,20 @@ impl<N: Network> BFT<N> {
     /// Starts the BFT handlers.
     fn start_handlers(&self, bft_receiver: BFTReceiver<N>) {
         let BFTReceiver {
+            mut rx_last_commit_request,
             mut rx_primary_round,
             mut rx_primary_certificate,
             mut rx_sync_bft_dag_at_bootup,
             mut rx_sync_bft,
         } = bft_receiver;
+
+        // Process the last commit request from the primary.
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some(callback) = rx_last_commit_request.recv().await {
+                callback.send(self_.dag.read().last_committed_round()).ok();
+            }
+        });
 
         // Process the current round from the primary.
         let self_ = self.clone();

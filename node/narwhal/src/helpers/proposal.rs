@@ -208,6 +208,7 @@ mod prop_tests {
         let header = BatchHeader::new(
             &signer.private_key,
             committee.starting_round(),
+            committee.starting_round(),
             now(),
             transmission_map.keys().cloned().collect(),
             Default::default(),

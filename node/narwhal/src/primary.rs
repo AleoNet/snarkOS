@@ -391,6 +391,9 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to sign & propose the batch. */
 
+        // Retrieve the last commit round.
+        let last_commit = self.last_commit_round().await?;
+
         // Initialize the RNG.
         let rng = &mut rand::thread_rng();
         // Retrieve the private key.
@@ -402,7 +405,8 @@ impl<N: Network> Primary<N> {
         // Prepare the certificate IDs.
         let certificate_ids = previous_certificates.into_iter().map(|c| c.certificate_id()).collect();
         // Sign the batch header.
-        let batch_header = BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng)?;
+        let batch_header =
+            BatchHeader::new(private_key, round, last_commit, timestamp, transmission_ids, certificate_ids, rng)?;
         // Construct the proposal.
         let proposal =
             Proposal::new(self.ledger.get_previous_committee_for_round(round)?, batch_header.clone(), transmissions)?;
@@ -464,6 +468,16 @@ impl<N: Network> Primary<N> {
         let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
         // Inserts the missing transmissions into the workers.
         self.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
+
+        // Retrieve the last commit round.
+        let last_commit = self.last_commit_round().await?;
+        // Ensure the last commit round matches.
+        if last_commit != batch_header.last_commit() {
+            bail!(
+                "Proposed batch with last commit round {}, but our last commit round is {last_commit}",
+                batch_header.last_commit()
+            );
+        }
 
         /* Proceeding to sign the batch. */
 
@@ -959,6 +973,20 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
+    /// Returns the last commit round.
+    async fn last_commit_round(&self) -> Result<u64> {
+        match self.bft_sender.get() {
+            Some(bft_sender) => match bft_sender.send_last_commit_request_to_bft().await {
+                Ok(last_commit) => Ok(last_commit),
+                Err(e) => {
+                    warn!("Failed to retrieve the last commit round - {e}");
+                    Err(e)
+                }
+            },
+            None => Ok(self.storage.current_round().saturating_sub(1)),
+        }
+    }
+
     /// Increments to the next round.
     async fn try_increment_to_the_next_round(&self, next_round: u64) -> Result<()> {
         // If the next round is within GC range, then iterate to the penultimate round.
@@ -1415,7 +1443,8 @@ mod tests {
         .into();
         // Sign the batch header.
         let batch_header =
-            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
+            BatchHeader::new(private_key, round, round, timestamp, transmission_ids, previous_certificate_ids, rng)
+                .unwrap();
         // Construct the proposal.
         Proposal::new(committee, batch_header, transmissions).unwrap()
     }
@@ -1489,7 +1518,8 @@ mod tests {
         .into();
 
         let batch_header =
-            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
+            BatchHeader::new(private_key, round, round, timestamp, transmission_ids, previous_certificate_ids, rng)
+                .unwrap();
         let signatures = peer_signatures_for_batch(primary_address, accounts, batch_header.batch_id(), rng);
         let certificate = BatchCertificate::<CurrentNetwork>::new(batch_header, signatures).unwrap();
         (certificate, transmissions)

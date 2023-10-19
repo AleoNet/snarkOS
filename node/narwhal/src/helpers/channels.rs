@@ -64,6 +64,7 @@ pub fn init_consensus_channels<N: Network>() -> (ConsensusSender<N>, ConsensusRe
 
 #[derive(Clone, Debug)]
 pub struct BFTSender<N: Network> {
+    pub tx_last_commit_request: mpsc::Sender<oneshot::Sender<u64>>,
     pub tx_primary_round: mpsc::Sender<(u64, oneshot::Sender<bool>)>,
     pub tx_primary_certificate: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
     pub tx_sync_bft_dag_at_bootup: mpsc::Sender<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
@@ -71,6 +72,16 @@ pub struct BFTSender<N: Network> {
 }
 
 impl<N: Network> BFTSender<N> {
+    /// Sends a request to return the last commit round.
+    pub async fn send_last_commit_request_to_bft(&self) -> Result<u64> {
+        // Initialize a callback sender and receiver.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Send the request to return the last commit round.
+        self.tx_last_commit_request.send(callback_sender).await?;
+        // Await the callback to continue.
+        Ok(callback_receiver.await?)
+    }
+
     /// Sends the current round to the BFT.
     pub async fn send_primary_round_to_bft(&self, current_round: u64) -> Result<bool> {
         // Initialize a callback sender and receiver.
@@ -104,6 +115,7 @@ impl<N: Network> BFTSender<N> {
 
 #[derive(Debug)]
 pub struct BFTReceiver<N: Network> {
+    pub rx_last_commit_request: mpsc::Receiver<oneshot::Sender<u64>>,
     pub rx_primary_round: mpsc::Receiver<(u64, oneshot::Sender<bool>)>,
     pub rx_primary_certificate: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
     pub rx_sync_bft_dag_at_bootup: mpsc::Receiver<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
@@ -112,13 +124,26 @@ pub struct BFTReceiver<N: Network> {
 
 /// Initializes the BFT channels.
 pub fn init_bft_channels<N: Network>() -> (BFTSender<N>, BFTReceiver<N>) {
+    let (tx_last_commit_request, rx_last_commit_request) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_primary_round, rx_primary_round) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_primary_certificate, rx_primary_certificate) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_sync_bft_dag_at_bootup, rx_sync_bft_dag_at_bootup) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_sync_bft, rx_sync_bft) = mpsc::channel(MAX_CHANNEL_SIZE);
 
-    let sender = BFTSender { tx_primary_round, tx_primary_certificate, tx_sync_bft_dag_at_bootup, tx_sync_bft };
-    let receiver = BFTReceiver { rx_primary_round, rx_primary_certificate, rx_sync_bft_dag_at_bootup, rx_sync_bft };
+    let sender = BFTSender {
+        tx_last_commit_request,
+        tx_primary_round,
+        tx_primary_certificate,
+        tx_sync_bft_dag_at_bootup,
+        tx_sync_bft,
+    };
+    let receiver = BFTReceiver {
+        rx_last_commit_request,
+        rx_primary_round,
+        rx_primary_certificate,
+        rx_sync_bft_dag_at_bootup,
+        rx_sync_bft,
+    };
 
     (sender, receiver)
 }
