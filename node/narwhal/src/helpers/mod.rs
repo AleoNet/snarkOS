@@ -51,3 +51,15 @@ pub fn fmt_id(id: impl ToString) -> String {
     }
     formatted_id
 }
+
+/// Returns the value that occurs most frequently in the given list.
+pub fn majority_value<T: Default + Eq + std::hash::Hash + Clone>(list: impl Iterator<Item = T>) -> Option<T> {
+    let mut occurrences = std::collections::HashMap::new();
+
+    for value in list {
+        let count = occurrences.entry(value.clone()).or_insert(0);
+        *count += 1;
+    }
+
+    occurrences.into_iter().max_by_key(|&(_, count)| count).map(|(value, _)| value)
+}

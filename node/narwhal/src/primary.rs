@@ -53,7 +53,7 @@ use snarkvm::{
 
 use colored::Colorize;
 use futures::stream::{FuturesUnordered, StreamExt};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rayon::prelude::*;
 use std::{
@@ -340,8 +340,32 @@ impl<N: Network> Primary<N> {
 
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
-        // Retrieve the previous certificates.
+        // Retrieve all certificates for the previous round.
         let previous_certificates = self.storage.get_certificates_for_round(previous_round);
+
+        // Retrieve the previous certificates.
+        let previous_certificates = if previous_round != 0 {
+            // Determine the most frequently occurring last commit round in the previous certificates.
+            let majority_commit = crate::helpers::majority_value(previous_certificates.iter().map(|c| c.last_commit()));
+            let previous_last_commit = match majority_commit {
+                Some(previous_last_commit) => previous_last_commit,
+                // If the previous last commit round is not known yet, return early.
+                None => {
+                    debug!(
+                        "Primary is safely skipping a batch proposal {}",
+                        "(previous last commit round is not known yet)".dimmed()
+                    );
+                    return Ok(());
+                }
+            };
+            // Filter the previous certificates by the most common last commit round.
+            previous_certificates
+                .into_iter()
+                .filter(|c| c.last_commit() == previous_last_commit)
+                .collect::<IndexSet<_>>()
+        } else {
+            previous_certificates
+        };
 
         // Check if the batch is ready to be proposed.
         // Note: The primary starts at round 1, and round 0 contains no certificates, by definition.
