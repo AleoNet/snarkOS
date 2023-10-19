@@ -14,6 +14,8 @@
 
 use super::*;
 
+use snarkvm::prelude::{FromBytes, ToBytes};
+
 use std::borrow::Cow;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -33,17 +35,16 @@ impl MessageTrait for Disconnect {
     fn name(&self) -> Cow<'static, str> {
         "Disconnect".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(self.reason.write_le(writer)?)
+impl ToBytes for Disconnect {
+    fn write_le<W: io::Write>(&self, writer: W) -> io::Result<()> {
+        self.reason.write_le(writer)
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
+impl FromBytes for Disconnect {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         Ok(Disconnect { reason: DisconnectReason::read_le(&mut reader)? })
     }
 }

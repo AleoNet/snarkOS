@@ -14,6 +14,8 @@
 
 use super::*;
 
+use snarkvm::prelude::{FromBytes, ToBytes};
+
 use indexmap::IndexMap;
 use std::borrow::Cow;
 
@@ -30,38 +32,36 @@ impl<N: Network> MessageTrait for Ping<N> {
     fn name(&self) -> Cow<'static, str> {
         "Ping".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.version.write_le(&mut *writer)?;
-        self.node_type.write_le(&mut *writer)?;
+impl<N: Network> ToBytes for Ping<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.version.write_le(&mut writer)?;
+        self.node_type.write_le(&mut writer)?;
         if let Some(locators) = &self.block_locators {
-            1u8.write_le(&mut *writer)?;
+            1u8.write_le(&mut writer)?;
 
-            (locators.recents.len().min(u32::MAX as usize) as u32).write_le(&mut *writer)?;
+            (locators.recents.len().min(u32::MAX as usize) as u32).write_le(&mut writer)?;
             for (height, hash) in locators.recents.iter() {
-                height.write_le(&mut *writer)?;
-                hash.write_le(&mut *writer)?;
+                height.write_le(&mut writer)?;
+                hash.write_le(&mut writer)?;
             }
 
-            (locators.checkpoints.len().min(u32::MAX as usize) as u32).write_le(&mut *writer)?;
+            (locators.checkpoints.len().min(u32::MAX as usize) as u32).write_le(&mut writer)?;
             for (height, hash) in locators.checkpoints.iter() {
-                height.write_le(&mut *writer)?;
-                hash.write_le(&mut *writer)?;
+                height.write_le(&mut writer)?;
+                hash.write_le(&mut writer)?;
             }
         } else {
-            0u8.write_le(&mut *writer)?;
+            0u8.write_le(&mut writer)?;
         }
 
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
+impl<N: Network> FromBytes for Ping<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let version = u32::read_le(&mut reader)?;
         let node_type = NodeType::read_le(&mut reader)?;
 

@@ -16,7 +16,6 @@ use super::*;
 use snarkos_node_router::messages::{
     BlockRequest,
     BlockResponse,
-    Data,
     DataBlocks,
     DisconnectReason,
     Message,
@@ -26,7 +25,10 @@ use snarkos_node_router::messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{block::Transaction, coinbase::EpochChallenge, error, Network};
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{block::Transaction, coinbase::EpochChallenge, error, Network},
+};
 
 use std::{io, net::SocketAddr, time::Duration};
 

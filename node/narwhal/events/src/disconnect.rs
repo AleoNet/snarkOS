@@ -59,7 +59,6 @@ impl ToBytes for Disconnect {
 impl FromBytes for Disconnect {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let reason = match u8::read_le(&mut reader) {
-            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => DisconnectReason::NoReasonGiven,
             Ok(0) => DisconnectReason::InvalidChallengeResponse,
             Ok(1) => DisconnectReason::NoReasonGiven,
             Ok(2) => DisconnectReason::ProtocolViolation,
@@ -76,7 +75,7 @@ mod tests {
     use crate::{Disconnect, DisconnectReason};
     use snarkvm::console::prelude::{FromBytes, ToBytes};
 
-    use bytes::{Buf, BufMut, Bytes, BytesMut};
+    use bytes::{Buf, BufMut, BytesMut};
 
     #[test]
     fn serialize_deserialize() {
@@ -96,13 +95,6 @@ mod tests {
             let disconnect = Disconnect::read_le(buf.into_inner().reader()).unwrap();
             assert_eq!(reason, &disconnect.reason);
         }
-    }
-
-    #[test]
-    fn deserializing_empty_defaults_no_reason() {
-        let buf = Bytes::default();
-        let disconnect = Disconnect::read_le(buf.reader()).unwrap();
-        assert_eq!(disconnect.reason, DisconnectReason::NoReasonGiven);
     }
 
     #[test]

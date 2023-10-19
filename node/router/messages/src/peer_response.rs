@@ -29,23 +29,21 @@ impl MessageTrait for PeerResponse {
     fn name(&self) -> Cow<'static, str> {
         "PeerResponse".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+impl ToBytes for PeerResponse {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
         // Restrict the maximum number of peers to share.
-        (self.peers.len().min(u8::MAX as usize) as u8).write_le(&mut *writer)?;
+        (self.peers.len().min(u8::MAX as usize) as u8).write_le(&mut writer)?;
         for peer in self.peers.iter().take(u8::MAX as usize) {
-            peer.write_le(&mut *writer)?;
+            peer.write_le(&mut writer)?;
         }
-
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
+impl FromBytes for PeerResponse {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let count = u8::read_le(&mut reader)?;
         let mut peers = Vec::with_capacity(count as usize);
         for _ in 0..count {

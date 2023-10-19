@@ -14,6 +14,11 @@
 
 use super::*;
 
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{FromBytes, ToBytes},
+};
+
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,21 +33,17 @@ impl<N: Network> MessageTrait for PuzzleResponse<N> {
     fn name(&self) -> Cow<'static, str> {
         "PuzzleResponse".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.epoch_challenge.write_le(&mut *writer)?;
-        self.block_header.serialize_blocking_into(writer)
+impl<N: Network> ToBytes for PuzzleResponse<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.epoch_challenge.write_le(&mut writer)?;
+        self.block_header.write_le(&mut writer)
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-        Ok(Self {
-            epoch_challenge: EpochChallenge::read_le(&mut reader)?,
-            block_header: Data::Buffer(reader.into_inner().freeze()),
-        })
+impl<N: Network> FromBytes for PuzzleResponse<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
+        Ok(Self { epoch_challenge: EpochChallenge::read_le(&mut reader)?, block_header: Data::read_le(reader)? })
     }
 }

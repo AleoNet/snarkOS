@@ -14,6 +14,8 @@
 
 use super::*;
 
+use snarkvm::prelude::{FromBytes, ToBytes};
+
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,22 +33,21 @@ impl<N: Network> MessageTrait for ChallengeRequest<N> {
     fn name(&self) -> Cow<'static, str> {
         "ChallengeRequest".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.version.write_le(&mut *writer)?;
-        self.listener_port.write_le(&mut *writer)?;
-        self.node_type.write_le(&mut *writer)?;
-        self.address.write_le(&mut *writer)?;
-        self.nonce.write_le(&mut *writer)?;
+impl<N: Network> ToBytes for ChallengeRequest<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.version.write_le(&mut writer)?;
+        self.listener_port.write_le(&mut writer)?;
+        self.node_type.write_le(&mut writer)?;
+        self.address.write_le(&mut writer)?;
+        self.nonce.write_le(&mut writer)?;
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
+impl<N: Network> FromBytes for ChallengeRequest<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let version = u32::read_le(&mut reader)?;
         let listener_port = u16::read_le(&mut reader)?;
         let node_type = NodeType::read_le(&mut reader)?;

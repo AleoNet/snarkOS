@@ -71,10 +71,7 @@ impl ToBytes for NodeType {
 }
 
 impl FromBytes for NodeType {
-    fn read_le<R: io::Read>(reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(reader: R) -> io::Result<Self> {
         match u8::read_le(reader)? {
             0 => Ok(Self::Client),
             1 => Ok(Self::Prover),
