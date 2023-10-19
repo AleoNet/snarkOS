@@ -47,3 +47,34 @@ impl io::Write for LogWriter {
         Ok(())
     }
 }
+
+fn strip_newlines(buf: &[u8]) -> Vec<u8> {
+    // Remove all newlines and then append one if the buffer ends with one;
+    // it should always be the case, but it's cheap to make extra sure.
+    buf.iter()
+        .copied()
+        .filter(|&b| b != b'\n')
+        .chain(if matches!(buf.last(), Some(b'\n')) { Some(b'\n') } else { None })
+        .collect()
+}
+
+pub struct WriterWrapper<W: io::Write>(pub W);
+
+impl<W: io::Write> io::Write for WriterWrapper<W> {
+    /// Writes the given buffer into the log writer.
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let sanitized = strip_newlines(buf);
+        // Force all the bytes to be written at once, otherwise
+        // buffer accounting could fail, resulting in random
+        // artifacts being written additionally.
+        self.0.write_all(&sanitized)?;
+        // Report the unsanitized size as the number of bytes
+        // written for the same reason as above.
+        Ok(buf.len())
+    }
+
+    /// Flushes the log writer (no-op).
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()
+    }
+}

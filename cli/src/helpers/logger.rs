@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::LogWriter;
+use crate::helpers::{LogWriter, WriterWrapper};
 
 use crossterm::tty::IsTty;
 use std::{fs::File, io, path::Path};
 use tokio::sync::mpsc;
+use tracing_appender::non_blocking::{NonBlockingBuilder, WorkerGuard};
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
@@ -34,7 +35,11 @@ use tracing_subscriber::{
 /// 5 => info, debug, trace, snarkos_node_router=trace
 /// 6 => info, debug, trace, snarkos_node_tcp=trace
 /// ```
-pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile: P) -> mpsc::Receiver<Vec<u8>> {
+pub fn initialize_logger<P: AsRef<Path>>(
+    verbosity: u8,
+    nodisplay: bool,
+    logfile: P,
+) -> (mpsc::Receiver<Vec<u8>>, WorkerGuard) {
     match verbosity {
         0 => std::env::set_var("RUST_LOG", "info"),
         1 => std::env::set_var("RUST_LOG", "debug"),
@@ -85,6 +90,7 @@ pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile
     // Create a file to write logs to.
     let logfile =
         File::options().append(true).create(true).open(logfile).expect("Failed to open the file for writing logs");
+    let (file_writer, guard) = NonBlockingBuilder::default().buffered_lines_limit(256).finish(WriterWrapper(logfile));
 
     // Initialize the log channel.
     let (log_sender, log_receiver) = mpsc::channel(1024);
@@ -109,13 +115,14 @@ pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile
             // Add layer redirecting logs to the file
             tracing_subscriber::fmt::Layer::default()
                 .with_ansi(false)
-                .with_writer(logfile)
+                .with_writer(file_writer)
                 .with_target(verbosity > 2)
                 .with_filter(filter2),
         )
         .try_init();
 
-    log_receiver
+    // The file logger guard must exist as long as the node.
+    (log_receiver, guard)
 }
 
 /// Returns the welcome message as a string.
