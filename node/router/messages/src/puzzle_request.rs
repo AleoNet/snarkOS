@@ -14,6 +14,8 @@
 
 use super::*;
 
+use snarkvm::prelude::{FromBytes, ToBytes};
+
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -25,19 +27,33 @@ impl MessageTrait for PuzzleRequest {
     fn name(&self) -> Cow<'static, str> {
         "PuzzleRequest".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, _writer: &mut W) -> Result<()> {
+impl ToBytes for PuzzleRequest {
+    fn write_le<W: io::Write>(&self, _writer: W) -> io::Result<()> {
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        match bytes.remaining() == 0 {
-            true => Ok(Self),
-            false => bail!("Invalid 'PuzzleRequest' message"),
-        }
+impl FromBytes for PuzzleRequest {
+    fn read_le<R: io::Read>(_reader: R) -> io::Result<Self> {
+        Ok(Self)
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use crate::PuzzleRequest;
+    use snarkvm::utilities::{FromBytes, ToBytes};
+
+    use bytes::{Buf, BufMut, BytesMut};
+
+    #[test]
+    fn puzzle_request_roundtrip() {
+        let puzzle_request = PuzzleRequest;
+        let mut bytes = BytesMut::default().writer();
+        puzzle_request.write_le(&mut bytes).unwrap();
+        let decoded = PuzzleRequest::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq!(decoded, puzzle_request);
     }
 }

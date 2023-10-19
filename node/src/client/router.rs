@@ -17,7 +17,6 @@ use snarkos_node_router::{
     messages::{
         BlockRequest,
         BlockResponse,
-        Data,
         DataBlocks,
         DisconnectReason,
         MessageCodec,
@@ -29,7 +28,10 @@ use snarkos_node_router::{
     Routing,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{block::Transaction, Network};
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{block::Transaction, Network},
+};
 
 use snarkos_node_sync::communication_service::CommunicationService;
 use std::{io, net::SocketAddr, time::Duration};
@@ -259,7 +261,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     /// Propagates the unconfirmed solution to all connected validators.
     async fn unconfirmed_solution(
         &self,
-        _peer_ip: SocketAddr,
+        peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
     ) -> bool {
@@ -277,9 +279,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
             match is_valid {
                 // If the solution is valid, propagate the `UnconfirmedSolution`.
                 Ok(Ok(true)) => {
-                    let _message = Message::UnconfirmedSolution(serialized);
+                    let message = Message::UnconfirmedSolution(serialized);
                     // Propagate the "UnconfirmedSolution".
-                    // self.propagate(message, &[peer_ip]);
+                    self.propagate(message, &[peer_ip]);
                 }
                 Ok(Ok(false)) | Ok(Err(_)) => {
                     trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())

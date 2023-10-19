@@ -77,10 +77,7 @@ impl ToBytes for DisconnectReason {
 }
 
 impl FromBytes for DisconnectReason {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         match u8::read_le(&mut reader)? {
             0 => Ok(Self::ExceededForkRange),
             1 => Ok(Self::InvalidChallengeResponse),

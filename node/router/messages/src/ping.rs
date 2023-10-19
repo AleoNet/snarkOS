@@ -14,6 +14,8 @@
 
 use super::*;
 
+use snarkvm::prelude::{FromBytes, ToBytes};
+
 use indexmap::IndexMap;
 use std::borrow::Cow;
 
@@ -30,38 +32,36 @@ impl<N: Network> MessageTrait for Ping<N> {
     fn name(&self) -> Cow<'static, str> {
         "Ping".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.version.write_le(&mut *writer)?;
-        self.node_type.write_le(&mut *writer)?;
+impl<N: Network> ToBytes for Ping<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.version.write_le(&mut writer)?;
+        self.node_type.write_le(&mut writer)?;
         if let Some(locators) = &self.block_locators {
-            1u8.write_le(&mut *writer)?;
+            1u8.write_le(&mut writer)?;
 
-            (locators.recents.len().min(u32::MAX as usize) as u32).write_le(&mut *writer)?;
+            (locators.recents.len().min(u32::MAX as usize) as u32).write_le(&mut writer)?;
             for (height, hash) in locators.recents.iter() {
-                height.write_le(&mut *writer)?;
-                hash.write_le(&mut *writer)?;
+                height.write_le(&mut writer)?;
+                hash.write_le(&mut writer)?;
             }
 
-            (locators.checkpoints.len().min(u32::MAX as usize) as u32).write_le(&mut *writer)?;
+            (locators.checkpoints.len().min(u32::MAX as usize) as u32).write_le(&mut writer)?;
             for (height, hash) in locators.checkpoints.iter() {
-                height.write_le(&mut *writer)?;
-                hash.write_le(&mut *writer)?;
+                height.write_le(&mut writer)?;
+                hash.write_le(&mut writer)?;
             }
         } else {
-            0u8.write_le(&mut *writer)?;
+            0u8.write_le(&mut writer)?;
         }
 
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
+impl<N: Network> FromBytes for Ping<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let version = u32::read_le(&mut reader)?;
         let node_type = NodeType::read_le(&mut reader)?;
 
@@ -94,5 +94,36 @@ impl<N: Network> MessageTrait for Ping<N> {
 impl<N: Network> Ping<N> {
     pub fn new(node_type: NodeType, block_locators: Option<BlockLocators<N>>) -> Self {
         Self { version: <Message<N>>::VERSION, node_type, block_locators }
+    }
+}
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{challenge_request::prop_tests::any_node_type, Ping};
+    use snarkos_node_sync_locators::{test_helpers::sample_block_locators, BlockLocators};
+    use snarkvm::utilities::{FromBytes, ToBytes};
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_block_locators() -> BoxedStrategy<BlockLocators<CurrentNetwork>> {
+        any::<u32>().prop_map(sample_block_locators).boxed()
+    }
+
+    pub fn any_ping() -> BoxedStrategy<Ping<CurrentNetwork>> {
+        (any::<u32>(), any_block_locators(), any_node_type())
+            .prop_map(|(version, bls, node_type)| Ping { version, block_locators: Some(bls), node_type })
+            .boxed()
+    }
+
+    #[proptest]
+    fn ping_roundtrip(#[strategy(any_ping())] ping: Ping<CurrentNetwork>) {
+        let mut bytes = BytesMut::default().writer();
+        ping.write_le(&mut bytes).unwrap();
+        let decoded = Ping::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq!(ping, decoded);
     }
 }

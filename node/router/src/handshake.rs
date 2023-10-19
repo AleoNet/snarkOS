@@ -13,12 +13,15 @@
 // limitations under the License.
 
 use crate::{
-    messages::{ChallengeRequest, ChallengeResponse, Data, DisconnectReason, Message, MessageCodec, MessageTrait},
+    messages::{ChallengeRequest, ChallengeResponse, DisconnectReason, Message, MessageCodec, MessageTrait},
     Peer,
     Router,
 };
 use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
-use snarkvm::prelude::{block::Header, error, Address, Network};
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{block::Header, error, Address, Network},
+};
 
 use anyhow::{bail, Result};
 use futures::SinkExt;
