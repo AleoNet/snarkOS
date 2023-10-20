@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-sync"
-version = "2.1.7"
+version = "2.2.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A synchronization module for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -44,16 +44,16 @@ version = "1"
 
 [dependencies.snarkos-node-narwhal-ledger-service]
 path = "../narwhal/ledger-service"
-version = "=2.1.7"
+version = "=2.2.0"
 features = [ "ledger-write" ]
 
 [dependencies.snarkos-node-sync-communication-service]
 path = "communication-service"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-node-sync-locators]
 path = "locators"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkvm]
 workspace = true
@@ -67,7 +67,6 @@ version = "0.1"
 
 [dev-dependencies.snarkos-node-narwhal-ledger-service]
 path = "../narwhal/ledger-service"
-version = "=2.1.7"
 features = [ "test" ]
 
 [dev-dependencies.snarkos-node-sync-locators]

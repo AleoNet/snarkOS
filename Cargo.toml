@@ -1,6 +1,6 @@
 [package]
 name = "snarkos"
-version = "2.1.7"
+version = "2.2.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
@@ -39,19 +39,16 @@ members = [
   ".integration"
 ]
 
+[workspace.dependencies.snarkvm]
+version = "=0.16.1"
+features = [ "circuit", "console", "rocks" ]
+
 [[bin]]
 name = "snarkos"
 path = "snarkos/main.rs"
 
 [features]
 jemalloc = [ "tikv-jemallocator" ]
-
-[workspace.dependencies.snarkvm]
-#path = "../snarkvm"
-#git = "https://github.com/AleoHQ/snarkVM.git"
-#rev = "1068c12"
-version = "=0.16.1"
-features = [ "circuit", "console", "rocks" ]
 
 [dependencies.anyhow]
 version = "1.0.75"
@@ -65,47 +62,47 @@ version = "1"
 
 [dependencies.snarkos-account]
 path = "./account"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-cli]
 path = "./cli"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-display]
 path = "./display"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-node]
 path = "./node"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-node-cdn]
 path = "./node/cdn"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-node-narwhal]
 path = "./node/narwhal"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-node-rest]
 path = "./node/rest"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-node-router]
 path = "./node/router"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-node-sync]
 path = "./node/sync"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.snarkos-node-tcp]
 path = "./node/tcp"
-version = "=2.1.7"
+version = "=2.2.0"
 
 [dependencies.tikv-jemallocator]
 version = "0.5"
