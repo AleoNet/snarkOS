@@ -16,14 +16,14 @@
 extern crate tracing;
 
 use snarkos_account::Account;
-use snarkos_node_narwhal::{
+use snarkos_node_bft::{
     helpers::{init_consensus_channels, init_primary_channels, ConsensusReceiver, PrimarySender, Storage},
     Primary,
     BFT,
     MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
-use snarkos_node_narwhal_ledger_service::MockLedgerService;
+use snarkos_node_bft_ledger_service::MockLedgerService;
 use snarkvm::{
     ledger::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
@@ -82,9 +82,9 @@ pub fn initialize_logger(verbosity: u8) {
             .add_directive("warp=off".parse().unwrap());
 
         let filter = if verbosity > 3 {
-            filter.add_directive("snarkos_node_narwhal::gateway=trace".parse().unwrap())
+            filter.add_directive("snarkos_node_bft::gateway=trace".parse().unwrap())
         } else {
-            filter.add_directive("snarkos_node_narwhal::gateway=off".parse().unwrap())
+            filter.add_directive("snarkos_node_bft::gateway=off".parse().unwrap())
         };
 
         if verbosity > 4 {

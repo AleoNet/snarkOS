@@ -1,5 +1,5 @@
 [package]
-name = "snarkos-node-narwhal-events"
+name = "snarkos-node-bft-events"
 version = "2.2.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Events for the gateway in a decentralized operating system"

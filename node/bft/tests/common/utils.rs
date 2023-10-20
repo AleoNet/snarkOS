@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::common::CurrentNetwork;
-use snarkos_node_narwhal::helpers::PrimarySender;
+use snarkos_node_bft::helpers::PrimarySender;
 use snarkvm::{
     ledger::narwhal::Data,
     prelude::{

@@ -1,4 +1,4 @@
-# snarkos-node-narwhal-sync-locators
+# snarkos-node-sync-locators
 
 [![Crates.io](https://img.shields.io/crates/v/snarkos-node-sync-locators.svg?color=neon)](https://crates.io/crates/snarkos-node-sync-locators)
 [![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](https://aleo.org)

@@ -18,7 +18,7 @@ use crate::common::{
     TranslucentLedgerService,
 };
 use snarkos_account::Account;
-use snarkos_node_narwhal::{
+use snarkos_node_bft::{
     helpers::{init_primary_channels, PrimarySender, Storage},
     Primary,
     BFT,

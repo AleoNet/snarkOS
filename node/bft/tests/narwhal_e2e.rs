@@ -16,7 +16,7 @@
 mod common;
 
 use crate::common::primary::{TestNetwork, TestNetworkConfig};
-use snarkos_node_narwhal::MAX_BATCH_DELAY;
+use snarkos_node_bft::MAX_BATCH_DELAY;
 
 use std::time::Duration;
 

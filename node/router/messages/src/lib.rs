@@ -59,7 +59,7 @@ pub use unconfirmed_solution::UnconfirmedSolution;
 mod unconfirmed_transaction;
 pub use unconfirmed_transaction::UnconfirmedTransaction;
 
-pub use snarkos_node_narwhal_events::DataBlocks;
+pub use snarkos_node_bft_events::DataBlocks;
 
 use snarkos_node_sync_locators::BlockLocators;
 use snarkvm::prelude::{

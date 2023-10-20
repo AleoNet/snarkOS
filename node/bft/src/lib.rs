@@ -20,8 +20,8 @@ extern crate async_trait;
 #[macro_use]
 extern crate tracing;
 
-pub use snarkos_node_narwhal_events as events;
-pub use snarkos_node_narwhal_ledger_service as ledger_service;
+pub use snarkos_node_bft_events as events;
+pub use snarkos_node_bft_ledger_service as ledger_service;
 
 pub mod helpers;
 

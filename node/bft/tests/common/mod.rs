@@ -17,4 +17,4 @@ pub mod utils;
 
 pub type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-pub type TranslucentLedgerService<N, C> = snarkos_node_narwhal_ledger_service::TranslucentLedgerService<N, C>;
+pub type TranslucentLedgerService<N, C> = snarkos_node_bft_ledger_service::TranslucentLedgerService<N, C>;
