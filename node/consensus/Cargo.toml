@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-consensus"
-version = "2.2.0"
+version = "2.2.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node consensus for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -37,15 +37,15 @@ version = "0.8"
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.2.0"
+version = "=2.2.1"
 
 [dependencies.snarkos-node-bft]
 path = "../bft"
-version = "=2.2.0"
+version = "=2.2.1"
 
 [dependencies.snarkos-node-bft-ledger-service]
 path = "../bft/ledger-service"
-version = "=2.2.0"
+version = "=2.2.1"
 default-features = false
 features = [ "ledger", "ledger-write" ]
 
