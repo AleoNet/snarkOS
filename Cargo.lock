@@ -2978,9 +2978,9 @@ dependencies = [
  "snarkos-cli",
  "snarkos-display",
  "snarkos-node",
+ "snarkos-node-bft",
  "snarkos-node-cdn",
  "snarkos-node-consensus",
- "snarkos-node-narwhal",
  "snarkos-node-rest",
  "snarkos-node-router",
  "snarkos-node-sync",
@@ -3076,9 +3076,9 @@ dependencies = [
  "rayon",
  "serde_json",
  "snarkos-account",
+ "snarkos-node-bft",
  "snarkos-node-cdn",
  "snarkos-node-consensus",
- "snarkos-node-narwhal",
  "snarkos-node-rest",
  "snarkos-node-router",
  "snarkos-node-sync",
@@ -3089,6 +3089,82 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber 0.3.17",
+]
+
+[[package]]
+name = "snarkos-node-bft"
+version = "2.2.0"
+dependencies = [
+ "anyhow",
+ "async-recursion",
+ "async-trait",
+ "axum",
+ "axum-extra",
+ "bytes",
+ "clap",
+ "colored",
+ "deadline",
+ "futures",
+ "indexmap 2.0.2",
+ "itertools 0.11.0",
+ "mockall",
+ "open",
+ "parking_lot",
+ "paste",
+ "proptest",
+ "rand",
+ "rand_chacha",
+ "rand_distr",
+ "rayon",
+ "serde",
+ "sha2",
+ "snarkos-account",
+ "snarkos-node-bft-events",
+ "snarkos-node-bft-ledger-service",
+ "snarkos-node-sync",
+ "snarkos-node-tcp",
+ "snarkvm",
+ "snow",
+ "test-strategy",
+ "time",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber 0.3.17",
+ "tracing-test 0.1.0",
+]
+
+[[package]]
+name = "snarkos-node-bft-events"
+version = "2.2.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "indexmap 2.0.2",
+ "proptest",
+ "rayon",
+ "serde",
+ "snarkos-node-sync-locators",
+ "snarkvm",
+ "snow",
+ "test-strategy",
+ "time",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-node-bft-ledger-service"
+version = "2.2.0"
+dependencies = [
+ "async-trait",
+ "indexmap 2.0.2",
+ "parking_lot",
+ "snarkvm",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3123,8 +3199,8 @@ dependencies = [
  "parking_lot",
  "rand",
  "snarkos-account",
- "snarkos-node-narwhal",
- "snarkos-node-narwhal-ledger-service",
+ "snarkos-node-bft",
+ "snarkos-node-bft-ledger-service",
  "snarkvm",
  "tokio",
  "tracing",
@@ -3138,82 +3214,6 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "tokio",
-]
-
-[[package]]
-name = "snarkos-node-narwhal"
-version = "2.2.0"
-dependencies = [
- "anyhow",
- "async-recursion",
- "async-trait",
- "axum",
- "axum-extra",
- "bytes",
- "clap",
- "colored",
- "deadline",
- "futures",
- "indexmap 2.0.2",
- "itertools 0.11.0",
- "mockall",
- "open",
- "parking_lot",
- "paste",
- "proptest",
- "rand",
- "rand_chacha",
- "rand_distr",
- "rayon",
- "serde",
- "sha2",
- "snarkos-account",
- "snarkos-node-narwhal-events",
- "snarkos-node-narwhal-ledger-service",
- "snarkos-node-sync",
- "snarkos-node-tcp",
- "snarkvm",
- "snow",
- "test-strategy",
- "time",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tower-http",
- "tracing",
- "tracing-subscriber 0.3.17",
- "tracing-test 0.1.0",
-]
-
-[[package]]
-name = "snarkos-node-narwhal-events"
-version = "2.2.0"
-dependencies = [
- "anyhow",
- "bytes",
- "indexmap 2.0.2",
- "proptest",
- "rayon",
- "serde",
- "snarkos-node-sync-locators",
- "snarkvm",
- "snow",
- "test-strategy",
- "time",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-node-narwhal-ledger-service"
-version = "2.2.0"
-dependencies = [
- "async-trait",
- "indexmap 2.0.2",
- "parking_lot",
- "snarkvm",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -3284,7 +3284,7 @@ dependencies = [
  "proptest",
  "rayon",
  "serde",
- "snarkos-node-narwhal-events",
+ "snarkos-node-bft-events",
  "snarkos-node-sync-locators",
  "snarkvm",
  "snow",
@@ -3305,7 +3305,7 @@ dependencies = [
  "parking_lot",
  "rand",
  "serde",
- "snarkos-node-narwhal-ledger-service",
+ "snarkos-node-bft-ledger-service",
  "snarkos-node-sync-communication-service",
  "snarkos-node-sync-locators",
  "snarkvm",

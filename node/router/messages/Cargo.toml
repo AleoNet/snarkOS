@@ -36,8 +36,8 @@ version = "1"
 [dependencies.serde]
 version = "1"
 
-[dependencies.snarkos-node-narwhal-events]
-path = "../../narwhal/events"
+[dependencies.snarkos-node-bft-events]
+path = "../../bft/events"
 version = "=2.2.0"
 
 [dependencies.snarkos-node-sync-locators]

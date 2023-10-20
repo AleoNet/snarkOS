@@ -22,7 +22,7 @@ use crate::{
     MAX_TRANSMISSIONS_PER_WORKER_PING,
     MAX_WORKERS,
 };
-use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
     ledger::narwhal::{Data, Transmission, TransmissionID},
@@ -453,7 +453,7 @@ impl<N: Network> Worker<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_node_narwhal_ledger_service::LedgerService;
+    use snarkos_node_bft_ledger_service::LedgerService;
     use snarkvm::{
         console::{network::Network, types::Field},
         ledger::{
@@ -744,7 +744,7 @@ mod tests {
 mod prop_tests {
     use super::*;
     use crate::Gateway;
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::{
         console::account::Address,
         ledger::committee::{Committee, MIN_VALIDATOR_STAKE},

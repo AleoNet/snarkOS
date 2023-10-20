@@ -16,7 +16,7 @@ use crate::{
     helpers::{PeerPair, SyncRequest},
     locators::BlockLocators,
 };
-use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync_communication_service::CommunicationService;
 use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::prelude::{block::Block, Network};
@@ -841,7 +841,7 @@ mod tests {
         CHECKPOINT_INTERVAL,
         NUM_RECENT_BLOCKS,
     };
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::prelude::{Field, TestRng};
 
     use indexmap::indexset;

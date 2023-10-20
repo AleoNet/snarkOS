@@ -29,8 +29,8 @@ use tracing_subscriber::{
 /// 0 => info
 /// 1 => info, debug
 /// 2 => info, debug, trace
-/// 3 => info, debug, trace, snarkos_node_narwhal::gateway=trace
-/// 4 => info, debug, trace, snarkos_node_narwhal=trace
+/// 3 => info, debug, trace, snarkos_node_bft::gateway=trace
+/// 4 => info, debug, trace, snarkos_node_bft=trace
 /// 5 => info, debug, trace, snarkos_node_router=trace
 /// 6 => info, debug, trace, snarkos_node_tcp=trace
 /// ```
@@ -52,15 +52,15 @@ pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile
             .add_directive("warp=off".parse().unwrap());
 
         let filter = if verbosity >= 3 {
-            filter.add_directive("snarkos_node_narwhal::gateway=trace".parse().unwrap())
+            filter.add_directive("snarkos_node_bft::gateway=trace".parse().unwrap())
         } else {
-            filter.add_directive("snarkos_node_narwhal::gateway=debug".parse().unwrap())
+            filter.add_directive("snarkos_node_bft::gateway=debug".parse().unwrap())
         };
 
         let filter = if verbosity >= 4 {
-            filter.add_directive("snarkos_node_narwhal=trace".parse().unwrap())
+            filter.add_directive("snarkos_node_bft=trace".parse().unwrap())
         } else {
-            filter.add_directive("snarkos_node_narwhal=debug".parse().unwrap())
+            filter.add_directive("snarkos_node_bft=debug".parse().unwrap())
         };
 
         let filter = if verbosity >= 5 {

@@ -39,12 +39,12 @@ version = "0.8"
 path = "../../account"
 version = "=2.2.0"
 
-[dependencies.snarkos-node-narwhal]
-path = "../narwhal"
+[dependencies.snarkos-node-bft]
+path = "../bft"
 version = "=2.2.0"
 
-[dependencies.snarkos-node-narwhal-ledger-service]
-path = "../narwhal/ledger-service"
+[dependencies.snarkos-node-bft-ledger-service]
+path = "../bft/ledger-service"
 version = "=2.2.0"
 default-features = false
 features = [ "ledger", "ledger-write" ]

@@ -208,6 +208,33 @@ jobs:
           workspace_member: node
           cache_key: snarkos-node-cache
 
+  node-bft:
+    docker:
+      - image: cimg/rust:1.71.1
+    resource_class: 2xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/bft
+          cache_key: snarkos-node-bft-cache
+
+  node-bft-events:
+    docker:
+      - image: cimg/rust:1.71.1
+    resource_class: 2xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/bft/events
+          cache_key: snarkos-node-bft-events-cache
+
+  node-bft-ledger-service:
+    docker:
+      - image: cimg/rust:1.71.1
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/bft/ledger-service
+          cache_key: snarkos-node-bft-ledger-service-cache
+
   node-cdn:
     docker:
       - image: cimg/rust:1.71.1
@@ -225,33 +252,6 @@ jobs:
       - run_serial:
           workspace_member: node/consensus
           cache_key: snarkos-node-consensus-cache
-
-  node-narwhal:
-    docker:
-      - image: cimg/rust:1.71.1
-    resource_class: 2xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/narwhal
-          cache_key: snarkos-node-narwhal-cache
-
-  node-narwhal-events:
-    docker:
-      - image: cimg/rust:1.71.1
-    resource_class: 2xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/narwhal/events
-          cache_key: snarkos-node-narwhal-events-cache
-
-  node-narwhal-ledger-service:
-    docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/narwhal/ledger-service
-          cache_key: snarkos-node-narwhal-ledger-service-cache
 
   node-rest:
     docker:
@@ -372,11 +372,11 @@ workflows:
       - cli
       - display
       - node
+      - node-bft
+      - node-bft-events
+      - node-bft-ledger-service
       - node-cdn
       - node-consensus
-      - node-narwhal
-      - node-narwhal-events
-      - node-narwhal-ledger-service
       - node-rest
       - node-router
       - node-router-messages

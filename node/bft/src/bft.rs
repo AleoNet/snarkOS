@@ -28,7 +28,7 @@ use crate::{
     MAX_LEADER_CERTIFICATE_DELAY,
 };
 use snarkos_account::Account;
-use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::account::Address,
     ledger::{
@@ -756,7 +756,7 @@ mod tests {
         BFT,
     };
     use snarkos_account::Account;
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::{
         ledger::narwhal::batch_certificate::test_helpers::{
             sample_batch_certificate,

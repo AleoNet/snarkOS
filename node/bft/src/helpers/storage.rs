@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::helpers::{check_timestamp_for_liveness, fmt_id};
-use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     ledger::{
         block::Block,
@@ -789,7 +789,7 @@ impl<N: Network> Storage<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::{
         ledger::narwhal::Data,
         prelude::{Rng, TestRng},
@@ -991,7 +991,7 @@ pub mod prop_tests {
         helpers::{now, storage::tests::assert_storage},
         MAX_GC_ROUNDS,
     };
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::{
         ledger::{
             coinbase::PuzzleCommitment,

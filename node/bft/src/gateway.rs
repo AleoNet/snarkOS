@@ -23,7 +23,7 @@ use crate::{
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
-use snarkos_node_narwhal_events::{
+use snarkos_node_bft_events::{
     BlockRequest,
     BlockResponse,
     CertificateRequest,
@@ -39,7 +39,7 @@ use snarkos_node_narwhal_events::{
     ValidatorsRequest,
     ValidatorsResponse,
 };
-use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
@@ -1297,7 +1297,7 @@ mod prop_tests {
         MEMORY_POOL_PORT,
     };
     use snarkos_account::Account;
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_tcp::P2P;
     use snarkvm::{
         ledger::committee::prop_tests::{CommitteeContext, ValidatorSet},

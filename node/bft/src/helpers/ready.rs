@@ -141,7 +141,7 @@ impl<N: Network> Ready<N> {
 mod tests {
     use super::*;
     use crate::helpers::Storage;
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::ledger::{coinbase::PuzzleCommitment, narwhal::Data};
 
     use ::bytes::Bytes;

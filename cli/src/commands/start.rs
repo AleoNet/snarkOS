@@ -14,7 +14,7 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{narwhal::MEMORY_POOL_PORT, router::messages::NodeType, Node};
+use snarkos_node::{bft::MEMORY_POOL_PORT, router::messages::NodeType, Node};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
@@ -79,16 +79,15 @@ pub struct Start {
     /// Specify the IP address and port for the node server
     #[clap(default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
+    /// Specify the IP address and port for the BFT
+    #[clap(long = "bft")]
+    pub bft: Option<SocketAddr>,
     /// Specify the IP address and port of the peer(s) to connect to
     #[clap(default_value = "", long = "peers")]
     pub peers: String,
     /// Specify the IP address and port of the validator(s) to connect to
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
-
-    // Specify the IP address and port for narwhal.
-    #[clap(long = "narwhal")]
-    pub narwhal: Option<SocketAddr>,
 
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
@@ -404,9 +403,9 @@ impl Start {
         crate::helpers::check_validator_machine(node_type);
 
         // Initialize the node.
-        let narwhal_ip = if self.dev.is_some() { self.narwhal } else { None };
+        let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, narwhal_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, bft_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
         }

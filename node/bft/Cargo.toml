@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-node-narwhal"
+name = "snarkos-node-bft"
 version = "2.2.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "A Narwhal-style memory pool for a decentralized operating system"
+description = "A memory pool for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -59,11 +59,11 @@ default-features = false
 path = "../../account"
 version = "=2.2.0"
 
-[dependencies.snarkos-node-narwhal-events]
+[dependencies.snarkos-node-bft-events]
 path = "./events"
 version = "=2.2.0"
 
-[dependencies.snarkos-node-narwhal-ledger-service]
+[dependencies.snarkos-node-bft-ledger-service]
 path = "./ledger-service"
 version = "=2.2.0"
 features = [ "ledger", "prover" ]
@@ -134,7 +134,7 @@ version = "0.4"
 [dev-dependencies.rayon]
 version = "1"
 
-[dev-dependencies.snarkos-node-narwhal-ledger-service]
+[dev-dependencies.snarkos-node-bft-ledger-service]
 path = "./ledger-service"
 default-features = false
 features = [ "test" ]

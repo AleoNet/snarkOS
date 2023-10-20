@@ -18,7 +18,7 @@ mod common;
 use crate::common::primary::{TestNetwork, TestNetworkConfig};
 use deadline::deadline;
 use itertools::Itertools;
-use snarkos_node_narwhal::MAX_BATCH_DELAY;
+use snarkos_node_bft::MAX_BATCH_DELAY;
 use std::time::Duration;
 use tokio::time::sleep;
 

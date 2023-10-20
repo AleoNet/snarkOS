@@ -39,8 +39,8 @@ use crate::{
     WORKER_PING_INTERVAL,
 };
 use snarkos_account::Account;
-use snarkos_node_narwhal_events::PrimaryPing;
-use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_bft_events::PrimaryPing;
+use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::{prelude::*, types::Field},
     ledger::{
@@ -1309,7 +1309,7 @@ impl<N: Network> Primary<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::{
         ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
         prelude::{Address, Signature},

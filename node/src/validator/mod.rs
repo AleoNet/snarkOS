@@ -16,8 +16,8 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
+use snarkos_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_node_consensus::Consensus;
-use snarkos_node_narwhal::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
     messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
@@ -74,7 +74,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
-        narwhal_ip: Option<SocketAddr>,
+        bft_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
@@ -104,7 +104,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service.clone());
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger_service, narwhal_ip, trusted_validators, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger_service, bft_ip, trusted_validators, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.

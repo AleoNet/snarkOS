@@ -18,8 +18,8 @@ use crate::{
     Transport,
     MAX_BATCH_DELAY,
 };
-use snarkos_node_narwhal_events::{CertificateRequest, CertificateResponse, Event};
-use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
+use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},

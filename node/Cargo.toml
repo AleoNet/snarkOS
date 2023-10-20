@@ -66,16 +66,16 @@ features = [ "preserve_order" ]
 path = "../account"
 version = "=2.2.0"
 
+[dependencies.snarkos-node-bft]
+path = "./bft"
+version = "=2.2.0"
+
 [dependencies.snarkos-node-cdn]
 path = "./cdn"
 version = "=2.2.0"
 
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
-version = "=2.2.0"
-
-[dependencies.snarkos-node-narwhal]
-path = "./narwhal"
 version = "=2.2.0"
 
 [dependencies.snarkos-node-rest]

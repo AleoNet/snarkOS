@@ -42,8 +42,8 @@ version = "0.8"
 [dependencies.serde]
 version = "1"
 
-[dependencies.snarkos-node-narwhal-ledger-service]
-path = "../narwhal/ledger-service"
+[dependencies.snarkos-node-bft-ledger-service]
+path = "../bft/ledger-service"
 version = "=2.2.0"
 features = [ "ledger-write" ]
 
@@ -65,8 +65,8 @@ features = [ "rt", "signal" ]
 [dependencies.tracing]
 version = "0.1"
 
-[dev-dependencies.snarkos-node-narwhal-ledger-service]
-path = "../narwhal/ledger-service"
+[dev-dependencies.snarkos-node-bft-ledger-service]
+path = "../bft/ledger-service"
 features = [ "test" ]
 
 [dev-dependencies.snarkos-node-sync-locators]

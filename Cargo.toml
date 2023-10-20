@@ -23,12 +23,12 @@ members = [
   "cli",
   "display",
   "node",
+  "node/bft",
+  "node/bft/events",
+  "node/bft/ledger-service",
   "node/cdn",
   "node/consensus",
   "node/metrics",
-  "node/narwhal",
-  "node/narwhal/events",
-  "node/narwhal/ledger-service",
   "node/rest",
   "node/router",
   "node/router/messages",
@@ -76,16 +76,16 @@ version = "=2.2.0"
 path = "./node"
 version = "=2.2.0"
 
+[dependencies.snarkos-node-bft]
+path = "./node/bft"
+version = "=2.2.0"
+
 [dependencies.snarkos-node-cdn]
 path = "./node/cdn"
 version = "=2.2.0"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-version = "=2.2.0"
-
-[dependencies.snarkos-node-narwhal]
-path = "./node/narwhal"
 version = "=2.2.0"
 
 [dependencies.snarkos-node-rest]

@@ -1,10 +1,10 @@
-# snarkos-node-narwhal
+# snarkos-node-bft
 
-[![Crates.io](https://img.shields.io/crates/v/snarkos-node-narwhal.svg?color=neon)](https://crates.io/crates/snarkos-node-narwhal)
+[![Crates.io](https://img.shields.io/crates/v/snarkos-node-bft.svg?color=neon)](https://crates.io/crates/snarkos-node-bft)
 [![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](https://aleo.org)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE.md)
 
-The `snarkos-node-narwhal` crate provides a node implementation for a Narwhal-style memory pool.
+The `snarkos-node-bft` crate provides a node implementation for a BFT-based memory pool.
 
 ## Primary
 
@@ -18,11 +18,11 @@ Each round runs until one of two conditions is met:
 
 #### Advancing Rounds
 
-As described in the paper, Narwhal advances rounds whenever n − f vertices are delivered.
+As described in the paper, the BFT advances rounds whenever n − f vertices are delivered.
 ```
 The problem in advancing rounds whenever n − f vertices are delivered is that parties
 might not vote for the anchor even if the party that broadcast it is just slightly slower
-than the fastest n − f parties. To deal with this, Bullshark integrates timeouts into
+than the fastest n − f parties. To deal with this, the BFT integrates timeouts into
 the DAG construction. If the first n − f vertices a party p gets in an even-numbered round r 
 do not include the anchor of round r, then p sets a timer and waits for the anchor
 until the timer expires. Similarly, in an odd-numbered round, parties wait for either
@@ -48,4 +48,3 @@ on the entries they receive from other validators' workers.
 
 1. How does one guarantee the number of accepted transactions and solutions does not exceed the block limits?
    - We need to set limits on number of transmissions for the workers, but also the primary.
-2. What should happen if another node comes online with the same address?

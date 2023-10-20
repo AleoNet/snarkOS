@@ -18,7 +18,7 @@
 extern crate tracing;
 
 use snarkos_account::Account;
-use snarkos_node_narwhal::{
+use snarkos_node_bft::{
     helpers::{
         fmt_id,
         init_consensus_channels,
@@ -32,7 +32,7 @@ use snarkos_node_narwhal::{
     MAX_GC_ROUNDS,
     MAX_TRANSMISSIONS_PER_BATCH,
 };
-use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     ledger::{
         block::Transaction,
