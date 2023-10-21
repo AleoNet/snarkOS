@@ -242,7 +242,41 @@ When no node type is specified, the node will default to `--client`.
 
 ### 6.3 Local Devnet
 
-#### 6.3.1 Start a Local Devnet
+#### 6.3.1 Install `tmux`
+
+To run a local devnet with the script, start by installing `tmux`.
+
+<details><summary>macOS</summary>
+To install `tmux` on macOS, you can use the `Homebrew` package manager.
+If you haven't installed `Homebrew` yet, you can find instructions at [their website](https://brew.sh/).
+```bash
+# Once Homebrew is installed, run:
+brew install tmux
+```
+</details>
+
+<details><summary>Ubuntu</summary>
+On Ubuntu and other Debian-based systems, you can use the `apt` package manager:
+```bash
+sudo apt update
+sudo apt install tmux
+```
+</details>
+
+<details><summary>Windows</summary>
+There are a couple of ways to use `tmux` on Windows:
+
+### Using Windows Subsystem for Linux (WSL)
+
+1. First, install [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install).
+2. Once WSL is set up and you have a Linux distribution installed (e.g., Ubuntu), open your WSL terminal and install `tmux` as you would on a native Linux system:
+```bash
+sudo apt update
+sudo apt install tmux
+```
+</details>
+
+#### 6.3.2 Start a Local Devnet
 
 To start a local devnet, run:
 ```
@@ -250,7 +284,7 @@ To start a local devnet, run:
 ```
 Follow the instructions in the terminal to start the devnet.
 
-### 6.3.2 View a Local Devnet
+#### 6.3.3 View a Local Devnet
 
 #### Switch Nodes (forward)
 
@@ -280,7 +314,7 @@ To select a node manually in a local devnet, run:
 Ctrl+b :select-window -t {NODE_ID}
 ```
 
-#### 6.3.3 Stop a Local Devnet
+#### 6.3.4 Stop a Local Devnet
 
 To stop a local devnet, run:
 ```
@@ -288,7 +322,7 @@ Ctrl+b :kill-session
 ```
 Then, press `Enter`.
 
-##### Clean Up
+### Clean Up
 
 To clean up the node storage, run:
 ```
