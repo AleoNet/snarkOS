@@ -17,10 +17,8 @@ sudo apt-get install -y \
 # Install Rust
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-source \$HOME/.cargo/env
-
-# Set CARGO_TARGET_DIR to reuse intermediate artifacts
-export CARGO_TARGET_DIR=./target
+# Set PATH to include Rust binary directory
+export PATH=\$HOME/.cargo/bin:\$PATH
 
 # Install snarkOS
 # cargo clean
