@@ -15,6 +15,7 @@ run_installation() {
   # SSH into the node
   ssh -o StrictHostKeyChecking=no aws-n$NODE_ID << EOF
     # Commands to run on the remote instance
+    sudo -i  # Switch to root user
     WORKSPACE=~/snarkOS
 
     if [ -d "\$WORKSPACE" ]; then
@@ -28,10 +29,8 @@ run_installation() {
       git checkout $BRANCH  # Checkout the specified branch
     fi
 
-    ./.devnet/.ssh-install.sh
-
-    # Exit the SSH session
-    exit
+    sudo ./build_ubuntu.sh
+    exit  # Exit root user
 EOF
 
   # Check the exit status of the SSH command
