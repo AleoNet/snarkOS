@@ -23,7 +23,7 @@ start_snarkos_in_tmux() {
     tmux new-session -d -s snarkos-session
 
     # Send the snarkOS start command to the tmux session with the NODE_ID
-    tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --bft 0.0.0.0:5000 --dev $NODE_ID --dev-num-validators $NUM_INSTANCES --validator --validators $NODE_IP:5000" C-m
+    tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --bft 0.0.0.0:5000 --rest 0.0.0.0:3033 --dev $NODE_ID --dev-num-validators $NUM_INSTANCES --validator --validators $NODE_IP:5000" C-m
 
     exit  # Exit root user
 EOF

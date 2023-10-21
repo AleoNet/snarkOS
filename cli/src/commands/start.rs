@@ -109,6 +109,10 @@ pub struct Start {
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
+    /// If the flag is set, the node will not prefresh from a CDN
+    #[clap(long)]
+    pub nocdn: bool,
+
     /// Enables development mode, specify a unique ID for this node
     #[clap(long)]
     pub dev: Option<u16>,
@@ -195,7 +199,7 @@ impl Start {
         //  2. The user has explicitly disabled CDN.
         //  3. The node is a prover (no need to sync).
         //  4. The node type is not declared (defaults to client) (no need to sync).
-        if self.dev.is_some() || self.cdn.is_empty() || self.prover || is_no_node_type {
+        if self.dev.is_some() || self.cdn.is_empty() || self.nocdn || self.prover || is_no_node_type {
             None
         }
         // Enable the CDN otherwise.
@@ -256,6 +260,7 @@ impl Start {
                     }
                 }
             }
+            // Add the dev nodes to the trusted validators.
             if trusted_validators.is_empty() {
                 // To avoid ambiguity, we define the first few nodes to be the trusted validators to connect to.
                 for i in 0..2 {
@@ -266,8 +271,11 @@ impl Start {
             }
             // Set the node IP to `4130 + dev`.
             self.node = SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?;
-            // Set the REST IP to `3030 + dev`.
-            if !self.norest {
+            // If the `norest` flag is not set, or the `bft` flag was not overridden,
+            // then set the REST IP to `3030 + dev`.
+            //
+            // Note: the reason the `bft` flag is an option is to detect for remote devnet testing.
+            if !self.norest || self.bft.is_none() {
                 self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
             }
         }

@@ -6,7 +6,7 @@ Start by creating EC2 instances in the AWS console.
 - Ubuntu 22.04 LTS (not Amazon Linux)
 - Security Group - Inbound Policy
   - SSH - Port 22 - 0.0.0.0/0 (or your IP)
-  - Custom TCP - Port 3033 - 0.0.0.0/0
+  - Custom TCP - Port 3033 - 0.0.0.0/0 (or your IP)
   - Custom TCP - Port 4133 - 0.0.0.0/0
   - Custom TCP - Port 5000 - 0.0.0.0/0
 
