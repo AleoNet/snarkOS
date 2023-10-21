@@ -136,6 +136,12 @@ Ctrl+b :kill-session
 ```
 Then, press `Enter`.
 
-## 6. `stop.sh`
+## 6. `analytics.sh` (optional)
+
+This script generates analytics for the EC2 instances.
+
+To run this optional script, you must have Node.js installed.
+
+## 7. `stop.sh`
 
 This script stops snarkOS on the EC2 instances.
