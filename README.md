@@ -247,23 +247,28 @@ When no node type is specified, the node will default to `--client`.
 To run a local devnet with the script, start by installing `tmux`.
 
 <details><summary>macOS</summary>
+
 To install `tmux` on macOS, you can use the `Homebrew` package manager.
 If you haven't installed `Homebrew` yet, you can find instructions at [their website](https://brew.sh/).
 ```bash
 # Once Homebrew is installed, run:
 brew install tmux
 ```
+
 </details>
 
 <details><summary>Ubuntu</summary>
+
 On Ubuntu and other Debian-based systems, you can use the `apt` package manager:
 ```bash
 sudo apt update
 sudo apt install tmux
 ```
+
 </details>
 
 <details><summary>Windows</summary>
+
 There are a couple of ways to use `tmux` on Windows:
 
 ### Using Windows Subsystem for Linux (WSL)
@@ -274,6 +279,7 @@ There are a couple of ways to use `tmux` on Windows:
 sudo apt update
 sudo apt install tmux
 ```
+
 </details>
 
 #### 6.3.2 Start a Local Devnet
