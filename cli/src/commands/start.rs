@@ -271,11 +271,11 @@ impl Start {
             }
             // Set the node IP to `4130 + dev`.
             self.node = SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?;
-            // If the `norest` flag is not set, or the `bft` flag was not overridden,
+            // If the `norest` flag is not set, and the `bft` flag was not overridden,
             // then set the REST IP to `3030 + dev`.
             //
             // Note: the reason the `bft` flag is an option is to detect for remote devnet testing.
-            if !self.norest || self.bft.is_none() {
+            if !self.norest && self.bft.is_none() {
                 self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
             }
         }
