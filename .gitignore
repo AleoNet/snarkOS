@@ -5,6 +5,7 @@ storage*/
 wasm/Cargo.lock
 **/build
 **.ledger-*
+**.logs-*
 validator-*
 **.bft-storage-*/
 **proptest-regressions/

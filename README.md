@@ -240,6 +240,54 @@ cargo run --release -- start --nodisplay --dev <NODE_ID>
 
 When no node type is specified, the node will default to `--client`.
 
+### 6.3 Local Devnet
+
+#### 6.3.1 Start a Local Devnet
+
+To start a local devnet, run:
+```
+./.devnet.sh
+```
+Follow the instructions in the terminal to start the devnet.
+
+### 6.3.2 View a Local Devnet
+
+#### Switch Nodes (forward)
+
+To toggle to the next node in a local devnet, run:
+```
+Ctrl+b n
+```
+
+#### Switch Nodes (backwards)
+
+To toggle to the previous node in a local devnet, run:
+```
+Ctrl+b p
+```
+
+#### Select a Node (choose-tree)
+
+To select a node in a local devnet, run:
+```
+Ctrl+b w
+```
+
+#### Select a Node (manually)
+
+To select a node manually in a local devnet, run:
+```
+Ctrl+b :select-window -t {NODE_ID}
+```
+
+#### 6.3.3 Stop a Local Devnet
+
+To stop a local devnet, run:
+```
+Ctrl+b :kill-session
+```
+Then, press `Enter`.
+
 ##### Clean Up
 
 To clean up the node storage, run:
