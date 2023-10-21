@@ -40,8 +40,8 @@ fi
 log_dir=".logs-$(date +"%Y%m%d%H%M%S")"
 mkdir -p "$log_dir"
 
-# Create a new tmux session named "bft-nodes" with 4 windows
-tmux new-session -d -s "bft-nodes" -n "window0"
+# Create a new tmux session named "devnet"
+tmux new-session -d -s "devnet" -n "window0"
 
 # Generate validator indices from 0 to (total_validators - 1)
 validator_indices=($(seq 0 $((total_validators - 1))))
@@ -52,11 +52,11 @@ for validator_index in "${validator_indices[@]}"; do
   log_file="$log_dir/validator-$validator_index.log"
 
   # Create a new window with a unique name
-  tmux new-window -t "bft-nodes:$validator_index" -n "window$validator_index"
+  tmux new-window -t "devnet:$validator_index" -n "window$validator_index"
 
   # Send the command to start the validator to the new window and capture output to the log file
-  tmux send-keys -t "bft-nodes:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
+  tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
 done
 
 # Attach to the tmux session to view and interact with the windows
-tmux attach-session -t "bft-nodes"
+tmux attach-session -t "devnet"
