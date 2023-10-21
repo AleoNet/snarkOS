@@ -430,9 +430,9 @@ impl Start {
             // Efficiency mode
             4..=8 => 2,
             // Standard mode
-            9..=16 => 4,
+            9..=16 => 8,
             // Performance mode
-            _ => 8,
+            _ => 16,
         };
 
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
