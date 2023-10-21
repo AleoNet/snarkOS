@@ -7,36 +7,36 @@ NUM_INSTANCES="${NUM_INSTANCES:-16}"
 # Get the IP address of NODE 0 from the SSH config for aws-n0
 NODE_0_IP=$(awk '/Host aws-n0/{f=1} f&&/HostName/{print $2; exit}' ~/.ssh/config)
 
-# Define a function to start SnarkOS in a tmux session on a node
+# Define a function to start snarkOS in a tmux session on a node
 start_snarkos_in_tmux() {
   local NODE_ID=$1
   local NODE_IP=$2
 
-  # SSH into the node and start SnarkOS in a new tmux session
+  # SSH into the node and start snarkOS in a new tmux session
   ssh -o StrictHostKeyChecking=no aws-n$NODE_ID << EOF
     # Commands to run on the remote instance
     sudo -i  # Switch to root user
     WORKSPACE=~/snarkOS
     cd \$WORKSPACE
 
-    # Start SnarkOS within a new tmux session named "snarkos-session"
+    # Start snarkOS within a new tmux session named "snarkos-session"
     tmux new-session -d -s snarkos-session
 
-    # Send the SnarkOS start command to the tmux session with the NODE_ID
-    tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --dev $NODE_ID --dev-num-validators $NUM_INSTANCES --validator --validators $NODE_IP" C-m
+    # Send the snarkOS start command to the tmux session with the NODE_ID
+    tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --bft 0.0.0.0:5000 --dev $NODE_ID --dev-num-validators $NUM_INSTANCES --validator --validators $NODE_IP:5000" C-m
 
     exit  # Exit root user
 EOF
 
   # Check the exit status of the SSH command
   if [ $? -eq 0 ]; then
-    echo "SnarkOS started successfully in a tmux session on aws-n$NODE_ID."
+    echo "snarkOS started successfully in a tmux session on aws-n$NODE_ID."
   else
-    echo "Failed to start SnarkOS in a tmux session on aws-n$NODE_ID."
+    echo "Failed to start snarkOS in a tmux session on aws-n$NODE_ID."
   fi
 }
 
-# Loop through aws-n nodes and start SnarkOS in tmux sessions in parallel
+# Loop through aws-n nodes and start snarkOS in tmux sessions in parallel
 for NODE_ID in $(seq 0 $NUM_INSTANCES); do
   start_snarkos_in_tmux $NODE_ID "$NODE_0_IP" &
 done

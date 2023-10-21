@@ -336,7 +336,7 @@ cargo run --release -- clean --dev <NODE_ID>
 ```
 
 ## 7. Contributors
-Thank you for helping make SnarkOS better!  
+Thank you for helping make snarkOS better!  
 [🧐 What do the emojis mean?](https://allcontributors.org/docs/en/emoji-key)
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->

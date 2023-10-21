@@ -95,6 +95,42 @@ This script starts snarkOS on the EC2 instances.
 
 This script monitors the EC2 instances.
 
+#### Switch Nodes (forward)
+
+To toggle to the next node in a local devnet, run:
+```
+Ctrl+b n
+```
+
+#### Switch Nodes (backwards)
+
+To toggle to the previous node in a local devnet, run:
+```
+Ctrl+b p
+```
+
+#### Select a Node (choose-tree)
+
+To select a node in a local devnet, run:
+```
+Ctrl+b w
+```
+
+#### Select a Node (manually)
+
+To select a node manually in a local devnet, run:
+```
+Ctrl+b :select-window -t {NODE_ID}
+```
+
+#### Exit (But Keeps the Devnet Running)
+
+To exit the monitor, run:
+```
+Ctrl+b :kill-session
+```
+Then, press `Enter`.
+
 ## 6. `stop.sh`
 
 This script stops snarkOS on the EC2 instances.

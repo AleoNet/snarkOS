@@ -30,7 +30,7 @@ tmux attach-session -t "devnet-aws"
 #read -p "Enter the node ID (default: 0): " NODE_ID
 #NODE_ID="${NODE_ID:-0}"
 #
-## SSH into the node and attach to the SnarkOS tmux session
+## SSH into the node and attach to the snarkOS tmux session
 ##ssh -o StrictHostKeyChecking=no aws-n$NODE_ID << EOF
 ##  # Commands to run on the remote instance
 ##  sudo -i  # Switch to root user
