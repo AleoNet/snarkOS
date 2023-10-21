@@ -9,3 +9,5 @@ wasm/Cargo.lock
 validator-*
 **.bft-storage-*/
 **proptest-regressions/
+**package-lock.json
+**node_modules/
