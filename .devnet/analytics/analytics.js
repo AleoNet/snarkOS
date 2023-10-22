@@ -2,6 +2,10 @@ const fs = require('fs');
 const axios = require('axios');
 const yargs = require('yargs');
 
+// Dim text style escape code
+const dimStart = "\x1b[2m";
+const dimEnd = "\x1b[0m";
+
 // Function to fetch block data
 async function fetchBlockData(baseUrl, height) {
     try {
@@ -18,12 +22,7 @@ async function calculateAverageBlockTime(baseUrl, latestHeight) {
     let totalBlockTime = 0;
     let previousTimestamp = 0;
 
-    for (let height = 1; height <= latestHeight; height++) {
-        // Print the current height every 10 blocks
-        if (height % 10 === 0) {
-            console.log(`Processed ${height} blocks...`);
-        }
-
+    for (let height = latestHeight; height >= 1; height--) {
         const blockData = await fetchBlockData(baseUrl, height);
         if (!blockData) {
             continue;
@@ -33,16 +32,28 @@ async function calculateAverageBlockTime(baseUrl, latestHeight) {
 
         if (timestamp && timestamp > 0) {
             if (previousTimestamp > 0) {
-                const deltaTimestamp = timestamp - previousTimestamp;
+                const deltaTimestamp = Math.abs(timestamp - previousTimestamp);
                 // Skip outliers (to account for stopping the devnet and restarting it)
                 if (deltaTimestamp < 500) {
-                    console.log(`Block ${height} Delta Timestamp: ${deltaTimestamp}`);
+                    console.log(`Block ${height} - ${deltaTimestamp} seconds`);
                     totalBlockTime += deltaTimestamp;
                 } else {
-                    console.log(`Block ${height} Delta Timestamp: ${deltaTimestamp} (skipped)`);
+                    console.log(`Block ${height} - ${deltaTimestamp} seconds (skipped)`);
                 }
             }
             previousTimestamp = timestamp;
+        }
+
+        // Calculate and log the average block time thus far
+        const blocksProcessedSoFar = latestHeight - height + 1;
+        if (blocksProcessedSoFar > 1) {
+            const averageBlockTimeSoFar = (totalBlockTime / (blocksProcessedSoFar - 1)).toFixed(1);
+            console.log(`${dimStart}Average Block Time Thus Far - ${averageBlockTimeSoFar} seconds${dimEnd}\n`);
+        }
+
+        // Print the current height every 10 blocks
+        if (height % 10 === 0) {
+            console.log(`Processed ${blocksProcessedSoFar} blocks...\n`);
         }
     }
 
@@ -52,7 +63,7 @@ async function calculateAverageBlockTime(baseUrl, latestHeight) {
 
 // Function to calculate the number of rounds in each block
 async function calculateRoundsInBlocks(baseUrl, latestHeight) {
-    for (let height = 1; height <= latestHeight; height++) {
+    for (let height = latestHeight; height >= 1; height--) {
         const blockData = await fetchBlockData(baseUrl, height);
         if (!blockData) {
             continue;
@@ -62,7 +73,7 @@ async function calculateRoundsInBlocks(baseUrl, latestHeight) {
         const subdag = blockData?.authority?.subdag?.subdag;
         const numRounds = subdag ? Object.keys(subdag).length : 0;
 
-        console.log(`Block ${height} Number of Rounds: ${numRounds}`);
+        console.log(`Block ${height} - ${numRounds} rounds`);
     }
 }
 
@@ -73,7 +84,7 @@ async function fetchBlockMetrics(baseUrl, metricType) {
         try {
             const response = await axios.get(`${baseUrl}/height/latest`);
             const latestHeight = response.data;
-            console.log(`Latest Block Height: ${latestHeight}`);
+            console.log(`${dimStart}Latest Block Height: ${latestHeight}${dimEnd}`);
             return latestHeight;
         } catch (error) {
             console.error('Error fetching latest block height:', error.message);
@@ -85,6 +96,8 @@ async function fetchBlockMetrics(baseUrl, metricType) {
     if (latestHeight === null) {
         console.error('Unable to fetch latest block height, try again...');
         return;
+    } else {
+        console.log(``);
     }
 
     if (metricType === 'averageBlockTime') {
@@ -123,8 +136,8 @@ async function main() {
         const ipAddress = match[1];
         const baseUrl = `http://${ipAddress}:3033/testnet3/block`;
 
-        console.log(`IP Address: ${ipAddress}`);
-        console.log(`Base URL: ${baseUrl}`);
+        console.log(`${dimStart}IP Address: ${ipAddress}${dimEnd}`);
+        console.log(`${dimStart}Base URL: ${baseUrl}${dimEnd}`);
 
         // Fetch and output the specified block metric
         fetchBlockMetrics(baseUrl, argv['metric-type']);
