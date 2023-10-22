@@ -31,7 +31,7 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
@@ -49,8 +49,6 @@ const RECOMMENDED_MIN_NOFILES_LIMIT: u64 = 2048;
 const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 /// The development mode number of genesis committee members.
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
-/// The development mode number of nodes with public balance.
-const DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE: u16 = 50;
 
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
@@ -287,43 +285,61 @@ impl Start {
     fn parse_genesis<N: Network>(&self) -> Result<Block<N>> {
         if self.dev.is_some() {
             // Determine the number of genesis committee members.
-            let num_genesis_committee_members = match self.dev_num_validators {
-                Some(num_genesis_committee_members) => num_genesis_committee_members,
+            let num_committee_members = match self.dev_num_validators {
+                Some(num_committee_members) => num_committee_members,
                 None => DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
             };
+            ensure!(
+                num_committee_members >= DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
+                "Number of genesis committee members is too low"
+            );
 
             // Initialize the (fixed) RNG.
             let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
             // Initialize the development private keys.
-            let development_private_keys = (0..DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE)
-                .map(|_| PrivateKey::<N>::new(&mut rng))
-                .collect::<Result<Vec<_>>>()?;
+            let development_private_keys =
+                (0..num_committee_members).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
 
-            // Construct the committee members.
-            let members = development_private_keys
-                .iter()
-                .take(num_genesis_committee_members as usize)
-                .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_VALIDATOR_STAKE, true))))
-                .collect::<Result<indexmap::IndexMap<_, _>>>()?;
             // Construct the committee.
-            let committee = Committee::<N>::new(0u64, members)?;
+            let committee = {
+                // Calculate the committee stake per member.
+                let stake_per_member =
+                    N::STARTING_SUPPLY.saturating_div(2).saturating_div(num_committee_members as u64);
+                ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
 
-            // Determine the public balance per validator.
-            let public_balance_per_validator = (N::STARTING_SUPPLY
-                - (num_genesis_committee_members as u64 * MIN_VALIDATOR_STAKE))
-                / (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64);
-            assert_eq!(
-                N::STARTING_SUPPLY,
-                (num_genesis_committee_members as u64 * MIN_VALIDATOR_STAKE)
-                    + (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64 * public_balance_per_validator),
-                "The public balance per validator is not correct."
-            );
+                // Construct the committee members and distribute stakes evenly among committee members.
+                let members = development_private_keys
+                    .iter()
+                    .map(|private_key| Ok((Address::try_from(private_key)?, (stake_per_member, true))))
+                    .collect::<Result<indexmap::IndexMap<_, _>>>()?;
 
-            // Construct the public balances.
-            let public_balances = development_private_keys
+                // Output the committee.
+                Committee::<N>::new(0u64, members)?
+            };
+
+            // Calculate the public balance per validator.
+            let remaining_balance = N::STARTING_SUPPLY.saturating_sub(committee.total_stake());
+            let public_balance_per_validator = remaining_balance.saturating_div(num_committee_members as u64);
+
+            // Construct the public balances with fairly equal distribution.
+            let mut public_balances = development_private_keys
                 .iter()
                 .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+
+            // If there is some leftover balance, add it to the 0-th validator.
+            let leftover =
+                remaining_balance.saturating_sub(public_balance_per_validator * num_committee_members as u64);
+            if leftover > 0 {
+                let (_, balance) = public_balances.get_index_mut(0).unwrap();
+                *balance += leftover;
+            }
+
+            // Check if the sum of committee stakes and public balances equals the total starting supply.
+            let public_balances_sum: u64 = public_balances.values().map(|balance| *balance).sum();
+            if committee.total_stake() + public_balances_sum != N::STARTING_SUPPLY {
+                bail!("Sum of committee stakes and public balances does not equal total starting supply.");
+            }
 
             // Construct the genesis block.
             load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
