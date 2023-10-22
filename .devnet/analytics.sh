@@ -4,7 +4,7 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Navigate to the directory containing the JavaScript program
-cd "$SCRIPT_DIR/analytics"
+cd "$SCRIPT_DIR/.analytics"
 
 # Check if the 'node_modules' directory exists
 if [ ! -d "node_modules" ]; then

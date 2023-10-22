@@ -21,6 +21,7 @@ terminate_tmux_session() {
     # Command to terminate the tmux session
     sudo -i  # Switch to root user
     tmux kill-session -t snarkos-session
+    snarkos clean --dev $NODE_ID
 
     exit  # Exit root user
 EOF
