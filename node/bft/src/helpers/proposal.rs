@@ -28,6 +28,7 @@ use snarkvm::{
 
 use indexmap::IndexMap;
 use std::collections::HashSet;
+use tokio::task::spawn_blocking;
 
 pub struct Proposal<N: Network> {
     /// The proposed batch header.
@@ -132,7 +133,7 @@ impl<N: Network> Proposal<N> {
     }
 
     /// Adds a signature to the proposal, if the signature is valid.
-    pub fn add_signature(
+    pub async fn add_signature(
         &mut self,
         signer: Address<N>,
         signature: Signature<N>,
@@ -141,15 +142,17 @@ impl<N: Network> Proposal<N> {
     ) -> Result<()> {
         // Ensure the signer is in the committee.
         if !committee.is_committee_member(signer) {
-            bail!("Signature is from a non-committee peer '{signer}'")
+            bail!("Signature from a non-committee member - '{signer}'")
         }
         // Ensure the signer is new.
         if self.signers().contains(&signer) {
-            bail!("Signature is from a duplicate peer '{signer}'")
+            bail!("Duplicate signature from '{signer}'")
         }
-        // Verify the signature.
+        // Verify the signature. If the signature is not valid, return an error.
         // Note: This check ensures the peer's address matches the address of the signature.
-        if !signature.verify(&signer, &[self.batch_id(), Field::from_u64(timestamp as u64)]) {
+        let batch_id = self.batch_id();
+        let timestamp_ = Field::from_u64(timestamp as u64);
+        if !spawn_blocking(move || signature.verify(&signer, &[batch_id, timestamp_])).await.unwrap_or(false) {
             bail!("Signature verification failed")
         }
         // Check the timestamp for liveness.
