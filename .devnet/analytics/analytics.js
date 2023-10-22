@@ -4,8 +4,8 @@ const axios = require('axios');
 // Read the ~/.ssh/config file
 const sshConfigFile = fs.readFileSync(`${process.env.HOME}/.ssh/config`, 'utf8');
 
-// Define the AWS node name to search for (e.g., aws-n0)
-const awsNodeName = 'aws-n0';
+// Define the AWS node name to search for (e.g., aws-n1)
+const awsNodeName = 'aws-n1';
 
 // Use regular expressions to extract the IP address associated with aws-n0
 const regex = new RegExp(`Host\\s+${awsNodeName}[\\s\\S]*?HostName\\s+(\\S+)`);
@@ -54,8 +54,13 @@ if (match && match[1]) {
                 if (timestamp && timestamp > 0) {
                     if (previousTimestamp > 0) {
                         const deltaTimestamp = timestamp - previousTimestamp;
-                        console.log(`Block ${height} Delta Timestamp: ${deltaTimestamp}`);
-                        totalBlockTime += deltaTimestamp;
+                        // Skip outliers (to account for stopping the devnet and restarting it)
+                        if (deltaTimestamp < 500) {
+                            console.log(`Block ${height} Delta Timestamp: ${deltaTimestamp}`);
+                            totalBlockTime += deltaTimestamp;
+                        } else {
+                            console.log(`Block ${height} Delta Timestamp: ${deltaTimestamp} (skipped)`);
+                        }
                     }
                     previousTimestamp = timestamp;
                 }
