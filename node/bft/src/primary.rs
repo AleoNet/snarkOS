@@ -55,7 +55,6 @@ use colored::Colorize;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
@@ -370,8 +369,11 @@ impl<N: Network> Primary<N> {
 
         // Determined the required number of transmissions per worker.
         let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
-        // Take the transmissions from the workers.
+        // Initialize the map of transmissions.
         let mut transmissions: IndexMap<_, _> = Default::default();
+        // Initialize a tracker for the number of transactions.
+        let mut num_transactions = 0;
+        // Take the transmissions from the workers.
         for worker in self.workers.iter() {
             for (id, transmission) in worker.drain(num_transmissions_per_worker) {
                 // Check if the transmission has been stored already.
@@ -399,6 +401,8 @@ impl<N: Network> Primary<N> {
                             trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
                             continue;
                         }
+                        // Increment the number of transactions.
+                        num_transactions += 1;
                     }
                     // Note: We explicitly forbid including ratifications,
                     // as the protocol currently does not support ratifications.
@@ -410,21 +414,19 @@ impl<N: Network> Primary<N> {
                 transmissions.insert(id, transmission);
             }
         }
-        trace!("Proposing - {} transmissions", transmissions.len());
-        // Determine if there is at least one unconfirmed transaction to propose.
-        let has_unconfirmed_transaction = transmissions.par_keys().any(|id| {
-            matches!(id, TransmissionID::Transaction(..)) && !self.ledger.contains_transmission(id).unwrap_or(true)
-        });
-        // If the batch is not ready to be proposed, return early.
-        match has_unconfirmed_transaction {
-            true => info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len()),
-            false => {
-                debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transmissions)".dimmed());
-                return Ok(());
-            }
+        // If there are no unconfirmed transmissions to propose, return early.
+        if transmissions.is_empty() {
+            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transmissions)".dimmed());
+            return Ok(());
+        }
+        // If there are no unconfirmed transactions to propose, return early.
+        if num_transactions == 0 {
+            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transactions)".dimmed());
+            return Ok(());
         }
 
         /* Proceeding to sign & propose the batch. */
+        info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len());
 
         // Retrieve the private key.
         let private_key = *self.gateway.account().private_key();
