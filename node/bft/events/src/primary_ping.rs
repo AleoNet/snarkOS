@@ -124,6 +124,13 @@ pub mod prop_tests {
             primary_ping.primary_certificate.deserialize_blocking().unwrap(),
             decoded.primary_certificate.deserialize_blocking().unwrap(),
         );
-        assert_eq!(primary_ping.batch_certificates, decoded.batch_certificates);
+        assert!(
+            primary_ping
+                .batch_certificates
+                .into_iter()
+                .map(|bc| bc.deserialize_blocking().unwrap())
+                .zip(decoded.batch_certificates.into_iter().map(|bc| bc.deserialize_blocking().unwrap()))
+                .all(|(a, b)| a == b)
+        )
     }
 }
