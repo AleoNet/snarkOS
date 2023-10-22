@@ -1,8 +1,16 @@
 #!/bin/bash
 
+# Determine the number of AWS EC2 instances by checking ~/.ssh/config
+NODE_ID=0
+while [ -n "$(grep "aws-n${NODE_ID}" ~/.ssh/config)" ]; do
+    NODE_ID=$((NODE_ID + 1))
+done
+
 # Read the number of AWS EC2 instances to query from the user
-read -p "Enter the number of AWS EC2 instances to query (default: 16): " NUM_INSTANCES
-NUM_INSTANCES="${NUM_INSTANCES:-16}"
+read -p "Enter the number of AWS EC2 instances to query (default: $NODE_ID): " NUM_INSTANCES
+NUM_INSTANCES="${NUM_INSTANCES:-$NODE_ID}"
+
+echo "Using $NUM_INSTANCES AWS EC2 instances for querying."
 
 # Get the IP address of NODE 0 from the SSH config for aws-n0
 NODE_0_IP=$(awk '/Host aws-n0/{f=1} f&&/HostName/{print $2; exit}' ~/.ssh/config)
