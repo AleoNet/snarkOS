@@ -14,5 +14,24 @@ else
   echo "Node.js dependencies already installed."
 fi
 
-# Call the JavaScript program using Node.js
-npm start
+# Prompt the user to select a metric type
+PS3="Select a metric type: "
+options=("Average Block Time" "Rounds in Blocks" "Quit")
+select opt in "${options[@]}"
+do
+  case $opt in
+    "Average Block Time")
+      npm run averageBlockTime
+      break
+      ;;
+    "Rounds in Blocks")
+      npm run roundsInBlocks
+      break
+      ;;
+    "Quit")
+      echo "Quitting..."
+      break
+      ;;
+    *) echo "Invalid option";;
+  esac
+done
