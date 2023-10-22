@@ -108,6 +108,21 @@ pub enum EventOrBytes<N: Network> {
     Event(Event<N>),
 }
 
+impl<N: Network> ToBytes for EventOrBytes<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        match self {
+            Self::Bytes(bytes) => {
+                0u8.write_le(&mut writer)?;
+                writer.write_all(bytes)
+            }
+            Self::Event(event) => {
+                1u8.write_le(&mut writer)?;
+                event.write_le(writer)
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct PostHandshakeState {
     state: Arc<StatelessTransportState>,
@@ -346,7 +361,8 @@ mod tests {
         let mut ciphertext = BytesMut::new();
 
         assert!(initiator_codec.encode(msg.clone(), &mut ciphertext).is_ok());
-        assert_eq!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(), msg);
+        let decoded = responder_codec.decode(&mut ciphertext).unwrap().unwrap();
+        assert_eq!(decoded.to_bytes_le().unwrap(), msg.to_bytes_le().unwrap());
     }
 
     #[proptest]
