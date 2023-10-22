@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::Storage;
 use snarkvm::{
     console::prelude::*,
     ledger::{
@@ -28,16 +27,21 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct Ready<N: Network> {
-    /// The storage.
-    storage: Storage<N>,
     /// The current map of `(transmission ID, transmission)` entries.
     transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>>,
 }
 
+impl<N: Network> Default for Ready<N> {
+    /// Initializes a new instance of the ready queue.
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<N: Network> Ready<N> {
     /// Initializes a new instance of the ready queue.
-    pub fn new(storage: Storage<N>) -> Self {
-        Self { storage, transmissions: Default::default() }
+    pub fn new() -> Self {
+        Self { transmissions: Default::default() }
     }
 
     /// Returns `true` if the ready queue is empty.
@@ -107,27 +111,14 @@ impl<N: Network> Ready<N> {
     /// Returns `true` if the transmission is new, and was added to the ready queue.
     pub fn insert(&self, transmission_id: impl Into<TransmissionID<N>>, transmission: Transmission<N>) -> bool {
         let transmission_id = transmission_id.into();
-
-        // TODO (howardwu): Ensure it does not exist in the ledger. Add a ledger service.
-        // Determine if the transmission is new.
-        let is_new = !self.contains(transmission_id) && !self.storage.contains_transmission(transmission_id);
-        // If the transmission is new, insert it.
-        if is_new {
-            // Insert the transmission ID.
-            self.transmissions.write().insert(transmission_id, transmission);
-        }
+        // Insert the transmission ID.
+        let is_new = self.transmissions.write().insert(transmission_id, transmission).is_none();
         // Return whether the transmission is new.
         is_new
     }
 
-    /// Retains the transmissions that satisfy the specified predicate.
-    pub fn retain(&self, predicate: impl FnMut(&TransmissionID<N>, &mut Transmission<N>) -> bool) {
-        // Retain the transmissions.
-        self.transmissions.write().retain(predicate);
-    }
-
-    /// Removes the specified number of transmissions and returns them.
-    pub fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+    /// Removes up to the specified number of transmissions and returns them.
+    pub fn drain(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
         // Acquire the write lock.
         let mut transmissions = self.transmissions.write();
         // Determine the number of transmissions to drain.
@@ -140,8 +131,6 @@ impl<N: Network> Ready<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helpers::Storage;
-    use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::ledger::{coinbase::PuzzleCommitment, narwhal::Data};
 
     use ::bytes::Bytes;
@@ -155,14 +144,8 @@ mod tests {
         // Sample random fake bytes.
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
 
-        // Sample a committee.
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
-        // Initialize the ledger.
-        let ledger = Arc::new(MockLedgerService::new(committee));
-        // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
         // Initialize the ready queue.
-        let ready = Ready::<CurrentNetwork>::new(storage);
+        let ready = Ready::<CurrentNetwork>::new();
 
         // Initialize the commitments.
         let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
@@ -198,7 +181,7 @@ mod tests {
         assert_eq!(ready.get(commitment_unknown), None);
 
         // Drain the ready queue.
-        let transmissions = ready.take(3);
+        let transmissions = ready.drain(3);
 
         // Check the number of transmissions.
         assert!(ready.is_empty());
@@ -224,14 +207,8 @@ mod tests {
         rng.fill_bytes(&mut vec);
         let data = Data::Buffer(Bytes::from(vec));
 
-        // Sample a committee.
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
-        // Initialize the ledger.
-        let ledger = Arc::new(MockLedgerService::new(committee));
-        // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
         // Initialize the ready queue.
-        let ready = Ready::<CurrentNetwork>::new(storage);
+        let ready = Ready::<CurrentNetwork>::new();
 
         // Initialize the commitments.
         let commitment = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));

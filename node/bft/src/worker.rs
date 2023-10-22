@@ -32,7 +32,6 @@ use snarkvm::{
     },
 };
 
-use futures::StreamExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
@@ -75,10 +74,10 @@ impl<N: Network> Worker<N> {
         Ok(Self {
             id,
             gateway,
-            storage: storage.clone(),
+            storage,
             ledger,
             proposed_batch,
-            ready: Ready::new(storage),
+            ready: Default::default(),
             pending: Default::default(),
             handles: Default::default(),
         })
@@ -192,44 +191,9 @@ impl<N: Network> Worker<N> {
         Ok((transmission_id, transmission))
     }
 
-    /// Removes the specified number of transmissions from the ready queue, and returns them.
-    pub(crate) async fn take_candidates(
-        &self,
-        num_transmissions: usize,
-    ) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        // Iterate through the ready transmissions, and determine which should be retained.
-        let keep = futures::stream::iter(self.ready.transmissions())
-            .filter_map(|(id, transmission)| async move {
-                // Check if the transmission has been stored already.
-                if self.storage.contains_transmission(id) {
-                    return None;
-                }
-                // Check if the proposed batch already contains the transmission.
-                if let Some(proposed_batch) = self.proposed_batch.read().as_ref() {
-                    if proposed_batch.contains_transmission(id) {
-                        return None;
-                    }
-                }
-                // Check if the ledger already contains the transmission.
-                if self.ledger.contains_transmission(&id).unwrap_or(false) {
-                    return None;
-                }
-                // If the transmission is a solution, ensure the solution is still valid.
-                if let (TransmissionID::Solution(commitment), Transmission::Solution(solution)) = (id, transmission) {
-                    // Check if the solution is still valid.
-                    if self.ledger.check_solution_basic(commitment, solution).await.is_err() {
-                        return None;
-                    }
-                }
-                Some(id)
-            })
-            .collect::<IndexSet<_>>()
-            .await;
-
-        // Retain the transmissions that are not in the storage or ledger.
-        self.ready.retain(|id, _| keep.contains(id));
-        // Remove the specified number of transmissions from the ready queue.
-        self.ready.take(num_transmissions).into_iter()
+    /// Removes up to the specified number of transmissions from the ready queue, and returns them.
+    pub(crate) fn drain(&self, num_transmissions: usize) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.ready.drain(num_transmissions).into_iter()
     }
 
     /// Reinserts the specified transmission into the ready queue.
@@ -271,12 +235,13 @@ impl<N: Network> Worker<N> {
         if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_WORKER {
             return Ok(());
         }
-        trace!("Worker {} - Found a new transmission ID '{}' from '{peer_ip}'", self.id, fmt_id(transmission_id));
         // Send an transmission request to the peer.
         let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
         // Ensure the transmission ID matches.
         ensure!(candidate_id == transmission_id, "Invalid transmission ID");
         // Insert the transmission into the ready queue.
+        // Note: This method checks `contains_transmission` again, because by the time the transmission is fetched,
+        // it could have already been inserted into the ready queue.
         self.process_transmission_from_peer(peer_ip, transmission_id, transmission);
         Ok(())
     }
@@ -288,10 +253,22 @@ impl<N: Network> Worker<N> {
         transmission_id: TransmissionID<N>,
         transmission: Transmission<N>,
     ) {
-        // Check if the transmission ID exists.
-        if !self.contains_transmission(transmission_id) {
-            // Insert the transmission into the ready queue.
-            self.ready.insert(transmission_id, transmission);
+        // If the transmission ID already exists, then do not store it.
+        if self.contains_transmission(transmission_id) {
+            return;
+        }
+        // Ensure the transmission ID and transmission type matches.
+        let is_well_formed = match (&transmission_id, &transmission) {
+            (TransmissionID::Solution(_), Transmission::Solution(_)) => true,
+            (TransmissionID::Transaction(_), Transmission::Transaction(_)) => true,
+            // Note: We explicitly forbid inserting ratifications into the ready queue,
+            // as the protocol currently does not support ratifications.
+            (TransmissionID::Ratification, Transmission::Ratification) => false,
+            // All other combinations are clearly invalid.
+            _ => false,
+        };
+        // If the transmission ID and transmission type matches, then insert the transmission into the ready queue.
+        if is_well_formed && self.ready.insert(transmission_id, transmission) {
             trace!("Worker {} - Added transmission '{}' from '{peer_ip}'", self.id, fmt_id(transmission_id));
         }
     }
@@ -303,22 +280,22 @@ impl<N: Network> Worker<N> {
         puzzle_commitment: PuzzleCommitment<N>,
         prover_solution: Data<ProverSolution<N>>,
     ) -> Result<()> {
-        // Construct the transmission.
-        let transmission = Transmission::Solution(prover_solution.clone());
-        // Remove the puzzle commitment from the pending queue.
-        self.pending.remove(puzzle_commitment, Some(transmission.clone()));
-
         // Check if the solution exists.
         if self.contains_transmission(puzzle_commitment) {
             bail!("Solution '{}' already exists.", fmt_id(puzzle_commitment));
         }
         // Check that the solution is well-formed and unique.
-        if let Err(e) = self.ledger.check_solution_basic(puzzle_commitment, prover_solution).await {
+        if let Err(e) = self.ledger.check_solution_basic(puzzle_commitment, prover_solution.clone()).await {
             bail!("Invalid unconfirmed solution '{}': {e}", fmt_id(puzzle_commitment));
         }
+        // Construct the transmission.
+        let transmission = Transmission::Solution(prover_solution);
+        // Remove the puzzle commitment from the pending queue.
+        self.pending.remove(puzzle_commitment, Some(transmission.clone()));
         // Adds the prover solution to the ready queue.
-        self.ready.insert(puzzle_commitment, transmission);
-        trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
+        if self.ready.insert(puzzle_commitment, transmission) {
+            trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
+        }
         Ok(())
     }
 
@@ -328,22 +305,22 @@ impl<N: Network> Worker<N> {
         transaction_id: N::TransactionID,
         transaction: Data<Transaction<N>>,
     ) -> Result<()> {
-        // Construct the transmission.
-        let transmission = Transmission::Transaction(transaction.clone());
-        // Remove the transaction from the pending queue.
-        self.pending.remove(&transaction_id, Some(transmission.clone()));
-
         // Check if the transaction ID exists.
         if self.contains_transmission(&transaction_id) {
             bail!("Transaction '{}' already exists.", fmt_id(transaction_id));
         }
         // Check that the transaction is well-formed and unique.
-        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
+        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction.clone()).await {
             bail!("Invalid unconfirmed transaction '{}': {e}", fmt_id(transaction_id));
         }
+        // Construct the transmission.
+        let transmission = Transmission::Transaction(transaction);
+        // Remove the transaction from the pending queue.
+        self.pending.remove(&transaction_id, Some(transmission.clone()));
         // Adds the transaction to the ready queue.
-        self.ready.insert(&transaction_id, transmission);
-        trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
+        if self.ready.insert(&transaction_id, transmission) {
+            trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
+        }
         Ok(())
     }
 }
@@ -548,7 +525,7 @@ mod tests {
         assert!(worker.ready.contains(transmission_id));
         assert_eq!(worker.get_transmission(transmission_id), Some(transmission));
         // Take the transmission from the ready set.
-        let transmission: Vec<_> = worker.take_candidates(1).await.collect();
+        let transmission: Vec<_> = worker.drain(1).collect();
         assert_eq!(transmission.len(), 1);
         assert!(!worker.ready.contains(transmission_id));
     }
