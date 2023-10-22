@@ -145,3 +145,7 @@ To run this optional script, you must have Node.js installed.
 ## 7. `stop.sh`
 
 This script stops snarkOS on the EC2 instances.
+
+## 8. `clean.sh`
+
+This script stops snarkOS on the EC2 instances, and removes the ledger DB from the EC2 instances.
