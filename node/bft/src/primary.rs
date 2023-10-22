@@ -437,8 +437,8 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
-        // Acquire the lock.
-        let _lock = self.lock.lock().await;
+        // // Acquire the lock.
+        // let _lock = self.lock.lock().await;
 
         // Ensure the batch proposal is from the validator.
         if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != batch_header.author()) {
@@ -525,8 +525,8 @@ impl<N: Network> Primary<N> {
             bail!("Invalid peer - received a batch signature from myself ({signer})");
         }
 
-        // Acquire the lock.
-        let _lock = self.lock.lock().await;
+        // // Acquire the lock.
+        // let _lock = self.lock.lock().await;
 
         let proposal = {
             // Acquire the write lock.
@@ -600,8 +600,8 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // Acquire the lock.
-        let _lock = self.lock.lock().await;
+        // // Acquire the lock.
+        // let _lock = self.lock.lock().await;
 
         // Retrieve the batch certificate author.
         let author = certificate.author();
@@ -669,8 +669,8 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // Acquire the lock.
-        let _lock = self.lock.lock().await;
+        // // Acquire the lock.
+        // let _lock = self.lock.lock().await;
 
         // Retrieve the batch certificate author.
         let author = certificate.author();
