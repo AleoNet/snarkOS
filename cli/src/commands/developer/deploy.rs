@@ -102,13 +102,24 @@ impl Deploy {
             let fee = match &self.record {
                 Some(record) => {
                     let fee_record = Developer::parse_record(&private_key, record)?;
-                    let fee_authorization =
-                        vm.authorize_fee_private(&private_key, fee_record, minimum_deployment_cost, self.priority_fee, deployment_id, rng)?;
+                    let fee_authorization = vm.authorize_fee_private(
+                        &private_key,
+                        fee_record,
+                        minimum_deployment_cost,
+                        self.priority_fee,
+                        deployment_id,
+                        rng,
+                    )?;
                     vm.execute_fee_authorization(fee_authorization, Some(query), rng)?
                 }
                 None => {
-                    let fee_authorization =
-                        vm.authorize_fee_public(&private_key, minimum_deployment_cost, self.priority_fee, deployment_id, rng)?;
+                    let fee_authorization = vm.authorize_fee_public(
+                        &private_key,
+                        minimum_deployment_cost,
+                        self.priority_fee,
+                        deployment_id,
+                        rng,
+                    )?;
                     vm.execute_fee_authorization(fee_authorization, Some(query), rng)?
                 }
             };
