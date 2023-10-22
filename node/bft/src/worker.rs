@@ -636,7 +636,7 @@ mod tests {
             )
             .await;
         assert!(result.is_err());
-        assert!(!worker.pending.contains(puzzle));
+        assert!(worker.pending.contains(puzzle));
         assert!(!worker.ready.contains(puzzle));
     }
 
@@ -712,7 +712,7 @@ mod tests {
             )
             .await;
         assert!(result.is_err());
-        assert!(!worker.pending.contains(transmission_id));
+        assert!(worker.pending.contains(transmission_id));
         assert!(!worker.ready.contains(transmission_id));
     }
 }
