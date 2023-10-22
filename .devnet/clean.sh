@@ -20,6 +20,9 @@ terminate_tmux_session() {
   ssh -o StrictHostKeyChecking=no aws-n$NODE_ID << EOF
     # Command to terminate the tmux session
     sudo -i  # Switch to root user
+    WORKSPACE=~/snarkOS
+    cd \$WORKSPACE
+
     tmux kill-session -t snarkos-session
     snarkos clean --dev $NODE_ID
 
