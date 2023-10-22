@@ -141,13 +141,13 @@ impl<N: Network> Proposal<N> {
     ) -> Result<()> {
         // Ensure the signer is in the committee.
         if !committee.is_committee_member(signer) {
-            bail!("Signature is from a non-committee peer '{signer}'")
+            bail!("Signature from a non-committee member - '{signer}'")
         }
         // Ensure the signer is new.
         if self.signers().contains(&signer) {
-            bail!("Signature is from a duplicate peer '{signer}'")
+            bail!("Duplicate signature from '{signer}'")
         }
-        // Verify the signature.
+        // Verify the signature. If the signature is not valid, return an error.
         // Note: This check ensures the peer's address matches the address of the signature.
         if !signature.verify(&signer, &[self.batch_id(), Field::from_u64(timestamp as u64)]) {
             bail!("Signature verification failed")

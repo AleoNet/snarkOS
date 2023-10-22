@@ -585,16 +585,14 @@ impl<N: Network> Primary<N> {
                             false => bail!("Unknown batch ID '{batch_id}'"),
                         }
                     }
-
                     // Retrieve the previous committee for the round.
                     let previous_committee = self.ledger.get_previous_committee_for_round(proposal.round())?;
-
-                    // Retrieve the address of the peer.
-                    match self.gateway.resolver().get_address(peer_ip) {
-                        // Add the signature to the batch.
-                        Some(signer) => proposal.add_signature(signer, signature, timestamp, &previous_committee)?,
-                        None => bail!("Signature is from a disconnected peer"),
+                    // Retrieve the address of the validator.
+                    let Some(signer) = self.gateway.resolver().get_address(peer_ip) else {
+                        bail!("Signature is from a disconnected validator");
                     };
+                    // Add the signature to the batch.
+                    proposal.add_signature(signer, signature, timestamp, &previous_committee)?;
                     info!("Received a batch signature for round {} from '{peer_ip}'", proposal.round());
                     // Check if the batch is ready to be certified.
                     if !proposal.is_quorum_threshold_reached(&previous_committee) {
