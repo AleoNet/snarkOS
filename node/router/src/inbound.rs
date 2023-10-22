@@ -43,7 +43,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// The maximum number of puzzle requests per interval.
     const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 9; // 9 seconds
+    const PING_SLEEP_IN_SECS: u64 = 20; // 20 seconds
 
     /// Handles the inbound message from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, message: Message<N>) -> Result<()> {
@@ -53,9 +53,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             None => bail!("Unable to resolve the (ambiguous) peer address '{peer_addr}'"),
         };
 
-        // Drop the peer, if they have sent more than 1000 messages in the last 5 seconds.
+        // Drop the peer, if they have sent more than 500 messages in the last 5 seconds.
         let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
-        if num_messages >= 1000 {
+        if num_messages >= 500 {
             bail!("Dropping '{peer_ip}' for spamming messages (num_messages = {num_messages})")
         }
 
@@ -145,15 +145,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 {
                     bail!("[Ping] {error}");
                 }
-
-                // TODO (howardwu): For this case, check that the peer is not within NUM_RECENTS, and disconnect.
-                //  As the validator, you should disconnect any node type that is not caught up.
-
-                // // If this node is a validator, the peer is not a validator and is syncing, proceed to disconnect.
-                // if self.node_type == NodeType::Validator && node_type != NodeType::Validator && peer_status == Status::Syncing {
-                //     warn!("Dropping '{peer_addr}' as this node is ahead");
-                //     return Some(DisconnectReason::INeedToSyncFirst);
-                // }
 
                 // Process the ping message.
                 match self.ping(peer_ip, message) {
