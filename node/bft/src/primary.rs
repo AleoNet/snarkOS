@@ -376,11 +376,6 @@ impl<N: Network> Primary<N> {
         // Take the transmissions from the workers.
         for worker in self.workers.iter() {
             for (id, transmission) in worker.drain(num_transmissions_per_worker) {
-                // Check if the transmission has been stored already.
-                if self.storage.contains_transmission(id) {
-                    trace!("Proposing - Skipping transmission '{}' - Already in a certificate", fmt_id(id));
-                    continue;
-                }
                 // Check if the ledger already contains the transmission.
                 if self.ledger.contains_transmission(&id).unwrap_or(true) {
                     trace!("Proposing - Skipping transmission '{}' - Already in ledger", fmt_id(id));
@@ -389,6 +384,11 @@ impl<N: Network> Primary<N> {
                 // Check the transmission is still valid.
                 match (id, transmission.clone()) {
                     (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
+                        // Check if the solution has been stored already.
+                        if self.storage.contains_transmission(id) {
+                            trace!("Proposing - Skipping solution '{}' - Already in a certificate", fmt_id(id));
+                            continue;
+                        }
                         // Check if the solution is still valid.
                         if let Err(e) = self.ledger.check_solution_basic(solution_id, solution).await {
                             trace!("Proposing - Skipping solution '{}' - {e}", fmt_id(solution_id));
@@ -396,6 +396,13 @@ impl<N: Network> Primary<N> {
                         }
                     }
                     (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+                        // If there is at least one transaction in the batch, then proceed to
+                        // check if this transaction has been stored already.
+                        // Note: This optimization is required to ensure the block does not contain 0 transactions.
+                        if num_transactions > 0 && self.storage.contains_transmission(id) {
+                            trace!("Proposing - Skipping transaction '{}' - Already in a certificate", fmt_id(id));
+                            continue;
+                        }
                         // Check if the transaction is still valid.
                         if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
                             trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
