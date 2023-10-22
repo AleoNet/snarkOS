@@ -4,18 +4,6 @@
 read -p "Enter the EC2 instance name to filter by (e.g. Name) (default: testnet3): " INSTANCE_NAME
 INSTANCE_NAME="${INSTANCE_NAME:-testnet3}"
 
-# Determine the number of AWS EC2 instances by checking ~/.ssh/config
-NODE_ID=0
-while [ -n "$(grep "aws-n${NODE_ID}" ~/.ssh/config)" ]; do
-    NODE_ID=$((NODE_ID + 1))
-done
-
-# Read the number of AWS EC2 instances to query from the user
-read -p "Enter the number of AWS EC2 instances to query (default: $NODE_ID): " NUM_INSTANCES
-NUM_INSTANCES="${NUM_INSTANCES:-$NODE_ID}"
-
-echo "Using $NUM_INSTANCES AWS EC2 instances for querying."
-
 # Read the PEM file path from the user or use the default in ~/.ssh
 read -p "Enter the PEM file path (default: ~/.ssh/s3-testnet3.pem): " PEM_FILE
 PEM_FILE="${PEM_FILE:-~/.ssh/s3-testnet3.pem}"
