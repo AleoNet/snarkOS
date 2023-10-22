@@ -336,7 +336,7 @@ impl Start {
             }
 
             // Check if the sum of committee stakes and public balances equals the total starting supply.
-            let public_balances_sum: u64 = public_balances.values().map(|balance| *balance).sum();
+            let public_balances_sum: u64 = public_balances.values().copied().sum();
             if committee.total_stake() + public_balances_sum != N::STARTING_SUPPLY {
                 bail!("Sum of committee stakes and public balances does not equal total starting supply.");
             }
