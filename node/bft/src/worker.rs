@@ -254,9 +254,9 @@ impl<N: Network> Worker<N> {
         transmission: Transmission<N>,
     ) {
         // If the transmission ID already exists, then do not store it.
-        if self.contains_transmission(transmission_id) {
-            return;
-        }
+        // if self.contains_transmission(transmission_id) {
+        //     return;
+        // }
         // Ensure the transmission ID and transmission type matches.
         let is_well_formed = match (&transmission_id, &transmission) {
             (TransmissionID::Solution(_), Transmission::Solution(_)) => true,
