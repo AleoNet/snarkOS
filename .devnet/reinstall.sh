@@ -29,6 +29,7 @@ run_installation() {
     if [ -d "\$WORKSPACE" ]; then
       # The workspace directory exists, update the existing repository
       cd \$WORKSPACE
+      git checkout $BRANCH  # Checkout the specified branch
       git pull origin $BRANCH
     else
       # The workspace directory doesn't exist, clone the repository
