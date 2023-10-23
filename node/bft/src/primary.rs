@@ -64,7 +64,7 @@ use std::{
 };
 use tokio::{
     sync::{Mutex as TMutex, OnceCell},
-    task::{self, JoinHandle},
+    task::JoinHandle,
 };
 
 /// A helper type for an optional proposed batch.
@@ -463,7 +463,7 @@ impl<N: Network> Primary<N> {
         let BatchPropose { round: batch_round, batch_header } = batch_propose;
 
         // Deserialize the batch header.
-        let batch_header = task::spawn_blocking(move || batch_header.deserialize_blocking()).await??;
+        let batch_header = spawn_blocking!(batch_header.deserialize_blocking())?;
         // Ensure the round matches in the batch header.
         if batch_round != batch_header.round() {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
@@ -810,9 +810,7 @@ impl<N: Network> Primary<N> {
                 }
 
                 // Deserialize the primary certificate in the primary ping.
-                let Ok(Ok(primary_certificate)) =
-                    task::spawn_blocking(move || primary_certificate.deserialize_blocking()).await
-                else {
+                let Ok(primary_certificate) = spawn_blocking!(primary_certificate.deserialize_blocking()) else {
                     warn!("Failed to deserialize primary certificate in a primary ping from '{peer_ip}'");
                     continue;
                 };
@@ -824,9 +822,7 @@ impl<N: Network> Primary<N> {
                 // Iterate through the batch certificates.
                 for batch_certificate in batch_certificates {
                     // Deserialize the batch certificate in the primary ping.
-                    let Ok(Ok(batch_certificate)) =
-                        task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
-                    else {
+                    let Ok(batch_certificate) = spawn_blocking!(batch_certificate.deserialize_blocking()) else {
                         warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
                         continue;
                     };
@@ -918,9 +914,7 @@ impl<N: Network> Primary<N> {
                 }
 
                 // Deserialize the batch certificate.
-                let Ok(Ok(batch_certificate)) =
-                    task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
-                else {
+                let Ok(batch_certificate) = spawn_blocking!(batch_certificate.deserialize_blocking()) else {
                     warn!("Failed to deserialize the batch certificate from '{peer_ip}'");
                     continue;
                 };

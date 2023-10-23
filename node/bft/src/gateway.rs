@@ -15,6 +15,7 @@
 use crate::{
     events::{EventCodec, PrimaryPing},
     helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
+    spawn_blocking,
     CONTEXT,
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
@@ -1273,7 +1274,7 @@ impl<N: Network> Gateway<N> {
         // Retrieve the components of the challenge response.
         let ChallengeResponse { signature } = response;
         // Perform the deferred non-blocking deserialization of the signature.
-        let Ok(Ok(signature)) = task::spawn_blocking(move || signature.deserialize_blocking()).await else {
+        let Ok(signature) = spawn_blocking!(signature.deserialize_blocking()) else {
             warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (cannot deserialize the signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         };
