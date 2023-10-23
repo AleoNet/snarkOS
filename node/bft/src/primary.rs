@@ -42,7 +42,10 @@ use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
-    console::{prelude::*, types::Field},
+    console::{
+        prelude::*,
+        types::{Address, Field},
+    },
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -86,6 +89,8 @@ pub struct Primary<N: Network> {
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
     proposed_batch: Arc<ProposedBatch<N>>,
+    /// The recently-signed batch proposals (a map from the address to the round and batch ID).
+    signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, Field<N>)>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The primary lock.
@@ -115,6 +120,7 @@ impl<N: Network> Primary<N> {
             workers: Arc::from(vec![]),
             bft_sender: Default::default(),
             proposed_batch: Default::default(),
+            signed_proposals: Default::default(),
             handles: Default::default(),
             lock: Default::default(),
         })
@@ -489,6 +495,22 @@ impl<N: Network> Primary<N> {
             bail!("Invalid peer - proposed batch from myself ({})", batch_header.author());
         }
 
+        // Retrieve the cached round and batch ID for this validator.
+        if let Some((signed_round, signed_batch_id)) = self.signed_proposals.read().get(&batch_header.author()).copied()
+        {
+            // If the round matches and the batch ID differs, then the validator is malicious.
+            if signed_round == batch_header.round() && signed_batch_id != batch_header.batch_id() {
+                // Proceed to disconnect the validator.
+                self.gateway.disconnect(peer_ip);
+                bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
+            }
+            // If the round and batch ID matches, then skip signing the batch a second time.
+            if signed_round == batch_header.round() && signed_batch_id == batch_header.batch_id() {
+                debug!("Skipping a proposal for round {signed_round} from '{peer_ip}' {}", "(already signed)".dimmed());
+                return Ok(());
+            }
+        }
+
         // If the peer is ahead, use the batch header to sync up to the peer.
         let transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
 
@@ -512,6 +534,8 @@ impl<N: Network> Primary<N> {
         let account = self.gateway.account().clone();
         let signature =
             spawn_blocking!(account.sign(&[batch_id, Field::from_u64(now() as u64)], &mut rand::thread_rng()))?;
+        // Cache the round and batch ID for this validator.
+        self.signed_proposals.write().insert(batch_header.author(), (batch_header.round(), batch_id));
         // Broadcast the signature back to the validator.
         let self_ = self.clone();
         tokio::spawn(async move {
