@@ -203,6 +203,10 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         if transaction_id != transaction.id() {
             bail!("Invalid transaction - expected {transaction_id}, found {}", transaction.id());
         }
+        // Check if the transmission is a fee transaction.
+        if transaction.is_fee() {
+            bail!("Invalid transaction - 'Transaction::fee' type is not valid at this stage ({})", transaction.id());
+        }
         // Check the transaction is well-formed.
         let ledger = self.ledger.clone();
         spawn_blocking!(ledger.check_transaction_basic(&transaction, None))
