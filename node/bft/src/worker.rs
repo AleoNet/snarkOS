@@ -221,29 +221,41 @@ impl<N: Network> Worker<N> {
 
 impl<N: Network> Worker<N> {
     /// Handles the incoming transmission ID from a worker ping event.
-    async fn process_transmission_id_from_ping(
-        &self,
-        peer_ip: SocketAddr,
-        transmission_id: TransmissionID<N>,
-    ) -> Result<()> {
+    fn process_transmission_id_from_ping(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
         // Check if the transmission ID exists.
         if self.contains_transmission(transmission_id) {
-            return Ok(());
+            return;
         }
         // If the ready queue is full, then skip this transmission.
         // Note: We must prioritize the unconfirmed solutions and unconfirmed transactions, not transmissions.
         if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_WORKER {
-            return Ok(());
+            return;
         }
-        // Send an transmission request to the peer.
-        let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
-        // Ensure the transmission ID matches.
-        ensure!(candidate_id == transmission_id, "Invalid transmission ID");
-        // Insert the transmission into the ready queue.
-        // Note: This method checks `contains_transmission` again, because by the time the transmission is fetched,
-        // it could have already been inserted into the ready queue.
-        self.process_transmission_from_peer(peer_ip, transmission_id, transmission);
-        Ok(())
+        // Attempt to fetch the transmission from the peer.
+        let self_ = self.clone();
+        tokio::spawn(async move {
+            // Send an transmission request to the peer.
+            match self_.send_transmission_request(peer_ip, transmission_id).await {
+                // If the transmission was fetched, then process it.
+                Ok((candidate_id, transmission)) => {
+                    // Ensure the transmission ID matches.
+                    if candidate_id == transmission_id {
+                        // Insert the transmission into the ready queue.
+                        // Note: This method checks `contains_transmission` again, because by the time the transmission is fetched,
+                        // it could have already been inserted into the ready queue.
+                        self_.process_transmission_from_peer(peer_ip, transmission_id, transmission);
+                    }
+                }
+                // If the transmission was not fetched, then attempt to fetch it again.
+                Err(e) => {
+                    warn!(
+                        "Worker {} - Failed to fetch transmission '{}' from '{peer_ip}' (ping) - {e}",
+                        self_.id,
+                        fmt_id(transmission_id)
+                    );
+                }
+            }
+        });
     }
 
     /// Handles the incoming transmission from a peer.
@@ -334,13 +346,7 @@ impl<N: Network> Worker<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
-                if let Err(e) = self_.process_transmission_id_from_ping(peer_ip, transmission_id).await {
-                    warn!(
-                        "Worker {} - Failed to fetch transmission '{}' from '{peer_ip}' - {e}",
-                        self_.id,
-                        fmt_id(transmission_id)
-                    );
-                }
+                self_.process_transmission_id_from_ping(peer_ip, transmission_id);
             }
         });
 
