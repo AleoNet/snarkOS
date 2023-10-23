@@ -94,9 +94,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.get_solution(solution_id)
     }
 
-    /// Returns the transaction for the given transaction ID.
-    fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
-        self.inner.get_transaction(transaction_id)
+    /// Returns the unconfirmed transaction for the given transaction ID.
+    fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
+        self.inner.get_unconfirmed_transaction(transaction_id)
     }
 
     /// Returns the batch certificate for the given batch certificate ID.
