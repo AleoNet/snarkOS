@@ -53,7 +53,11 @@ pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile
 
         let filter = if verbosity >= 3 {
             filter
-                .add_directive("snarkos_node_bft=trace".parse().unwrap())
+                .add_directive("snarkos_node_bft::bft=trace".parse().unwrap())
+                .add_directive("snarkos_node_bft::primary=trace".parse().unwrap())
+                .add_directive("snarkos_node_bft::sync=trace".parse().unwrap())
+                .add_directive("snarkos_node_bft::worker=trace".parse().unwrap())
+                .add_directive("snarkos_node_bft::helpers=trace".parse().unwrap())
                 .add_directive("snarkos_node_bft::gateway=debug".parse().unwrap())
         } else {
             filter.add_directive("snarkos_node_bft=debug".parse().unwrap())
