@@ -469,9 +469,6 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
-        // // Acquire the lock.
-        // let _lock = self.lock.lock().await;
-
         // Ensure the batch proposal is from the validator.
         if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != batch_header.author()) {
             // Proceed to disconnect the validator.
@@ -489,33 +486,56 @@ impl<N: Network> Primary<N> {
             bail!("Invalid peer - proposed batch from myself ({})", batch_header.author());
         }
 
-        // If the peer is ahead, use the batch header to sync up to the peer.
-        let transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
-
-        // Ensure the batch is for the current round.
-        // This method must be called after fetching previous certificates (above),
-        // and prior to checking the batch header (below).
-        self.ensure_is_signing_round(batch_round)?;
-
-        // Ensure the batch header from the peer is valid.
-        let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
-        // Inserts the missing transmissions into the workers.
-        self.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
-
-        /* Proceeding to sign the batch. */
-
-        // Retrieve the batch ID.
-        let batch_id = batch_header.batch_id();
-        // Generate a timestamp.
-        let timestamp = now();
-        // Sign the batch ID.
-        let account = self.gateway.account().clone();
-        let signature =
-            spawn_blocking!(account.sign(&[batch_id, Field::from_u64(now() as u64)], &mut rand::thread_rng()))?;
         // Broadcast the signature back to the validator.
         let self_ = self.clone();
         tokio::spawn(async move {
-            let event = Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp));
+            // If the peer is ahead, use the batch header to sync up to the peer.
+            let transmissions = match self_.sync_with_batch_header_from_peer(peer_ip, &batch_header).await {
+                Ok(transmissions) => transmissions,
+                Err(e) => {
+                    warn!("Failed to sync with batch header from '{peer_ip}' - {e}");
+                    return;
+                }
+            };
+            // Ensure the batch is for the current round.
+            // This method must be called after fetching previous certificates (above),
+            // and prior to checking the batch header (below).
+            if let Err(e) = self_.ensure_is_signing_round(batch_round) {
+                warn!("{e}");
+                return;
+            }
+            // Ensure the batch header from the peer is valid, and find the missing transmissions from our worker(s).
+            let missing_transmissions = match self_.storage.check_batch_header(&batch_header, transmissions) {
+                Ok(missing_transmissions) => missing_transmissions,
+                Err(e) => {
+                    warn!("Skipping signing proposal from '{peer_ip}' - {e}");
+                    return;
+                }
+            };
+            // Inserts the missing transmissions into the workers.
+            if let Err(e) = self_.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions) {
+                error!("Failed to insert missing transmissions from '{peer_ip}' into workers - {e}");
+                return;
+            }
+
+            /* Proceeding to sign the batch. */
+
+            // Retrieve the batch ID.
+            let batch_id = batch_header.batch_id();
+            // Generate a timestamp.
+            let timestamp = now();
+            // Sign the batch ID.
+            let account = self_.gateway.account().clone();
+            let event = match spawn_blocking!(
+                account.sign(&[batch_id, Field::from_u64(now() as u64)], &mut rand::thread_rng())
+            ) {
+                // Construct the 'BatchSignature' event.
+                Ok(signature) => Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp)),
+                Err(e) => {
+                    error!("Failed to sign batch ID '{batch_id}' - {e}");
+                    return;
+                }
+            };
             // Send the batch signature to the peer.
             if self_.gateway.send(peer_ip, event).await.is_some() {
                 debug!("Signed a batch for round {batch_round} from '{peer_ip}'");
@@ -557,8 +577,8 @@ impl<N: Network> Primary<N> {
             bail!("Invalid peer - received a batch signature from myself ({signer})");
         }
 
-        // // Acquire the lock.
-        // let _lock = self.lock.lock().await;
+        // Acquire the lock.
+        let _lock = self.lock.lock().await;
 
         let proposal = {
             // Acquire the write lock.
@@ -713,8 +733,7 @@ impl<N: Network> Primary<N> {
         }
 
         // Store the certificate, after ensuring it is valid.
-        self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
-        Ok(())
+        self.sync_with_certificate_from_peer(peer_ip, certificate).await
     }
 }
 
@@ -1095,10 +1114,10 @@ impl<N: Network> Primary<N> {
     fn insert_missing_transmissions_into_workers(
         &self,
         peer_ip: SocketAddr,
-        transmissions: impl Iterator<Item = (TransmissionID<N>, Transmission<N>)>,
+        transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<()> {
         // Insert the transmissions into the workers.
-        assign_to_workers(&self.workers, transmissions, |worker, transmission_id, transmission| {
+        assign_to_workers(&self.workers, transmissions.into_iter(), |worker, transmission_id, transmission| {
             worker.process_transmission_from_peer(peer_ip, transmission_id, transmission);
         })
     }
