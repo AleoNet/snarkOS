@@ -280,18 +280,18 @@ impl<N: Network> Worker<N> {
         puzzle_commitment: PuzzleCommitment<N>,
         prover_solution: Data<ProverSolution<N>>,
     ) -> Result<()> {
+        // Construct the transmission.
+        let transmission = Transmission::Solution(prover_solution.clone());
+        // Remove the puzzle commitment from the pending queue.
+        self.pending.remove(puzzle_commitment, Some(transmission.clone()));
         // Check if the solution exists.
         if self.contains_transmission(puzzle_commitment) {
             bail!("Solution '{}' already exists.", fmt_id(puzzle_commitment));
         }
         // Check that the solution is well-formed and unique.
-        if let Err(e) = self.ledger.check_solution_basic(puzzle_commitment, prover_solution.clone()).await {
+        if let Err(e) = self.ledger.check_solution_basic(puzzle_commitment, prover_solution).await {
             bail!("Invalid unconfirmed solution '{}': {e}", fmt_id(puzzle_commitment));
         }
-        // Construct the transmission.
-        let transmission = Transmission::Solution(prover_solution);
-        // Remove the puzzle commitment from the pending queue.
-        self.pending.remove(puzzle_commitment, Some(transmission.clone()));
         // Adds the prover solution to the ready queue.
         if self.ready.insert(puzzle_commitment, transmission) {
             trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
@@ -305,18 +305,18 @@ impl<N: Network> Worker<N> {
         transaction_id: N::TransactionID,
         transaction: Data<Transaction<N>>,
     ) -> Result<()> {
+        // Construct the transmission.
+        let transmission = Transmission::Transaction(transaction.clone());
+        // Remove the transaction from the pending queue.
+        self.pending.remove(&transaction_id, Some(transmission.clone()));
         // Check if the transaction ID exists.
         if self.contains_transmission(&transaction_id) {
             bail!("Transaction '{}' already exists.", fmt_id(transaction_id));
         }
         // Check that the transaction is well-formed and unique.
-        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction.clone()).await {
+        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
             bail!("Invalid unconfirmed transaction '{}': {e}", fmt_id(transaction_id));
         }
-        // Construct the transmission.
-        let transmission = Transmission::Transaction(transaction);
-        // Remove the transaction from the pending queue.
-        self.pending.remove(&transaction_id, Some(transmission.clone()));
         // Adds the transaction to the ready queue.
         if self.ready.insert(&transaction_id, transmission) {
             trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
@@ -636,7 +636,7 @@ mod tests {
             )
             .await;
         assert!(result.is_err());
-        assert!(worker.pending.contains(puzzle));
+        assert!(!worker.pending.contains(puzzle));
         assert!(!worker.ready.contains(puzzle));
     }
 
@@ -712,7 +712,7 @@ mod tests {
             )
             .await;
         assert!(result.is_err());
-        assert!(worker.pending.contains(transmission_id));
+        assert!(!worker.pending.contains(transmission_id));
         assert!(!worker.ready.contains(transmission_id));
     }
 }
