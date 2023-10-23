@@ -170,17 +170,24 @@ pub async fn start_bft(
 
 /// Starts the primary instance.
 pub async fn start_primary(
-    _node_id: u16,
-    _num_nodes: u16,
-    _peers: HashMap<u16, SocketAddr>,
+    node_id: u16,
+    num_nodes: u16,
+    peers: HashMap<u16, SocketAddr>,
 ) -> Result<(Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
-    /*
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (committee, account) = initialize_components(node_id, num_nodes)?;
-    // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new(committee));
+    let gen_key = account.private_key();
+    let public_balance_per_validator =
+        (1_500_000_000_000_000 - (num_nodes as u64) * 1_000_000_000_000) / (num_nodes as u64);
+    let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
+    for address in committee.members().keys() {
+        balances.insert(*address, public_balance_per_validator);
+    }
+    let mut rng = TestRng::default();
+    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), &mut rng);
+    let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger));
     // Initialize the storage.
     let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
@@ -198,8 +205,6 @@ pub async fn start_primary(
     handle_signals(&primary);
     // Return the primary instance.
     Ok((primary, sender))
-    */
-    todo!()
 }
 
 pub type CurrentLedger = Ledger<CurrentNetwork, ConsensusMemory<CurrentNetwork>>;
