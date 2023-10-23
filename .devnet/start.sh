@@ -12,6 +12,12 @@ NUM_INSTANCES="${NUM_INSTANCES:-$NODE_ID}"
 
 echo "Using $NUM_INSTANCES AWS EC2 instances for querying."
 
+# Read the verbosity level from the user (default: 1)
+read -p "Enter the verbosity level (default: 1): " VERBOSITY
+VERBOSITY="${VERBOSITY:-1}"
+
+echo "Using verbosity level $VERBOSITY."
+
 # Get the IP address of NODE 0 from the SSH config for aws-n0
 NODE_0_IP=$(awk '/Host aws-n0/{f=1} f&&/HostName/{print $2; exit}' ~/.ssh/config)
 
@@ -31,7 +37,7 @@ start_snarkos_in_tmux() {
     tmux new-session -d -s snarkos-session
 
     # Send the snarkOS start command to the tmux session with the NODE_ID
-    tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --bft 0.0.0.0:5000 --rest 0.0.0.0:3033 --dev $NODE_ID --dev-num-validators $NUM_INSTANCES --validator --validators $NODE_IP:5000" C-m
+    tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --bft 0.0.0.0:5000 --rest 0.0.0.0:3033 --verbosity $VERBOSITY --dev $NODE_ID --dev-num-validators $NUM_INSTANCES --validator --validators $NODE_IP:5000" C-m
 
     exit  # Exit root user
 EOF
