@@ -2798,6 +2798,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "self_update"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a34ad8e4a86884ab42e9b8690e9343abdcfe5fa38a0318cfe1565ba9ad437b4"
+dependencies = [
+ "hyper",
+ "indicatif",
+ "log",
+ "quick-xml",
+ "regex",
+ "reqwest",
+ "self-replace",
+ "semver",
+ "serde_json",
+ "tempfile",
+ "urlencoding",
+]
+
+[[package]]
 name = "semver"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3017,7 +3036,7 @@ dependencies = [
  "rand",
  "rand_chacha",
  "rayon",
- "self_update",
+ "self_update 0.39.0",
  "serde",
  "serde_json",
  "snarkos-account",
@@ -3362,7 +3381,7 @@ dependencies = [
  "parking_lot",
  "rand",
  "rayon",
- "self_update",
+ "self_update 0.38.0",
  "serde_json",
  "snarkvm-algorithms",
  "snarkvm-circuit",
