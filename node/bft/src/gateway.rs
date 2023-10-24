@@ -15,6 +15,7 @@
 use crate::{
     events::{EventCodec, PrimaryPing},
     helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
+    spawn_blocking,
     CONTEXT,
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
@@ -49,7 +50,11 @@ use snarkos_node_tcp::{
     Tcp,
     P2P,
 };
-use snarkvm::{console::prelude::*, ledger::narwhal::Data, prelude::Address};
+use snarkvm::{
+    console::prelude::*,
+    ledger::{committee::Committee, narwhal::Data},
+    prelude::Address,
+};
 
 use colored::Colorize;
 use futures::SinkExt;
@@ -64,9 +69,6 @@ use tokio::{
 };
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
-
-/// TODO (howardwu): Move this to snarkVM.
-const MAX_COMMITTEE_SIZE: u16 = 200;
 
 /// The maximum interval of events to cache.
 const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
@@ -138,7 +140,7 @@ impl<N: Network> Gateway<N> {
             (Some(ip), _) => ip,
         };
         // Initialize the TCP stack.
-        let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));
+        let tcp = Tcp::new(Config::new(ip, Committee::<N>::MAX_COMMITTEE_SIZE));
         // Return the gateway.
         Ok(Self {
             account,
@@ -198,7 +200,7 @@ impl<N: Network> Gateway<N> {
     fn max_committee_size(&self) -> usize {
         self.ledger
             .current_committee()
-            .map_or_else(|_e| MAX_COMMITTEE_SIZE as usize, |committee| committee.num_members())
+            .map_or_else(|_e| Committee::<N>::MAX_COMMITTEE_SIZE as usize, |committee| committee.num_members())
     }
 
     /// The maxixmum number of events to cache.
@@ -968,7 +970,7 @@ impl<N: Network> Reading for Gateway<N> {
 
     /// The maximum queue depth of incoming messages for a single peer.
     const MESSAGE_QUEUE_DEPTH: usize =
-        2 * MAX_GC_ROUNDS as usize * MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
+        2 * MAX_GC_ROUNDS as usize * Committee::<N>::MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
 
     /// Creates a [`Decoder`] used to interpret messages from the network.
     /// The `side` param indicates the connection side **from the node's perspective**.
@@ -1001,7 +1003,7 @@ impl<N: Network> Writing for Gateway<N> {
 
     /// The maximum queue depth of outgoing messages for a single peer.
     const MESSAGE_QUEUE_DEPTH: usize =
-        2 * MAX_GC_ROUNDS as usize * MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
+        2 * MAX_GC_ROUNDS as usize * Committee::<N>::MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
 
     /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
     /// The `side` parameter indicates the connection side **from the node's perspective**.
@@ -1272,7 +1274,7 @@ impl<N: Network> Gateway<N> {
         // Retrieve the components of the challenge response.
         let ChallengeResponse { signature } = response;
         // Perform the deferred non-blocking deserialization of the signature.
-        let Ok(Ok(signature)) = task::spawn_blocking(move || signature.deserialize_blocking()).await else {
+        let Ok(signature) = spawn_blocking!(signature.deserialize_blocking()) else {
             warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (cannot deserialize the signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         };
@@ -1287,7 +1289,6 @@ impl<N: Network> Gateway<N> {
 
 #[cfg(test)]
 mod prop_tests {
-    use super::MAX_COMMITTEE_SIZE;
     use crate::{
         gateway::prop_tests::GatewayAddress::{Dev, Prod},
         helpers::{init_primary_channels, init_worker_channels, Storage},
@@ -1300,7 +1301,10 @@ mod prop_tests {
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_tcp::P2P;
     use snarkvm::{
-        ledger::committee::prop_tests::{CommitteeContext, ValidatorSet},
+        ledger::committee::{
+            prop_tests::{CommitteeContext, ValidatorSet},
+            Committee,
+        },
         prelude::{PrivateKey, Testnet3},
     };
 
@@ -1410,7 +1414,7 @@ mod prop_tests {
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.port().unwrap()));
 
         let tcp_config = gateway.tcp().config();
-        assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
+        assert_eq!(tcp_config.max_connections, Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE);
         assert_eq!(gateway.account().address(), account.address());
     }
 
@@ -1430,7 +1434,7 @@ mod prop_tests {
         }
 
         let tcp_config = gateway.tcp().config();
-        assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
+        assert_eq!(tcp_config.max_connections, Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE);
         assert_eq!(gateway.account().address(), account.address());
     }
 

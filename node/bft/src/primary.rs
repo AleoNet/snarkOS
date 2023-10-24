@@ -42,7 +42,10 @@ use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
-    console::{prelude::*, types::Field},
+    console::{
+        prelude::*,
+        types::{Address, Field},
+    },
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -55,7 +58,6 @@ use colored::Colorize;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
@@ -65,7 +67,7 @@ use std::{
 };
 use tokio::{
     sync::{Mutex as TMutex, OnceCell},
-    task::{self, JoinHandle},
+    task::JoinHandle,
 };
 
 /// A helper type for an optional proposed batch.
@@ -87,6 +89,8 @@ pub struct Primary<N: Network> {
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
     proposed_batch: Arc<ProposedBatch<N>>,
+    /// The recently-signed batch proposals (a map from the address to the round and batch ID).
+    signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, Field<N>)>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The primary lock.
@@ -116,6 +120,7 @@ impl<N: Network> Primary<N> {
             workers: Arc::from(vec![]),
             bft_sender: Default::default(),
             proposed_batch: Default::default(),
+            signed_proposals: Default::default(),
             handles: Default::default(),
             lock: Default::default(),
         })
@@ -370,26 +375,59 @@ impl<N: Network> Primary<N> {
 
         // Determined the required number of transmissions per worker.
         let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
-        // Take the transmissions from the workers.
+        // Initialize the map of transmissions.
         let mut transmissions: IndexMap<_, _> = Default::default();
+        // Initialize a tracker for the number of transactions.
+        let mut num_transactions = 0;
+        // Take the transmissions from the workers.
         for worker in self.workers.iter() {
-            transmissions.extend(worker.take_candidates(num_transmissions_per_worker).await);
-        }
-        trace!("Proposing - {} transmissions", transmissions.len());
-        // Determine if there is at least one unconfirmed transaction to propose.
-        let has_unconfirmed_transaction = transmissions.par_keys().any(|id| {
-            matches!(id, TransmissionID::Transaction(..)) && !self.ledger.contains_transmission(id).unwrap_or(true)
-        });
-        // If the batch is not ready to be proposed, return early.
-        match has_unconfirmed_transaction {
-            true => info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len()),
-            false => {
-                debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transmissions)".dimmed());
-                return Ok(());
+            for (id, transmission) in worker.drain(num_transmissions_per_worker) {
+                // Check if the ledger already contains the transmission.
+                if self.ledger.contains_transmission(&id).unwrap_or(true) {
+                    trace!("Proposing - Skipping transmission '{}' - Already in ledger", fmt_id(id));
+                    continue;
+                }
+                // Check the transmission is still valid.
+                match (id, transmission.clone()) {
+                    (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
+                        // Check if the solution is still valid.
+                        if let Err(e) = self.ledger.check_solution_basic(solution_id, solution).await {
+                            trace!("Proposing - Skipping solution '{}' - {e}", fmt_id(solution_id));
+                            continue;
+                        }
+                    }
+                    (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+                        // Check if the transaction is still valid.
+                        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
+                            trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
+                            continue;
+                        }
+                        // Increment the number of transactions.
+                        num_transactions += 1;
+                    }
+                    // Note: We explicitly forbid including ratifications,
+                    // as the protocol currently does not support ratifications.
+                    (TransmissionID::Ratification, Transmission::Ratification) => continue,
+                    // All other combinations are clearly invalid.
+                    _ => continue,
+                }
+                // Insert the transmission into the map.
+                transmissions.insert(id, transmission);
             }
+        }
+        // If there are no unconfirmed transmissions to propose, return early.
+        if transmissions.is_empty() {
+            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transmissions)".dimmed());
+            return Ok(());
+        }
+        // If there are no unconfirmed transactions to propose, return early.
+        if num_transactions == 0 {
+            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transactions)".dimmed());
+            return Ok(());
         }
 
         /* Proceeding to sign & propose the batch. */
+        info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len());
 
         // Retrieve the private key.
         let private_key = *self.gateway.account().private_key();
@@ -431,14 +469,14 @@ impl<N: Network> Primary<N> {
         let BatchPropose { round: batch_round, batch_header } = batch_propose;
 
         // Deserialize the batch header.
-        let batch_header = task::spawn_blocking(move || batch_header.deserialize_blocking()).await??;
+        let batch_header = spawn_blocking!(batch_header.deserialize_blocking())?;
         // Ensure the round matches in the batch header.
         if batch_round != batch_header.round() {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
-        // Acquire the lock.
-        let _lock = self.lock.lock().await;
+        // // Acquire the lock.
+        // let _lock = self.lock.lock().await;
 
         // Ensure the batch proposal is from the validator.
         if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != batch_header.author()) {
@@ -455,6 +493,22 @@ impl<N: Network> Primary<N> {
         // Ensure the batch proposal is not from the current primary.
         if self.gateway.account().address() == batch_header.author() {
             bail!("Invalid peer - proposed batch from myself ({})", batch_header.author());
+        }
+
+        // Retrieve the cached round and batch ID for this validator.
+        if let Some((signed_round, signed_batch_id)) = self.signed_proposals.read().get(&batch_header.author()).copied()
+        {
+            // If the round matches and the batch ID differs, then the validator is malicious.
+            if signed_round == batch_header.round() && signed_batch_id != batch_header.batch_id() {
+                // Proceed to disconnect the validator.
+                self.gateway.disconnect(peer_ip);
+                bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
+            }
+            // If the round and batch ID matches, then skip signing the batch a second time.
+            if signed_round == batch_header.round() && signed_batch_id == batch_header.batch_id() {
+                debug!("Skipping a proposal for round {signed_round} from '{peer_ip}' {}", "(already signed)".dimmed());
+                return Ok(());
+            }
         }
 
         // If the peer is ahead, use the batch header to sync up to the peer.
@@ -480,6 +534,8 @@ impl<N: Network> Primary<N> {
         let account = self.gateway.account().clone();
         let signature =
             spawn_blocking!(account.sign(&[batch_id, Field::from_u64(now() as u64)], &mut rand::thread_rng()))?;
+        // Cache the round and batch ID for this validator.
+        self.signed_proposals.write().insert(batch_header.author(), (batch_header.round(), batch_id));
         // Broadcast the signature back to the validator.
         let self_ = self.clone();
         tokio::spawn(async move {
@@ -525,8 +581,8 @@ impl<N: Network> Primary<N> {
             bail!("Invalid peer - received a batch signature from myself ({signer})");
         }
 
-        // Acquire the lock.
-        let _lock = self.lock.lock().await;
+        // // Acquire the lock.
+        // let _lock = self.lock.lock().await;
 
         let proposal = {
             // Acquire the write lock.
@@ -541,16 +597,14 @@ impl<N: Network> Primary<N> {
                             false => bail!("Unknown batch ID '{batch_id}'"),
                         }
                     }
-
                     // Retrieve the previous committee for the round.
                     let previous_committee = self.ledger.get_previous_committee_for_round(proposal.round())?;
-
-                    // Retrieve the address of the peer.
-                    match self.gateway.resolver().get_address(peer_ip) {
-                        // Add the signature to the batch.
-                        Some(signer) => proposal.add_signature(signer, signature, timestamp, &previous_committee)?,
-                        None => bail!("Signature is from a disconnected peer"),
+                    // Retrieve the address of the validator.
+                    let Some(signer) = self.gateway.resolver().get_address(peer_ip) else {
+                        bail!("Signature is from a disconnected validator");
                     };
+                    // Add the signature to the batch.
+                    proposal.add_signature(signer, signature, timestamp, &previous_committee)?;
                     info!("Received a batch signature for round {} from '{peer_ip}'", proposal.round());
                     // Check if the batch is ready to be certified.
                     if !proposal.is_quorum_threshold_reached(&previous_committee) {
@@ -600,8 +654,8 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // Acquire the lock.
-        let _lock = self.lock.lock().await;
+        // // Acquire the lock.
+        // let _lock = self.lock.lock().await;
 
         // Retrieve the batch certificate author.
         let author = certificate.author();
@@ -669,8 +723,8 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // Acquire the lock.
-        let _lock = self.lock.lock().await;
+        // // Acquire the lock.
+        // let _lock = self.lock.lock().await;
 
         // Retrieve the batch certificate author.
         let author = certificate.author();
@@ -780,9 +834,7 @@ impl<N: Network> Primary<N> {
                 }
 
                 // Deserialize the primary certificate in the primary ping.
-                let Ok(Ok(primary_certificate)) =
-                    task::spawn_blocking(move || primary_certificate.deserialize_blocking()).await
-                else {
+                let Ok(primary_certificate) = spawn_blocking!(primary_certificate.deserialize_blocking()) else {
                     warn!("Failed to deserialize primary certificate in a primary ping from '{peer_ip}'");
                     continue;
                 };
@@ -794,9 +846,7 @@ impl<N: Network> Primary<N> {
                 // Iterate through the batch certificates.
                 for batch_certificate in batch_certificates {
                     // Deserialize the batch certificate in the primary ping.
-                    let Ok(Ok(batch_certificate)) =
-                        task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
-                    else {
+                    let Ok(batch_certificate) = spawn_blocking!(batch_certificate.deserialize_blocking()) else {
                         warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
                         continue;
                     };
@@ -888,9 +938,7 @@ impl<N: Network> Primary<N> {
                 }
 
                 // Deserialize the batch certificate.
-                let Ok(Ok(batch_certificate)) =
-                    task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
-                else {
+                let Ok(batch_certificate) = spawn_blocking!(batch_certificate.deserialize_blocking()) else {
                     warn!("Failed to deserialize the batch certificate from '{peer_ip}'");
                     continue;
                 };

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::LedgerService;
+use crate::{spawn_blocking, LedgerService};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
+        coinbase::{CoinbaseVerifyingKey, ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
@@ -27,17 +27,19 @@ use snarkvm::{
 
 use indexmap::IndexMap;
 use snarkvm::prelude::narwhal::BatchCertificate;
-use std::{fmt, ops::Range};
+use std::{fmt, ops::Range, sync::Arc};
 
 /// A core ledger service.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
+    coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
     pub fn new(ledger: Ledger<N, C>) -> Self {
-        Self { ledger }
+        let coinbase_verifying_key = Arc::new(ledger.coinbase_puzzle().coinbase_verifying_key().clone());
+        Self { ledger, coinbase_verifying_key }
     }
 }
 
@@ -169,22 +171,21 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         solution: Data<ProverSolution<N>>,
     ) -> Result<()> {
         // Deserialize the solution.
-        let solution = tokio::task::spawn_blocking(move || solution.deserialize_blocking()).await??;
+        let solution = spawn_blocking!(solution.deserialize_blocking())?;
         // Ensure the puzzle commitment matches in the solution.
         if puzzle_commitment != solution.commitment() {
             bail!("Invalid solution - expected {puzzle_commitment}, found {}", solution.commitment());
         }
 
         // Retrieve the coinbase verifying key.
-        let coinbase_verifying_key = self.ledger.coinbase_puzzle().coinbase_verifying_key();
+        let coinbase_verifying_key = self.coinbase_verifying_key.clone();
         // Compute the current epoch challenge.
         let epoch_challenge = self.ledger.latest_epoch_challenge()?;
         // Retrieve the current proof target.
         let proof_target = self.ledger.latest_proof_target();
 
         // Ensure that the prover solution is valid for the given epoch.
-        // TODO(ljedrz): check if this operation requires a blocking task.
-        if !solution.verify(coinbase_verifying_key, &epoch_challenge, proof_target)? {
+        if !spawn_blocking!(solution.verify(&coinbase_verifying_key, &epoch_challenge, proof_target))? {
             bail!("Invalid prover solution '{puzzle_commitment}' for the current epoch.");
         }
         Ok(())
@@ -197,14 +198,14 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         transaction: Data<Transaction<N>>,
     ) -> Result<()> {
         // Deserialize the transaction.
-        let transaction = tokio::task::spawn_blocking(move || transaction.deserialize_blocking()).await??;
+        let transaction = spawn_blocking!(transaction.deserialize_blocking())?;
         // Ensure the transaction ID matches in the transaction.
         if transaction_id != transaction.id() {
             bail!("Invalid transaction - expected {transaction_id}, found {}", transaction.id());
         }
         // Check the transaction is well-formed.
-        // TODO(ljedrz): check if this operation requires a blocking task.
-        self.ledger.check_transaction_basic(&transaction, None)
+        let ledger = self.ledger.clone();
+        spawn_blocking!(ledger.check_transaction_basic(&transaction, None))
     }
 
     /// Checks the given block is valid next block.
