@@ -43,7 +43,7 @@ impl<N: Network> EventTrait for WorkerPing<N> {
 
 impl<N: Network> ToBytes for WorkerPing<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        (self.transmission_ids.len() as u32).write_le(&mut writer)?;
+        u16::try_from(self.transmission_ids.len()).map_err(error)?.write_le(&mut writer)?;
         for transmission_id in &self.transmission_ids {
             transmission_id.write_le(&mut writer)?;
         }
@@ -53,12 +53,11 @@ impl<N: Network> ToBytes for WorkerPing<N> {
 
 impl<N: Network> FromBytes for WorkerPing<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
-        let num_transmissions = u32::read_le(&mut reader)?;
+        let num_transmissions = u16::read_le(&mut reader)?;
         let mut transmission_ids = IndexSet::new();
         for _ in 0..num_transmissions {
             transmission_ids.insert(TransmissionID::read_le(&mut reader)?);
         }
-
         Ok(Self { transmission_ids })
     }
 }

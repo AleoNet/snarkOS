@@ -49,3 +49,14 @@ pub fn fmt_id(id: impl ToString) -> String {
     }
     formatted_id
 }
+
+/// A helper macro to spawn a blocking task.
+#[macro_export]
+macro_rules! spawn_blocking {
+    ($expr:expr) => {
+        match tokio::task::spawn_blocking(move || $expr).await {
+            Ok(value) => value,
+            Err(error) => Err(snarkvm::prelude::anyhow!("[tokio::spawn_blocking] {error}")),
+        }
+    };
+}

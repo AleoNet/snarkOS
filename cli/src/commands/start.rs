@@ -446,9 +446,9 @@ impl Start {
             // Efficiency mode
             4..=8 => 2,
             // Standard mode
-            9..=16 => 4,
+            9..=16 => 8,
             // Performance mode
-            _ => 8,
+            _ => 16,
         };
 
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
@@ -487,19 +487,19 @@ fn load_or_compute_genesis<N: Network>(
     preimage.extend(committee.to_bytes_le()?);
     preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
 
-    // Input the parameters.
-    preimage.extend(snarkvm::parameters::testnet3::BondPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::UnbondPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::UnbondDelegatorAsValidatorVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::ClaimUnbondPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::SetValidatorStateVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::TransferPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateToPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::TransferPublicToPrivateVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::FeePrivateVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::FeePublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::InclusionVerifier::load_bytes()?);
+    // Input the parameters' metadata.
+    preimage.extend(snarkvm::parameters::testnet3::BondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::UnbondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::UnbondDelegatorAsValidatorVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::SetValidatorStateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::TransferPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::FeePrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::FeePublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::InclusionVerifier::METADATA.as_bytes());
 
     // Initialize the hasher.
     let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;

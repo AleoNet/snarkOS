@@ -28,6 +28,8 @@ run_installation() {
 
     if [ -d "\$WORKSPACE" ]; then
       # The workspace directory exists, update the existing repository
+#      rm -rf \$WORKSPACE
+#      git clone https://github.com/AleoHQ/snarkOS.git \$WORKSPACE
       cd \$WORKSPACE
       git checkout $BRANCH  # Checkout the specified branch
       git pull origin $BRANCH
