@@ -16,7 +16,6 @@ use super::*;
 
 use snarkvm::prelude::{FromBytes, ToBytes};
 
-use indexmap::IndexMap;
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,18 +39,7 @@ impl<N: Network> ToBytes for Ping<N> {
         self.node_type.write_le(&mut writer)?;
         if let Some(locators) = &self.block_locators {
             1u8.write_le(&mut writer)?;
-
-            (locators.recents.len().min(u32::MAX as usize) as u32).write_le(&mut writer)?;
-            for (height, hash) in locators.recents.iter() {
-                height.write_le(&mut writer)?;
-                hash.write_le(&mut writer)?;
-            }
-
-            (locators.checkpoints.len().min(u32::MAX as usize) as u32).write_le(&mut writer)?;
-            for (height, hash) in locators.checkpoints.iter() {
-                height.write_le(&mut writer)?;
-                hash.write_le(&mut writer)?;
-            }
+            locators.write_le(&mut writer)?;
         } else {
             0u8.write_le(&mut writer)?;
         }
@@ -65,27 +53,12 @@ impl<N: Network> FromBytes for Ping<N> {
         let version = u32::read_le(&mut reader)?;
         let node_type = NodeType::read_le(&mut reader)?;
 
-        if u8::read_le(&mut reader)? == 0 {
-            return Ok(Self { version, node_type, block_locators: None });
-        }
-
-        let mut recents = IndexMap::new();
-        let num_recents = u32::read_le(&mut reader)?;
-        for _ in 0..num_recents {
-            let height = u32::read_le(&mut reader)?;
-            let hash = N::BlockHash::read_le(&mut reader)?;
-            recents.insert(height, hash);
-        }
-
-        let mut checkpoints = IndexMap::new();
-        let num_checkpoints = u32::read_le(&mut reader)?;
-        for _ in 0..num_checkpoints {
-            let height = u32::read_le(&mut reader)?;
-            let hash = N::BlockHash::read_le(&mut reader)?;
-            checkpoints.insert(height, hash);
-        }
-
-        let block_locators = Some(BlockLocators { recents, checkpoints });
+        let locators_marker = u8::read_le(&mut reader)?;
+        let block_locators = match locators_marker {
+            0 => None,
+            1 => Some(BlockLocators::read_le(&mut reader)?),
+            _ => return Err(error("Invalid block locators marker")),
+        };
 
         Ok(Self { version, node_type, block_locators })
     }
