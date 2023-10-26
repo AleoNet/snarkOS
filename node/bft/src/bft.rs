@@ -499,7 +499,7 @@ impl<N: Network> BFT<N> {
                 // Retrieve the transmission.
                 let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
                     bail!(
-                        "BFT failed to retrieve transmission {} from round {}",
+                        "BFT failed to retrieve transmission '{}' from round {}",
                         fmt_id(transmission_id),
                         certificate.round()
                     );
