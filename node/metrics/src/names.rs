@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub const GAUGE_NAMES: [&str; 9] = [
+pub const GAUGE_NAMES: [&str; 10] = [
     blocks::HEIGHT,
     blocks::TRANSACTIONS,
     consensus::COMMITTED_CERTIFICATES,
@@ -22,6 +22,7 @@ pub const GAUGE_NAMES: [&str; 9] = [
     peers::RESTRICTED,
     primary::CURRENT_ROUND,
     network::TCP_CONNECTIONS,
+    network::TCP_TASKS,
 ];
 
 pub const HISTOGRAM_NAMES: [&str; 6] = [
@@ -64,4 +65,5 @@ pub mod network {
     pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_network_noise_codec_encryption_size";
     pub const NOISE_CODEC_DECRYPTION_SIZE: &str = "snarkos_network_noise_codec_decryption_size";
     pub const TCP_CONNECTIONS: &str = "snarkos_network_tcp_connections_total";
+    pub const TCP_TASKS: &str = "snarkos_network_tcp_tasks_total";
 }

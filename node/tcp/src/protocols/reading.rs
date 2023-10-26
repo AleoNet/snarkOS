@@ -17,6 +17,10 @@ use std::{io, net::SocketAddr};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures_util::StreamExt;
+#[cfg(feature = "metrics")]
+use metrics::{decrement_gauge, increment_gauge};
+#[cfg(feature = "metrics")]
+use snarkos_node_metrics::network::TCP_TASKS;
 use tokio::{
     io::AsyncRead,
     sync::{mpsc, oneshot},
@@ -142,6 +146,8 @@ impl<R: Reading> ReadingInternal for R {
             tx_processing.send(()).unwrap(); // safe; the channel was just opened
 
             while let Some(msg) = inbound_message_receiver.recv().await {
+                #[cfg(feature = "metrics")]
+                decrement_gauge!(TCP_TASKS, 1f64);
                 if let Err(e) = self_clone.process_message(addr, msg).await {
                     error!(parent: node.span(), "can't process a message from {}: {}", addr, e);
                     node.known_peers().register_failure(addr);
@@ -172,6 +178,8 @@ impl<R: Reading> ReadingInternal for R {
                             error!(parent: node.span(), "can't process a message from {}: {}", addr, e);
                             node.stats().register_failure();
                         }
+                        #[cfg(feature = "metrics")]
+                        increment_gauge!(TCP_TASKS, 1f64);
                     }
                     Err(e) => {
                         error!(parent: node.span(), "can't read from {}: {}", addr, e);
