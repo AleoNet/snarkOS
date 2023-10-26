@@ -527,6 +527,8 @@ impl<N: Network> Gateway<N> {
         // checking the event is valid, and then calling the appropriate (trait) handler.
         match event {
             Event::BatchPropose(batch_propose) => {
+                debug!("{CONTEXT} Received 'Batch proposal' round {} from '{peer_ip}'", batch_propose.round);
+
                 // Send the batch propose to the primary.
                 let _ = self.primary_sender().tx_batch_propose.send((peer_ip, batch_propose)).await;
                 Ok(())

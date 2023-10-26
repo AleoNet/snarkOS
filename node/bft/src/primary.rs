@@ -470,6 +470,8 @@ impl<N: Network> Primary<N> {
     /// If our primary is ahead of the peer, we will not sign the batch.
     /// If our primary is behind the peer, but within GC range, we will sync up to the peer's round, and then sign the batch.
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
+        debug!("Processing a batch proposal - round {} from {}", batch_propose.round, peer_ip);
+
         let BatchPropose { round: batch_round, batch_header } = batch_propose;
 
         // Deserialize the batch header.
@@ -909,9 +911,11 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
+                debug!("Forwarding batch proposal - round {} from '{peer_ip}' ", batch_propose.round);
+
                 // If the primary is not synced, then do not sign the batch.
                 if !self_.sync.is_synced() {
-                    trace!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
+                    debug!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
                     continue;
                 }
                 // Process the proposed batch.
