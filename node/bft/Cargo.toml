@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-bft"
-version = "2.2.1"
+version = "2.2.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A memory pool for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -57,24 +57,24 @@ default-features = false
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.2.1"
+version = "=2.2.2"
 
 [dependencies.snarkos-node-bft-events]
 path = "./events"
-version = "=2.2.1"
+version = "=2.2.2"
 
 [dependencies.snarkos-node-bft-ledger-service]
 path = "./ledger-service"
-version = "=2.2.1"
+version = "=2.2.2"
 features = [ "ledger", "prover" ]
 
 [dependencies.snarkos-node-sync]
 path = "../sync"
-version = "=2.2.1"
+version = "=2.2.2"
 
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
-version = "=2.2.1"
+version = "=2.2.2"
 
 [dependencies.snarkvm]
 workspace = true

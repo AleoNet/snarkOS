@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-display"
-version = "2.2.1"
+version = "2.2.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A display for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -24,7 +24,7 @@ version = "0.27"
 
 [dependencies.snarkos-node]
 path = "../node"
-version = "=2.2.1"
+version = "=2.2.2"
 
 [dependencies.snarkvm]
 workspace = true
