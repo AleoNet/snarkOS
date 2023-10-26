@@ -123,6 +123,10 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         let connected_validators = self.router().connected_validators();
         let peers = connected_validators.iter().filter(|peer_ip| !excluded_peers.contains(peer_ip));
 
+        if let Message::UnconfirmedTransaction(tx) = &message {
+            debug!("SENDING MESSAGE {} TXID to {} peers", tx.transaction_id, connected_validators.len());
+        }
+
         // Iterate through all validators that are not the sender and excluded validators.
         for peer_ip in peers {
             self.send(*peer_ip, message.clone());

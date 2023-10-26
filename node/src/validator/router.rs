@@ -257,11 +257,16 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         serialized: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
     ) -> bool {
+        debug!("RECEIVED TRANSACTION {} TXID from {peer_ip}", serialized.transaction_id);
+
         // Add the unconfirmed transaction to the memory pool.
         if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction).await {
             trace!("[UnconfirmedTransaction] {error}");
             return true; // Maintain the connection.
         }
+
+        debug!("PROCESSED TRANSACTION {} TXID from {peer_ip}", serialized.transaction_id);
+
         let message = Message::UnconfirmedTransaction(serialized);
         // Propagate the "UnconfirmedTransaction" to the connected validators.
         self.propagate_to_validators(message, &[peer_ip]);
