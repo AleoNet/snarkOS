@@ -43,8 +43,7 @@ impl<N: Network, B: BFTStorage<N>> fmt::Debug for BFTStorageService<N, B> {
 }
 
 impl<N: Network, B: BFTStorage<N>> StorageService<N> for BFTStorageService<N, B> {
-    /// Stores the given `(round, transmission)` pair into storage.
-    /// If the `transmission ID` already exists, the method returns an error.
+    /// Stores the given round, transmission ID, and transmission into storage.
     fn insert_transmission(
         &self,
         round: u64,
@@ -54,33 +53,42 @@ impl<N: Network, B: BFTStorage<N>> StorageService<N> for BFTStorageService<N, B>
         self.store.insert_transmission(round, transmission_id, transmission)
     }
 
-    /// Stores the given `(round, transmissions)` pair into storage.
+    /// Stores the given `(transmission ID, transmission)` pairs for the given round into storage.
     fn insert_transmissions(&self, round: u64, transmissions: Vec<(TransmissionID<N>, Transmission<N>)>) -> Result<()> {
         self.store.insert_transmissions(round, transmissions)
     }
 
+    /// Removes the transmission for the given `transmission ID` from storage.
+    fn remove_transmission(&self, transmission_id: TransmissionID<N>) -> Result<()> {
+        self.store.remove_transmission(transmission_id)
+    }
+
     /// Removes the transmission for the given `round` and `transmission ID` from storage.
-    fn remove_transmission(&self, round: u64, transmission_id: TransmissionID<N>) -> Result<()> {
-        self.store.remove_transmission(round, transmission_id)
+    fn remove_transmission_for_round(&self, round: u64, transmission_id: TransmissionID<N>) -> Result<()> {
+        self.store.remove_transmission_for_round(round, transmission_id)
     }
 
-    /// Removes the transmissions for the given `round` from storage.
-    fn remove_transmissions_for_round(&self, round: u64) -> Result<()> {
-        self.store.remove_transmissions_for_round(round)
+    /// Returns `true` if the given `transmission ID` exists.
+    fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
+        self.store.contains_transmission(transmission_id)
     }
 
-    /// Returns `true` if the given `round` and `transmission ID` exist.
-    fn contains_transmission(&self, round: u64, transmission_id: &TransmissionID<N>) -> Result<bool> {
-        self.store.contains_transmission_confirmed(round, transmission_id)
+    /// Returns `true` if the given `round` and `transmission ID` exists.
+    fn contains_transmission_for_round(&self, round: u64, transmission_id: &TransmissionID<N>) -> Result<bool> {
+        self.store.contains_transmission_for_round(round, transmission_id)
     }
 
-    /// Returns the confirmed transmission for the given `round` and `transmission ID`.
-    fn get_transmission(&self, round: u64, transmission_id: &TransmissionID<N>) -> Result<Option<Transmission<N>>> {
-        self.store.get_transmission_confirmed(round, transmission_id)
+    /// Returns the transmission for the given `transmission ID`.
+    fn get_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<Option<Transmission<N>>> {
+        self.store.get_transmission(transmission_id)
     }
 
-    /// Returns the confirmed transmission entries for the given `round`.
-    fn get_transmissions(&self, round: u64) -> Result<Vec<(TransmissionID<N>, Transmission<N>)>> {
-        self.store.get_transmissions_confirmed(round)
+    /// Returns the transmission for the given `round` and `transmission ID`.
+    fn get_transmission_for_round(
+        &self,
+        round: u64,
+        transmission_id: &TransmissionID<N>,
+    ) -> Result<Option<Transmission<N>>> {
+        self.store.get_transmission_for_round(round, transmission_id)
     }
 }

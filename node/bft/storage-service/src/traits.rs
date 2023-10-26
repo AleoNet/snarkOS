@@ -20,8 +20,7 @@ use snarkvm::{
 use std::fmt::Debug;
 
 pub trait StorageService<N: Network>: Debug + Send + Sync {
-    /// Stores the given `(round, transmission)` pair into storage.
-    /// If the `transmission ID` already exists, the method returns an error.
+    /// Stores the given round, transmission ID, and transmission into storage.
     fn insert_transmission(
         &self,
         round: u64,
@@ -29,21 +28,28 @@ pub trait StorageService<N: Network>: Debug + Send + Sync {
         transmission: Transmission<N>,
     ) -> Result<()>;
 
-    /// Stores the given `(round, transmissions)` pair into storage.
+    /// Stores the given `(transmission ID, transmission)` pairs for the given round into storage.
     fn insert_transmissions(&self, round: u64, transmissions: Vec<(TransmissionID<N>, Transmission<N>)>) -> Result<()>;
 
+    /// Removes the transmission for the given `transmission ID` from storage.
+    fn remove_transmission(&self, transmission_id: TransmissionID<N>) -> Result<()>;
+
     /// Removes the transmission for the given `round` and `transmission ID` from storage.
-    fn remove_transmission(&self, round: u64, transmission_id: TransmissionID<N>) -> Result<()>;
+    fn remove_transmission_for_round(&self, round: u64, transmission_id: TransmissionID<N>) -> Result<()>;
 
-    /// Removes the transmissions for the given `round` from storage.
-    fn remove_transmissions_for_round(&self, round: u64) -> Result<()>;
+    /// Returns `true` if the given `transmission ID` exists.
+    fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
 
-    /// Returns `true` if the given `round` and `transmission ID` exist.
-    fn contains_transmission(&self, round: u64, transmission_id: &TransmissionID<N>) -> Result<bool>;
+    /// Returns `true` if the given `round` and `transmission ID` exists.
+    fn contains_transmission_for_round(&self, round: u64, transmission_id: &TransmissionID<N>) -> Result<bool>;
 
-    /// Returns the confirmed transmission for the given `round` and `transmission ID`.
-    fn get_transmission(&self, round: u64, transmission_id: &TransmissionID<N>) -> Result<Option<Transmission<N>>>;
+    /// Returns the transmission for the given `transmission ID`.
+    fn get_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<Option<Transmission<N>>>;
 
-    /// Returns the confirmed transmission entries for the given `round`.
-    fn get_transmissions(&self, round: u64) -> Result<Vec<(TransmissionID<N>, Transmission<N>)>>;
+    /// Returns the transmission for the given `round` and `transmission ID`.
+    fn get_transmission_for_round(
+        &self,
+        round: u64,
+        transmission_id: &TransmissionID<N>,
+    ) -> Result<Option<Transmission<N>>>;
 }
