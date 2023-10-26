@@ -257,11 +257,6 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         serialized: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
     ) -> bool {
-        // Check that the transaction is not a fee transaction.
-        if transaction.is_fee() {
-            return true; // Maintain the connection
-        }
-
         // Add the unconfirmed transaction to the memory pool.
         if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction).await {
             trace!("[UnconfirmedTransaction] {error}");
