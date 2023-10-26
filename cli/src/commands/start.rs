@@ -209,33 +209,35 @@ impl Start {
     /// Read the private key directly from an argument or from a filesystem location,
     /// returning the Aleo account.
     fn parse_private_key<N: Network>(&self) -> Result<Account<N>> {
-        match (&self.private_key, &self.private_key_file) {
-            // Parse the private key directly.
-            (Some(private_key), None) => Account::from_str(private_key.trim()),
-            // Parse the private key from a file.
-            (None, Some(path)) => Account::from_str(std::fs::read_to_string(path)?.trim()),
-            // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
-            (None, None) => {
-                if self.client {
-                    Account::new(&mut rand::thread_rng())
-                } else if let Some(dev) = self.dev {
-                    // Sample the private key of this node.
-                    Account::try_from({
-                        // Initialize the (fixed) RNG.
-                        let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
-                        // Iterate through 'dev' address instances to match the account.
-                        for _ in 0..dev {
-                            let _ = PrivateKey::<N>::new(&mut rng)?;
-                        }
-                        PrivateKey::<N>::new(&mut rng)?
-                    })
-                } else {
-                    bail!("Missing the '--private-key' or '--private-key-file' argument")
+        match self.dev {
+            None => match (&self.private_key, &self.private_key_file) {
+                // Parse the private key directly.
+                (Some(private_key), None) => Account::from_str(private_key.trim()),
+                // Parse the private key from a file.
+                (None, Some(path)) => Account::from_str(std::fs::read_to_string(path)?.trim()),
+                // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
+                (None, None) => match self.client {
+                    true => Account::new(&mut rand::thread_rng()),
+                    false => bail!("Missing the '--private-key' or '--private-key-file' argument"),
+                },
+                // Ensure only one private key flag is provided to the CLI.
+                (Some(_), Some(_)) => {
+                    bail!("Cannot use '--private-key' and '--private-key-file' simultaneously, please use only one")
                 }
-            }
-            // Ensure only one private key flag is provided to the CLI.
-            (Some(_), Some(_)) => {
-                bail!("Cannot use '--private-key' and '--private-key-file' simultaneously, please use only one")
+            },
+            Some(dev) => {
+                // Sample the private key of this node.
+                Account::try_from({
+                    // Initialize the (fixed) RNG.
+                    let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
+                    // Iterate through 'dev' address instances to match the account.
+                    for _ in 0..dev {
+                        let _ = PrivateKey::<N>::new(&mut rng)?;
+                    }
+                    let private_key = PrivateKey::<N>::new(&mut rng)?;
+                    println!("🔑 Your development private key for node {dev} is {}\n", private_key.to_string().bold());
+                    private_key
+                })
             }
         }
     }

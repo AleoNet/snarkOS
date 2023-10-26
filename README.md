@@ -286,7 +286,7 @@ sudo apt install tmux
 
 To start a local devnet, run:
 ```
-./.devnet.sh
+./devnet.sh
 ```
 Follow the instructions in the terminal to start the devnet.
 
