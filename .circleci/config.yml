@@ -235,6 +235,15 @@ jobs:
           workspace_member: node/bft/ledger-service
           cache_key: snarkos-node-bft-ledger-service-cache
 
+  node-bft-storage-service:
+    docker:
+      - image: cimg/rust:1.71.1
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/bft/storage-service
+          cache_key: snarkos-node-bft-storage-service-cache
+
   node-cdn:
     docker:
       - image: cimg/rust:1.71.1
@@ -375,6 +384,7 @@ workflows:
       - node-bft
       - node-bft-events
       - node-bft-ledger-service
+      - node-bft-storage-service
       - node-cdn
       - node-consensus
       - node-rest

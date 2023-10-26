@@ -762,9 +762,9 @@ mod tests {
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::{
-        ledger::narwhal::batch_certificate::test_helpers::{
-            sample_batch_certificate,
-            sample_batch_certificate_for_round,
+        ledger::{
+            committee::Committee,
+            narwhal::batch_certificate::test_helpers::{sample_batch_certificate, sample_batch_certificate_for_round},
         },
         utilities::TestRng,
     };
@@ -773,15 +773,38 @@ mod tests {
     use indexmap::IndexSet;
     use std::sync::{atomic::Ordering, Arc};
 
+    type CurrentNetwork = snarkvm::console::network::Testnet3;
+
+    /// Samples a new test instance, with an optional committee round and the given maximum GC rounds.
+    fn sample_test_instance(
+        committee_round: Option<u64>,
+        max_gc_rounds: u64,
+        rng: &mut TestRng,
+    ) -> (
+        Committee<CurrentNetwork>,
+        Account<CurrentNetwork>,
+        Arc<MockLedgerService<CurrentNetwork>>,
+        Storage<CurrentNetwork>,
+    ) {
+        let committee = match committee_round {
+            Some(round) => snarkvm::ledger::committee::test_helpers::sample_committee_for_round(round, rng),
+            None => snarkvm::ledger::committee::test_helpers::sample_committee(rng),
+        };
+        let account = Account::new(rng).unwrap();
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        let storage = Storage::new(ledger.clone(), max_gc_rounds);
+
+        (committee, account, ledger, storage)
+    }
+
     #[test]
     #[tracing_test::traced_test]
     fn test_is_leader_quorum_odd() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
-        let account = Account::new(rng)?;
-        let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        // Sample the test instance.
+        let (_, account, ledger, storage) = sample_test_instance(None, 10, rng);
+        assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -815,11 +838,9 @@ mod tests {
     fn test_is_leader_quorum_even_out_of_sync() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        // Create a committee with round 1.
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
-        let account = Account::new(rng)?;
-        let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        // Sample the test instance.
+        let (_, account, ledger, storage) = sample_test_instance(None, 10, rng);
+        assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -837,11 +858,10 @@ mod tests {
     fn test_is_leader_quorum_even() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
-        let account = Account::new(rng)?;
-        let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        // Sample the test instance.
+        let (_, account, ledger, storage) = sample_test_instance(Some(2), 10, rng);
         assert_eq!(storage.current_round(), 2);
+        assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -858,10 +878,9 @@ mod tests {
     fn test_is_even_round_ready() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
-        let account = Account::new(rng)?;
-        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
-        let storage = Storage::new(ledger.clone(), 10);
+        // Sample the test instance.
+        let (committee, account, ledger, storage) = sample_test_instance(Some(2), 10, rng);
+        assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -884,10 +903,9 @@ mod tests {
     fn test_update_leader_certificate_odd() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
-        let account = Account::new(rng)?;
-        let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        // Sample the test instance.
+        let (_, account, ledger, storage) = sample_test_instance(None, 10, rng);
+        assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -903,10 +921,8 @@ mod tests {
     fn test_update_leader_certificate_bad_round() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
-        let account = Account::new(rng)?;
-        let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        // Sample the test instance.
+        let (_, account, ledger, storage) = sample_test_instance(None, 10, rng);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
@@ -978,9 +994,8 @@ mod tests {
     async fn test_order_dag_with_dfs() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(1, rng);
-        let account = Account::new(rng)?;
-        let ledger = Arc::new(MockLedgerService::new(committee));
+        // Sample the test instance.
+        let (_, account, ledger, _) = sample_test_instance(Some(1), 10, rng);
 
         // Initialize the round parameters.
         let previous_round = 2; // <- This must be an even number, for `BFT::update_dag` to behave correctly below.
@@ -1066,9 +1081,9 @@ mod tests {
     fn test_order_dag_with_dfs_fails_on_missing_previous_certificate() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(1, rng);
-        let account = Account::new(rng)?;
-        let ledger = Arc::new(MockLedgerService::new(committee));
+        // Sample the test instance.
+        let (_, account, ledger, storage) = sample_test_instance(Some(1), 1, rng);
+        assert_eq!(storage.max_gc_rounds(), 1);
 
         // Initialize the round parameters.
         let previous_round = 2; // <- This must be an even number, for `BFT::update_dag` to behave correctly below.
@@ -1084,8 +1099,6 @@ mod tests {
 
         /* Test missing previous certificate. */
 
-        // Initialize the storage.
-        let storage = Storage::new(ledger.clone(), 1);
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
