@@ -43,6 +43,7 @@ use snarkvm::{
 };
 
 use anyhow::Result;
+use colored::Colorize;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::Mutex;
@@ -187,12 +188,12 @@ impl<N: Network> Consensus<N> {
             }
             // Check if the solution already exists in the ledger.
             if self.ledger.contains_transmission(&TransmissionID::from(solution_id))? {
-                bail!("Solution '{}' already exists in the ledger", fmt_id(solution_id));
+                bail!("Solution '{}' exists in the ledger {}", fmt_id(solution_id), "(skipping)".dimmed());
             }
             // Add the solution to the memory pool.
             trace!("Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
             if self.solutions_queue.lock().insert(solution_id, solution).is_some() {
-                bail!("Solution '{}' already exists in the memory pool", fmt_id(solution_id));
+                bail!("Solution '{}' exists in the memory pool", fmt_id(solution_id));
             }
         }
 
@@ -230,6 +231,10 @@ impl<N: Network> Consensus<N> {
         {
             let transaction_id = transaction.id();
 
+            // Check that the transaction is not a fee transaction.
+            if transaction.is_fee() {
+                bail!("Transaction '{}' is a fee transaction {}", fmt_id(transaction_id), "(skipping)".dimmed());
+            }
             // Check if the transaction was recently seen.
             if self.seen_transactions.lock().put(transaction_id, ()).is_some() {
                 // If the transaction was recently seen, return early.
@@ -237,12 +242,12 @@ impl<N: Network> Consensus<N> {
             }
             // Check if the transaction already exists in the ledger.
             if self.ledger.contains_transmission(&TransmissionID::from(&transaction_id))? {
-                bail!("Transaction '{}' already exists in the ledger", fmt_id(transaction_id));
+                bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
             // Add the transaction to the memory pool.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
             if self.transactions_queue.lock().insert(transaction_id, transaction).is_some() {
-                bail!("Transaction '{}' already exists in the memory pool", fmt_id(transaction_id));
+                bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
             }
         }
 
