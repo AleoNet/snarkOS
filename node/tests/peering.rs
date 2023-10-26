@@ -21,8 +21,8 @@ use common::{node::*, test_peer::TestPeer};
 use snarkos_node_router::Outbound;
 use snarkos_node_tcp::P2P;
 
+use deadline::deadline;
 use std::time::Duration;
-use tokio::time::sleep;
 
 // Macro to simply construct disconnect cases.
 // Syntax:
@@ -164,10 +164,9 @@ async fn duplicate_disconnect_attempts() {
     let node1_clone = node1.clone();
     let disconn3 = tokio::spawn(async move { node1_clone.router().disconnect(addr2).await.unwrap() });
 
-    // Attempt to connect the 1st node to the other one several times at once.
+    // Attempt to disconnect the 1st node from the other one several times at once.
     let (result1, result2, result3) = tokio::join!(disconn1, disconn2, disconn3);
     // A small anti-flakiness buffer.
-    sleep(Duration::from_millis(200)).await;
 
     // Count the successes.
     let mut successes = 0;
@@ -181,8 +180,12 @@ async fn duplicate_disconnect_attempts() {
         successes += 1;
     }
 
-    // Connection checks.
+    // There may only be a single success.
     assert_eq!(successes, 1);
-    assert_eq!(node1.router().number_of_connected_peers(), 0);
-    assert_eq!(node2.router().number_of_connected_peers(), 0);
+
+    // Connection checks.
+    let node1_clone = node1.clone();
+    deadline!(Duration::from_secs(5), move || node1_clone.router().number_of_connected_peers() == 0);
+    let node2_clone = node2.clone();
+    deadline!(Duration::from_secs(5), move || node2_clone.router().number_of_connected_peers() == 0);
 }
