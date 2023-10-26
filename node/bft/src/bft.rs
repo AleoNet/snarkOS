@@ -226,6 +226,11 @@ impl<N: Network> BFT<N> {
             }
         }
 
+        match is_ready {
+            true => debug!("BFT is ready to proceed to next round"),
+            false => debug!("BFT is not ready to proceed to next round"),
+        }
+
         // If the BFT is ready, then update to the next round.
         if is_ready {
             // Update to the next round in storage.

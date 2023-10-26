@@ -307,13 +307,17 @@ impl<N: Network> Primary<N> {
 
         // Ensure the primary has not proposed a batch for this round before.
         if self.storage.contains_certificate_in_round_from(round, self.gateway.account().address()) {
+            debug!("Storage contains own certificate for round {round}, attempting to advance");
             // If a BFT sender was provided, attempt to advance the current round.
             if let Some(bft_sender) = self.bft_sender.get() {
-                match bft_sender.send_primary_round_to_bft(self.current_round()).await {
+                match bft_sender.send_primary_round_to_bft(round).await {
                     // 'is_ready' is true if the primary is ready to propose a batch for the next round.
                     Ok(true) => (), // continue,
                     // 'is_ready' is false if the primary is not ready to propose a batch for the next round.
-                    Ok(false) => return Ok(()),
+                    Ok(false) => {
+                        debug!("BFT is not ready to propose the batch (round {round})");
+                        return Ok(());
+                    }
                     // An error occurred while attempting to advance the current round.
                     Err(e) => {
                         warn!("Failed to update the BFT to the next round - {e}");
@@ -605,11 +609,16 @@ impl<N: Network> Primary<N> {
                     };
                     // Add the signature to the batch.
                     proposal.add_signature(signer, signature, timestamp, &previous_committee)?;
-                    info!("Received a batch signature for round {} from '{peer_ip}'", proposal.round());
                     // Check if the batch is ready to be certified.
                     if !proposal.is_quorum_threshold_reached(&previous_committee) {
+                        info!("Received a batch signature for round {} from '{peer_ip}'", proposal.round());
                         // If the batch is not ready to be certified, return early.
                         return Ok(());
+                    } else {
+                        info!(
+                            "Received a batch signature for round {} from '{peer_ip}', quorum reached",
+                            proposal.round()
+                        );
                     }
                 }
                 // There is no proposed batch, so return early.
@@ -701,6 +710,7 @@ impl<N: Network> Primary<N> {
 
         // Determine whether to advance to the next round.
         if is_quorum && !is_proposing {
+            debug!("We have quorum and no proposal, try proceed to round {}", current_round + 1);
             // If we have reached the quorum threshold, then proceed to the next round.
             self.try_increment_to_the_next_round(current_round + 1).await?;
         }
@@ -1006,6 +1016,7 @@ impl<N: Network> Primary<N> {
             // Reset the proposed batch.
             let proposal = self.proposed_batch.write().take();
             if let Some(proposal) = proposal {
+                debug!("Our proposal for round {} has expired, resetting", proposal.round());
                 self.reinsert_transmissions_into_workers(proposal)?;
             }
         }
@@ -1017,12 +1028,19 @@ impl<N: Network> Primary<N> {
         // If the next round is within GC range, then iterate to the penultimate round.
         if self.current_round() + self.storage.max_gc_rounds() >= next_round {
             let mut fast_forward_round = self.current_round();
-            // Iterate until the penultimate round is reached.
-            while fast_forward_round < next_round.saturating_sub(1) {
-                // Update to the next round in storage.
-                fast_forward_round = self.storage.increment_to_next_round(fast_forward_round)?;
-                // Clear the proposed batch.
-                *self.proposed_batch.write() = None;
+            if fast_forward_round < next_round.saturating_sub(1) {
+                debug!("Fast forward rounds {fast_forward_round}-{}", next_round.saturating_sub(1));
+                // Clear the proposed batch and reinsert transmissions into workers.
+                let proposal = self.proposed_batch.write().take();
+                if let Some(proposal) = proposal {
+                    self.reinsert_transmissions_into_workers(proposal)?;
+                }
+
+                // Iterate until the penultimate round is reached.
+                while fast_forward_round < next_round.saturating_sub(1) {
+                    // Update to the next round in storage.
+                    fast_forward_round = self.storage.increment_to_next_round(fast_forward_round)?;
+                }
             }
         }
 
@@ -1058,6 +1076,8 @@ impl<N: Network> Primary<N> {
             if is_ready {
                 self.propose_batch().await?;
             }
+        } else {
+            warn!("Skipped round increment, storage round {current_round} was already >= {next_round}");
         }
         Ok(())
     }
@@ -1096,7 +1116,7 @@ impl<N: Network> Primary<N> {
         let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
         // Store the certified batch.
         self.storage.insert_certificate(certificate.clone(), transmissions)?;
-        debug!("Stored a batch certificate for round {}", certificate.round());
+        debug!("Stored our batch certificate for round {}", certificate.round());
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
             // Await the callback to continue.
@@ -1129,6 +1149,11 @@ impl<N: Network> Primary<N> {
 
     /// Re-inserts the transmissions from the proposal into the workers.
     fn reinsert_transmissions_into_workers(&self, proposal: Proposal<N>) -> Result<()> {
+        debug!(
+            "Reinserting {} transmissions from our proposal for round {}",
+            proposal.transmissions().len(),
+            proposal.round()
+        );
         // Re-insert the transmissions into the workers.
         assign_to_workers(
             &self.workers,
@@ -1208,6 +1233,9 @@ impl<N: Network> Primary<N> {
         let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();
         // If our primary is far behind the peer, update our committee to the batch round.
         if is_behind_schedule || is_peer_far_in_future {
+            debug!(
+                "Trying to proceed to round {batch_round} before sync (behind_schedule={is_behind_schedule} far_in_future={is_peer_far_in_future})"
+            );
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
             // If the batch round is greater than the current committee round, update the committee.
             self.try_increment_to_the_next_round(batch_round).await?;
@@ -1310,11 +1338,11 @@ impl<N: Network> Primary<N> {
         }
 
         // If there are no missing previous certificates, return early.
+        let expected_cert_count = fetch_certificates.len();
         match fetch_certificates.is_empty() {
             true => return Ok(Default::default()),
-            false => trace!(
-                "Fetching {} missing previous certificates for round {round} from '{peer_ip}'...",
-                fetch_certificates.len(),
+            false => debug!(
+                "Fetching {expected_cert_count} missing previous certificates for round {round} from '{peer_ip}'...",
             ),
         }
 
@@ -1322,8 +1350,20 @@ impl<N: Network> Primary<N> {
         let mut missing_previous_certificates = HashSet::with_capacity(fetch_certificates.len());
         // Wait for all of the missing previous certificates to be fetched.
         while let Some(result) = fetch_certificates.next().await {
-            // Insert the missing previous certificate into the set.
-            missing_previous_certificates.insert(result?);
+            match result {
+                Ok(cert) => {
+                    missing_previous_certificates.insert(cert);
+                }
+                Err(reason) => {
+                    debug!("Fetching certificate from '{peer_ip}' failed: {reason}");
+                }
+            };
+        }
+        if missing_previous_certificates.len() < expected_cert_count {
+            bail!(
+                "Unable to fetch {}/{expected_cert_count} batch certificates from '{peer_ip}' for round {round}",
+                expected_cert_count - missing_previous_certificates.len()
+            );
         }
         debug!(
             "Fetched {} missing previous certificates for round {round} from '{peer_ip}'",
