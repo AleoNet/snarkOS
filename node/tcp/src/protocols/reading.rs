@@ -142,8 +142,8 @@ impl<R: Reading> ReadingInternal for R {
             tx_processing.send(()).unwrap(); // safe; the channel was just opened
 
             while let Some(msg) = inbound_message_receiver.recv().await {
-                debug!(
-                    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ INBOUND MESSAGE RECEIVER: {:#?}",
+                println!(
+                    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ INBOUND MESSAGE RECEIVER: {:#?}",
                     inbound_message_receiver
                 );
 
