@@ -482,17 +482,24 @@ impl<N: Network> Gateway<N> {
 
     /// Handles the inbound event from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, event: Event<N>) -> Result<()> {
+        if let Event::BatchPropose(batch_propose) = &event {
+            debug!("------------------------------------{CONTEXT} Received '{}' from '{peer_addr}'", event.name());
+        }
+
         // Retrieve the listener IP for the peer.
         let Some(peer_ip) = self.resolver.get_listener(peer_addr) else {
+            debug!("----------------{CONTEXT} Unable to resolve the (ambiguous) peer address '{peer_addr}'");
             bail!("{CONTEXT} Unable to resolve the (ambiguous) peer address '{peer_addr}'")
         };
         // Ensure that the peer is an authorized committee member.
         if !self.is_authorized_validator_ip(peer_ip) {
+            debug!("----------------{CONTEXT} Dropping '{}' from '{peer_ip}' (not authorized)", event.name());
             bail!("{CONTEXT} Dropping '{}' from '{peer_ip}' (not authorized)", event.name())
         }
         // Drop the peer, if they have exceeded the rate limit (i.e. they are requesting too much from us).
         let num_events = self.cache.insert_inbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
         if num_events >= self.max_cache_events() {
+            debug!("----------------{CONTEXT} Dropping '{peer_ip}' for spamming events (num_events = {num_events})");
             bail!("Dropping '{peer_ip}' for spamming events (num_events = {num_events})")
         }
         // Rate limit for duplicate requests.
@@ -506,6 +513,9 @@ impl<N: Network> Gateway<N> {
             // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
             let num_events = self.cache.insert_inbound_certificate(certificate_id, CACHE_REQUESTS_INTERVAL);
             if num_events >= self.max_cache_duplicates() {
+                debug!(
+                    "--------------------- RATE LIMITED '{peer_ip}' for spamming certificate requests/Responses (num_events = {num_events})"
+                );
                 return Ok(());
             }
         } else if matches!(&event, &Event::TransmissionRequest(_) | Event::TransmissionResponse(_)) {
@@ -518,6 +528,9 @@ impl<N: Network> Gateway<N> {
             // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
             let num_events = self.cache.insert_inbound_transmission(transmission_id, CACHE_REQUESTS_INTERVAL);
             if num_events >= self.max_cache_duplicates() {
+                debug!(
+                    "--------------------- RATE LIMITED '{peer_ip}' for spamming transmission requests/Responses (num_events = {num_events})"
+                );
                 return Ok(());
             }
         }
@@ -834,7 +847,7 @@ impl<N: Network> Gateway<N> {
         info!("{connections_msg}");
         for peer_ip in validators {
             let address = self.resolver.get_address(peer_ip).map_or("Unknown".to_string(), |a| a.to_string());
-            debug!("{}", format!("  {peer_ip} - {address}").dimmed());
+            // debug!("{}", format!("  {peer_ip} - {address}").dimmed());
         }
     }
 

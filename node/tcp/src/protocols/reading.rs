@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{io, net::SocketAddr};
+use std::{fmt::Debug, io, net::SocketAddr};
 
 use async_trait::async_trait;
 use bytes::BytesMut;
@@ -142,11 +142,21 @@ impl<R: Reading> ReadingInternal for R {
             tx_processing.send(()).unwrap(); // safe; the channel was just opened
 
             while let Some(msg) = inbound_message_receiver.recv().await {
+                debug!(
+                    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ INBOUND MESSAGE RECEIVER: {:#?}",
+                    inbound_message_receiver
+                );
+
                 if let Err(e) = self_clone.process_message(addr, msg).await {
                     error!(parent: node.span(), "can't process a message from {}: {}", addr, e);
                     node.known_peers().register_failure(addr);
                 }
             }
+
+            error!(
+                "\n\n\n\n\n\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ SHOULD NOT HAVE REACHED THIS POINT @@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n\n\n\n\n\n\n\n INBOUND MESSAGE RECEIVER: {:#?}",
+                inbound_message_receiver
+            );
         });
         let _ = rx_processing.await;
         conn.tasks.push(inbound_processing_task);
