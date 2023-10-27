@@ -417,4 +417,63 @@ mod tests {
             .is_err()
         );
     }
+
+    #[test]
+    fn test_parse_block() {
+        let block_height = 50875;
+
+        for i in 0..1000 {
+            let block_to_query = block_height - i;
+
+            let blocks_endpoint = format!("https://api.explorer.aleo.org/v1/testnet3/block/{block_to_query}");
+            // Fetch blocks
+            let block: Block<CurrentNetwork> = ureq::get(&blocks_endpoint).call().unwrap().into_json().unwrap();
+
+            println!("Fetched block: {:?}", block.height());
+
+            let num_aborted = block.aborted_transaction_ids();
+
+            if num_aborted.len() > 0 {
+                println!("----------------- Aborted transactions: {:?}", num_aborted.len());
+            } else {
+                println!("Aborted transactions: {:?}", num_aborted.len());
+            }
+
+            let mut has_rejected = 0;
+
+            for tranasction in block.transactions().iter() {
+                if tranasction.is_rejected() {
+                    has_rejected += 1;
+                }
+                //
+                // let unconfirmed_transasction_id = tranasction.().unwrap().to_string();
+                //
+                // println!("Unconfirmed transaction id: {}", unconfirmed_transasction_id);
+                //
+                // if unconfirmed_transasction_id.starts_with("at19yrvdzf9gjrjl") {
+                //     println!(
+                //         "-----------FOUND 'at19yrvdzf9gjrjl' IN BLOCK {} - is rejected {}",
+                //         block.height(),
+                //         tranasction.is_rejected()
+                //     );
+                // }
+
+                if tranasction
+                    .id()
+                    .to_string()
+                    .starts_with("at19p599gh7ldwru3cs4506ztje6mh89kyg75mag3g95rsd9emg7v9svhwgas")
+                {
+                    println!(
+                        "-----------FOUND 'at19p599gh7ldwru3cs4506ztje6mh89kyg75mag3g95rsd9emg7v9svhwgas' IN BLOCK {} - is rejected {}",
+                        block.height(),
+                        tranasction.is_rejected()
+                    );
+                }
+            }
+
+            if has_rejected > 0 {
+                println!("Block {} has {has_rejected} rejected transactions", block.height());
+            }
+        }
+    }
 }

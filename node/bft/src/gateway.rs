@@ -740,6 +740,7 @@ impl<N: Network> Gateway<N> {
                     ping.transmission_ids.len() <= MAX_TRANSMISSIONS_PER_WORKER_PING,
                     "{CONTEXT} Received too many transmissions"
                 );
+                debug!("--------------RECEIVED WORKER PING with {} transmissions", ping.transmission_ids.len());
                 // Retrieve the number of workers.
                 let num_workers = self.num_workers();
                 // Iterate over the transmission IDs.
