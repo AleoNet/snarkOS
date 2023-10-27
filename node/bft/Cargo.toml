@@ -71,7 +71,7 @@ features = [ "ledger", "prover" ]
 [dependencies.snarkos-node-bft-storage-service]
 path = "./storage-service"
 version = "=2.2.1"
-features = [ "bft" ]
+features = [ "storage" ]
 
 [dependencies.snarkos-node-sync]
 path = "../sync"

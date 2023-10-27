@@ -17,10 +17,10 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
-default = [ ]
-bft = [ "tokio", "tracing" ]
-mock = [ "parking_lot", "tracing" ]
-test = [ "mock" ]
+default = [ "memory" ]
+memory = [ "parking_lot", "tracing" ]
+storage = [ "tokio", "tracing" ]
+test = [ "memory" ]
 
 [dependencies.indexmap]
 version = "2.0"

@@ -13,43 +13,46 @@
 // limitations under the License.
 
 use snarkvm::{
+    console::types::Field,
     ledger::narwhal::{Transmission, TransmissionID},
     prelude::{Network, Result},
 };
 
-use std::fmt::Debug;
+use indexmap::IndexSet;
+use std::{collections::HashMap, fmt::Debug};
 
-pub trait StorageService<N: Network>: Debug + Send + Sync {
-    /// Stores the given round, transmission ID, and transmission into storage.
-    fn insert_transmission(
-        &self,
-        round: u64,
-        transmission_id: TransmissionID<N>,
-        transmission: Transmission<N>,
-    ) -> Result<()>;
-
-    /// Stores the given `(transmission ID, transmission)` pairs for the given round into storage.
-    fn insert_transmissions(&self, round: u64, transmissions: Vec<(TransmissionID<N>, Transmission<N>)>) -> Result<()>;
-
-    /// Removes the transmission for the given `transmission ID` from storage.
-    fn remove_transmission(&self, transmission_id: TransmissionID<N>) -> Result<()>;
-
-    /// Removes the transmission for the given `round` and `transmission ID` from storage.
-    fn remove_transmission_for_round(&self, round: u64, transmission_id: TransmissionID<N>) -> Result<()>;
-
-    /// Returns `true` if the given `transmission ID` exists.
-    fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
-
-    /// Returns `true` if the given `round` and `transmission ID` exists.
-    fn contains_transmission_for_round(&self, round: u64, transmission_id: &TransmissionID<N>) -> Result<bool>;
+pub trait StorageService<N: Network>:
+    IntoIterator<Item = (TransmissionID<N>, Transmission<N>, IndexSet<Field<N>>)> + Debug + Send + Sync
+{
+    /// Returns `true` if the storage contains the specified `transmission ID`.
+    fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool;
 
     /// Returns the transmission for the given `transmission ID`.
-    fn get_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<Option<Transmission<N>>>;
+    /// If the transmission ID does not exist in storage, `None` is returned.
+    fn get_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Transmission<N>>;
 
-    /// Returns the transmission for the given `round` and `transmission ID`.
-    fn get_transmission_for_round(
+    /// Given a list of transmission IDs, identify and return the transmissions that are missing from storage.
+    fn find_missing_transmissions(
+        &self,
+        transmission_ids: &IndexSet<TransmissionID<N>>,
+        transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>>;
+
+    /// Inserts the transmissions from the given list of transmission IDs,
+    /// using the provided map of missing transmissions.
+    fn insert_transmissions(
         &self,
         round: u64,
-        transmission_id: &TransmissionID<N>,
-    ) -> Result<Option<Transmission<N>>>;
+        certificate_id: Field<N>,
+        transmission_ids: IndexSet<TransmissionID<N>>,
+        missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<()>;
+
+    /// Removes the transmissions for the given round and certificate ID, from the given list of transmission IDs from storage.
+    fn remove_transmissions(
+        &self,
+        round: u64,
+        certificate_id: Field<N>,
+        transmission_ids: &IndexSet<TransmissionID<N>>,
+    ) -> Result<()>;
 }
