@@ -591,24 +591,24 @@ impl<N: Network> Storage<N> {
         // Remove the batch ID.
         self.batch_ids.write().remove(&batch_id);
         // Acquire the transmissions write lock.
-        let mut transmissions = self.transmissions.write();
+        // let mut transmissions = self.transmissions.write();
         // If this is the last certificate ID for the transmission ID, remove the transmission.
-        for transmission_id in certificate.transmission_ids() {
-            // Remove the certificate ID for the transmission ID, and determine if there are any more certificate IDs.
-            match transmissions.entry(*transmission_id) {
-                Entry::Occupied(mut occupied_entry) => {
-                    let (_, certificate_ids) = occupied_entry.get_mut();
-                    // Remove the certificate ID for the transmission ID.
-                    certificate_ids.remove(&certificate_id);
-                    // If there are no more certificate IDs for the transmission ID, remove the transmission.
-                    if certificate_ids.is_empty() {
-                        // Remove the entry for the transmission ID.
-                        occupied_entry.remove();
-                    }
-                }
-                Entry::Vacant(_) => {}
-            }
-        }
+        // for transmission_id in certificate.transmission_ids() {
+        //     // Remove the certificate ID for the transmission ID, and determine if there are any more certificate IDs.
+        //     match transmissions.entry(*transmission_id) {
+        //         Entry::Occupied(mut occupied_entry) => {
+        //             let (_, certificate_ids) = occupied_entry.get_mut();
+        //             // Remove the certificate ID for the transmission ID.
+        //             certificate_ids.remove(&certificate_id);
+        //             // If there are no more certificate IDs for the transmission ID, remove the transmission.
+        //             if certificate_ids.is_empty() {
+        //                 // Remove the entry for the transmission ID.
+        //                 occupied_entry.remove();
+        //             }
+        //         }
+        //         Entry::Vacant(_) => {}
+        //     }
+        // }
         // Return successfully.
         true
     }
