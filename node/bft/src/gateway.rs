@@ -482,9 +482,7 @@ impl<N: Network> Gateway<N> {
 
     /// Handles the inbound event from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, event: Event<N>) -> Result<()> {
-        if let Event::BatchPropose(batch_propose) = &event {
-            debug!("------------------------------------{CONTEXT} Received '{}' from '{peer_addr}'", event.name());
-        }
+        debug!("------------------------------------{CONTEXT} Received '{}' from '{peer_addr}'", event.name());
 
         // Retrieve the listener IP for the peer.
         let Some(peer_ip) = self.resolver.get_listener(peer_addr) else {
