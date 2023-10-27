@@ -504,11 +504,6 @@ impl<N: Network> Primary<N> {
                 self.gateway.disconnect(peer_ip);
                 bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
             }
-            // If the round and batch ID matches, then skip signing the batch a second time.
-            if signed_round == batch_header.round() && signed_batch_id == batch_header.batch_id() {
-                debug!("Skipping a proposal for round {signed_round} from '{peer_ip}' {}", "(already signed)".dimmed());
-                return Ok(());
-            }
         }
 
         // If the peer is ahead, use the batch header to sync up to the peer.
