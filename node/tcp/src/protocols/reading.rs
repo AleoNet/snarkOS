@@ -142,18 +142,13 @@ impl<R: Reading> ReadingInternal for R {
             tx_processing.send(()).unwrap(); // safe; the channel was just opened
 
             while let Some(msg) = inbound_message_receiver.recv().await {
-                println!(
-                    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ INBOUND MESSAGE RECEIVER: {:#?}",
-                    inbound_message_receiver
-                );
-
                 if let Err(e) = self_clone.process_message(addr, msg).await {
                     error!(parent: node.span(), "can't process a message from {}: {}", addr, e);
                     node.known_peers().register_failure(addr);
                 }
             }
 
-            error!(
+            println!(
                 "\n\n\n\n\n\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ SHOULD NOT HAVE REACHED THIS POINT @@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n\n\n\n\n\n\n\n INBOUND MESSAGE RECEIVER: {:#?}",
                 inbound_message_receiver
             );
