@@ -107,8 +107,6 @@ pub struct BlockSync<N: Network> {
     request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
     /// The boolean indicator of whether the node is synced up to the latest block (within the given tolerance).
     is_block_synced: Arc<AtomicBool>,
-    /// A lock to ensure that only one thread is performing block sync at a time.
-    sync_lock: Arc<Mutex<()>>,
 }
 
 impl<N: Network> BlockSync<N> {
@@ -124,7 +122,6 @@ impl<N: Network> BlockSync<N> {
             request_timestamps: Default::default(),
             request_timeouts: Default::default(),
             is_block_synced: Default::default(),
-            sync_lock: Default::default(),
         }
     }
 
@@ -190,9 +187,6 @@ impl<N: Network> BlockSync<N> {
     /// Performs one iteration of the block sync.
     #[inline]
     pub async fn try_block_sync<C: CommunicationService>(&self, communication: &C) {
-        // Acquire the sync lock.
-        let _lock = self.sync_lock.lock().await;
-
         // Prepare the block requests, if any.
         // In the process, we update the state of `is_block_synced` for the sync module.
         let block_requests = self.prepare_block_requests();
