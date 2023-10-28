@@ -589,7 +589,11 @@ impl<N: Network> Primary<N> {
                     if proposal.batch_id() != batch_id {
                         match self.storage.contains_batch(batch_id) {
                             true => bail!("This batch was already certified"),
-                            false => bail!("Unknown batch ID '{batch_id}'"),
+                            false => bail!(
+                                "Unknown batch ID '{batch_id}', expected '{}' for round {}",
+                                proposal.batch_id(),
+                                proposal.round()
+                            ),
                         }
                     }
                     // Retrieve the previous committee for the round.
