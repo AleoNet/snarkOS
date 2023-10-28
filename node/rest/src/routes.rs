@@ -132,7 +132,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
 
         let blocks = cfg_into_iter!((start_height..end_height))
-            .map(|height| rest.ledger.get_committee_for_height(height))
+            .map(|height| rest.ledger.get_committee(height))
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(ErasedJson::pretty(blocks))
