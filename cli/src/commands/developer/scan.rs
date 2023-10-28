@@ -27,7 +27,7 @@ use std::{
     sync::Arc,
 };
 
-const MAX_BLOCK_RANGE: u32 = 50;
+const MAX_BLOCK_RANGE: u32 = 5000;
 
 /// Scan the snarkOS node for records.
 #[derive(Debug, Parser)]
