@@ -34,14 +34,14 @@ impl<N: Network> PrimaryPing<N> {
     }
 }
 
-impl<N: Network> From<(u32, BlockLocators<N>, BatchCertificate<N>, Vec<BatchCertificate<N>>)> for PrimaryPing<N> {
+impl<N: Network> From<(u32, BlockLocators<N>, BatchCertificate<N>, IndexSet<BatchCertificate<N>>)> for PrimaryPing<N> {
     /// Initializes a new ping event.
     fn from(
         (version, block_locators, primary_certificate, batch_certificates): (
             u32,
             BlockLocators<N>,
             BatchCertificate<N>,
-            Vec<BatchCertificate<N>>,
+            IndexSet<BatchCertificate<N>>,
         ),
     ) -> Self {
         Self::new(
@@ -128,6 +128,7 @@ pub mod prop_tests {
     use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
+    use indexmap::indexset;
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
@@ -140,7 +141,7 @@ pub mod prop_tests {
     pub fn any_primary_ping() -> BoxedStrategy<PrimaryPing<CurrentNetwork>> {
         (any::<u32>(), any_block_locators(), any_batch_certificate())
             .prop_map(|(version, block_locators, batch_certificate)| {
-                PrimaryPing::from((version, block_locators, batch_certificate.clone(), vec![batch_certificate]))
+                PrimaryPing::from((version, block_locators, batch_certificate.clone(), indexset![batch_certificate]))
             })
             .boxed()
     }

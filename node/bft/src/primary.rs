@@ -808,12 +808,27 @@ impl<N: Network> Primary<N> {
                         }
                     };
 
-                    // Retrieve the batch certificates for the current round.
-                    let current_round = self_.current_round();
-                    let mut batch_certificates = Vec::new();
-                    batch_certificates
-                        .extend(self_.storage.get_certificates_for_round(current_round.saturating_sub(1)));
-                    batch_certificates.extend(self_.storage.get_certificates_for_round(current_round));
+                    // Retrieve the batch certificates.
+                    let batch_certificates = {
+                        // Retrieve the current round.
+                        let current_round = self_.current_round();
+                        // Retrieve the batch certificates for the current round.
+                        let mut current_certificates = self_.storage.get_certificates_for_round(current_round);
+                        // If there are no batch certificates for the current round,
+                        // then retrieve the batch certificates for the previous round.
+                        if current_certificates.is_empty() {
+                            // Retrieve the previous round.
+                            let previous_round = current_round.saturating_sub(1);
+                            // Retrieve the batch certificates for the previous round.
+                            current_certificates = self_.storage.get_certificates_for_round(previous_round);
+                        }
+                        current_certificates
+                    };
+
+                    // If there are no batch certificates, then skip this iteration of the loop.
+                    if batch_certificates.is_empty() {
+                        continue;
+                    }
 
                     // Construct the primary ping.
                     let primary_ping = PrimaryPing::from((
