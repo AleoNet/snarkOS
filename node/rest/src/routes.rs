@@ -62,10 +62,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     pub(crate) async fn latest_committee(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
-    // Deprecated: Use `get_committee_latest` instead.
+
     // GET /testnet3/committee/{height}
-    pub(crate) async fn get_committee_for_height(State(rest): State<Self>,Path(height_or_hash): Path<String>) -> Result<ErasedJson, RestError> {
-        let height = height_or_hash.parse::<u32>();
+    pub(crate) async fn get_committee_for_height(State(rest): State<Self>,Path(height): Path<String>) -> Result<ErasedJson, RestError> {
+        let height = height.parse::<u32>();
         let block = rest.ledger.get_committee(height.expect("invalid input, it is neither a block height nor a block hash"))?;
         Ok(ErasedJson::pretty(block))
     }
