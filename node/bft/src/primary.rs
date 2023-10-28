@@ -838,14 +838,21 @@ impl<N: Network> Primary<N> {
                     continue;
                 }
 
-                // Deserialize the primary certificate in the primary ping.
-                let Ok(primary_certificate) = spawn_blocking!(primary_certificate.deserialize_blocking()) else {
-                    warn!("Failed to deserialize primary certificate in a primary ping from '{peer_ip}'");
-                    continue;
-                };
-                // Process the primary certificate.
-                if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, primary_certificate).await {
-                    warn!("Cannot process a primary certificate in a primary ping from '{peer_ip}' - {e}");
+                // Spawn a task to process the primary certificate.
+                {
+                    let self_ = self_.clone();
+                    tokio::spawn(async move {
+                        // Deserialize the primary certificate in the primary ping.
+                        let Ok(primary_certificate) = spawn_blocking!(primary_certificate.deserialize_blocking())
+                        else {
+                            warn!("Failed to deserialize primary certificate in 'PrimaryPing' from '{peer_ip}'");
+                            return;
+                        };
+                        // Process the primary certificate.
+                        if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, primary_certificate).await {
+                            warn!("Cannot process a primary certificate in a 'PrimaryPing' from '{peer_ip}' - {e}");
+                        }
+                    });
                 }
 
                 // Iterate through the batch certificates.
@@ -859,19 +866,19 @@ impl<N: Network> Primary<N> {
                     tokio::spawn(async move {
                         // Deserialize the batch certificate in the primary ping.
                         let Ok(batch_certificate) = spawn_blocking!(certificate.deserialize_blocking()) else {
-                            warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
+                            warn!("Failed to deserialize batch certificate in a 'PrimaryPing' from '{peer_ip}'");
                             return;
                         };
                         // Ensure the batch certificate ID matches.
                         if batch_certificate.id() != certificate_id {
-                            warn!("Batch certificate ID mismatch in a primary ping from '{peer_ip}'");
+                            warn!("Batch certificate ID mismatch in a 'PrimaryPing' from '{peer_ip}'");
                             // Proceed to disconnect the validator.
                             self_.gateway.disconnect(peer_ip);
                             return;
                         }
                         // Process the batch certificate.
                         if let Err(e) = self_.process_batch_certificate_from_ping(peer_ip, batch_certificate).await {
-                            warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
+                            warn!("Cannot process a batch certificate in a 'PrimaryPing' from '{peer_ip}' - {e}");
                         }
                     });
                 }
