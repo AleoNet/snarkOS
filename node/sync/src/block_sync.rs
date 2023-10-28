@@ -35,6 +35,7 @@ use std::{
     },
     time::Instant,
 };
+use tokio::sync::Mutex;
 
 pub const REDUNDANCY_FACTOR: usize = 3;
 const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
@@ -106,6 +107,8 @@ pub struct BlockSync<N: Network> {
     request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
     /// The boolean indicator of whether the node is synced up to the latest block (within the given tolerance).
     is_block_synced: Arc<AtomicBool>,
+    /// A lock to ensure that only one thread is performing block sync at a time.
+    sync_lock: Arc<Mutex<()>>,
 }
 
 impl<N: Network> BlockSync<N> {
@@ -121,6 +124,7 @@ impl<N: Network> BlockSync<N> {
             request_timestamps: Default::default(),
             request_timeouts: Default::default(),
             is_block_synced: Default::default(),
+            sync_lock: Default::default(),
         }
     }
 
@@ -183,33 +187,12 @@ impl<N: Network> BlockSync<N> {
 }
 
 impl<N: Network> BlockSync<N> {
-    /// Returns the block locators.
-    #[inline]
-    pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
-        // Retrieve the latest block height.
-        let latest_height = self.canon.latest_block_height();
-
-        // Initialize the recents map.
-        let mut recents = IndexMap::with_capacity(NUM_RECENT_BLOCKS);
-        // Retrieve the recent block hashes.
-        for height in latest_height.saturating_sub((NUM_RECENT_BLOCKS - 1) as u32)..=latest_height {
-            recents.insert(height, self.canon.get_block_hash(height)?);
-        }
-
-        // Initialize the checkpoints map.
-        let mut checkpoints = IndexMap::with_capacity((latest_height / CHECKPOINT_INTERVAL + 1).try_into()?);
-        // Retrieve the checkpoint block hashes.
-        for height in (0..=latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
-            checkpoints.insert(height, self.canon.get_block_hash(height)?);
-        }
-
-        // Construct the block locators.
-        BlockLocators::new(recents, checkpoints)
-    }
-
     /// Performs one iteration of the block sync.
     #[inline]
     pub async fn try_block_sync<C: CommunicationService>(&self, communication: &C) {
+        // Acquire the sync lock.
+        let _lock = self.sync_lock.lock().await;
+
         // Prepare the block requests, if any.
         // In the process, we update the state of `is_block_synced` for the sync module.
         let block_requests = self.prepare_block_requests();
@@ -273,7 +256,7 @@ impl<N: Network> BlockSync<N> {
         // Retrieve the latest block height.
         let mut current_height = self.canon.latest_block_height();
         // Try to advance the ledger with the sync pool.
-        while let Some(block) = self.remove_block_response(current_height + 1) {
+        while let Some(block) = self.process_next_block(current_height + 1) {
             // Ensure the block height matches.
             if block.height() != current_height + 1 {
                 warn!("Block height mismatch: expected {}, found {}", current_height + 1, block.height());
@@ -296,6 +279,7 @@ impl<N: Network> BlockSync<N> {
     }
 }
 
+// For use by provers.
 impl<N: Network> BlockSync<N> {
     /// Returns the sync peers with their latest heights, and their minimum common ancestor, if the node can sync.
     /// This function returns peers that are consistent with each other, and have a block height
@@ -310,6 +294,33 @@ impl<N: Network> BlockSync<N> {
         } else {
             None
         }
+    }
+}
+
+// For use by all node types.
+impl<N: Network> BlockSync<N> {
+    /// Returns the block locators.
+    #[inline]
+    pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
+        // Retrieve the latest block height.
+        let latest_height = self.canon.latest_block_height();
+
+        // Initialize the recents map.
+        let mut recents = IndexMap::with_capacity(NUM_RECENT_BLOCKS);
+        // Retrieve the recent block hashes.
+        for height in latest_height.saturating_sub((NUM_RECENT_BLOCKS - 1) as u32)..=latest_height {
+            recents.insert(height, self.canon.get_block_hash(height)?);
+        }
+
+        // Initialize the checkpoints map.
+        let mut checkpoints = IndexMap::with_capacity((latest_height / CHECKPOINT_INTERVAL + 1).try_into()?);
+        // Retrieve the checkpoint block hashes.
+        for height in (0..=latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
+            checkpoints.insert(height, self.canon.get_block_hash(height)?);
+        }
+
+        // Construct the block locators.
+        BlockLocators::new(recents, checkpoints)
     }
 
     /// Updates the block locators and common ancestors for the given peer IP.

@@ -17,6 +17,7 @@ use crate::{
     Gateway,
     Transport,
     MAX_BATCH_DELAY,
+    PRIMARY_PING_INTERVAL,
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -89,7 +90,7 @@ impl<N: Network> Sync<N> {
         self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // Sleep briefly to avoid triggering spam detection.
-                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(PRIMARY_PING_INTERVAL)).await;
                 // Perform the sync routine.
                 let communication = &self_.gateway;
                 // let communication = &node.router;
