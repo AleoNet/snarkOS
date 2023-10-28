@@ -170,9 +170,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                 // Sleep briefly to avoid triggering spam detection.
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                 // Perform the sync routine.
-                if let Err(error) = node.sync.try_block_sync(&node).await {
-                    warn!("Sync error - {error}");
-                }
+                node.sync.try_block_sync(&node).await;
             }
         }));
     }

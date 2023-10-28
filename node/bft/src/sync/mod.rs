@@ -93,9 +93,7 @@ impl<N: Network> Sync<N> {
                 // Perform the sync routine.
                 let communication = &self_.gateway;
                 // let communication = &node.router;
-                if let Err(error) = self_.block_sync.try_block_sync(communication).await {
-                    warn!("Sync error - {error}");
-                }
+                self_.block_sync.try_block_sync(communication).await;
             }
         }));
 
