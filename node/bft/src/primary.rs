@@ -660,10 +660,14 @@ impl<N: Network> Primary<N> {
         let author = certificate.author();
 
         // Ensure the batch certificate is from the validator.
-        if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != author) {
-            // Proceed to disconnect the validator.
-            self.gateway.disconnect(peer_ip);
-            bail!("Malicious peer - batch certificate from a different validator ({author})");
+        match self.gateway.resolver().get_address(peer_ip) {
+            Some(address) if address != author => {
+                // Proceed to disconnect the validator.
+                self.gateway.disconnect(peer_ip);
+                bail!("Malicious peer - batch certificate from a different validator ({author})");
+            }
+            None => bail!("Batch certificate from a disconnected validator"),
+            _ => (),
         }
         // Ensure the batch certificate is authored by a current committee member.
         if !self.gateway.is_authorized_validator_address(author) {
