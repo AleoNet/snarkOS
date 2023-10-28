@@ -31,7 +31,7 @@ use anyhow::{bail, Result};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{
-    sync::{oneshot, Mutex as TMutex, OnceCell},
+    sync::{oneshot, OnceCell},
     task::JoinHandle,
 };
 
@@ -51,8 +51,6 @@ pub struct Sync<N: Network> {
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
-    /// The sync lock.
-    lock: Arc<TMutex<()>>,
 }
 
 impl<N: Network> Sync<N> {
@@ -69,7 +67,6 @@ impl<N: Network> Sync<N> {
             pending: Default::default(),
             bft_sender: Default::default(),
             handles: Default::default(),
-            lock: Default::default(),
         }
     }
 
@@ -187,9 +184,6 @@ impl<N: Network> Sync<N> {
         // Retrieve the blocks.
         let blocks = self.ledger.get_blocks(gc_height..block_height.saturating_add(1))?;
 
-        // Acquire the sync lock.
-        let _lock = self.lock.lock().await;
-
         /* Sync storage */
 
         // Sync the height with the block.
@@ -267,9 +261,6 @@ impl<N: Network> Sync<N> {
 
     /// Syncs the storage with the given blocks.
     pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
-        // Acquire the sync lock.
-        let _lock = self.lock.lock().await;
-
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
             // Iterate over the certificates.
@@ -378,8 +369,6 @@ impl<N: Network> Sync<N> {
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
         info!("Shutting down the sync module...");
-        // Acquire the sync lock.
-        let _lock = self.lock.lock().await;
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
     }
