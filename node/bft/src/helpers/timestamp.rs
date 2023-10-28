@@ -59,6 +59,6 @@ mod prop_tests {
 
     #[proptest]
     fn test_check_timestamp_for_liveness_too_far_in_future(#[strategy(any_invalid_timestamp())] timestamp: i64) {
-        check_timestamp_for_liveness(timestamp).unwrap();
+        assert!(check_timestamp_for_liveness(timestamp).is_err());
     }
 }
