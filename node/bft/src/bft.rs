@@ -498,7 +498,11 @@ impl<N: Network> BFT<N> {
                 }
                 // Retrieve the transmission.
                 let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
-                    bail!("BFT failed to retrieve transmission {}", fmt_id(transmission_id));
+                    bail!(
+                        "BFT failed to retrieve transmission '{}' from round {}",
+                        fmt_id(transmission_id),
+                        certificate.round()
+                    );
                 };
                 // Add the transmission to the set.
                 transmissions.insert(*transmission_id, transmission);
