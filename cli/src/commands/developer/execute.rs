@@ -15,6 +15,7 @@
 use super::{CurrentNetwork, Developer};
 
 use snarkvm::prelude::{
+    cost_in_microcredits,
     query::Query,
     store::{helpers::memory::ConsensusMemory, ConsensusStore},
     Address,
@@ -114,21 +115,32 @@ impl Execute {
         };
 
         // Check if the public balance is sufficient.
+        let storage_cost = transaction
+            .execution()
+            .ok_or_else(|| anyhow!("The transaction does not contain an execution"))?
+            .size_in_bytes()?;
+
+        // Calculate the base fee.
+        // This fee is the minimum fee required to pay for the transaction,
+        // excluding any finalize fees that the execution may incur.
+        let base_fee = storage_cost.saturating_add(self.priority_fee.unwrap_or(0));
+
+        // Calculate the finalize fee.
+        let finalize_fee = match Developer::fetch_program(&self.program_id, &self.query)?
+            .get_function_ref(&self.function)?
+            .finalize_logic()
+        {
+            None => 0u64,
+            Some(finalize_logic) => cost_in_microcredits(finalize_logic)?,
+        };
+
+        println!("📦 The total fee for this transaction is {} microcredits", base_fee.saturating_add(finalize_fee));
+
+        // Check if the public balance is sufficient.
         if self.record.is_none() {
             // Fetch the public balance.
             let address = Address::try_from(&private_key)?;
             let public_balance = Developer::get_public_balance(&address, &self.query)?;
-
-            // Check if the public balance is sufficient.
-            let storage_cost = transaction
-                .execution()
-                .ok_or_else(|| anyhow!("The transaction does not contain an execution"))?
-                .size_in_bytes()?;
-
-            // Calculate the base fee.
-            // This fee is the minimum fee required to pay for the transaction,
-            // excluding any finalize fees that the execution may incur.
-            let base_fee = storage_cost.saturating_add(self.priority_fee.unwrap_or(0));
 
             // If the public balance is insufficient, return an error.
             if public_balance < base_fee {

@@ -98,6 +98,8 @@ impl Deploy {
             // Compute the minimum deployment cost.
             let (minimum_deployment_cost, (_, _)) = deployment_cost(&deployment)?;
 
+            println!("📦 The minimum deployment cost for this transaction is {minimum_deployment_cost} microcredits");
+
             // Prepare the fees.
             let fee = match &self.record {
                 Some(record) => {
