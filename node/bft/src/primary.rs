@@ -848,15 +848,19 @@ impl<N: Network> Primary<N> {
 
                 // Iterate through the batch certificates.
                 for batch_certificate in batch_certificates {
-                    // Deserialize the batch certificate in the primary ping.
-                    let Ok(batch_certificate) = spawn_blocking!(batch_certificate.deserialize_blocking()) else {
-                        warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
-                        continue;
-                    };
-                    // Process the batch certificate.
-                    if let Err(e) = self_.process_batch_certificate_from_ping(peer_ip, batch_certificate).await {
-                        warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
-                    }
+                    // Spawn a task to process the batch certificate.
+                    let self_ = self_.clone();
+                    tokio::spawn(async move {
+                        // Deserialize the batch certificate in the primary ping.
+                        let Ok(batch_certificate) = spawn_blocking!(batch_certificate.deserialize_blocking()) else {
+                            warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
+                            return;
+                        };
+                        // Process the batch certificate.
+                        if let Err(e) = self_.process_batch_certificate_from_ping(peer_ip, batch_certificate).await {
+                            warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
+                        }
+                    });
                 }
             }
         });
