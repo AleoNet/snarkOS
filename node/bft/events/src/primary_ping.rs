@@ -19,7 +19,7 @@ pub struct PrimaryPing<N: Network> {
     pub version: u32,
     pub block_locators: BlockLocators<N>,
     pub primary_certificate: Data<BatchCertificate<N>>,
-    pub batch_certificates: Vec<Data<BatchCertificate<N>>>,
+    pub batch_certificates: IndexMap<Field<N>, Data<BatchCertificate<N>>>,
 }
 
 impl<N: Network> PrimaryPing<N> {
@@ -28,7 +28,7 @@ impl<N: Network> PrimaryPing<N> {
         version: u32,
         block_locators: BlockLocators<N>,
         primary_certificate: Data<BatchCertificate<N>>,
-        batch_certificates: Vec<Data<BatchCertificate<N>>>,
+        batch_certificates: IndexMap<Field<N>, Data<BatchCertificate<N>>>,
     ) -> Self {
         Self { version, block_locators, primary_certificate, batch_certificates }
     }
@@ -48,7 +48,7 @@ impl<N: Network> From<(u32, BlockLocators<N>, BatchCertificate<N>, Vec<BatchCert
             version,
             block_locators,
             Data::Object(primary_certificate),
-            batch_certificates.into_iter().map(Data::Object).collect(),
+            batch_certificates.into_iter().map(|c| (c.id(), Data::Object(c))).collect(),
         )
     }
 }
@@ -63,12 +63,23 @@ impl<N: Network> EventTrait for PrimaryPing<N> {
 
 impl<N: Network> ToBytes for PrimaryPing<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Write the version.
         self.version.write_le(&mut writer)?;
+        // Write the block locators.
         self.block_locators.write_le(&mut writer)?;
+        // Write the primary certificate.
         self.primary_certificate.write_le(&mut writer)?;
-        u16::try_from(self.batch_certificates.len()).map_err(error)?.write_le(&mut writer)?;
-        for batch_certificate in &self.batch_certificates {
-            batch_certificate.write_le(&mut writer)?;
+
+        // Determine the number of batch certificates.
+        let num_certificates =
+            u16::try_from(self.batch_certificates.len()).map_err(error)?.min(Committee::<N>::MAX_COMMITTEE_SIZE);
+
+        // Write the number of batch certificates.
+        num_certificates.write_le(&mut writer)?;
+        // Write the batch certificates.
+        for (certificate_id, certificate) in self.batch_certificates.iter().take(usize::from(num_certificates)) {
+            certificate_id.write_le(&mut writer)?;
+            certificate.write_le(&mut writer)?;
         }
         Ok(())
     }
@@ -76,15 +87,36 @@ impl<N: Network> ToBytes for PrimaryPing<N> {
 
 impl<N: Network> FromBytes for PrimaryPing<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Read the version.
         let version = u32::read_le(&mut reader)?;
+        // Read the block locators.
         let block_locators = BlockLocators::read_le(&mut reader)?;
+        // Read the primary certificate.
         let primary_certificate = Data::read_le(&mut reader)?;
+
+        // Read the number of batch certificates.
         let num_certificates = u16::read_le(&mut reader)?;
-        // TODO: Limit to the number of MAX_COMMITTEE + 1 (self).
-        let mut batch_certificates = Vec::with_capacity(usize::from(num_certificates));
-        for _ in 0..num_certificates {
-            batch_certificates.push(Data::read_le(&mut reader)?);
+        // Ensure the number of batch certificates is not zero.
+        if num_certificates == 0 {
+            return Err(error("The number of batch certificates is zero"));
         }
+        // Ensure the number of batch certificates is not greater than the maximum committee size.
+        if num_certificates > Committee::<N>::MAX_COMMITTEE_SIZE {
+            return Err(error("The number of batch certificates is greater than the maximum committee size"));
+        }
+
+        // Read the batch certificates.
+        let mut batch_certificates = IndexMap::with_capacity(usize::from(num_certificates));
+        for _ in 0..num_certificates {
+            // Read the certificate ID.
+            let certificate_id = Field::read_le(&mut reader)?;
+            // Read the certificate.
+            let certificate = Data::read_le(&mut reader)?;
+            // Insert the certificate.
+            batch_certificates.insert(certificate_id, certificate);
+        }
+
+        // Return the ping event.
         Ok(Self::new(version, block_locators, primary_certificate, batch_certificates))
     }
 }
@@ -128,8 +160,8 @@ pub mod prop_tests {
             primary_ping
                 .batch_certificates
                 .into_iter()
-                .map(|bc| bc.deserialize_blocking().unwrap())
-                .zip(decoded.batch_certificates.into_iter().map(|bc| bc.deserialize_blocking().unwrap()))
+                .map(|(a, bc)| (a, bc.deserialize_blocking().unwrap()))
+                .zip(decoded.batch_certificates.into_iter().map(|(a, bc)| (a, bc.deserialize_blocking().unwrap())))
                 .all(|(a, b)| a == b)
         )
     }

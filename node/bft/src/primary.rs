@@ -470,6 +470,8 @@ impl<N: Network> Primary<N> {
         let batch_header = spawn_blocking!(batch_header.deserialize_blocking())?;
         // Ensure the round matches in the batch header.
         if batch_round != batch_header.round() {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
@@ -832,7 +834,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, primary_certificate, batch_certificates)) = rx_primary_ping.recv().await {
                 // If the primary is not synced, then do not process the primary ping.
                 if !self_.sync.is_synced() {
-                    trace!("Skipping a primary ping from '{peer_ip}' - node is syncing");
+                    trace!("Skipping a primary ping from '{peer_ip}' {}", "(node is syncing)".dimmed());
                     continue;
                 }
 
@@ -847,15 +849,26 @@ impl<N: Network> Primary<N> {
                 }
 
                 // Iterate through the batch certificates.
-                for batch_certificate in batch_certificates {
+                for (certificate_id, certificate) in batch_certificates {
+                    // Ensure storage does not already contain the certificate.
+                    if self_.storage.contains_certificate(certificate_id) {
+                        continue;
+                    }
                     // Spawn a task to process the batch certificate.
                     let self_ = self_.clone();
                     tokio::spawn(async move {
                         // Deserialize the batch certificate in the primary ping.
-                        let Ok(batch_certificate) = spawn_blocking!(batch_certificate.deserialize_blocking()) else {
+                        let Ok(batch_certificate) = spawn_blocking!(certificate.deserialize_blocking()) else {
                             warn!("Failed to deserialize batch certificate in a primary ping from '{peer_ip}'");
                             return;
                         };
+                        // Ensure the batch certificate ID matches.
+                        if batch_certificate.id() != certificate_id {
+                            warn!("Batch certificate ID mismatch in a primary ping from '{peer_ip}'");
+                            // Proceed to disconnect the validator.
+                            self_.gateway.disconnect(peer_ip);
+                            return;
+                        }
                         // Process the batch certificate.
                         if let Err(e) = self_.process_batch_certificate_from_ping(peer_ip, batch_certificate).await {
                             warn!("Cannot process a batch certificate in a primary ping from '{peer_ip}' - {e}");
@@ -873,7 +886,7 @@ impl<N: Network> Primary<N> {
                     tokio::time::sleep(Duration::from_millis(WORKER_PING_INTERVAL)).await;
                     // If the primary is not synced, then do not broadcast the worker ping(s).
                     if !self_.sync.is_synced() {
-                        trace!("Skipping worker ping(s) - node is syncing");
+                        trace!("Skipping worker ping(s) {}", "(node is syncing)".dimmed());
                         continue;
                     }
                     // Broadcast the worker ping(s).
@@ -892,7 +905,7 @@ impl<N: Network> Primary<N> {
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
                 // If the primary is not synced, then do not propose a batch.
                 if !self_.sync.is_synced() {
-                    debug!("Skipping batch proposal - node is syncing");
+                    debug!("Skipping batch proposal {}", "(node is syncing)".dimmed());
                     continue;
                 }
                 // If there is no proposed batch, attempt to propose a batch.
@@ -908,7 +921,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
                 // If the primary is not synced, then do not sign the batch.
                 if !self_.sync.is_synced() {
-                    trace!("Skipping a batch proposal from '{peer_ip}' - node is syncing");
+                    trace!("Skipping a batch proposal from '{peer_ip}' {}", "(node is syncing)".dimmed());
                     continue;
                 }
                 // Process the proposed batch.
@@ -924,7 +937,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
                 // If the primary is not synced, then do not store the signature.
                 if !self_.sync.is_synced() {
-                    trace!("Skipping a batch signature from '{peer_ip}' - node is syncing");
+                    trace!("Skipping a batch signature from '{peer_ip}' {}", "(node is syncing)".dimmed());
                     continue;
                 }
                 // Process the batch signature.
@@ -940,7 +953,7 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
                 // If the primary is not synced, then do not store the certificate.
                 if !self_.sync.is_synced() {
-                    trace!("Skipping a certified batch from '{peer_ip}' - node is syncing");
+                    trace!("Skipping a certified batch from '{peer_ip}' {}", "(node is syncing)".dimmed());
                     continue;
                 }
 
