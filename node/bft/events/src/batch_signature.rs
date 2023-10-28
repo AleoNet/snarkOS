@@ -18,13 +18,12 @@ use super::*;
 pub struct BatchSignature<N: Network> {
     pub batch_id: Field<N>,
     pub signature: Signature<N>,
-    pub timestamp: i64,
 }
 
 impl<N: Network> BatchSignature<N> {
     /// Initializes a new batch signature event.
-    pub fn new(batch_id: Field<N>, signature: Signature<N>, timestamp: i64) -> Self {
-        Self { batch_id, signature, timestamp }
+    pub fn new(batch_id: Field<N>, signature: Signature<N>) -> Self {
+        Self { batch_id, signature }
     }
 }
 
@@ -40,7 +39,6 @@ impl<N: Network> ToBytes for BatchSignature<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.batch_id.write_le(&mut writer)?;
         self.signature.write_le(&mut writer)?;
-        self.timestamp.write_le(&mut writer)?;
         Ok(())
     }
 }
@@ -49,9 +47,8 @@ impl<N: Network> FromBytes for BatchSignature<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let batch_id = Field::read_le(&mut reader)?;
         let signature = Signature::read_le(&mut reader)?;
-        let timestamp = i64::read_le(&mut reader)?;
 
-        Ok(Self { batch_id, signature, timestamp })
+        Ok(Self { batch_id, signature })
     }
 }
 
@@ -60,22 +57,19 @@ pub mod prop_tests {
     use crate::{
         certificate_request::prop_tests::any_field,
         challenge_response::prop_tests::any_signature,
-        prop_tests::now,
         BatchSignature,
     };
     use snarkvm::console::prelude::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{BoxedStrategy, Just, Strategy};
+    use proptest::prelude::{BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     pub fn any_batch_signature() -> BoxedStrategy<BatchSignature<CurrentNetwork>> {
-        (any_field(), any_signature(), Just(now()), -10..10i64)
-            .prop_map(|(certificate_id, signature, timestamp, drift)| {
-                BatchSignature::new(certificate_id, signature, timestamp + drift)
-            })
+        (any_field(), any_signature())
+            .prop_map(|(certificate_id, signature)| BatchSignature::new(certificate_id, signature))
             .boxed()
     }
 

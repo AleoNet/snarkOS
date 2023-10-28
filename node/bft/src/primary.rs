@@ -431,17 +431,15 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the private key.
         let private_key = *self.gateway.account().private_key();
-        // Generate the local timestamp for batch
-        let timestamp = now();
         // Prepare the transmission IDs.
         let transmission_ids = transmissions.keys().copied().collect();
         // Prepare the certificate IDs.
-        let certificate_ids = previous_certificates.into_iter().map(|c| c.certificate_id()).collect();
+        let certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
         // Sign the batch header.
         let batch_header = spawn_blocking!(BatchHeader::new(
             &private_key,
             round,
-            timestamp,
+            now(),
             transmission_ids,
             certificate_ids,
             &mut rand::thread_rng()
@@ -528,18 +526,15 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the batch ID.
         let batch_id = batch_header.batch_id();
-        // Generate a timestamp.
-        let timestamp = now();
         // Sign the batch ID.
         let account = self.gateway.account().clone();
-        let signature =
-            spawn_blocking!(account.sign(&[batch_id, Field::from_u64(now() as u64)], &mut rand::thread_rng()))?;
+        let signature = spawn_blocking!(account.sign(&[batch_id], &mut rand::thread_rng()))?;
         // Cache the round and batch ID for this validator.
         self.signed_proposals.write().insert(batch_header.author(), (batch_header.round(), batch_id));
         // Broadcast the signature back to the validator.
         let self_ = self.clone();
         tokio::spawn(async move {
-            let event = Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp));
+            let event = Event::BatchSignature(BatchSignature::new(batch_id, signature));
             // Send the batch signature to the peer.
             if self_.gateway.send(peer_ip, event).await.is_some() {
                 debug!("Signed a batch for round {batch_round} from '{peer_ip}'");
@@ -565,7 +560,7 @@ impl<N: Network> Primary<N> {
         self.check_proposed_batch_for_expiration().await?;
 
         // Retrieve the signature and timestamp.
-        let BatchSignature { batch_id, signature, timestamp } = batch_signature;
+        let BatchSignature { batch_id, signature } = batch_signature;
 
         // Retrieve the signer.
         let signer = spawn_blocking!(Ok(signature.to_address()))?;
@@ -604,7 +599,7 @@ impl<N: Network> Primary<N> {
                         bail!("Signature is from a disconnected validator");
                     };
                     // Add the signature to the batch.
-                    proposal.add_signature(signer, signature, timestamp, &previous_committee)?;
+                    proposal.add_signature(signer, signature, &previous_committee)?;
                     info!("Received a batch signature for round {} from '{peer_ip}'", proposal.round());
                     // Check if the batch is ready to be certified.
                     if !proposal.is_quorum_threshold_reached(&previous_committee) {
@@ -650,7 +645,7 @@ impl<N: Network> Primary<N> {
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
         // Ensure storage does not already contain the certificate.
-        if self.storage.contains_certificate(certificate.certificate_id()) {
+        if self.storage.contains_certificate(certificate.id()) {
             return Ok(());
         }
 
@@ -719,7 +714,7 @@ impl<N: Network> Primary<N> {
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
         // Ensure storage does not already contain the certificate.
-        if self.storage.contains_certificate(certificate.certificate_id()) {
+        if self.storage.contains_certificate(certificate.id()) {
             return Ok(());
         }
 
@@ -1164,7 +1159,7 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
         // If the certificate already exists in storage, return early.
-        if self.storage.contains_certificate(certificate.certificate_id()) {
+        if self.storage.contains_certificate(certificate.id()) {
             return Ok(());
         }
 
@@ -1172,7 +1167,7 @@ impl<N: Network> Primary<N> {
         let missing_transmissions = self.sync_with_batch_header_from_peer(peer_ip, batch_header).await?;
 
         // Check if the certificate needs to be stored.
-        if !self.storage.contains_certificate(certificate.certificate_id()) {
+        if !self.storage.contains_certificate(certificate.id()) {
             // Store the batch certificate.
             self.storage.insert_certificate(certificate.clone(), missing_transmissions)?;
             debug!("Stored a batch certificate for round {batch_round} from '{peer_ip}'");
@@ -1486,35 +1481,29 @@ mod tests {
             if account.address() == primary.gateway.account().address() {
                 continue;
             }
-
             let batch_id = primary.proposed_batch.read().as_ref().unwrap().batch_id();
-            let timestamp = now();
-            let signature = account.sign(&[batch_id, Field::from_u64(timestamp as u64)], rng).unwrap();
-            signatures.push((*socket_addr, BatchSignature::new(batch_id, signature, timestamp)));
+            let signature = account.sign(&[batch_id], rng).unwrap();
+            signatures.push((*socket_addr, BatchSignature::new(batch_id, signature)));
         }
 
         signatures
     }
 
-    // Creates a signature of the batch ID for each committe member
-    // (excluding the primary).
+    /// Creates a signature of the batch ID for each committee member (excluding the primary).
     fn peer_signatures_for_batch(
         primary_address: Address<CurrentNetwork>,
         accounts: &[(SocketAddr, Account<CurrentNetwork>)],
         batch_id: Field<CurrentNetwork>,
         rng: &mut TestRng,
-    ) -> IndexMap<Signature<CurrentNetwork>, i64> {
-        let mut signatures = IndexMap::new();
+    ) -> IndexSet<Signature<CurrentNetwork>> {
+        let mut signatures = IndexSet::new();
         for (_, account) in accounts {
             if account.address() == primary_address {
                 continue;
             }
-
-            let timestamp = now();
-            let signature = account.sign(&[batch_id, Field::from_u64(timestamp as u64)], rng).unwrap();
-            signatures.insert(signature, timestamp);
+            let signature = account.sign(&[batch_id], rng).unwrap();
+            signatures.insert(signature);
         }
-
         signatures
     }
 
@@ -1544,7 +1533,7 @@ mod tests {
         let batch_header =
             BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
         let signatures = peer_signatures_for_batch(primary_address, accounts, batch_header.batch_id(), rng);
-        let certificate = BatchCertificate::<CurrentNetwork>::new(batch_header, signatures).unwrap();
+        let certificate = BatchCertificate::<CurrentNetwork>::from(batch_header, signatures).unwrap();
         (certificate, transmissions)
     }
 
@@ -1566,7 +1555,7 @@ mod tests {
                     previous_certificates.clone(),
                     rng,
                 );
-                next_certificates.insert(certificate.certificate_id());
+                next_certificates.insert(certificate.id());
                 assert!(primary.storage.insert_certificate(certificate, transmissions).is_ok());
             }
 
