@@ -31,7 +31,7 @@ use snarkvm::prelude::{
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use colored::Colorize;
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 /// Executes an Aleo program function.
 #[derive(Debug, Parser)]
@@ -114,26 +114,49 @@ impl Execute {
             )?
         };
 
-        // Check if the public balance is sufficient.
-        let storage_cost = transaction
-            .execution()
-            .ok_or_else(|| anyhow!("The transaction does not contain an execution"))?
-            .size_in_bytes()?;
+        // Get the execution from the transaction.
+        let execution =
+            transaction.execution().ok_or_else(|| anyhow!("The transaction does not contain an execution"))?;
+
+        // Calculate the storage cost.
+        let storage_cost = execution.size_in_bytes()?;
 
         // Calculate the base fee.
         // This fee is the minimum fee required to pay for the transaction,
         // excluding any finalize fees that the execution may incur.
         let base_fee = storage_cost.saturating_add(self.priority_fee.unwrap_or(0));
 
-        // Calculate the finalize fee.
-        let finalize_fee = match Developer::fetch_program(&self.program_id, &self.query)?
-            .get_function_ref(&self.function)?
-            .finalize_logic()
-        {
-            None => 0u64,
-            Some(finalize_logic) => cost_in_microcredits(finalize_logic)?,
-        };
+        // Prepare the program lookup.
+        let lookup = execution
+            .transitions()
+            .map(|transition| {
+                let program_id = transition.program_id();
+                Ok((*program_id, Developer::fetch_program(&self.program_id, &self.query)?))
+            })
+            .collect::<Result<HashMap<_, _>>>()?;
 
+        // Compute the finalize fee in microcredits.
+        let mut finalize_fee = 0u64;
+        // Iterate over the transitions to accumulate the finalize fee.
+        for transition in execution.transitions() {
+            // Retrieve the program ID.
+            let program_id = transition.program_id();
+            // Retrieve the function name.
+            let function_name = transition.function_name();
+            // Retrieve the program.
+            let program = lookup.get(program_id).ok_or(anyhow!("Program '{program_id}' is missing"))?;
+            // Retrieve the finalize cost.
+            let cost = match program.get_function(function_name)?.finalize_logic() {
+                Some(finalize) => cost_in_microcredits(finalize)?,
+                None => continue,
+            };
+            // Accumulate the finalize cost.
+            finalize_fee = finalize_fee
+                .checked_add(cost)
+                .ok_or(anyhow!("The finalize cost computation overflowed for an execution"))?;
+        }
+
+        println!("📦 The base fee for this transaction is {} microcredits", base_fee);
         println!("📦 The total fee for this transaction is {} microcredits", base_fee.saturating_add(finalize_fee));
 
         // Check if the public balance is sufficient.
