@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-cdn"
-version = "2.2.1"
+version = "2.2.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A CDN client for a decentralized operating system"
 homepage = "https://aleo.org"
