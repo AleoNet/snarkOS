@@ -109,7 +109,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         let start_height = block_range.start;
         let end_height = block_range.end;
 
-        const MAX_BLOCK_RANGE: u32 = 50;
+        const MAX_BLOCK_RANGE: u32 = 5000;
 
         // Ensure the end height is greater than the start height.
         if start_height > end_height {
