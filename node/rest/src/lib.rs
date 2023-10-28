@@ -124,6 +124,9 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/latest/committee", get(Self::latest_committee))
             // ------------------------------------------------------
 
+            // ../committee/..
+            .route("/testnet3/committee/{height}", get(Self::get_committee_for_height))
+
             // GET ../block/..
             .route("/testnet3/block/height/latest", get(Self::get_block_height_latest))
             .route("/testnet3/block/hash/latest", get(Self::get_block_hash_latest))

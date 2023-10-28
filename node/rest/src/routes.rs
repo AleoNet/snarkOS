@@ -62,6 +62,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     pub(crate) async fn latest_committee(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
+    // Deprecated: Use `get_committee_latest` instead.
+    // GET /testnet3/committee/{height}
+    pub(crate) async fn get_committee_for_height(Path(height_or_hash): Path<String>) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_committee(height_or_hash)?))
+    }
 
     // ---------------------------------------------------------
 
