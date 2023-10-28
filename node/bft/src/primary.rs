@@ -589,7 +589,11 @@ impl<N: Network> Primary<N> {
                     if proposal.batch_id() != batch_id {
                         match self.storage.contains_batch(batch_id) {
                             true => bail!("This batch was already certified"),
-                            false => bail!("Unknown batch ID '{batch_id}'"),
+                            false => bail!(
+                                "Unknown batch ID '{batch_id}', expected '{}' for round {}",
+                                proposal.batch_id(),
+                                proposal.round()
+                            ),
                         }
                     }
                     // Retrieve the previous committee for the round.
@@ -801,8 +805,8 @@ impl<N: Network> Primary<N> {
                     // Retrieve the batch certificates for the current round.
                     let current_round = self_.current_round();
                     let mut batch_certificates = Vec::new();
-                    batch_certificates
-                        .extend(self_.storage.get_certificates_for_round(current_round.saturating_sub(1)));
+                    // batch_certificates
+                    //     .extend(self_.storage.get_certificates_for_round(current_round.saturating_sub(1)));
                     batch_certificates.extend(self_.storage.get_certificates_for_round(current_round));
 
                     // Construct the primary ping.
