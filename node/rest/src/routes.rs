@@ -132,16 +132,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
 
         let blocks = cfg_into_iter!((start_height..end_height))
-            .map(|height| rest.ledger.get_committee(height))
-            .collect::<Result<Vec<_>, _>>()?;
-
+            .map(|height| {rest.ledger.get_committee(height),height})
+            .collect::<Result<Vec<_,_>, _>>()?;
+            
         Ok(ErasedJson::pretty(blocks))
-    }
-
-    pub(create) async wrap_get_committee(State(rest): State<Self>,Path(height): Path<String>) -> {
-        let height = height.parse::<u32>();
-        let block = rest.ledger.get_committee(height.expect("invalid input, it is neither a block height nor a block hash"))?;
-        Ok(ErasedJson::pretty(block))
     }
 
     // GET /testnet3/blocks?start={start_height}&end={end_height}
@@ -173,7 +167,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
         Ok(ErasedJson::pretty(blocks))
     }
-    
 
     // GET /testnet3/height/{blockHash}
     pub(crate) async fn get_height(
