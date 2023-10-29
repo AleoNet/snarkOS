@@ -18,7 +18,6 @@ use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -76,7 +75,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         //let height = height.parse::<u32>()?;
         let block = rest.ledger.get_committee(height)?;
         
-        let response_json = json!({
+        let response_json = serde_json::json!({
             "height": height,
             "block": block,
         });
