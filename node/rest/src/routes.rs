@@ -172,7 +172,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             let block = rest.ledger.get_block(height);
             let committee = rest.ledger.get_committee(height);
             match (block, committee) {
-                (Ok(block), Ok(committee)) => Some((height, block, committee)),
+                (Ok(block), Ok(committee)) => Some((block, committee)),
                 _ => None
             }
         })
