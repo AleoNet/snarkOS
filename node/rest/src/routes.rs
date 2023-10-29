@@ -131,15 +131,18 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             )));
         }
 
-        let mut blocks_with_height = Vec::new();
+        let mut blocks_and_committees = Vec::new();
+
 
         for height in start_height..end_height {
             if let Ok(committee) = rest.ledger.get_committee(height) {
-                blocks_with_height.push((height, committee));
+                if let Ok(block) = rest.ledger.get_block(height) {
+                    blocks_and_committees.push((committee, block));
+                }
             }
         }
     
-        Ok(ErasedJson::pretty(blocks_with_height))
+        Ok(ErasedJson::pretty(blocks_and_committees))
     }
 
     // GET /testnet3/blocks?start={start_height}&end={end_height}
