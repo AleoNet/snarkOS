@@ -130,14 +130,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
                 end_height - start_height
             )));
         }
-
-        let blocks = cfg_into_iter!((start_height..end_height))
-            .map(|height| {
-                let committee = rest.ledger.get_committee(height);
-                let height_attr = height;
-                (committee,height_attr)   
-            })
-            .collect::<Result<Vec<(_, _)>, _>>()?;
+        
+        let blocks = (start_height..end_height)
+        .try_fold(Vec::new(), |mut vec, height| {
+            if let Ok(committee) = rest.ledger.get_committee(height) {
+                vec.push((committee, height));
+                Ok(vec)
+            }
+        })?;
 
         Ok(ErasedJson::pretty(blocks))
     }
