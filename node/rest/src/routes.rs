@@ -64,34 +64,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     }
 
 
-    // GET /testnet3/committee/{height}
-    pub(crate) async fn get_committee_for_height(State(rest): State<Self>,Path(height): Path<String>) -> Result<ErasedJson, RestError> {
-        let height = height.parse::<u32>();
-        let block = rest.ledger.get_committee(height.expect("invalid input, it is neither a block height nor a block hash"))?;
-        Ok(ErasedJson::pretty(block))
-    }
-
-    pub(crate) async fn get_committee_for_with_height(State(rest): State<Self>, height: u32) -> Result<ErasedJson, RestError> {
-        //let height = height.parse::<u32>()?;
-        //let block = rest.ledger.get_committee(height)?;
-        
-        // Define a struct to represent the response
-        #[derive(Serialize, Deserialize)]
-        struct CommitteeResponse<T> {
-            height: u32,
-            block: T,
-        }
-
-        let block = rest.ledger.get_committee(height)?;
-
-        let response = CommitteeResponse {
-            height,
-            block,
-        };
-    
-        Ok(ErasedJson::pretty(response))
-    }
-
     // ---------------------------------------------------------
 
     // GET /testnet3/block/height/latest
@@ -154,7 +126,24 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
 
         let blocks = cfg_into_iter!((start_height..end_height))
-            .map(|height| get_committee_for_with_height(height))
+            .map(|height| {
+                // let block = rest.ledger.get_committee(height)?;
+                // Define a struct to represent the response
+                #[derive(Serialize, Deserialize)]
+                struct CommitteeResponse<T> {
+                    height: u32,
+                    block: T,
+                }
+
+                let block = rest.ledger.get_committee(height)?;
+
+                let response = CommitteeResponse {
+                    height,
+                    block,
+                };
+
+                Ok(response).expect("TODO: panic message");
+            })
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(ErasedJson::pretty(blocks))
@@ -184,24 +173,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
 
         let blocks = cfg_into_iter!((start_height..end_height))
-            .map(|height| {
-                // let block = rest.ledger.get_committee(height)?;
-                // Define a struct to represent the response
-                #[derive(Serialize, Deserialize)]
-                struct CommitteeResponse<T> {
-                    height: u32,
-                    block: T,
-                }
-
-                let block = rest.ledger.get_committee(height)?;
-
-                let response = CommitteeResponse {
-                    height,
-                    block,
-                };
-
-                Ok(response).expect("TODO: panic message");
-            })
+            .map(|height| rest.ledger.get_block(height))
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(ErasedJson::pretty(blocks))
