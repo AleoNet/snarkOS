@@ -131,11 +131,9 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             )));
         }
 
-        let blocks = (start_height..end_height)
-        .try_fold(Vec::new(), |mut vec, height| {
-            let committee = rest.ledger.get_committee(height);
-            vec.push((committee, height));
-            })?;
+        let blocks = cfg_into_iter!((start_height..end_height))
+            .map(|height| { rest.ledger.get_committee(height).expect("TODO: panic message"); height})
+            .collect::<Result<Vec<_,_>, _>>()?;
 
         Ok(ErasedJson::pretty(blocks))
     }
