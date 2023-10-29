@@ -18,6 +18,7 @@ use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -63,6 +64,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
+
     // GET /testnet3/committee/{height}
     pub(crate) async fn get_committee_for_height(State(rest): State<Self>,Path(height): Path<String>) -> Result<ErasedJson, RestError> {
         let height = height.parse::<u32>();
@@ -70,8 +72,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(block))
     }
 
-    pub(crate) async fn get_committee_for_with_height(State(rest): State<Self>, Path(height): Path<u32>) -> Result<ErasedJson, RestError> {
-        let height = height.parse::<u32>()?;
+    pub(crate) async fn get_committee_for_with_height(State(rest): State<Self>, height: u32) -> Result<ErasedJson, RestError> {
+        //let height = height.parse::<u32>()?;
         let block = rest.ledger.get_committee(height)?;
         
         let response_json = json!({
