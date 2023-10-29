@@ -138,7 +138,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         })
         .collect::<Result<Vec<(_, _)>, _>>()?;
         
-        let json_blocks = ErasedJson::pretty(blocks)?;
+        let json_blocks = ErasedJson::pretty(blocks);
         
         Ok(json_blocks)
     }
