@@ -70,7 +70,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(block))
     }
 
-    pub(crate) async fn get_committee_for_with_height(State(rest): State<Self>, Path(height): Path<String>) -> Result<ErasedJson, RestError> {
+    pub(crate) async fn get_committee_for_with_height(State(rest): State<Self>, Path(height): Path<u32>) -> Result<ErasedJson, RestError> {
         let height = height.parse::<u32>()?;
         let block = rest.ledger.get_committee(height)?;
         
