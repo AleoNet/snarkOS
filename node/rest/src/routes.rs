@@ -70,6 +70,18 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(block))
     }
 
+    pub(crate) async fn get_committee_for_with_height(State(rest): State<Self>, Path(height): Path<String>) -> Result<ErasedJson, RestError> {
+        let height = height.parse::<u32>()?;
+        let block = rest.ledger.get_committee(height)?;
+        
+        let response_json = json!({
+            "height": height,
+            "block": block,
+        });
+    
+        Ok(ErasedJson::pretty(response_json))
+    }
+
     // ---------------------------------------------------------
 
     // GET /testnet3/block/height/latest
@@ -131,16 +143,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             )));
         }
 
-        let blocks = (start_height..end_height)
-        .map(|height| {
-            let committee = rest.ledger.get_committee(height)?;
-            Ok((committee, height))
-        })
-        .collect::<Result<Vec<(_, _)>, _>>()?;
-        
-        let json_blocks = ErasedJson::pretty(blocks);
-        
-        Ok(json_blocks)
+        let blocks = cfg_into_iter!((start_height..end_height))
+            .map(|height| rest.ledger.get_committee_for_with_height(height))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(ErasedJson::pretty(blocks))
     }
 
     // GET /testnet3/blocks?start={start_height}&end={end_height}
@@ -172,7 +179,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
         Ok(ErasedJson::pretty(blocks))
     }
-
     
 
     // GET /testnet3/height/{blockHash}
