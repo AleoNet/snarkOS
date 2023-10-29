@@ -136,7 +136,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
                 let committee = rest.ledger.get_committee(height)?;
                 Result::<(_, _), _>::Ok((committee, height))
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect();
 
         Ok(ErasedJson::pretty(blocks))
     }
