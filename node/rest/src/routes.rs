@@ -137,7 +137,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
                 let height_attr = height;
                 (committee,height_attr)   
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<(_, _)>, _>>()?;
 
         Ok(ErasedJson::pretty(blocks))
     }
