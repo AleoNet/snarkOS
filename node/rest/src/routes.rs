@@ -136,7 +136,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
                 let committee = rest.ledger.get_committee(height)?;
                 Ok((committee, height))
             })
-            .collect::<Result<Vec<(_, _)>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(ErasedJson::pretty(blocks))
     }
@@ -170,6 +170,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
         Ok(ErasedJson::pretty(blocks))
     }
+
+    
 
     // GET /testnet3/height/{blockHash}
     pub(crate) async fn get_height(
