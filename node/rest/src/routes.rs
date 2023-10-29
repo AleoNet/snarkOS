@@ -133,7 +133,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
         let mut blocks_and_committees = Vec::new();
 
-
         for height in start_height..end_height {
             if let Ok(committee) = rest.ledger.get_committee(height) {
                 if let Ok(block) = rest.ledger.get_block(height) {
@@ -168,11 +167,18 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             )));
         }
 
-        let blocks = cfg_into_iter!((start_height..end_height))
-            .map(|height| rest.ledger.get_block(height))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(ErasedJson::pretty(blocks))
+        let blocks_and_committees = cfg_into_iter!((start_height..end_height))
+        .filter_map(|height| {
+            let block = rest.ledger.get_block(height);
+            let committee = rest.ledger.get_committee(height);
+            match (block, committee) {
+                (Ok(block), Ok(committee)) => Some((height, block, committee)),
+                _ => None
+            }
+        })
+        .collect::<Vec<_>>();
+    
+        Ok(ErasedJson::pretty(blocks_and_committees))
     }
 
     // GET /testnet3/height/{blockHash}
