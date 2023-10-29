@@ -131,14 +131,16 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             )));
         }
 
-        let blocks = cfg_into_iter!((start_height..end_height))
-            .map(|height| {
-                let committee = rest.ledger.get_committee(height)?;
-                Ok((committee, height))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(ErasedJson::pretty(blocks))
+        let blocks = (start_height..end_height)
+        .map(|height| {
+            let committee = rest.ledger.get_committee(height)?;
+            Ok((committee, height))
+        })
+        .collect::<Result<Vec<(_, _)>, _>>()?;
+        
+        let json_blocks = ErasedJson::pretty(blocks)?;
+        
+        Ok(json_blocks)
     }
 
     // GET /testnet3/blocks?start={start_height}&end={end_height}
