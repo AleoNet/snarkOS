@@ -75,12 +75,21 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         //let height = height.parse::<u32>()?;
         let block = rest.ledger.get_committee(height)?;
         
-        let response_json = serde_json::json!({
-            "height": height,
-            "block": block,
-        });
+        // Define a struct to represent the response
+        #[derive(Serialize, Deserialize)]
+        struct CommitteeResponse<T> {
+            height: u32,
+            block: T,
+        }
+
+        let block = rest.ledger.get_committee(height)?;
+
+        let response = CommitteeResponse {
+            height,
+            block,
+        };
     
-        Ok(ErasedJson::pretty(response_json))
+        Ok(ErasedJson::pretty(response))
     }
 
     // ---------------------------------------------------------
