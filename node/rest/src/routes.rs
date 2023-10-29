@@ -131,13 +131,15 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             )));
         }
 
-        let blocks = cfg_into_iter!((start_height..end_height))
-            .map(|height| rest.ledger.get_committee(height))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut blocks_with_height = Vec::new();
 
-        
-
-        Ok(ErasedJson::pretty(blocks))
+        for height in start_height..end_height {
+            if let Ok(committee) = rest.ledger.get_committee(height) {
+                blocks_with_height.push((height, committee));
+            }
+        }
+    
+        Ok(ErasedJson::pretty(blocks_with_height))
     }
 
     // GET /testnet3/blocks?start={start_height}&end={end_height}
