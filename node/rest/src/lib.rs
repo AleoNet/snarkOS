@@ -159,6 +159,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
             // GET misc endpoints.
             .route("/testnet3/blocks", get(Self::get_blocks))
+            .route("/testnet3/blocks/committees", get(Self::get_blocks_committees))
             .route("/testnet3/height/:hash", get(Self::get_height))
             .route("/testnet3/memoryPool/transmissions", get(Self::get_memory_pool_transmissions))
             .route("/testnet3/memoryPool/solutions", get(Self::get_memory_pool_solutions))

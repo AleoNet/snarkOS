@@ -143,9 +143,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     
         Ok(ErasedJson::pretty(blocks_and_committees))
     }
-
-    // GET /testnet3/blocks?start={start_height}&end={end_height}
-    pub(crate) async fn get_blocks(
+    // GET /testnet3/blocks/committees?start={start_height}&end={end_height}
+    pub(crate) async fn get_blocks_committees(
         State(rest): State<Self>,
         Query(block_range): Query<BlockRange>,
     ) -> Result<ErasedJson, RestError> {
@@ -179,6 +178,36 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         .collect::<Vec<_>>();
     
         Ok(ErasedJson::pretty(blocks_and_committees))
+    }
+
+    // GET /testnet3/blocks?start={start_height}&end={end_height}
+    pub(crate) async fn get_blocks(
+        State(rest): State<Self>,
+        Query(block_range): Query<BlockRange>,
+    ) -> Result<ErasedJson, RestError> {
+        let start_height = block_range.start;
+        let end_height = block_range.end;
+
+        const MAX_BLOCK_RANGE: u32 = 5000;
+
+        // Ensure the end height is greater than the start height.
+        if start_height > end_height {
+            return Err(RestError("Invalid block range".to_string()));
+        }
+
+        // Ensure the block range is bounded.
+        if end_height - start_height > MAX_BLOCK_RANGE {
+            return Err(RestError(format!(
+                "Cannot request more than {MAX_BLOCK_RANGE} blocks per call (requested {})",
+                end_height - start_height
+            )));
+        }
+
+        let blocks = cfg_into_iter!((start_height..end_height))
+            .map(|height| rest.ledger.get_block(height))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(ErasedJson::pretty(blocks))
     }
 
     // GET /testnet3/height/{blockHash}
