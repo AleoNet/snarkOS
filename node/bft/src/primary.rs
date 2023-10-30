@@ -66,10 +66,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{
-    sync::{Mutex as TMutex, OnceCell},
-    task::JoinHandle,
-};
+use tokio::{sync::OnceCell, task::JoinHandle};
 
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
@@ -94,8 +91,6 @@ pub struct Primary<N: Network> {
     signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, Field<N>, Signature<N>)>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
-    /// The primary lock.
-    lock: Arc<TMutex<()>>,
 }
 
 impl<N: Network> Primary<N> {
@@ -123,7 +118,6 @@ impl<N: Network> Primary<N> {
             proposed_batch: Default::default(),
             signed_proposals: Default::default(),
             handles: Default::default(),
-            lock: Default::default(),
         })
     }
 
@@ -477,9 +471,6 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
-        // // Acquire the lock.
-        // let _lock = self.lock.lock().await;
-
         // Retrieve the batch author.
         let batch_author = batch_header.author();
 
@@ -623,9 +614,6 @@ impl<N: Network> Primary<N> {
             bail!("Invalid peer - received a batch signature from myself ({signer})");
         }
 
-        // // Acquire the lock.
-        // let _lock = self.lock.lock().await;
-
         let proposal = {
             // Acquire the write lock.
             let mut proposed_batch = self.proposed_batch.write();
@@ -700,9 +688,6 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // // Acquire the lock.
-        // let _lock = self.lock.lock().await;
-
         // Retrieve the batch certificate author.
         let author = certificate.author();
 
@@ -774,9 +759,6 @@ impl<N: Network> Primary<N> {
         if self.storage.contains_certificate(certificate.id()) {
             return Ok(());
         }
-
-        // // Acquire the lock.
-        // let _lock = self.lock.lock().await;
 
         // Retrieve the batch certificate author.
         let author = certificate.author();
@@ -1431,8 +1413,6 @@ impl<N: Network> Primary<N> {
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
         info!("Shutting down the primary...");
-        // Acquire the lock.
-        let _lock = self.lock.lock().await;
         // Shut down the workers.
         self.workers.iter().for_each(|worker| worker.shut_down());
         // Abort the tasks.
