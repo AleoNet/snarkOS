@@ -32,11 +32,11 @@ use crate::{
     Sync,
     Transport,
     Worker,
-    MAX_BATCH_DELAY,
+    MAX_BATCH_DELAY_IN_MS,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
-    PRIMARY_PING_INTERVAL,
-    WORKER_PING_INTERVAL,
+    PRIMARY_PING_IN_MS,
+    WORKER_PING_IN_MS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
@@ -765,7 +765,7 @@ impl<N: Network> Primary<N> {
             self.spawn(async move {
                 loop {
                     // Sleep briefly.
-                    tokio::time::sleep(Duration::from_millis(PRIMARY_PING_INTERVAL)).await;
+                    tokio::time::sleep(Duration::from_millis(PRIMARY_PING_IN_MS)).await;
 
                     // Retrieve the block locators.
                     let block_locators = match self_.sync.get_block_locators() {
@@ -900,7 +900,7 @@ impl<N: Network> Primary<N> {
             let self_ = self.clone();
             self.spawn(async move {
                 loop {
-                    tokio::time::sleep(Duration::from_millis(WORKER_PING_INTERVAL)).await;
+                    tokio::time::sleep(Duration::from_millis(WORKER_PING_IN_MS)).await;
                     // If the primary is not synced, then do not broadcast the worker ping(s).
                     if !self_.sync.is_synced() {
                         trace!("Skipping worker ping(s) {}", "(node is syncing)".dimmed());
@@ -919,7 +919,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             loop {
                 // Sleep briefly, but longer than if there were no batch.
-                tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
+                tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
                 // If the primary is not synced, then do not propose a batch.
                 if !self_.sync.is_synced() {
                     debug!("Skipping batch proposal {}", "(node is syncing)".dimmed());

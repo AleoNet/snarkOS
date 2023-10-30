@@ -16,8 +16,8 @@ use crate::{
     helpers::{BFTSender, Pending, Storage, SyncReceiver},
     Gateway,
     Transport,
-    MAX_BATCH_DELAY,
-    PRIMARY_PING_INTERVAL,
+    MAX_BATCH_DELAY_IN_MS,
+    PRIMARY_PING_IN_MS,
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -92,7 +92,7 @@ impl<N: Network> Sync<N> {
         self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // Sleep briefly to avoid triggering spam detection.
-                tokio::time::sleep(std::time::Duration::from_secs(PRIMARY_PING_INTERVAL)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(PRIMARY_PING_IN_MS)).await;
                 // Perform the sync routine.
                 let communication = &self_.gateway;
                 // let communication = &node.router;
@@ -339,7 +339,7 @@ impl<N: Network> Sync<N> {
             }
         }
         // Wait for the certificate to be fetched.
-        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
+        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
