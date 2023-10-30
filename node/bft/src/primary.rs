@@ -825,11 +825,6 @@ impl<N: Network> Primary<N> {
                         current_certificates
                     };
 
-                    // If there are no batch certificates, then skip this iteration of the loop.
-                    if batch_certificates.is_empty() {
-                        continue;
-                    }
-
                     // Construct the primary ping.
                     let primary_ping = PrimaryPing::from((
                         <Event<N>>::VERSION,

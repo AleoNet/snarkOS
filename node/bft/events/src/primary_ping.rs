@@ -96,11 +96,8 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
 
         // Read the number of batch certificates.
         let num_certificates = u16::read_le(&mut reader)?;
-        // Ensure the number of batch certificates is not zero.
-        if num_certificates == 0 {
-            return Err(error("The number of batch certificates is zero"));
-        }
         // Ensure the number of batch certificates is not greater than the maximum committee size.
+        // Note: We allow there to be 0 batch certificates. This is necessary to ensure primary pings are sent.
         if num_certificates > Committee::<N>::MAX_COMMITTEE_SIZE {
             return Err(error("The number of batch certificates is greater than the maximum committee size"));
         }
