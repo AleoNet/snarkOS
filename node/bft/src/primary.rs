@@ -1006,17 +1006,19 @@ impl<N: Network> Primary<N> {
                     trace!("Skipping a certified batch from '{peer_ip}' {}", "(node is syncing)".dimmed());
                     continue;
                 }
-
-                // Deserialize the batch certificate.
-                let Ok(batch_certificate) = spawn_blocking!(batch_certificate.deserialize_blocking()) else {
-                    warn!("Failed to deserialize the batch certificate from '{peer_ip}'");
-                    continue;
-                };
-
-                // Process the batch certificate.
-                if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
-                    warn!("Cannot store a certificate from '{peer_ip}' - {e}");
-                }
+                // Spawn a task to process the batch certificate.
+                let self_ = self_.clone();
+                tokio::spawn(async move {
+                    // Deserialize the batch certificate.
+                    let Ok(batch_certificate) = spawn_blocking!(batch_certificate.deserialize_blocking()) else {
+                        warn!("Failed to deserialize the batch certificate from '{peer_ip}'");
+                        return;
+                    };
+                    // Process the batch certificate.
+                    if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
+                        warn!("Cannot store a certificate from '{peer_ip}' - {e}");
+                    }
+                });
             }
         });
 
