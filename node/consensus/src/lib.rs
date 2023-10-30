@@ -303,6 +303,8 @@ impl<N: Network> Consensus<N> {
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
         callback: oneshot::Sender<Result<()>>,
     ) {
+        println!("@@@@@@@@@@@@@@@ PROCESSING BFT SUBDAG @@@@@@@@@@@@@@@");
+
         // Try to advance to the next block.
         let self_ = self.clone();
         let transmissions_ = transmissions.clone();
