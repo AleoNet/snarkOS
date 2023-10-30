@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::process::exit;
+
 use snarkos_cli::{commands::CLI, helpers::Updater};
 
 use clap::Parser;
@@ -30,7 +32,10 @@ fn main() -> anyhow::Result<()> {
     // Run the CLI.
     match cli.command.parse() {
         Ok(output) => println!("{output}\n"),
-        Err(error) => println!("⚠️  {error}\n"),
+        Err(error) => {
+            println!("⚠️  {error}\n");
+            exit(1);
+        }
     }
     Ok(())
 }
