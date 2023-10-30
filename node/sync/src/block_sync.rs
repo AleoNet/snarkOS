@@ -440,6 +440,7 @@ impl<N: Network> BlockSync<N> {
 
         // Remove the peer IP from the request entry.
         if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
+            println!("@@@@@@@@@@@@@@@@@@@@@@@@ REMOVING PEER IP {peer_ip} FROM REQUEST FOR BLOCK {height}");
             sync_ips.remove(&peer_ip);
         }
 
@@ -502,6 +503,7 @@ impl<N: Network> BlockSync<N> {
             }
             // Ensure the sync pool requested this block from the given peer.
             if !sync_ips.contains(peer_ip) {
+                println!("@@@@@@@@@@@@@@@@@@@@@@@@@ SYNC IPS - sync_ips: {:#?}", sync_ips.len());
                 bail!("The sync pool did not request block {height} from '{peer_ip}'")
             }
             Ok(())
@@ -621,6 +623,11 @@ impl<N: Network> BlockSync<N> {
             // Retain if this is not a timeout.
             !is_timeout
         });
+
+        println!(
+            "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ REMOVED TIMED OUT BLOCK REQUESTS: {num_timed_out_block_requests}, timeout ips {}",
+            timeout_ips.len()
+        );
 
         // If there are timeout IPs, then add them to the request timeouts map.
         if !timeout_ips.is_empty() {

@@ -261,9 +261,13 @@ impl<N: Network> Sync<N> {
         let mut current_height = self.ledger.latest_block_height() + 1;
         // Try to advance the ledger with sync blocks.
         while let Some(block) = self.block_sync.process_next_block(current_height) {
-            info!("Syncing the BFT to block {}...", block.height());
+            let block_height = block.height();
+            info!("Syncing the BFT to block {}... (current_height: {current_height})", block.height());
             // Sync the storage with the block.
             self.sync_storage_with_block(block).await?;
+
+            info!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  Synced the BFT to block {block_height}...");
+
             // Update the current height.
             current_height += 1;
         }
@@ -275,6 +279,8 @@ impl<N: Network> Sync<N> {
         // Acquire the sync lock.
         let _lock = self.lock.lock().await;
 
+        info!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  sync_storage_with_block...");
+
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
             // Iterate over the certificates.
@@ -285,6 +291,7 @@ impl<N: Network> Sync<N> {
                 if let Some(bft_sender) = self.bft_sender.get() {
                     // Await the callback to continue.
                     if let Err(e) = bft_sender.send_sync_bft(certificate.clone()).await {
+                        println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FAILED TO SEND SYNC BFT - {e}");
                         bail!("Sync - {e}");
                     };
                 }

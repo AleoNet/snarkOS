@@ -682,6 +682,8 @@ impl<N: Network> BFT<N> {
             while let Some((certificate, callback)) = rx_sync_bft.recv().await {
                 // Update the DAG with the certificate.
                 let result = self_.update_dag::<true>(certificate).await;
+
+                println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Updating DAG result: {:?}", result);
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(result).ok();
