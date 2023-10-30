@@ -955,6 +955,8 @@ impl<N: Network> Primary<N> {
                     continue;
                 }
                 // If there is no proposed batch, attempt to propose a batch.
+                // Note: Do NOT spawn a task around this function call. Proposing a batch is a critical path,
+                // and only one batch needs be proposed at a time.
                 if let Err(e) = self_.propose_batch().await {
                     warn!("Cannot propose a batch - {e}");
                 }
@@ -991,6 +993,10 @@ impl<N: Network> Primary<N> {
                     continue;
                 }
                 // Process the batch signature.
+                // Note: Do NOT spawn a task around this function call. Processing signatures from peers
+                // is a critical path, and we should only store the minimum required number of signatures.
+                // In addition, spawning a task can cause concurrent processing of signatures (even with a lock),
+                // which means the RwLock for the proposed batch must become a 'tokio::sync' to be safe.
                 if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
                     warn!("Cannot store a signature from '{peer_ip}' - {e}");
                 }
