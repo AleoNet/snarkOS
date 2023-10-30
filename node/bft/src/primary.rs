@@ -43,6 +43,7 @@ use snarkos_node_bft_events::PrimaryPing;
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::{
+        account::Signature,
         prelude::*,
         types::{Address, Field},
     },
@@ -89,8 +90,8 @@ pub struct Primary<N: Network> {
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
     proposed_batch: Arc<ProposedBatch<N>>,
-    /// The recently-signed batch proposals (a map from the address to the round and batch ID).
-    signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, Field<N>)>>>,
+    /// The recently-signed batch proposals (a map from the address to the round, batch ID, and signature).
+    signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, Field<N>, Signature<N>)>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The primary lock.
@@ -285,14 +286,15 @@ impl<N: Network> Primary<N> {
             for address in proposal.nonsigners(&self.ledger.get_previous_committee_for_round(proposal.round())?) {
                 // Resolve the address to the peer IP.
                 match self.gateway.resolver().get_peer_ip_for_address(address) {
-                    // Broadcast the batch to all validators for signing.
+                    // Resend the batch proposal to the validator for signing.
                     Some(peer_ip) => {
-                        debug!("Resending batch proposal for round {} to peer '{peer_ip}'", proposal.round());
-                        // Broadcast the event.
-                        let self_ = self.clone();
-                        let event_ = event.clone();
+                        let (gateway, event_, round) = (self.gateway.clone(), event.clone(), proposal.round());
                         tokio::spawn(async move {
-                            let _ = self_.gateway.send(peer_ip, event_).await;
+                            debug!("Resending batch proposal for round {round} to peer '{peer_ip}'");
+                            // Resend the batch proposal to the peer.
+                            if gateway.send(peer_ip, event_).await.is_none() {
+                                warn!("Failed to resend batch proposal for round {round} to peer '{peer_ip}'");
+                            }
                         });
                     }
                     None => continue,
@@ -478,25 +480,35 @@ impl<N: Network> Primary<N> {
         // // Acquire the lock.
         // let _lock = self.lock.lock().await;
 
+        // Retrieve the batch author.
+        let batch_author = batch_header.author();
+
         // Ensure the batch proposal is from the validator.
-        if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != batch_header.author()) {
-            // Proceed to disconnect the validator.
-            self.gateway.disconnect(peer_ip);
-            bail!("Malicious peer - proposed batch from a different validator ({})", batch_header.author());
+        match self.gateway.resolver().get_address(peer_ip) {
+            // If the peer is a validator, then ensure the batch proposal is from the validator.
+            Some(address) => {
+                if address != batch_author {
+                    // Proceed to disconnect the validator.
+                    self.gateway.disconnect(peer_ip);
+                    bail!("Malicious peer - proposed batch from a different validator ({batch_author})");
+                }
+            }
+            None => bail!("Batch proposal from a disconnected validator"),
         }
         // Ensure the batch author is a current committee member.
-        if !self.gateway.is_authorized_validator_address(batch_header.author()) {
+        if !self.gateway.is_authorized_validator_address(batch_author) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
-            bail!("Malicious peer - proposed batch from a non-committee member ({})", batch_header.author());
+            bail!("Malicious peer - proposed batch from a non-committee member ({batch_author})");
         }
         // Ensure the batch proposal is not from the current primary.
-        if self.gateway.account().address() == batch_header.author() {
-            bail!("Invalid peer - proposed batch from myself ({})", batch_header.author());
+        if self.gateway.account().address() == batch_author {
+            bail!("Invalid peer - proposed batch from myself ({batch_author})");
         }
 
         // Retrieve the cached round and batch ID for this validator.
-        if let Some((signed_round, signed_batch_id)) = self.signed_proposals.read().get(&batch_header.author()).copied()
+        if let Some((signed_round, signed_batch_id, signature)) =
+            self.signed_proposals.read().get(&batch_author).copied()
         {
             // If the round matches and the batch ID differs, then the validator is malicious.
             if signed_round == batch_header.round() && signed_batch_id != batch_header.batch_id() {
@@ -505,8 +517,18 @@ impl<N: Network> Primary<N> {
                 bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
             }
             // If the round and batch ID matches, then skip signing the batch a second time.
+            // Instead, rebroadcast the cached signature to the peer.
             if signed_round == batch_header.round() && signed_batch_id == batch_header.batch_id() {
-                debug!("Skipping a proposal for round {signed_round} from '{peer_ip}' {}", "(already signed)".dimmed());
+                let gateway = self.gateway.clone();
+                tokio::spawn(async move {
+                    debug!("Resending a signature for a batch in round {batch_round} from '{peer_ip}'");
+                    let event = Event::BatchSignature(BatchSignature::new(batch_header.batch_id(), signature));
+                    // Resend the batch signature to the peer.
+                    if gateway.send(peer_ip, event).await.is_none() {
+                        warn!("Failed to resend a signature for a batch in round {batch_round} to '{peer_ip}'");
+                    }
+                });
+                // Return early.
                 return Ok(());
             }
         }
@@ -531,8 +553,31 @@ impl<N: Network> Primary<N> {
         // Sign the batch ID.
         let account = self.gateway.account().clone();
         let signature = spawn_blocking!(account.sign(&[batch_id], &mut rand::thread_rng()))?;
-        // Cache the round and batch ID for this validator.
-        self.signed_proposals.write().insert(batch_header.author(), (batch_header.round(), batch_id));
+
+        // Ensure the proposal has not already been signed.
+        //
+        // Note: Due to the need to sync the batch header with the peer, it is possible
+        // for the primary to receive the same 'BatchPropose' event again, whereby only
+        // one instance of this handler should sign the batch. This check guarantees this.
+        match self.signed_proposals.write().entry(batch_author) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                // If the validator has already signed a batch for this round, then return early,
+                // since, if the peer still has not received the signature, they will request it again,
+                // and the logic at the start of this function will resend the (now cached) signature
+                // to the peer if asked to sign this batch proposal again.
+                if entry.get().0 == batch_round {
+                    return Ok(());
+                }
+                // Otherwise, cache the round, batch ID, and signature for this validator.
+                entry.insert((batch_round, batch_id, signature));
+            }
+            // If the validator has not signed a batch before, then continue.
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                // Cache the round, batch ID, and signature for this validator.
+                entry.insert((batch_round, batch_id, signature));
+            }
+        };
+
         // Broadcast the signature back to the validator.
         let self_ = self.clone();
         tokio::spawn(async move {
@@ -663,13 +708,15 @@ impl<N: Network> Primary<N> {
 
         // Ensure the batch certificate is from the validator.
         match self.gateway.resolver().get_address(peer_ip) {
-            Some(address) if address != author => {
-                // Proceed to disconnect the validator.
-                self.gateway.disconnect(peer_ip);
-                bail!("Malicious peer - batch certificate from a different validator ({author})");
+            // If the peer is a validator, then ensure the batch certificate is from the validator.
+            Some(address) => {
+                if address != author {
+                    // Proceed to disconnect the validator.
+                    self.gateway.disconnect(peer_ip);
+                    bail!("Malicious peer - batch certificate from a different validator ({author})");
+                }
             }
             None => bail!("Batch certificate from a disconnected validator"),
-            _ => (),
         }
         // Ensure the batch certificate is authored by a current committee member.
         if !self.gateway.is_authorized_validator_address(author) {
@@ -941,10 +988,14 @@ impl<N: Network> Primary<N> {
                     trace!("Skipping a batch proposal from '{peer_ip}' {}", "(node is syncing)".dimmed());
                     continue;
                 }
-                // Process the proposed batch.
-                if let Err(e) = self_.process_batch_propose_from_peer(peer_ip, batch_propose).await {
-                    warn!("Cannot sign a batch from '{peer_ip}' - {e}");
-                }
+                // Spawn a task to process the proposed batch.
+                let self_ = self_.clone();
+                tokio::spawn(async move {
+                    // Process the batch proposal.
+                    if let Err(e) = self_.process_batch_propose_from_peer(peer_ip, batch_propose).await {
+                        warn!("Cannot sign a batch from '{peer_ip}' - {e}");
+                    }
+                });
             }
         });
 
@@ -1240,12 +1291,12 @@ impl<N: Network> Primary<N> {
         }
 
         // Check if our primary should move to the next round.
-        let is_behind_schedule = batch_round > self.current_round(); // TODO: Check if threshold is reached.
+        // TODO (howardwu): Re-evaluate whether we need to guard this to increment after quorum threshold is reached.
+        let is_behind_schedule = batch_round > self.current_round();
         // Check if our primary is far behind the peer.
         let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();
         // If our primary is far behind the peer, update our committee to the batch round.
         if is_behind_schedule || is_peer_far_in_future {
-            // TODO (howardwu): Guard this to increment after quorum threshold is reached.
             // If the batch round is greater than the current committee round, update the committee.
             self.try_increment_to_the_next_round(batch_round).await?;
         }
