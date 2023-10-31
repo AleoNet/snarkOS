@@ -500,7 +500,7 @@ impl<N: Network> Gateway<N> {
             // Retrieve the certificate ID.
             let certificate_id = match &event {
                 Event::CertificateRequest(CertificateRequest { certificate_id }) => *certificate_id,
-                Event::CertificateResponse(CertificateResponse { certificate }) => certificate.certificate_id(),
+                Event::CertificateResponse(CertificateResponse { certificate }) => certificate.id(),
                 _ => unreachable!(),
             };
             // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).

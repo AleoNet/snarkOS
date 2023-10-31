@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::check_timestamp_for_liveness;
 use snarkvm::{
     console::{
         account::{Address, Signature},
@@ -26,7 +25,7 @@ use snarkvm::{
     prelude::{bail, ensure, Itertools, Result},
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use std::collections::HashSet;
 
 pub struct Proposal<N: Network> {
@@ -34,8 +33,8 @@ pub struct Proposal<N: Network> {
     batch_header: BatchHeader<N>,
     /// The proposed transmissions.
     transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
-    /// The map of `(signature, timestamp)` entries.
-    signatures: IndexMap<Signature<N>, i64>,
+    /// The set of signatures.
+    signatures: IndexSet<Signature<N>>,
 }
 
 impl<N: Network> Proposal<N> {
@@ -95,7 +94,7 @@ impl<N: Network> Proposal<N> {
 
     /// Returns the signers.
     pub fn signers(&self) -> HashSet<Address<N>> {
-        self.signatures.keys().chain(Some(self.batch_header.signature())).map(Signature::to_address).collect()
+        self.signatures.iter().chain(Some(self.batch_header.signature())).map(Signature::to_address).collect()
     }
 
     /// Returns the nonsigners.
@@ -136,7 +135,6 @@ impl<N: Network> Proposal<N> {
         &mut self,
         signer: Address<N>,
         signature: Signature<N>,
-        timestamp: i64,
         committee: &Committee<N>,
     ) -> Result<()> {
         // Ensure the signer is in the committee.
@@ -149,13 +147,11 @@ impl<N: Network> Proposal<N> {
         }
         // Verify the signature. If the signature is not valid, return an error.
         // Note: This check ensures the peer's address matches the address of the signature.
-        if !signature.verify(&signer, &[self.batch_id(), Field::from_u64(timestamp as u64)]) {
+        if !signature.verify(&signer, &[self.batch_id()]) {
             bail!("Signature verification failed")
         }
-        // Check the timestamp for liveness.
-        check_timestamp_for_liveness(timestamp)?;
         // Insert the signature.
-        self.signatures.insert(signature, timestamp);
+        self.signatures.insert(signature);
         Ok(())
     }
 
@@ -167,7 +163,7 @@ impl<N: Network> Proposal<N> {
         // Ensure the quorum threshold has been reached.
         ensure!(self.is_quorum_threshold_reached(committee), "The quorum threshold has not been reached");
         // Create the batch certificate.
-        let certificate = BatchCertificate::new(self.batch_header.clone(), self.signatures.clone())?;
+        let certificate = BatchCertificate::from(self.batch_header.clone(), self.signatures.clone())?;
         // Return the certificate and transmissions.
         Ok((certificate, self.transmissions.clone()))
     }
