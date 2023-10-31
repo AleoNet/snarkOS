@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::process::exit;
-
 use snarkos_cli::{commands::CLI, helpers::Updater};
 
 use clap::Parser;
+use std::process::exit;
 #[cfg(feature = "jemalloc")]
 use tikv_jemallocator::Jemalloc;
 
