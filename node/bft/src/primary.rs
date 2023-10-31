@@ -1097,7 +1097,9 @@ impl<N: Network> Primary<N> {
         // Note: Do not change the `Proposal` to use a HashMap. The ordering there is necessary for safety.
         let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
         // Store the certified batch.
-        self.storage.insert_certificate(certificate.clone(), transmissions)?;
+        let storage = self.storage.clone();
+        let certificate_clone = certificate.clone();
+        spawn_blocking!(storage.insert_certificate(certificate_clone, transmissions))?;
         debug!("Stored a batch certificate for round {}", certificate.round());
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
@@ -1176,7 +1178,9 @@ impl<N: Network> Primary<N> {
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.certificate_id()) {
             // Store the batch certificate.
-            self.storage.insert_certificate(certificate.clone(), missing_transmissions)?;
+            let storage = self.storage.clone();
+            let certificate_clone = certificate.clone();
+            spawn_blocking!(storage.insert_certificate(certificate_clone, missing_transmissions))?;
             debug!("Stored a batch certificate for round {batch_round} from '{peer_ip}'");
             // If a BFT sender was provided, send the round and certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
