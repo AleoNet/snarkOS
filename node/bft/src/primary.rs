@@ -520,7 +520,9 @@ impl<N: Network> Primary<N> {
         self.ensure_is_signing_round(batch_round)?;
 
         // Ensure the batch header from the peer is valid.
-        let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
+        let storage = self.storage.clone();
+        let header = batch_header.clone();
+        let missing_transmissions = spawn_blocking!(storage.check_batch_header(&header, transmissions))?;
         // Inserts the missing transmissions into the workers.
         self.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
 
