@@ -105,9 +105,9 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         unreachable!("MockLedgerService does not support get_solution")
     }
 
-    /// Returns the transaction for the given transaction ID.
-    fn get_transaction(&self, _transaction_id: N::TransactionID) -> Result<Transaction<N>> {
-        unreachable!("MockLedgerService does not support get_transaction")
+    /// Returns the unconfirmed transaction for the given transaction ID.
+    fn get_unconfirmed_transaction(&self, _transaction_id: N::TransactionID) -> Result<Transaction<N>> {
+        unreachable!("MockLedgerService does not support get_unconfirmed_transaction")
     }
 
     /// Returns the batch certificate for the given batch certificate ID.

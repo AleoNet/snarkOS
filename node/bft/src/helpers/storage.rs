@@ -689,8 +689,8 @@ impl<N: Network> Storage<N> {
                     match unconfirmed_transactions.remove(transaction_id) {
                         // Insert the transaction.
                         Some(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
-                        // Otherwise, try to load the transaction from the ledger.
-                        None => match self.ledger.get_transaction(*transaction_id) {
+                        // Otherwise, try to load the unconfirmed transaction from the ledger.
+                        None => match self.ledger.get_unconfirmed_transaction(*transaction_id) {
                             // Insert the transaction.
                             Ok(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
                             Err(_) => {
