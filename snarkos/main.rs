@@ -16,6 +16,7 @@ use snarkos_cli::{commands::CLI, helpers::Updater};
 
 use clap::Parser;
 use std::process::exit;
+
 #[cfg(feature = "jemalloc")]
 use tikv_jemallocator::Jemalloc;
 
