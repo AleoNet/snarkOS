@@ -418,12 +418,12 @@ impl<N: Network> BFT<N> {
         let commit_round = certificate_round.saturating_sub(1);
         // If the commit round is odd, return early.
         if commit_round % 2 != 0 || commit_round < 2 {
-            println!("@@@@@@@@@@@@ DID NOT COMMIT {commit_round} @@@@@@@@@@@@");
+            debug!("@@@@@@@@@@@@ DID NOT COMMIT {commit_round} @@@@@@@@@@@@");
             return Ok(());
         }
         // If the commit round is at or below the last committed round, return early.
         if commit_round <= self.dag.read().last_committed_round() {
-            println!(
+            debug!(
                 "@@@@@@@@@@@@ DID NOT COMMIT {commit_round} <= {}  @@@@@@@@@@@@",
                 self.dag.read().last_committed_round()
             );
@@ -466,7 +466,7 @@ impl<N: Network> BFT<N> {
 
         /* Proceeding to commit the leader. */
 
-        println!("@@@@@@@@@@@@ PREPARING TO COMMIT LEADER CERTIFICATE {commit_round} @@@@@@@@@@@@",);
+        debug!("@@@@@@@@@@@@ PREPARING TO COMMIT LEADER CERTIFICATE {commit_round} @@@@@@@@@@@@",);
 
         // Commit the leader certificate, and all previous leader certificates since the last committed round.
         self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, false>(leader_certificate).await
@@ -717,7 +717,7 @@ impl<N: Network> BFT<N> {
                 // Update the DAG with the certificate.
                 let result = self_.update_dag::<true>(certificate).await;
 
-                println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Updating DAG result: {:?}", result);
+                debug!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Updating DAG result: {:?}", result);
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(result).ok();

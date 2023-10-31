@@ -276,10 +276,12 @@ impl<N: Network> Sync<N> {
 
     /// Syncs the storage with the given blocks.
     pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
+        debug!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  sync_storage_with_block... awaiting lock");
+
         // Acquire the sync lock.
         let _lock = self.lock.lock().await;
 
-        info!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  sync_storage_with_block...");
+        debug!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  sync_storage_with_block...");
 
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
@@ -291,7 +293,7 @@ impl<N: Network> Sync<N> {
                 if let Some(bft_sender) = self.bft_sender.get() {
                     // Await the callback to continue.
                     if let Err(e) = bft_sender.send_sync_bft(certificate.clone()).await {
-                        println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FAILED TO SEND SYNC BFT - {e}");
+                        debug!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FAILED TO SEND SYNC BFT - {e}");
                         bail!("Sync - {e}");
                     };
                 }
