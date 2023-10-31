@@ -386,9 +386,11 @@ impl<N: Network> BlockSync<N> {
             let greatest_peer_height = sync_peers.values().map(|l| l.latest_locator_height()).max().unwrap_or(0);
             // Update the state of `is_block_synced` for the sync module.
             self.update_is_block_synced(greatest_peer_height, MAX_BLOCKS_BEHIND);
+            debug!("@@@@@@@@@@@ GREATEST PEER HEIGHT {greatest_peer_height} @@@@@@@@@@@@");
             // Return the list of block requests.
             self.construct_requests(sync_peers, min_common_ancestor, &mut rand::thread_rng())
         } else {
+            println!("@@@@@@@@@ COULD NOT FIND SYNC PEERS @@@@@@@@@");
             // Update the state of `is_block_synced` for the sync module.
             self.update_is_block_synced(0, MAX_BLOCKS_BEHIND);
             // Return an empty list of block requests.
@@ -440,6 +442,7 @@ impl<N: Network> BlockSync<N> {
 
         // Remove the peer IP from the request entry.
         if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
+            debug!("@@@@@@@@@@@@@@@@@@@@@@@@ REMOVING PEER IP {peer_ip} FROM REQUEST FOR BLOCK {height}");
             sync_ips.remove(&peer_ip);
         }
 
@@ -502,6 +505,7 @@ impl<N: Network> BlockSync<N> {
             }
             // Ensure the sync pool requested this block from the given peer.
             if !sync_ips.contains(peer_ip) {
+                debug!("@@@@@@@@@@@@@@@@@@@@@@@@@ SYNC IPS - sync_ips: {:#?}", sync_ips.len());
                 bail!("The sync pool did not request block {height} from '{peer_ip}'")
             }
             Ok(())
@@ -622,6 +626,11 @@ impl<N: Network> BlockSync<N> {
             !is_timeout
         });
 
+        debug!(
+            "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ REMOVED TIMED OUT BLOCK REQUESTS: {num_timed_out_block_requests}, num timeout ips {}",
+            timeout_ips.len()
+        );
+
         // If there are timeout IPs, then add them to the request timeouts map.
         if !timeout_ips.is_empty() {
             // Acquire the write lock on the request timeouts map.
@@ -715,6 +724,11 @@ impl<N: Network> BlockSync<N> {
             return None;
         }
 
+        debug!(
+            "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FOUND SYNC PEERS: {}, min common ancestor {min_common_ancestor}",
+            sync_peers.len()
+        );
+
         Some((sync_peers, min_common_ancestor))
     }
 
@@ -742,7 +756,8 @@ impl<N: Network> BlockSync<N> {
 
         for height in start_height..end_height {
             // Ensure the current height is not canonized or already requested.
-            if self.check_block_request(height).is_err() {
+            if let Err(err) = self.check_block_request(height) {
+                debug!("@@@@@@@@@@@@@@@@@@@@@@@@ Error when preparing block request: {}", err);
                 continue;
             }
 

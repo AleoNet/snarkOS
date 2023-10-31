@@ -470,6 +470,10 @@ impl<N: Network> BFT<N> {
         &self,
         leader_certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        debug!(
+            "@@@@@@@@@@@@ COMMITTING LEADER CERTIFICATE (IS_SYNCING {IS_SYNCING}, ALLOW_LEDGER_ACCESS {ALLOW_LEDGER_ACCESS}) @@@@@@@@@@@@"
+        );
+
         // Retrieve the leader certificate round.
         let leader_round = leader_certificate.round();
         // Compute the commit subdag.
@@ -682,6 +686,7 @@ impl<N: Network> BFT<N> {
             while let Some((certificate, callback)) = rx_sync_bft.recv().await {
                 // Update the DAG with the certificate.
                 let result = self_.update_dag::<true>(certificate).await;
+                debug!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Updating DAG from sync result: {:?}", result);
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(result).ok();
