@@ -264,6 +264,12 @@ impl<N: Network> Primary<N> {
     /// 3. Set the batch proposal in the primary.
     /// 4. Broadcast the batch header to all validators for signing.
     pub async fn propose_batch(&self) -> Result<()> {
+        // If the primary is not synced, then do not propose a batch.
+        if !self.sync.is_synced() {
+            debug!("Skipping batch proposal {}", "(node is syncing)".dimmed());
+            return Ok(());
+        }
+
         // Check if the proposed batch has expired, and clear it if it has expired.
         if let Err(e) = self.check_proposed_batch_for_expiration().await {
             warn!("Failed to check the proposed batch for expiration - {e}");
@@ -460,6 +466,12 @@ impl<N: Network> Primary<N> {
     /// If our primary is ahead of the peer, we will not sign the batch.
     /// If our primary is behind the peer, but within GC range, we will sync up to the peer's round, and then sign the batch.
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
+        // If the primary is not synced, then do not sign the batch.
+        if !self.sync.is_synced() {
+            trace!("Skipping a batch proposal from '{peer_ip}' {}", "(node is syncing)".dimmed());
+            return Ok(());
+        }
+
         let BatchPropose { round: batch_round, batch_header } = batch_propose;
 
         // Deserialize the batch header.
@@ -594,6 +606,12 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         batch_signature: BatchSignature<N>,
     ) -> Result<()> {
+        // If the primary is not synced, then do not store the signature.
+        if !self.sync.is_synced() {
+            trace!("Skipping a batch signature from '{peer_ip}' {}", "(node is syncing)".dimmed());
+            return Ok(());
+        }
+
         // Ensure the proposed batch has not expired, and clear the proposed batch if it has expired.
         self.check_proposed_batch_for_expiration().await?;
 
@@ -683,6 +701,12 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        // If the primary is not synced, then do not process the batch certificate from peer.
+        if !self.sync.is_synced() {
+            trace!("Skipping a batch certificate from '{peer_ip}' {}", "(node is syncing)".dimmed());
+            return Ok(());
+        }
+
         // Ensure storage does not already contain the certificate.
         if self.storage.contains_certificate(certificate.id()) {
             return Ok(());
@@ -755,6 +779,12 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        // If the primary is not synced, then do not process the batch certificate from ping.
+        if !self.sync.is_synced() {
+            trace!("Skipping a batch certificate from '{peer_ip}' {}", "(node is syncing)".dimmed());
+            return Ok(());
+        }
+
         // Ensure storage does not already contain the certificate.
         if self.storage.contains_certificate(certificate.id()) {
             return Ok(());
