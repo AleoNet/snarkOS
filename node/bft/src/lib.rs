@@ -46,11 +46,11 @@ pub const CONTEXT: &str = "[MemoryPool]";
 pub const MEMORY_POOL_PORT: u16 = 5000; // port
 
 /// The maximum number of milliseconds to wait before proposing a batch.
-pub const MAX_BATCH_DELAY: u64 = 2500; // ms
+pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
 /// The maximum number of rounds to store before garbage collecting.
 pub const MAX_GC_ROUNDS: u64 = 50; // rounds
 /// The maximum number of seconds allowed for the leader to send their certificate.
-pub const MAX_LEADER_CERTIFICATE_DELAY: i64 = 2 * MAX_BATCH_DELAY as i64 / 1000; // seconds
+pub const MAX_LEADER_CERTIFICATE_DELAY_IN_SECS: i64 = 2 * MAX_BATCH_DELAY_IN_MS as i64 / 1000; // seconds
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.
@@ -61,9 +61,9 @@ pub const MAX_TRANSMISSIONS_PER_WORKER_PING: usize = MAX_TRANSMISSIONS_PER_BATCH
 pub const MAX_WORKERS: u8 = 1; // workers
 
 /// The frequency at which each primary broadcasts a ping to every other node.
-pub const PRIMARY_PING_INTERVAL: u64 = 2 * MAX_BATCH_DELAY; // ms
+pub const PRIMARY_PING_IN_MS: u64 = 2 * MAX_BATCH_DELAY_IN_MS; // ms
 /// The frequency at which each worker broadcasts a ping to every other node.
-pub const WORKER_PING_INTERVAL: u64 = 4 * MAX_BATCH_DELAY; // ms
+pub const WORKER_PING_IN_MS: u64 = 4 * MAX_BATCH_DELAY_IN_MS; // ms
 
 /// A helper macro to spawn a blocking task.
 #[macro_export]

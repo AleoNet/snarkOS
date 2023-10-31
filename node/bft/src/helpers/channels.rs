@@ -22,16 +22,13 @@ use crate::events::{
 };
 use snarkos_node_sync::locators::BlockLocators;
 use snarkvm::{
-    console::network::*,
+    console::{network::*, types::Field},
     ledger::{
-        block::Block,
+        block::{Block, Transaction},
+        coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{
-        block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
-        Result,
-    },
+    prelude::Result,
 };
 
 use indexmap::IndexMap;
@@ -128,7 +125,8 @@ pub struct PrimarySender<N: Network> {
     pub tx_batch_propose: mpsc::Sender<(SocketAddr, BatchPropose<N>)>,
     pub tx_batch_signature: mpsc::Sender<(SocketAddr, BatchSignature<N>)>,
     pub tx_batch_certified: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>,
-    pub tx_primary_ping: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>, Vec<Data<BatchCertificate<N>>>)>,
+    pub tx_primary_ping:
+        mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>, IndexMap<Field<N>, Data<BatchCertificate<N>>>)>,
     pub tx_unconfirmed_solution:
         mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>, oneshot::Sender<Result<()>>)>,
     pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>, oneshot::Sender<Result<()>>)>,
@@ -169,7 +167,8 @@ pub struct PrimaryReceiver<N: Network> {
     pub rx_batch_propose: mpsc::Receiver<(SocketAddr, BatchPropose<N>)>,
     pub rx_batch_signature: mpsc::Receiver<(SocketAddr, BatchSignature<N>)>,
     pub rx_batch_certified: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
-    pub rx_primary_ping: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>, Vec<Data<BatchCertificate<N>>>)>,
+    pub rx_primary_ping:
+        mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>, IndexMap<Field<N>, Data<BatchCertificate<N>>>)>,
     pub rx_unconfirmed_solution:
         mpsc::Receiver<(PuzzleCommitment<N>, Data<ProverSolution<N>>, oneshot::Sender<Result<()>>)>,
     pub rx_unconfirmed_transaction:

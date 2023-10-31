@@ -25,7 +25,7 @@ use crate::{
         DAG,
     },
     Primary,
-    MAX_LEADER_CERTIFICATE_DELAY,
+    MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -321,7 +321,7 @@ impl<N: Network> BFT<N> {
 
     /// Returns `true` if the timer for the leader certificate has expired.
     fn is_timer_expired(&self) -> bool {
-        self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY <= now()
+        self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY_IN_SECS <= now()
     }
 
     /// Returns 'true' if any of the following conditions hold:
