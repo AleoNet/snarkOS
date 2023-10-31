@@ -418,15 +418,10 @@ impl<N: Network> BFT<N> {
         let commit_round = certificate_round.saturating_sub(1);
         // If the commit round is odd, return early.
         if commit_round % 2 != 0 || commit_round < 2 {
-            debug!("@@@@@@@@@@@@ DID NOT COMMIT {commit_round} @@@@@@@@@@@@");
             return Ok(());
         }
         // If the commit round is at or below the last committed round, return early.
         if commit_round <= self.dag.read().last_committed_round() {
-            debug!(
-                "@@@@@@@@@@@@ DID NOT COMMIT {commit_round} <= {}  @@@@@@@@@@@@",
-                self.dag.read().last_committed_round()
-            );
             return Ok(());
         }
 
@@ -511,12 +506,6 @@ impl<N: Network> BFT<N> {
                 }
                 // Retrieve the transmission.
                 let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
-                    println!(
-                        "\t @@@@@@@@@@@@ COMMITTING LEADER CERTIFICATE FAILED TO RETRIEVE TRANSMISSION {} from round {} @@@@@@@@@@@@",
-                        fmt_id(transmission_id),
-                        certificate.round()
-                    );
-
                     bail!(
                         "BFT failed to retrieve transmission '{}' from round {}",
                         fmt_id(transmission_id),
@@ -527,8 +516,6 @@ impl<N: Network> BFT<N> {
                 transmissions.insert(*transmission_id, transmission);
             }
         }
-
-        println!("\t @@@@@@@@@@@@ COMMITTING LEADER CERTIFICATE 2");
 
         // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
         if !IS_SYNCING {
@@ -541,15 +528,11 @@ impl<N: Network> BFT<N> {
             // Retrieve metadata about the subdag.
             let subdag_metadata = subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
 
-            println!("\t @@@@@@@@@@@@ COMMITTING LEADER CERTIFICATE 3");
-
             // Ensure the subdag anchor round matches the leader round.
             ensure!(
                 anchor_round == leader_round,
                 "BFT failed to commit - the subdag anchor round {anchor_round} does not match the leader round {leader_round}",
             );
-
-            println!("\t @@@@@@@@@@@@ COMMITTING LEADER CERTIFICATE 4");
 
             // Trigger consensus.
             if let Some(consensus_sender) = self.consensus_sender.get() {
@@ -561,18 +544,10 @@ impl<N: Network> BFT<N> {
                 match callback_receiver.await {
                     Ok(Ok(())) => (), // continue
                     Ok(Err(e)) => {
-                        println!(
-                            "\t @@@@@@@@@@@@ COMMITTING LEADER CERTIFICATE 5 - FAILED TO ADVANCE FOR ROUND {anchor_round} {e}"
-                        );
-
                         error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
                         return Ok(());
                     }
                     Err(e) => {
-                        println!(
-                            "\t @@@@@@@@@@@@ COMMITTING LEADER CERTIFICATE 6 - FAILED TO RECEIVED CALLBACK FOR ROUND {anchor_round} {e}"
-                        );
-
                         error!("BFT failed to receive the callback for round {anchor_round} - {e}");
                         return Ok(());
                     }
