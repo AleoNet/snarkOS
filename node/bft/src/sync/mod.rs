@@ -276,13 +276,10 @@ impl<N: Network> Sync<N> {
 
     /// Syncs the storage with the given blocks.
     pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
-        debug!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  sync_storage_with_block... awaiting lock");
+        debug!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  sync_storage_with_block...");
 
         // Acquire the sync lock.
         let _lock = self.lock.lock().await;
-
-        debug!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  sync_storage_with_block...");
-
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
             // Iterate over the certificates.

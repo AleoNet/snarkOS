@@ -386,6 +386,7 @@ impl<N: Network> BlockSync<N> {
             let greatest_peer_height = sync_peers.values().map(|l| l.latest_locator_height()).max().unwrap_or(0);
             // Update the state of `is_block_synced` for the sync module.
             self.update_is_block_synced(greatest_peer_height, MAX_BLOCKS_BEHIND);
+            println!("@@@@@@@@@@@ GREATEST PEER HEIGHT {greatest_peer_height} @@@@@@@@@@@@");
             // Return the list of block requests.
             self.construct_requests(sync_peers, min_common_ancestor, &mut rand::thread_rng())
         } else {
@@ -755,7 +756,8 @@ impl<N: Network> BlockSync<N> {
 
         for height in start_height..end_height {
             // Ensure the current height is not canonized or already requested.
-            if self.check_block_request(height).is_err() {
+            if let Err(err) = self.check_block_request(height) {
+                warn!("@@@@@@@@@@@@@@@@@@@@@@@@ Error when preparing block request: {}", err);
                 continue;
             }
 
@@ -768,6 +770,10 @@ impl<N: Network> BlockSync<N> {
                 warn!("Detected dishonest peer(s) when preparing block request");
                 // If there are not enough peers in the dishonest case, then return early.
                 if sync_peers.len() < num_sync_ips {
+                    println!(
+                        "@@@@@@@@@@@@@@@@@@@@@ sync_peers.len() < num_sync_ips, ({} < {num_sync_ips})",
+                        sync_peers.len()
+                    );
                     break;
                 }
             }
