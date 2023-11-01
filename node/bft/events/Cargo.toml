@@ -23,7 +23,7 @@ version = "1.0"
 version = "1"
 
 [dependencies.indexmap]
-version = "2.0"
+version = "2.1"
 features = [ "serde", "rayon" ]
 
 [dependencies.rayon]
