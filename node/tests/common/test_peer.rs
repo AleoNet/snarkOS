@@ -15,9 +15,12 @@
 use snarkos_account::Account;
 use snarkos_node_router::{
     expect_message,
-    messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, MessageTrait, NodeType},
+    messages::{ChallengeRequest, ChallengeResponse, Message, MessageCodec, MessageTrait, NodeType},
 };
-use snarkvm::prelude::{block::Block, error, Address, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{block::Block, error, Address, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork},
+};
 
 use std::{
     io,

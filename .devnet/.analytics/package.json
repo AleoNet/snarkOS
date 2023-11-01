@@ -1,0 +1,17 @@
+{
+  "name": "analytics",
+  "version": "1.0.0",
+  "description": "",
+  "main": "analytics.js",
+  "scripts": {
+    "averageBlockTime": "node analytics.js --metric-type averageBlockTime",
+    "roundsInBlocks": "node analytics.js --metric-type roundsInBlocks",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "The Aleo Team",
+  "license": "Apache 2.0",
+  "dependencies": {
+    "axios": "^1.5.1",
+    "yargs": "^17.7.2"
+  }
+}

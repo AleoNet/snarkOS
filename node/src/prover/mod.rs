@@ -16,9 +16,9 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_narwhal::ledger_service::ProverLedgerService;
+use snarkos_node_bft::ledger_service::ProverLedgerService;
 use snarkos_node_router::{
-    messages::{Data, Message, NodeType, UnconfirmedSolution},
+    messages::{Message, NodeType, UnconfirmedSolution},
     Heartbeat,
     Inbound,
     Outbound,
@@ -30,11 +30,14 @@ use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
 };
-use snarkvm::prelude::{
-    block::{Block, Header},
-    coinbase::{CoinbasePuzzle, EpochChallenge, ProverSolution},
-    store::ConsensusStorage,
-    Network,
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{
+        block::{Block, Header},
+        coinbase::{CoinbasePuzzle, EpochChallenge, ProverSolution},
+        store::ConsensusStorage,
+        Network,
+    },
 };
 
 use anyhow::Result;
@@ -258,12 +261,12 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Broadcasts the prover solution to the network.
     fn broadcast_prover_solution(&self, prover_solution: ProverSolution<N>) {
         // Prepare the unconfirmed solution message.
-        let _message = Message::UnconfirmedSolution(UnconfirmedSolution {
-            puzzle_commitment: prover_solution.commitment(),
+        let message = Message::UnconfirmedSolution(UnconfirmedSolution {
+            solution_id: prover_solution.commitment(),
             solution: Data::Object(prover_solution),
         });
         // Propagate the "UnconfirmedSolution".
-        // self.propagate(message, &[]);
+        self.propagate(message, &[]);
     }
 
     /// Returns the current number of puzzle instances.

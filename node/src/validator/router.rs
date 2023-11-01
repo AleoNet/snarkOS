@@ -16,7 +16,6 @@ use super::*;
 use snarkos_node_router::messages::{
     BlockRequest,
     BlockResponse,
-    Data,
     DataBlocks,
     DisconnectReason,
     Message,
@@ -26,7 +25,10 @@ use snarkos_node_router::messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{block::Transaction, coinbase::EpochChallenge, error, Network};
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{block::Transaction, coinbase::EpochChallenge, error, Network},
+};
 
 use std::{io, net::SocketAddr, time::Duration};
 
@@ -233,18 +235,18 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     /// Propagates the unconfirmed solution to all connected validators.
     async fn unconfirmed_solution(
         &self,
-        _peer_ip: SocketAddr,
-        _serialized: UnconfirmedSolution<N>,
-        _solution: ProverSolution<N>,
+        peer_ip: SocketAddr,
+        serialized: UnconfirmedSolution<N>,
+        solution: ProverSolution<N>,
     ) -> bool {
-        // // Add the unconfirmed solution to the memory pool.
-        // if let Err(error) = self.consensus.add_unconfirmed_solution(solution).await {
-        //     trace!("[UnconfirmedSolution] {error}");
-        //     return true; // Maintain the connection.
-        // }
-        // let message = Message::UnconfirmedSolution(serialized);
-        // // Propagate the "UnconfirmedSolution" to the connected validators.
-        // self.propagate_to_validators(message, &[peer_ip]);
+        // Add the unconfirmed solution to the memory pool.
+        if let Err(error) = self.consensus.add_unconfirmed_solution(solution).await {
+            trace!("[UnconfirmedSolution] {error}");
+            return true; // Maintain the connection.
+        }
+        let message = Message::UnconfirmedSolution(serialized);
+        // Propagate the "UnconfirmedSolution" to the connected validators.
+        self.propagate_to_validators(message, &[peer_ip]);
         true
     }
 

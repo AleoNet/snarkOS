@@ -14,6 +14,11 @@
 
 use super::*;
 
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{FromBytes, ToBytes},
+};
+
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,19 +41,64 @@ impl<N: Network> MessageTrait for BlockResponse<N> {
         }
         .into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.request.serialize(writer)?;
-        self.blocks.serialize_blocking_into(writer)
+impl<N: Network> ToBytes for BlockResponse<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.request.write_le(&mut writer)?;
+        self.blocks.write_le(writer)
+    }
+}
+
+impl<N: Network> FromBytes for BlockResponse<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
+        let request = BlockRequest::read_le(&mut reader)?;
+        let blocks = Data::read_le(reader)?;
+        Ok(Self { request, blocks })
+    }
+}
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{block_request::prop_tests::any_block_request, BlockResponse, DataBlocks};
+    use snarkvm::{
+        ledger::ledger_test_helpers::sample_genesis_block,
+        prelude::{block::Block, narwhal::Data},
+        utilities::{FromBytes, TestRng, ToBytes},
+    };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::{
+        collection::vec,
+        prelude::{any, BoxedStrategy, Strategy},
+    };
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_block() -> BoxedStrategy<Block<CurrentNetwork>> {
+        any::<u64>().prop_map(|seed| sample_genesis_block(&mut TestRng::fixed(seed))).boxed()
     }
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let request = BlockRequest::deserialize(bytes.clone())?;
-        let blocks = Data::Buffer(bytes.freeze());
-        Ok(Self { request, blocks })
+    pub fn any_data_blocks() -> BoxedStrategy<DataBlocks<CurrentNetwork>> {
+        vec(any_block(), 0..=1).prop_map(DataBlocks).boxed()
+    }
+
+    pub fn any_block_response() -> BoxedStrategy<BlockResponse<CurrentNetwork>> {
+        (any_block_request(), any_data_blocks())
+            .prop_map(|(request, data_blocks)| BlockResponse { request, blocks: Data::Object(data_blocks) })
+            .boxed()
+    }
+
+    #[proptest]
+    fn block_response_roundtrip(#[strategy(any_block_response())] block_response: BlockResponse<CurrentNetwork>) {
+        let mut bytes = BytesMut::default().writer();
+        block_response.write_le(&mut bytes).unwrap();
+        let decoded = BlockResponse::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq!(block_response.request, decoded.request);
+        assert_eq!(
+            block_response.blocks.deserialize_blocking().unwrap(),
+            decoded.blocks.deserialize_blocking().unwrap(),
+        );
     }
 }

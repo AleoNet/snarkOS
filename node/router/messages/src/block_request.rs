@@ -14,6 +14,8 @@
 
 use super::*;
 
+use snarkvm::prelude::{FromBytes, ToBytes};
+
 use std::borrow::Cow;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -36,19 +38,18 @@ impl MessageTrait for BlockRequest {
         }
         .into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.start_height.write_le(&mut *writer)?;
-        self.end_height.write_le(writer)?;
+impl ToBytes for BlockRequest {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.start_height.write_le(&mut writer)?;
+        self.end_height.write_le(&mut writer)?;
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
+impl FromBytes for BlockRequest {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         let start_height = u32::read_le(&mut reader)?;
         let end_height = u32::read_le(&mut reader)?;
         Ok(Self { start_height, end_height })
@@ -58,5 +59,27 @@ impl MessageTrait for BlockRequest {
 impl Display for BlockRequest {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}..{}", self.start_height, self.end_height)
+    }
+}
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::BlockRequest;
+    use snarkvm::utilities::{FromBytes, ToBytes};
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use test_strategy::proptest;
+
+    pub fn any_block_request() -> BoxedStrategy<BlockRequest> {
+        any::<(u32, u32)>().prop_map(|(start_height, end_height)| BlockRequest { start_height, end_height }).boxed()
+    }
+
+    #[proptest]
+    fn block_request_roundtrip(#[strategy(any_block_request())] block_request: BlockRequest) {
+        let mut bytes = BytesMut::default().writer();
+        block_request.write_le(&mut bytes).unwrap();
+        let decoded = BlockRequest::read_le(&mut bytes.into_inner().reader()).unwrap();
+        assert_eq![decoded, block_request];
     }
 }

@@ -24,11 +24,12 @@ mod routes;
 
 use snarkos_node_consensus::Consensus;
 use snarkos_node_router::{
-    messages::{Data, Message, UnconfirmedTransaction},
+    messages::{Message, UnconfirmedTransaction},
     Routing,
 };
 use snarkvm::{
     console::{program::ProgramID, types::Field},
+    ledger::narwhal::Data,
     prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},
 };
 
@@ -103,6 +104,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         let router = {
             axum::Router::new()
 
+            // All the endpoints before the call to `route_layer` are protected with JWT auth.
+            .route("/testnet3/node/address", get(Self::get_node_address))
+            .route_layer(middleware::from_fn(auth_middleware))
+
             // ----------------- DEPRECATED ROUTES -----------------
             // The following `GET ../latest/..` routes will be removed before mainnet.
             // Please refer to the recommended routes for each endpoint:
@@ -157,7 +162,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
             .route("/testnet3/stateRoot/latest", get(Self::get_state_root_latest))
             .route("/testnet3/committee/latest", get(Self::get_committee_latest))
-            .route("/testnet3/node/address", get(Self::get_node_address))
 
             // Pass in `Rest` to make things convenient.
             .with_state(self.clone())
@@ -169,8 +173,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .layer(cors)
             // Cap body size at 10MB.
             .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
-            // JWT auth.
-            // .layer(middleware::from_fn(auth_middleware))
         };
 
         self.handles.lock().push(tokio::spawn(async move {

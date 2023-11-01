@@ -27,7 +27,7 @@ use snarkvm::{
     },
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
@@ -51,7 +51,7 @@ pub struct Deploy {
     priority_fee: u64,
     /// The record to spend the fee from.
     #[clap(short, long)]
-    record: String,
+    record: Option<String>,
     /// The endpoint used to broadcast the generated transaction.
     #[clap(short, long, conflicts_with = "dry_run")]
     broadcast: Option<String>,
@@ -97,17 +97,32 @@ impl Deploy {
 
             // Compute the minimum deployment cost.
             let (minimum_deployment_cost, (_, _)) = deployment_cost(&deployment)?;
-            // Determine the fee.
-            let fee_in_microcredits = minimum_deployment_cost
-                .checked_add(self.priority_fee)
-                .ok_or_else(|| anyhow!("Fee overflowed for a deployment transaction"))?;
 
             // Prepare the fees.
-            let fee_record = Developer::parse_record(&private_key, &self.record)?;
-            let fee_authorization =
-                vm.authorize_fee_private(&private_key, fee_record, fee_in_microcredits, deployment_id, rng)?;
-            let fee = vm.execute_fee_authorization(fee_authorization, Some(query), rng)?;
-
+            let fee = match &self.record {
+                Some(record) => {
+                    let fee_record = Developer::parse_record(&private_key, record)?;
+                    let fee_authorization = vm.authorize_fee_private(
+                        &private_key,
+                        fee_record,
+                        minimum_deployment_cost,
+                        self.priority_fee,
+                        deployment_id,
+                        rng,
+                    )?;
+                    vm.execute_fee_authorization(fee_authorization, Some(query), rng)?
+                }
+                None => {
+                    let fee_authorization = vm.authorize_fee_public(
+                        &private_key,
+                        minimum_deployment_cost,
+                        self.priority_fee,
+                        deployment_id,
+                        rng,
+                    )?;
+                    vm.execute_fee_authorization(fee_authorization, Some(query), rng)?
+                }
+            };
             // Construct the owner.
             let owner = ProgramOwner::new(&private_key, deployment_id, rng)?;
 
@@ -155,7 +170,7 @@ mod tests {
             assert_eq!(deploy.private_key, "PRIVATE_KEY");
             assert_eq!(deploy.query, "QUERY");
             assert_eq!(deploy.priority_fee, 77);
-            assert_eq!(deploy.record, "RECORD");
+            assert_eq!(deploy.record, Some("RECORD".to_string()));
         } else {
             panic!("Unexpected result of clap parsing!");
         }

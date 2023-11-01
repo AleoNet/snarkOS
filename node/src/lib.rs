@@ -21,9 +21,9 @@ extern crate async_trait;
 #[macro_use]
 extern crate tracing;
 
+pub use snarkos_node_bft as bft;
 pub use snarkos_node_cdn as cdn;
 pub use snarkos_node_consensus as consensus;
-pub use snarkos_node_narwhal as narwhal;
 pub use snarkos_node_rest as rest;
 pub use snarkos_node_router as router;
 pub use snarkos_node_sync as sync;
@@ -121,6 +121,24 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             std::thread::sleep(std::time::Duration::from_secs(5));
             return Ledger::<N, C>::load(genesis.clone(), dev);
         }
+    } else if let Ok(block) = ledger.get_block(115314) {
+        if *block.hash() == *ID::<N>::from_str("ab13eckyhvhpv5zdhw8xz2zskrmm0a5hgeq7f5sjaw4errx0678pgpsjhuaqf")? {
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            return Ledger::<N, C>::load(genesis.clone(), dev);
+        }
+    } else if let Ok(block) = ledger.get_block(115315) {
+        if *block.hash() == *ID::<N>::from_str("ab1axs5ltm6kjezsjxw35taf3xjpherrhpu6868h3ezhc3ap8pyrggqrrkjcg")? {
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            return Ledger::<N, C>::load(genesis.clone(), dev);
+        }
     }
     Ok(ledger)
 }
@@ -131,7 +149,8 @@ pub fn start_notification_message_loop() -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
             interval.tick().await;
-            info!("{}", notification_message());
+            // TODO (howardwu): Swap this with the official message for Testnet 3 announcements.
+            // info!("{}", notification_message());
         }
     })
 }

@@ -240,7 +240,95 @@ cargo run --release -- start --nodisplay --dev <NODE_ID>
 
 When no node type is specified, the node will default to `--client`.
 
-##### Clean Up
+### 6.3 Local Devnet
+
+#### 6.3.1 Install `tmux`
+
+To run a local devnet with the script, start by installing `tmux`.
+
+<details><summary>macOS</summary>
+
+To install `tmux` on macOS, you can use the `Homebrew` package manager.
+If you haven't installed `Homebrew` yet, you can find instructions at [their website](https://brew.sh/).
+```bash
+# Once Homebrew is installed, run:
+brew install tmux
+```
+
+</details>
+
+<details><summary>Ubuntu</summary>
+
+On Ubuntu and other Debian-based systems, you can use the `apt` package manager:
+```bash
+sudo apt update
+sudo apt install tmux
+```
+
+</details>
+
+<details><summary>Windows</summary>
+
+There are a couple of ways to use `tmux` on Windows:
+
+### Using Windows Subsystem for Linux (WSL)
+
+1. First, install [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install).
+2. Once WSL is set up and you have a Linux distribution installed (e.g., Ubuntu), open your WSL terminal and install `tmux` as you would on a native Linux system:
+```bash
+sudo apt update
+sudo apt install tmux
+```
+
+</details>
+
+#### 6.3.2 Start a Local Devnet
+
+To start a local devnet, run:
+```
+./devnet.sh
+```
+Follow the instructions in the terminal to start the devnet.
+
+#### 6.3.3 View a Local Devnet
+
+#### Switch Nodes (forward)
+
+To toggle to the next node in a local devnet, run:
+```
+Ctrl+b n
+```
+
+#### Switch Nodes (backwards)
+
+To toggle to the previous node in a local devnet, run:
+```
+Ctrl+b p
+```
+
+#### Select a Node (choose-tree)
+
+To select a node in a local devnet, run:
+```
+Ctrl+b w
+```
+
+#### Select a Node (manually)
+
+To select a node manually in a local devnet, run:
+```
+Ctrl+b :select-window -t {NODE_ID}
+```
+
+#### 6.3.4 Stop a Local Devnet
+
+To stop a local devnet, run:
+```
+Ctrl+b :kill-session
+```
+Then, press `Enter`.
+
+### Clean Up
 
 To clean up the node storage, run:
 ```
@@ -248,7 +336,7 @@ cargo run --release -- clean --dev <NODE_ID>
 ```
 
 ## 7. Contributors
-Thank you for helping make SnarkOS better!  
+Thank you for helping make snarkOS better!  
 [🧐 What do the emojis mean?](https://allcontributors.org/docs/en/emoji-key)
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->

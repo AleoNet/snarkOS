@@ -14,6 +14,11 @@
 
 use super::*;
 
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{FromBytes, ToBytes},
+};
+
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -35,21 +40,64 @@ impl<N: Network> MessageTrait for UnconfirmedTransaction<N> {
     fn name(&self) -> Cow<'static, str> {
         "UnconfirmedTransaction".into()
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.transaction_id.write_le(&mut *writer)?;
-        self.transaction.serialize_blocking_into(writer)
+impl<N: Network> ToBytes for UnconfirmedTransaction<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.transaction_id.write_le(&mut writer)?;
+        self.transaction.write_le(&mut writer)?;
+        Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for UnconfirmedTransaction<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
+        Ok(Self { transaction_id: N::TransactionID::read_le(&mut reader)?, transaction: Data::read_le(reader)? })
+    }
+}
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{Transaction, UnconfirmedTransaction};
+    use snarkvm::{
+        ledger::{ledger_test_helpers::sample_fee_public_transaction, narwhal::Data},
+        prelude::{FromBytes, TestRng, ToBytes},
+    };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_transaction() -> BoxedStrategy<Transaction<CurrentNetwork>> {
+        any::<u64>()
+            .prop_map(|seed| {
+                let mut rng = TestRng::fixed(seed);
+                sample_fee_public_transaction(&mut rng)
+            })
+            .boxed()
     }
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-        Ok(Self {
-            transaction_id: N::TransactionID::read_le(&mut reader)?,
-            transaction: Data::Buffer(reader.into_inner().freeze()),
-        })
+    pub fn any_unconfirmed_transaction() -> BoxedStrategy<UnconfirmedTransaction<CurrentNetwork>> {
+        any_transaction()
+            .prop_map(|tx| UnconfirmedTransaction { transaction_id: tx.id(), transaction: Data::Object(tx) })
+            .boxed()
+    }
+
+    #[proptest]
+    fn unconfirmed_transaction_roundtrip(
+        #[strategy(any_unconfirmed_transaction())] original: UnconfirmedTransaction<CurrentNetwork>,
+    ) {
+        let mut buf = BytesMut::default().writer();
+        UnconfirmedTransaction::write_le(&original, &mut buf).unwrap();
+
+        let deserialized: UnconfirmedTransaction<CurrentNetwork> =
+            UnconfirmedTransaction::read_le(buf.into_inner().reader()).unwrap();
+        assert_eq!(original.transaction_id, deserialized.transaction_id);
+        assert_eq!(
+            original.transaction.deserialize_blocking().unwrap(),
+            deserialized.transaction.deserialize_blocking().unwrap(),
+        );
     }
 }

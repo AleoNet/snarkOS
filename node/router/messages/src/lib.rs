@@ -59,12 +59,13 @@ pub use unconfirmed_solution::UnconfirmedSolution;
 mod unconfirmed_transaction;
 pub use unconfirmed_transaction::UnconfirmedTransaction;
 
-pub use snarkos_node_narwhal_events::DataBlocks;
+pub use snarkos_node_bft_events::DataBlocks;
 
 use snarkos_node_sync_locators::BlockLocators;
 use snarkvm::prelude::{
     block::{Header, Transaction},
     coinbase::{EpochChallenge, ProverSolution, PuzzleCommitment},
+    error,
     Address,
     FromBytes,
     Network,
@@ -72,25 +73,17 @@ use snarkvm::prelude::{
     ToBytes,
 };
 
-use ::bytes::{Buf, BytesMut};
-use anyhow::{bail, Result};
 use std::{
     borrow::Cow,
     fmt,
     fmt::{Display, Formatter},
-    io::Write,
+    io,
     net::SocketAddr,
 };
 
-pub trait MessageTrait {
+pub trait MessageTrait: ToBytes + FromBytes {
     /// Returns the message name.
     fn name(&self) -> Cow<'static, str>;
-    /// Serializes the message into the buffer.
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()>;
-    /// Deserializes the given buffer into a message.
-    fn deserialize(bytes: BytesMut) -> Result<Self>
-    where
-        Self: Sized;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -118,7 +111,7 @@ impl<N: Network> From<DisconnectReason> for Message<N> {
 
 impl<N: Network> Message<N> {
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 10;
+    pub const VERSION: u32 = 11;
 
     /// Returns the message name.
     #[inline]
@@ -159,56 +152,53 @@ impl<N: Network> Message<N> {
             Self::UnconfirmedTransaction(..) => 12,
         }
     }
+}
 
-    /// Serializes the message into the buffer.
-    #[inline]
-    pub fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.id().write_le(&mut *writer)?;
+impl<N: Network> ToBytes for Message<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.id().write_le(&mut writer)?;
 
         match self {
-            Self::BlockRequest(message) => message.serialize(writer),
-            Self::BlockResponse(message) => message.serialize(writer),
-            Self::ChallengeRequest(message) => message.serialize(writer),
-            Self::ChallengeResponse(message) => message.serialize(writer),
-            Self::Disconnect(message) => message.serialize(writer),
-            Self::PeerRequest(message) => message.serialize(writer),
-            Self::PeerResponse(message) => message.serialize(writer),
-            Self::Ping(message) => message.serialize(writer),
-            Self::Pong(message) => message.serialize(writer),
-            Self::PuzzleRequest(message) => message.serialize(writer),
-            Self::PuzzleResponse(message) => message.serialize(writer),
-            Self::UnconfirmedSolution(message) => message.serialize(writer),
-            Self::UnconfirmedTransaction(message) => message.serialize(writer),
+            Self::BlockRequest(message) => message.write_le(writer),
+            Self::BlockResponse(message) => message.write_le(writer),
+            Self::ChallengeRequest(message) => message.write_le(writer),
+            Self::ChallengeResponse(message) => message.write_le(writer),
+            Self::Disconnect(message) => message.write_le(writer),
+            Self::PeerRequest(message) => message.write_le(writer),
+            Self::PeerResponse(message) => message.write_le(writer),
+            Self::Ping(message) => message.write_le(writer),
+            Self::Pong(message) => message.write_le(writer),
+            Self::PuzzleRequest(message) => message.write_le(writer),
+            Self::PuzzleResponse(message) => message.write_le(writer),
+            Self::UnconfirmedSolution(message) => message.write_le(writer),
+            Self::UnconfirmedTransaction(message) => message.write_le(writer),
         }
     }
+}
 
-    /// Deserializes the given buffer into a message.
-    #[inline]
-    pub fn deserialize(mut bytes: BytesMut) -> Result<Self> {
-        // Ensure there is at least a message ID in the buffer.
-        if bytes.remaining() < 2 {
-            bail!("Missing message ID");
-        }
-
-        // Read the message ID.
-        let id: u16 = bytes.get_u16_le();
+impl<N: Network> FromBytes for Message<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
+        // Read the event ID.
+        let mut id_bytes = [0u8; 2];
+        reader.read_exact(&mut id_bytes)?;
+        let id = u16::from_le_bytes(id_bytes);
 
         // Deserialize the data field.
         let message = match id {
-            0 => Self::BlockRequest(MessageTrait::deserialize(bytes)?),
-            1 => Self::BlockResponse(MessageTrait::deserialize(bytes)?),
-            2 => Self::ChallengeRequest(MessageTrait::deserialize(bytes)?),
-            3 => Self::ChallengeResponse(MessageTrait::deserialize(bytes)?),
-            4 => Self::Disconnect(MessageTrait::deserialize(bytes)?),
-            5 => Self::PeerRequest(MessageTrait::deserialize(bytes)?),
-            6 => Self::PeerResponse(MessageTrait::deserialize(bytes)?),
-            7 => Self::Ping(MessageTrait::deserialize(bytes)?),
-            8 => Self::Pong(MessageTrait::deserialize(bytes)?),
-            9 => Self::PuzzleRequest(MessageTrait::deserialize(bytes)?),
-            10 => Self::PuzzleResponse(MessageTrait::deserialize(bytes)?),
-            11 => Self::UnconfirmedSolution(MessageTrait::deserialize(bytes)?),
-            12 => Self::UnconfirmedTransaction(MessageTrait::deserialize(bytes)?),
-            13.. => bail!("Unknown message ID {id}"),
+            0 => Self::BlockRequest(BlockRequest::read_le(reader)?),
+            1 => Self::BlockResponse(BlockResponse::read_le(reader)?),
+            2 => Self::ChallengeRequest(ChallengeRequest::read_le(reader)?),
+            3 => Self::ChallengeResponse(ChallengeResponse::read_le(reader)?),
+            4 => Self::Disconnect(Disconnect::read_le(reader)?),
+            5 => Self::PeerRequest(PeerRequest::read_le(reader)?),
+            6 => Self::PeerResponse(PeerResponse::read_le(reader)?),
+            7 => Self::Ping(Ping::read_le(reader)?),
+            8 => Self::Pong(Pong::read_le(reader)?),
+            9 => Self::PuzzleRequest(PuzzleRequest::read_le(reader)?),
+            10 => Self::PuzzleResponse(PuzzleResponse::read_le(reader)?),
+            11 => Self::UnconfirmedSolution(UnconfirmedSolution::read_le(reader)?),
+            12 => Self::UnconfirmedTransaction(UnconfirmedTransaction::read_le(reader)?),
+            13.. => return Err(error("Unknown message ID {id}")),
         };
 
         Ok(message)
