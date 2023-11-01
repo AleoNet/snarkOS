@@ -1466,9 +1466,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.0.2"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8adf3ddd720272c6ea8bf59463c04e0f93d0bbf7c5439b691bca2987e0270897"
+checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.1",
@@ -2848,7 +2848,7 @@ version = "1.0.108"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d1c7e3eac408d115102c4c24ad393e0821bb3a5df4d506a80f85f7a742a526b"
 dependencies = [
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "itoa",
  "ryu",
  "serde",
@@ -3029,7 +3029,7 @@ dependencies = [
  "clap",
  "colored",
  "crossterm 0.27.0",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "nix",
  "num_cpus",
  "parking_lot",
@@ -3085,7 +3085,7 @@ dependencies = [
  "colored",
  "deadline",
  "futures-util",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "num_cpus",
  "once_cell",
  "parking_lot",
@@ -3124,7 +3124,7 @@ dependencies = [
  "colored",
  "deadline",
  "futures",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "itertools 0.11.0",
  "mockall",
  "open",
@@ -3161,7 +3161,7 @@ version = "2.2.2"
 dependencies = [
  "anyhow",
  "bytes",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "proptest",
  "rayon",
  "serde",
@@ -3179,7 +3179,7 @@ name = "snarkos-node-bft-ledger-service"
 version = "2.2.2"
 dependencies = [
  "async-trait",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "parking_lot",
  "snarkvm",
  "tokio",
@@ -3212,7 +3212,7 @@ version = "2.2.2"
 dependencies = [
  "anyhow",
  "colored",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "itertools 0.11.0",
  "lru",
  "once_cell",
@@ -3244,7 +3244,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "http",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "jsonwebtoken",
  "once_cell",
  "parking_lot",
@@ -3272,7 +3272,7 @@ dependencies = [
  "deadline",
  "futures",
  "futures-util",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "linked-hash-map",
  "parking_lot",
  "peak_alloc",
@@ -3300,7 +3300,7 @@ version = "2.2.2"
 dependencies = [
  "anyhow",
  "bytes",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "proptest",
  "rayon",
  "serde",
@@ -3319,7 +3319,7 @@ name = "snarkos-node-sync"
 version = "2.2.2"
 dependencies = [
  "anyhow",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "itertools 0.11.0",
  "once_cell",
  "parking_lot",
@@ -3346,7 +3346,7 @@ name = "snarkos-node-sync-locators"
 version = "2.2.2"
 dependencies = [
  "anyhow",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "serde",
  "snarkvm",
  "tracing",
@@ -3376,7 +3376,7 @@ dependencies = [
  "clap",
  "colored",
  "dotenvy",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "num-format",
  "once_cell",
  "parking_lot",
@@ -3408,7 +3408,7 @@ dependencies = [
  "fxhash",
  "hashbrown 0.14.1",
  "hex",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "itertools 0.11.0",
  "num-traits",
  "parking_lot",
@@ -3476,7 +3476,7 @@ name = "snarkvm-circuit-environment"
 version = "0.16.6"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1dd6ca27aa9f8efca209815bec"
 dependencies = [
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "itertools 0.11.0",
  "nom",
  "num-traits",
@@ -3668,7 +3668,7 @@ version = "0.16.6"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1dd6ca27aa9f8efca209815bec"
 dependencies = [
  "anyhow",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "itertools 0.11.0",
  "lazy_static",
  "once_cell",
@@ -3710,7 +3710,7 @@ source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1d
 dependencies = [
  "enum_index",
  "enum_index_derive",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "num-derive",
  "num-traits",
  "once_cell",
@@ -3851,7 +3851,7 @@ source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1d
 dependencies = [
  "aleo-std",
  "anyhow",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "parking_lot",
  "rand",
  "rayon",
@@ -3886,7 +3886,7 @@ name = "snarkvm-ledger-block"
 version = "0.16.6"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1dd6ca27aa9f8efca209815bec"
 dependencies = [
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "rayon",
  "serde_json",
  "snarkvm-console",
@@ -3908,7 +3908,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "blake2",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "rayon",
  "serde_json",
  "snarkvm-algorithms",
@@ -3925,7 +3925,7 @@ version = "0.16.6"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1dd6ca27aa9f8efca209815bec"
 dependencies = [
  "anyhow",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "proptest",
  "rand",
  "rand_chacha",
@@ -3953,7 +3953,7 @@ name = "snarkvm-ledger-narwhal-batch-certificate"
 version = "0.16.6"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1dd6ca27aa9f8efca209815bec"
 dependencies = [
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "serde_json",
  "snarkvm-console",
  "snarkvm-ledger-narwhal-batch-header",
@@ -3965,7 +3965,7 @@ name = "snarkvm-ledger-narwhal-batch-header"
 version = "0.16.6"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1dd6ca27aa9f8efca209815bec"
 dependencies = [
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "serde_json",
  "snarkvm-console",
  "snarkvm-ledger-narwhal-transmission-id",
@@ -3988,7 +3988,7 @@ name = "snarkvm-ledger-narwhal-subdag"
 version = "0.16.6"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1dd6ca27aa9f8efca209815bec"
 dependencies = [
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "rayon",
  "serde_json",
  "snarkvm-console",
@@ -4039,7 +4039,7 @@ dependencies = [
  "aleo-std",
  "anyhow",
  "bincode",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "once_cell",
  "parking_lot",
  "rayon",
@@ -4083,7 +4083,7 @@ dependencies = [
  "colored",
  "curl",
  "hex",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "itertools 0.11.0",
  "lazy_static",
  "paste",
@@ -4102,7 +4102,7 @@ source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1d
 dependencies = [
  "aleo-std",
  "anyhow",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "parking_lot",
  "rand",
  "rayon",
@@ -4127,7 +4127,7 @@ source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1d
 dependencies = [
  "aleo-std",
  "colored",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "once_cell",
  "parking_lot",
  "rand",
@@ -4147,7 +4147,7 @@ name = "snarkvm-synthesizer-program"
 version = "0.16.6"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=2e245e3#2e245e30b9b53c1dd6ca27aa9f8efca209815bec"
 dependencies = [
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "paste",
  "rand",
  "rand_chacha",
