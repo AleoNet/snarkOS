@@ -18,9 +18,6 @@ pub use account::*;
 mod clean;
 pub use clean::*;
 
-mod developer;
-pub use developer::*;
-
 mod start;
 pub use start::*;
 
@@ -55,8 +52,6 @@ pub enum Command {
     Account(Account),
     #[clap(name = "clean")]
     Clean(Clean),
-    #[clap(subcommand)]
-    Developer(Developer),
     #[clap(name = "start")]
     Start(Box<Start>),
     #[clap(name = "update")]
@@ -69,7 +64,6 @@ impl Command {
         match self {
             Self::Account(command) => command.parse(),
             Self::Clean(command) => command.parse(),
-            Self::Developer(command) => command.parse(),
             Self::Start(command) => command.parse(),
             Self::Update(command) => command.parse(),
         }
