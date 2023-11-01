@@ -55,8 +55,8 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// Returns the solution for the given solution ID.
     fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
 
-    /// Returns the transaction for the given transaction ID.
-    fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
+    /// Returns the unconfirmed transaction for the given transaction ID.
+    fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
 
     /// Returns the batch certificate for the given batch certificate ID.
     fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;

@@ -38,7 +38,7 @@ pub fn check_timestamp_for_liveness(timestamp: i64) -> Result<()> {
 
 #[cfg(test)]
 mod prop_tests {
-    use super::{check_timestamp_for_liveness, now};
+    use super::*;
     use crate::MAX_TIMESTAMP_DELTA_IN_SECS;
 
     use proptest::prelude::*;
@@ -54,13 +54,11 @@ mod prop_tests {
 
     #[proptest]
     fn test_check_timestamp_for_liveness(#[strategy(any_valid_timestamp())] timestamp: i64) {
-        let result = check_timestamp_for_liveness(timestamp);
-        assert!(result.is_ok());
+        check_timestamp_for_liveness(timestamp).unwrap();
     }
 
     #[proptest]
     fn test_check_timestamp_for_liveness_too_far_in_future(#[strategy(any_invalid_timestamp())] timestamp: i64) {
-        let result = check_timestamp_for_liveness(timestamp);
-        assert!(result.is_err());
+        assert!(check_timestamp_for_liveness(timestamp).is_err());
     }
 }

@@ -25,7 +25,7 @@ use crate::{
         DAG,
     },
     Primary,
-    MAX_LEADER_CERTIFICATE_DELAY,
+    MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -321,7 +321,7 @@ impl<N: Network> BFT<N> {
 
     /// Returns `true` if the timer for the leader certificate has expired.
     fn is_timer_expired(&self) -> bool {
-        self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY <= now()
+        self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY_IN_SECS <= now()
     }
 
     /// Returns 'true' if any of the following conditions hold:
@@ -349,7 +349,7 @@ impl<N: Network> BFT<N> {
             return true;
         };
         // Retrieve the leader certificate ID.
-        let leader_certificate_id = leader_certificate.certificate_id();
+        let leader_certificate_id = leader_certificate.id();
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
         // Retrieve the previous committee of the current round.
@@ -447,7 +447,7 @@ impl<N: Network> BFT<N> {
         // Construct a set over the authors who included the leader's certificate in the certificate round.
         let authors = certificates
             .values()
-            .filter_map(|c| match c.previous_certificate_ids().contains(&leader_certificate.certificate_id()) {
+            .filter_map(|c| match c.previous_certificate_ids().contains(&leader_certificate.id()) {
                 true => Some(c.author()),
                 false => None,
             })
@@ -498,7 +498,11 @@ impl<N: Network> BFT<N> {
                 }
                 // Retrieve the transmission.
                 let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
-                    bail!("BFT failed to retrieve transmission {}", fmt_id(transmission_id));
+                    bail!(
+                        "BFT failed to retrieve transmission '{}' from round {}",
+                        fmt_id(transmission_id),
+                        certificate.round()
+                    );
                 };
                 // Add the transmission to the set.
                 transmissions.insert(*transmission_id, transmission);
@@ -622,7 +626,7 @@ impl<N: Network> BFT<N> {
                     }
                 };
                 // Insert the previous certificate into the set of already ordered certificates.
-                already_ordered.insert(previous_certificate.certificate_id());
+                already_ordered.insert(previous_certificate.id());
                 // Insert the previous certificate into the buffer.
                 buffer.push(previous_certificate);
             }
@@ -715,7 +719,7 @@ impl<N: Network> BFT<N> {
             // Iterate over the certificates.
             for certificate in certificates {
                 // If the certificate is not the latest leader certificate, insert it.
-                if leader_certificate.certificate_id() != certificate.certificate_id() {
+                if leader_certificate.id() != certificate.id() {
                     // Insert the certificate into the DAG.
                     dag.insert(certificate);
                 }
@@ -1012,8 +1016,8 @@ mod tests {
             assert_eq!(candidate_certificates.len(), 1);
             let expected_certificates = vec![certificate.clone()];
             assert_eq!(
-                candidate_certificates.iter().map(|c| c.certificate_id()).collect::<Vec<_>>(),
-                expected_certificates.iter().map(|c| c.certificate_id()).collect::<Vec<_>>()
+                candidate_certificates.iter().map(|c| c.id()).collect::<Vec<_>>(),
+                expected_certificates.iter().map(|c| c.id()).collect::<Vec<_>>()
             );
             assert_eq!(candidate_certificates, expected_certificates);
         }
@@ -1048,8 +1052,8 @@ mod tests {
                 certificate,
             ];
             assert_eq!(
-                candidate_certificates.iter().map(|c| c.certificate_id()).collect::<Vec<_>>(),
-                expected_certificates.iter().map(|c| c.certificate_id()).collect::<Vec<_>>()
+                candidate_certificates.iter().map(|c| c.id()).collect::<Vec<_>>(),
+                expected_certificates.iter().map(|c| c.id()).collect::<Vec<_>>()
             );
             assert_eq!(candidate_certificates, expected_certificates);
         }
@@ -1076,7 +1080,7 @@ mod tests {
             rng,
         );
         // Construct the previous certificate IDs.
-        let previous_certificate_ids: IndexSet<_> = previous_certificates.iter().map(|c| c.certificate_id()).collect();
+        let previous_certificate_ids: IndexSet<_> = previous_certificates.iter().map(|c| c.id()).collect();
 
         /* Test missing previous certificate. */
 

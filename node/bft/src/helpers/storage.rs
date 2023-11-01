@@ -200,7 +200,7 @@ impl<N: Network> Storage<N> {
                 // Iterate over the certificates for the GC round.
                 for certificate in self.get_certificates_for_round(gc_round).iter() {
                     // Remove the certificate from storage.
-                    self.remove_certificate(certificate.certificate_id());
+                    self.remove_certificate(certificate.id());
                 }
             }
             // Update the GC round.
@@ -437,7 +437,7 @@ impl<N: Network> Storage<N> {
         let gc_log = format!("(gc = {gc_round})");
 
         // Ensure the certificate ID does not already exist in storage.
-        if self.contains_certificate(certificate.certificate_id()) {
+        if self.contains_certificate(certificate.id()) {
             bail!("Certificate for round {round} already exists in storage {gc_log}")
         }
 
@@ -449,11 +449,8 @@ impl<N: Network> Storage<N> {
         // Ensure the batch header is well-formed.
         let missing_transmissions = self.check_batch_header(certificate.batch_header(), transmissions)?;
 
-        // Iterate over the timestamps.
-        for timestamp in certificate.timestamps() {
-            // Check the timestamp for liveness.
-            check_timestamp_for_liveness(timestamp)?;
-        }
+        // Check the timestamp for liveness.
+        check_timestamp_for_liveness(certificate.timestamp())?;
 
         // Retrieve the previous committee for the batch round.
         let Ok(previous_committee) = self.ledger.get_previous_committee_for_round(round) else {
@@ -522,7 +519,7 @@ impl<N: Network> Storage<N> {
         // Retrieve the round.
         let round = certificate.round();
         // Retrieve the certificate ID.
-        let certificate_id = certificate.certificate_id();
+        let certificate_id = certificate.id();
         // Retrieve the batch ID.
         let batch_id = certificate.batch_id();
         // Retrieve the author of the batch.
@@ -644,7 +641,7 @@ impl<N: Network> Storage<N> {
             return;
         }
         // If the certificate ID already exists in storage, skip it.
-        if self.contains_certificate(certificate.certificate_id()) {
+        if self.contains_certificate(certificate.id()) {
             return;
         }
         // Retrieve the transmissions for the certificate.
@@ -689,8 +686,8 @@ impl<N: Network> Storage<N> {
                     match unconfirmed_transactions.remove(transaction_id) {
                         // Insert the transaction.
                         Some(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
-                        // Otherwise, try to load the transaction from the ledger.
-                        None => match self.ledger.get_transaction(*transaction_id) {
+                        // Otherwise, try to load the unconfirmed transaction from the ledger.
+                        None => match self.ledger.get_unconfirmed_transaction(*transaction_id) {
                             // Insert the transaction.
                             Ok(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
                             Err(_) => {
@@ -703,7 +700,7 @@ impl<N: Network> Storage<N> {
             }
         }
         // Insert the batch certificate into storage.
-        let certificate_id = fmt_id(certificate.certificate_id());
+        let certificate_id = fmt_id(certificate.id());
         debug!(
             "Syncing certificate '{certificate_id}' for round {} with {} transmissions",
             certificate.round(),
@@ -752,7 +749,7 @@ impl<N: Network> Storage<N> {
         // Retrieve the round.
         let round = certificate.round();
         // Retrieve the certificate ID.
-        let certificate_id = certificate.certificate_id();
+        let certificate_id = certificate.id();
         // Retrieve the batch ID.
         let batch_id = certificate.batch_id();
         // Retrieve the author of the batch.
@@ -840,7 +837,7 @@ mod tests {
         HashMap<TransmissionID<CurrentNetwork>, (Transmission<CurrentNetwork>, IndexSet<Field<CurrentNetwork>>)>,
     ) {
         // Retrieve the certificate ID.
-        let certificate_id = certificate.certificate_id();
+        let certificate_id = certificate.id();
 
         let mut missing_transmissions = HashMap::new();
         let mut transmissions = HashMap::<_, (_, IndexSet<Field<CurrentNetwork>>)>::new();
@@ -878,7 +875,7 @@ mod tests {
         // Create a new certificate.
         let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
         // Retrieve the certificate ID.
-        let certificate_id = certificate.certificate_id();
+        let certificate_id = certificate.id();
         // Retrieve the round.
         let round = certificate.round();
         // Retrieve the batch ID.
@@ -944,7 +941,7 @@ mod tests {
         // Create a new certificate.
         let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
         // Retrieve the certificate ID.
-        let certificate_id = certificate.certificate_id();
+        let certificate_id = certificate.id();
         // Retrieve the round.
         let round = certificate.round();
         // Retrieve the batch ID.
@@ -1129,13 +1126,11 @@ pub mod prop_tests {
         validator_set: &ValidatorSet,
         batch_header: &BatchHeader<CurrentNetwork>,
         rng: &mut R,
-    ) -> IndexMap<Signature<CurrentNetwork>, i64> {
-        let mut signatures = IndexMap::with_capacity(validator_set.0.len());
+    ) -> IndexSet<Signature<CurrentNetwork>> {
+        let mut signatures = IndexSet::with_capacity(validator_set.0.len());
         for validator in validator_set.0.iter() {
             let private_key = validator.private_key;
-            let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
-            let timestamp_field = Field::from_u64(timestamp as u64);
-            signatures.insert(private_key.sign(&[batch_header.batch_id(), timestamp_field], rng).unwrap(), timestamp);
+            signatures.insert(private_key.sign(&[batch_header.batch_id()], rng).unwrap());
         }
         signatures
     }
@@ -1174,14 +1169,14 @@ pub mod prop_tests {
             &mut rng,
         )
         .unwrap();
-        let certificate = BatchCertificate::new(
+        let certificate = BatchCertificate::from(
             batch_header.clone(),
             sign_batch_header(&ValidatorSet(validators), &batch_header, &mut rng),
         )
         .unwrap();
 
         // Retrieve the certificate ID.
-        let certificate_id = certificate.certificate_id();
+        let certificate_id = certificate.id();
         let mut internal_transmissions = HashMap::<_, (_, IndexSet<Field<CurrentNetwork>>)>::new();
         for (AnyTransmissionID(id), AnyTransmission(t)) in transmissions.iter().cloned() {
             internal_transmissions.entry(id).or_insert((t, Default::default())).1.insert(certificate_id);

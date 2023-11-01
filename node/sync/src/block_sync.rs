@@ -209,7 +209,7 @@ impl<N: Network> BlockSync<N> {
 
     /// Performs one iteration of the block sync.
     #[inline]
-    pub async fn try_block_sync<C: CommunicationService>(&self, communication: &C) -> Result<()> {
+    pub async fn try_block_sync<C: CommunicationService>(&self, communication: &C) {
         // Prepare the block requests, if any.
         // In the process, we update the state of `is_block_synced` for the sync module.
         let block_requests = self.prepare_block_requests();
@@ -218,27 +218,31 @@ impl<N: Network> BlockSync<N> {
         // Process the block requests.
         'outer: for (height, (hash, previous_hash, sync_ips)) in block_requests {
             // Insert the block request into the sync pool.
-            let result = self.insert_block_request(height, (hash, previous_hash, sync_ips.clone()));
-
-            // If the block request was inserted, send it to the peers.
-            if result.is_ok() {
-                // Construct the message.
-                let message = C::prepare_block_request(height, height + 1);
-                // Send the message to the peers.
-                for sync_ip in sync_ips {
-                    // If the send fails for any peer, remove the block request from the sync pool.
-                    if communication.send(sync_ip, message.clone()).await.is_none() {
-                        // Remove the entire block request.
-                        self.remove_block_request(height);
-                        // Break out of the loop.
-                        break 'outer;
-                    }
-                }
-                // Sleep for 10 milliseconds to avoid triggering spam detection.
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            if let Err(error) = self.insert_block_request(height, (hash, previous_hash, sync_ips.clone())) {
+                warn!("Block sync failed - {error}");
+                // Break out of the loop.
+                break 'outer;
             }
+
+            /* Send the block request to the peers */
+
+            // Construct the message.
+            let message = C::prepare_block_request(height, height + 1);
+            // Send the message to the peers.
+            for sync_ip in sync_ips {
+                let sender = communication.send(sync_ip, message.clone()).await;
+                // If the send fails for any peer, remove the block request from the sync pool.
+                if sender.is_none() {
+                    warn!("Failed to send block request to peer '{sync_ip}'");
+                    // Remove the entire block request from the sync pool.
+                    self.remove_block_request(height);
+                    // Break out of the loop.
+                    break 'outer;
+                }
+            }
+            // Sleep for 10 milliseconds to avoid triggering spam detection.
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
-        Ok(())
     }
 
     /// Processes the block response from the given peer IP.
@@ -394,8 +398,13 @@ impl<N: Network> BlockSync<N> {
 
     /// Updates the state of `is_block_synced` for the sync module.
     fn update_is_block_synced(&self, greatest_peer_height: u32, max_blocks_behind: u32) {
+        // Retrieve the latest block height.
+        let canon_height = self.canon.latest_block_height();
+        trace!(
+            "Updating is_block_synced: greatest_peer_height = {greatest_peer_height}, canon_height = {canon_height}"
+        );
         // Compute the number of blocks that we are behind by.
-        let num_blocks_behind = greatest_peer_height.saturating_sub(self.canon.latest_block_height());
+        let num_blocks_behind = greatest_peer_height.saturating_sub(canon_height);
         // Determine if the primary is synced.
         let is_synced = num_blocks_behind <= max_blocks_behind;
         // Update the sync status.

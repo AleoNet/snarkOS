@@ -31,6 +31,7 @@ run_installation() {
 #      rm -rf \$WORKSPACE
 #      git clone https://github.com/AleoHQ/snarkOS.git \$WORKSPACE
       cd \$WORKSPACE
+      git pull # If we are switching branches, this will find the new branch
       git checkout $BRANCH  # Checkout the specified branch
       git pull origin $BRANCH
     else

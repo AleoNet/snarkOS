@@ -17,7 +17,7 @@ use crate::{
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
     ProposedBatch,
     Transport,
-    MAX_BATCH_DELAY,
+    MAX_BATCH_DELAY_IN_MS,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_TRANSMISSIONS_PER_WORKER_PING,
     MAX_WORKERS,
@@ -383,7 +383,7 @@ impl<N: Network> Worker<N> {
             bail!("Unable to fetch transmission - failed to send request")
         }
         // Wait for the transmission to be fetched.
-        match timeout(Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
+        match timeout(Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
             // If the transmission was fetched, return it.
             Ok(result) => Ok((transmission_id, result?)),
             // If the transmission was not fetched, return an error.
@@ -476,7 +476,7 @@ mod tests {
             fn get_block(&self, height: u32) -> Result<Block<N>>;
             fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
             fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
-            fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
+            fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
             fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
