@@ -235,18 +235,19 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     /// Propagates the unconfirmed solution to all connected validators.
     async fn unconfirmed_solution(
         &self,
-        peer_ip: SocketAddr,
-        serialized: UnconfirmedSolution<N>,
-        solution: ProverSolution<N>,
+        _peer_ip: SocketAddr,
+        _serialized: UnconfirmedSolution<N>,
+        _solution: ProverSolution<N>,
     ) -> bool {
-        // Add the unconfirmed solution to the memory pool.
-        if let Err(error) = self.consensus.add_unconfirmed_solution(solution).await {
-            trace!("[UnconfirmedSolution] {error}");
-            return true; // Maintain the connection.
-        }
-        let message = Message::UnconfirmedSolution(serialized);
-        // Propagate the "UnconfirmedSolution" to the connected validators.
-        self.propagate_to_validators(message, &[peer_ip]);
+        // TODO (howardwu) - Attention, this is being disabled temporarily until transmission storage is updated.
+        // // Add the unconfirmed solution to the memory pool.
+        // if let Err(error) = self.consensus.add_unconfirmed_solution(solution).await {
+        //     trace!("[UnconfirmedSolution] {error}");
+        //     return true; // Maintain the connection.
+        // }
+        // let message = Message::UnconfirmedSolution(serialized);
+        // // Propagate the "UnconfirmedSolution" to the connected validators.
+        // self.propagate_to_validators(message, &[peer_ip]);
         true
     }
 

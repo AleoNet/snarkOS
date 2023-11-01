@@ -192,9 +192,10 @@ impl<N: Network> Consensus<N> {
             }
             // Add the solution to the memory pool.
             trace!("Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
-            if self.solutions_queue.lock().insert(solution_id, solution).is_some() {
-                bail!("Solution '{}' exists in the memory pool", fmt_id(solution_id));
-            }
+            // TODO (howardwu) - Attention, this is being disabled temporarily until transmission storage is updated.
+            // if self.solutions_queue.lock().insert(solution_id, solution).is_some() {
+            //     bail!("Solution '{}' exists in the memory pool", fmt_id(solution_id));
+            // }
         }
 
         // If the memory pool of this node is full, return early.
