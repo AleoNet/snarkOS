@@ -431,7 +431,7 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
         // Ditto if the batch had already been proposed.
-        assert!(round > 0);
+        ensure!(round > 0, "Round 0 cannot have transaction batches");
         if *lock_guard == round {
             warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
             return Ok(());
