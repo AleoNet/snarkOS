@@ -81,6 +81,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
+        dev_tx_interval: Option<Duration>,
     ) -> Result<Self> {
         // Initialize the signal handler.
         let signal_node = Self::handle_signals();
@@ -132,7 +133,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             shutdown: Default::default(),
         };
         // Initialize the transaction pool.
-        node.initialize_transaction_pool(dev)?;
+        node.initialize_transaction_pool(dev, dev_tx_interval)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
@@ -331,24 +332,29 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     // }
 
     /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self, dev: Option<u16>) -> Result<()> {
+    fn initialize_transaction_pool(&self, dev: Option<u16>, dev_tx_interval: Option<Duration>) -> Result<()> {
         use snarkvm::console::{
             program::{Identifier, Literal, ProgramID, Value},
             types::U64,
         };
         use std::str::FromStr;
 
+        // The default transaction generation interval (overrideable with --dev-tx-interval-ms)
+        const DEFAULT_INTERVAL: Duration = Duration::from_millis(500);
+
         // Initialize the locator.
         let locator = (ProgramID::from_str("credits.aleo")?, Identifier::from_str("transfer_public")?);
 
-        // Determine whether to start the loop.
-        match dev {
+        // Determine whether to start the loop and resolve generation interval.
+        let interval = match dev {
             // If the node is running in development mode, only generate if you are allowed.
             Some(dev) => {
-                // If the node is not the first node, do not start the loop.
-                if dev != 0 {
+                // If the node is not the first node and tx interval is not explicitly set, do not start the loop.
+                if dev != 0 && dev_tx_interval.is_none() {
                     return Ok(());
                 }
+
+                dev_tx_interval.unwrap_or(DEFAULT_INTERVAL)
             }
             None => {
                 // Retrieve the genesis committee.
@@ -362,9 +368,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 // If the node is not the first member, do not start the loop.
                 if self.address() != *first_member {
                     return Ok(());
-                }
+                };
+                DEFAULT_INTERVAL
             }
-        }
+        };
 
         let self_ = self.clone();
         self.spawn(async move {
@@ -373,7 +380,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
             // Start the transaction loop.
             loop {
-                tokio::time::sleep(Duration::from_millis(500)).await;
+                tokio::time::sleep(interval).await;
 
                 // Prepare the inputs.
                 let inputs = [Value::from(Literal::Address(self_.address())), Value::from(Literal::U64(U64::new(1)))];
@@ -486,6 +493,7 @@ mod tests {
             genesis,
             None,
             dev,
+            None,
         )
         .await
         .unwrap();

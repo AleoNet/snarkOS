@@ -25,7 +25,7 @@ use snarkvm::prelude::{
 };
 
 use anyhow::Result;
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 pub enum Node<N: Network> {
     /// A validator is a full node, capable of validating blocks.
@@ -48,10 +48,22 @@ impl<N: Network> Node<N> {
         genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
+        dev_tx_interval: Option<Duration>,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
-            Validator::new(node_ip, rest_ip, bft_ip, account, trusted_peers, trusted_validators, genesis, cdn, dev)
-                .await?,
+            Validator::new(
+                node_ip,
+                rest_ip,
+                bft_ip,
+                account,
+                trusted_peers,
+                trusted_validators,
+                genesis,
+                cdn,
+                dev,
+                dev_tx_interval,
+            )
+            .await?,
         )))
     }
 
