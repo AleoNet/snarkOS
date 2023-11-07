@@ -196,7 +196,7 @@ impl<N: Network> Storage<N> {
         // Check if storage needs to be garbage collected.
         if next_gc_round > current_gc_round {
             // Remove the GC round(s) from storage.
-            for gc_round in current_gc_round..next_gc_round {
+            for gc_round in current_gc_round..=next_gc_round {
                 // Iterate over the certificates for the GC round.
                 for certificate in self.get_certificates_for_round(gc_round).iter() {
                     // Remove the certificate from storage.
