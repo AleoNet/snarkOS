@@ -28,6 +28,7 @@ pub async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
         sample_genesis_block(),
         None, // No CDN.
         None,
+        vec![],
     )
     .await
     .expect("couldn't create client instance")
@@ -56,6 +57,7 @@ pub async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNet
         sample_genesis_block(), // Should load the current network's genesis block.
         None,                   // No CDN.
         None,
+        vec![],
     )
     .await
     .expect("couldn't create validator instance")

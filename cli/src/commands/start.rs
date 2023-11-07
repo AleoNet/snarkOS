@@ -93,6 +93,9 @@ pub struct Start {
     /// If the flag is set, the node will not initialize the REST server
     #[clap(long)]
     pub norest: bool,
+    /// If present, this will restrict the CORS origins for the REST server to the provided list.
+    #[clap(long)]
+    pub allowed_origins: Vec<String>,
 
     /// If the flag is set, the node will not render the display
     #[clap(long)]
@@ -394,6 +397,7 @@ impl Start {
             true => None,
             false => Some(self.rest),
         };
+        let allowed_origins = std::mem::take(&mut self.allowed_origins);
 
         // If the display is not enabled, render the welcome message.
         if self.nodisplay {
@@ -431,9 +435,9 @@ impl Start {
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, bft_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, bft_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev, allowed_origins).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
-            NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev, allowed_origins).await,
         }
     }
 

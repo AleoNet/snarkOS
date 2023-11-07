@@ -81,6 +81,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
+        allowed_origins: Vec<String>,
     ) -> Result<Self> {
         // Initialize the signal handler.
         let signal_node = Self::handle_signals();
@@ -129,7 +130,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Rest::start(rest_ip, None, ledger.clone(), Arc::new(node.clone()))?);
+            node.rest = Some(Rest::start(rest_ip, None, ledger.clone(), Arc::new(node.clone()), allowed_origins)?);
         }
         // Initialize the routing.
         node.initialize_routing().await;
