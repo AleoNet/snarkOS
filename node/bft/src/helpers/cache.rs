@@ -166,6 +166,9 @@ impl<N: Network> Cache<N> {
         let mut map_write = map.write();
         // Load the entry for the key, and increment the counter.
         let entry = map_write.entry(key).or_default();
+        if *entry == u16::MAX {
+            warn!("A cache counter was maxed out");
+        }
         *entry = entry.saturating_add(1);
         // Return the updated counter.
         *entry
@@ -176,6 +179,9 @@ impl<N: Network> Cache<N> {
         let mut map_write = map.write();
         // Load the entry for the key, and decrement the counter.
         let entry = map_write.entry(key).or_default();
+        if *entry == 0 {
+            warn!("A zeroed cache counter is being decremented");
+        }
         let value = entry.saturating_sub(1);
         // If the entry is 0, remove the entry.
         if *entry == 0 {
