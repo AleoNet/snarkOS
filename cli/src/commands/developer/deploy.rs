@@ -30,6 +30,7 @@ use snarkvm::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
+use snarkvm::prelude::ToBytes;
 use std::str::FromStr;
 
 /// Deploys an Aleo program.
@@ -132,6 +133,7 @@ impl Deploy {
             Transaction::from_deployment(owner, deployment, fee)?
         };
         println!("✅ Created deployment transaction for '{}'", self.program_id.to_string().bold());
+        println!("📦 The size of transaction is {} bytes", transaction.to_bytes_le()?.len());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(

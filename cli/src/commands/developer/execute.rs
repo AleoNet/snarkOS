@@ -24,6 +24,7 @@ use snarkvm::prelude::{
     PrivateKey,
     Process,
     ProgramID,
+    ToBytes,
     Value,
     VM,
 };
@@ -156,6 +157,7 @@ impl Execute {
                 .ok_or(anyhow!("The finalize cost computation overflowed for an execution"))?;
         }
 
+        println!("📦 The size of transaction is {} bytes", transaction.to_bytes_le()?.len());
         println!("📦 The base fee for this transaction is {} microcredits", base_fee);
         println!("📦 The total fee for this transaction is {} microcredits", base_fee.saturating_add(finalize_fee));
 
