@@ -231,8 +231,12 @@ impl<N: Network> Cache<N> {
         map: &RwLock<LinkedHashMap<K, OffsetDateTime>>,
         key: K,
     ) -> Option<OffsetDateTime> {
+        // Insert the key, and return the previous timestamp if it existed.
+        let previous_timestamp = map.write().insert(key, OffsetDateTime::now_utc());
+        // Refresh the cache.
         Self::refresh(map);
-        map.write().insert(key, OffsetDateTime::now_utc())
+        // Return the previous timestamp.
+        previous_timestamp
     }
 }
 
