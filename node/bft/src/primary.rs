@@ -392,29 +392,15 @@ impl<N: Network> Primary<N> {
                     trace!("Proposing - Skipping transmission '{}' - Already in ledger", fmt_id(id));
                     continue;
                 }
-                // Check the transmission is still valid.
-                match (id, transmission.clone()) {
-                    (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
-                        // Check if the solution is still valid.
-                        if let Err(e) = self.ledger.check_solution_basic(solution_id, solution).await {
-                            trace!("Proposing - Skipping solution '{}' - {e}", fmt_id(solution_id));
-                            continue;
-                        }
-                    }
-                    (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
-                        // Check if the transaction is still valid.
-                        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
-                            trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
-                            continue;
-                        }
-                        // Increment the number of transactions.
-                        num_transactions += 1;
-                    }
+
+                if let TransmissionID::Ratification = id {
                     // Note: We explicitly forbid including ratifications,
                     // as the protocol currently does not support ratifications.
-                    (TransmissionID::Ratification, Transmission::Ratification) => continue,
-                    // All other combinations are clearly invalid.
-                    _ => continue,
+                    continue;
+                }
+                if let TransmissionID::Transaction(_) = id {
+                    // Increment the number of transactions.
+                    num_transactions += 1;
                 }
                 // Insert the transmission into the map.
                 transmissions.insert(id, transmission);
