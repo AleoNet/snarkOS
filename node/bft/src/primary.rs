@@ -478,6 +478,7 @@ impl<N: Network> Primary<N> {
         if self.go_HAM.load(std::sync::atomic::Ordering::Relaxed) {
             let now = Instant::now();
             while now.elapsed().as_secs() < 60 {
+                println!("_____sending batch header");
                 self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
             }
         }
