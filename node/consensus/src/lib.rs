@@ -25,7 +25,7 @@ use snarkos_node_bft::{
         ConsensusReceiver,
         PrimaryReceiver,
         PrimarySender,
-        Storage as NarwhalStorage,
+        Storage as NarwhalStorage, Proposal,
     },
     spawn_blocking,
     BFT,
@@ -47,7 +47,7 @@ use colored::Colorize;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
+use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -71,6 +71,8 @@ pub struct Consensus<N: Network> {
     seen_transactions: Arc<Mutex<LruCache<N::TransactionID, ()>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// Whether or not we should be validating
+    validating: Arc<AtomicBool>,
 }
 
 impl<N: Network> Consensus<N> {
@@ -96,6 +98,7 @@ impl<N: Network> Consensus<N> {
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             handles: Default::default(),
+            validating: Arc::new(AtomicBool::new(true)),
         })
     }
 
@@ -171,6 +174,30 @@ impl<N: Network> Consensus<N> {
     /// Returns the unconfirmed transactions.
     pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
         self.bft.unconfirmed_transactions()
+    }
+}
+
+impl<N: Network> Consensus<N> {
+    /// Starts validation
+    pub fn start_validation(&self) -> bool {
+        self.validating.store(true, Ordering::Relaxed);
+        true
+    }
+
+    /// Stops validation
+    pub fn stop_validation(&self) -> bool {
+        self.validating.store(false, Ordering::Relaxed);
+        true
+    }
+
+    /// Get latest proposed batch
+    pub fn latest_proposed_batch(&self) -> Option<Proposal<N>> {
+        (*self.bft.primary().proposed_batch().read()).clone()
+    }
+
+    /// Get transactions queue
+    pub fn transactions_queue(&self) -> IndexMap<N::TransactionID, Transaction<N>> {
+        self.transactions_queue.lock().clone()
     }
 }
 
@@ -257,26 +284,29 @@ impl<N: Network> Consensus<N> {
         if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
-        // Retrieve the transactions.
-        let transactions = {
-            // Determine the available capacity.
-            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
-            // Acquire the lock on the queue.
-            let mut queue = self.transactions_queue.lock();
-            // Determine the number of transactions to send.
-            let num_transactions = queue.len().min(capacity);
-            // Drain the solutions from the queue.
-            queue.drain(..num_transactions).collect::<Vec<_>>()
-        };
-        // Iterate over the transactions.
-        for (_, transaction) in transactions.into_iter() {
-            let transaction_id = transaction.id();
-            trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
-            // Send the unconfirmed transaction to the primary.
-            if let Err(e) =
-                self.primary_sender().send_unconfirmed_transaction(transaction_id, Data::Object(transaction)).await
-            {
-                warn!("Failed to add unconfirmed transaction '{}' to the memory pool - {e}", fmt_id(transaction_id));
+        if self.validating.load(Ordering::Relaxed) {
+            // TODO: make sure that we can arbitrarily halt this, in dev mode, so that we can craft the mempool before starting validation again
+            // Retrieve the transactions.
+            let transactions = {
+                // Determine the available capacity.
+                let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+                // Acquire the lock on the queue.
+                let mut queue = self.transactions_queue.lock();
+                // Determine the number of transactions to send.
+                let num_transactions = queue.len().min(capacity);
+                // Drain the solutions from the queue.
+                queue.drain(..num_transactions).collect::<Vec<_>>()
+            };
+            // Iterate over the transactions.
+            for (_, transaction) in transactions.into_iter() {
+                let transaction_id = transaction.id();
+                trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
+                // Send the unconfirmed transaction to the primary.
+                if let Err(e) =
+                    self.primary_sender().send_unconfirmed_transaction(transaction_id, Data::Object(transaction)).await
+                {
+                    warn!("Failed to add unconfirmed transaction '{}' to the memory pool - {e}", fmt_id(transaction_id));
+                }
             }
         }
         Ok(())

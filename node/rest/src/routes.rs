@@ -218,6 +218,22 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         ErasedJson::pretty(rest.ledger.latest_state_root())
     }
 
+    // GET /testnet3/proposed_batch/latest
+    pub(crate) async fn get_proposed_batch_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.latest_proposed_batch())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
+    // GET /testnet3/transactions/queue
+    pub(crate) async fn get_transactions_queue(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.transactions_queue())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
     // GET /testnet3/committee/latest
     pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
@@ -297,5 +313,25 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         rest.routing.propagate(message, &[]);
 
         Ok(ErasedJson::pretty(tx_id))
+    }
+
+    // GET /testnet3/validation/start
+    pub(crate) async fn start_validation(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => {
+                Ok(ErasedJson::pretty(consensus.start_validation()))
+            }
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
+    // GET /testnet3/validation/stop
+    pub(crate) async fn stop_validation(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => {
+                Ok(ErasedJson::pretty(consensus.stop_validation()))
+            }
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
     }
 }

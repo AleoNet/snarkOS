@@ -76,9 +76,9 @@ impl Scan {
         if records.is_empty() {
             Ok("No records found".to_string())
         } else {
-            if private_key.is_none() {
-                println!("⚠️  This list may contain records that have already been spent.\n");
-            }
+            // if private_key.is_none() {
+            //     println!("⚠️  This list may contain records that have already been spent.\n");
+            // }
 
             Ok(serde_json::to_string_pretty(&records)?.replace("\\n", ""))
         }
@@ -129,9 +129,9 @@ impl Scan {
                 let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
                 // Print warning message if the user is attempting to scan the whole chain.
-                if start == 0 {
-                    println!("⚠️  Attention - Scanning the entire chain. This may take a while...\n");
-                }
+                // if start == 0 {
+                //     println!("⚠️  Attention - Scanning the entire chain. This may take a while...\n");
+                // }
 
                 Ok((start, latest_height))
             }
@@ -172,28 +172,28 @@ impl Scan {
         let total_blocks = end_height.saturating_sub(start_height);
 
         // Log the initial progress.
-        print!("\rScanning {total_blocks} blocks for records (0% complete)...");
-        stdout().flush()?;
+        // print!("\rScanning {total_blocks} blocks for records (0% complete)...");
+        // stdout().flush()?;
 
         // Scan the CDN first for records.
-        Self::scan_from_cdn(
-            start_height,
-            end_height,
-            cdn.to_string(),
-            endpoint.to_string(),
-            private_key,
-            *view_key,
-            address_x_coordinate,
-            records.clone(),
-        )?;
+        // Self::scan_from_cdn(
+        //     start_height,
+        //     end_height,
+        //     cdn.to_string(),
+        //     endpoint.to_string(),
+        //     private_key,
+        //     *view_key,
+        //     address_x_coordinate,
+        //     records.clone(),
+        // )?;
 
         // Scan the endpoint for the remaining blocks.
-        let mut request_start = end_height.saturating_sub(start_height % MAX_BLOCK_RANGE);
+        let mut request_start = start_height; //end_height.saturating_sub(start_height % MAX_BLOCK_RANGE);
         while request_start <= end_height {
             // Log the progress.
             let percentage_complete = request_start.saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
-            print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
-            stdout().flush()?;
+            // print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
+            // stdout().flush()?;
 
             let num_blocks_to_request =
                 std::cmp::min(MAX_BLOCK_RANGE, end_height.saturating_sub(request_start).saturating_add(1));
@@ -213,8 +213,8 @@ impl Scan {
         }
 
         // Print final complete message.
-        println!("\rScanning {total_blocks} blocks for records (100% complete)...   \n");
-        stdout().flush()?;
+        // println!("\rScanning {total_blocks} blocks for records (100% complete)...   \n");
+        // stdout().flush()?;
 
         let result = records.read().clone();
         Ok(result)
@@ -253,8 +253,8 @@ impl Scan {
                 // Log the progress.
                 let percentage_complete =
                     block.height().saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
-                print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
-                stdout().flush()?;
+                // print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
+                // stdout().flush()?;
 
                 // Scan the block for records.
                 Self::scan_block(&block, &endpoint, private_key, &view_key, &address_x_coordinate, records.clone())?;

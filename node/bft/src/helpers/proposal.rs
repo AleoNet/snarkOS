@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use serde::{Deserialize, Serialize, Serializer, Deserializer};
 use snarkvm::{
     console::{
         account::{Address, Signature},
@@ -22,12 +23,15 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, Itertools, Result},
+    prelude::{bail, ensure, error, Itertools, Result}, utilities::{ToBytesSerializer, FromBytesDeserializer, DeserializeExt, FromBytes, ToBytes},
 };
+use snarkvm::prelude::SerializeStruct;
 
 use indexmap::{IndexMap, IndexSet};
-use std::collections::HashSet;
+use std::{collections::HashSet, io::{Write, Read, Result as IoResult}, fmt::{Display, Formatter}, str::FromStr};
+use std::io::Error;
 
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Proposal<N: Network> {
     /// The proposed batch header.
     batch_header: BatchHeader<N>,
@@ -168,6 +172,197 @@ impl<N: Network> Proposal<N> {
         Ok((certificate, self.transmissions.clone()))
     }
 }
+
+impl<N: Network> Serialize for Proposal<N> {
+    #[inline]
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match serializer.is_human_readable() {
+            true => {
+                let mut proposal = serializer.serialize_struct("Proposal", 3)?;
+                proposal.serialize_field("batch_header", &self.batch_header)?;
+                proposal.serialize_field("transmissions", &self.transmissions)?;
+                proposal.serialize_field("signatures", &self.signatures)?;
+                proposal.end()
+            }
+            false => ToBytesSerializer::serialize_with_size_encoding(self, serializer),
+        }
+    }
+}
+
+impl<'de, N: Network> Deserialize<'de> for Proposal<N> {
+    #[inline]
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        match deserializer.is_human_readable() {
+            true => {
+                let mut proposal = serde_json::Value::deserialize(deserializer)?;
+                Ok(Proposal{
+                    batch_header: DeserializeExt::take_from_value::<D>(&mut proposal, "batch_header")?,
+                    transmissions: DeserializeExt::take_from_value::<D>(&mut proposal, "transmissions")?,
+                    signatures: DeserializeExt::take_from_value::<D>(&mut proposal, "signatures")?,
+                })
+            }
+            false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "proposal"),
+        }
+    }
+}
+
+impl<N: Network> FromBytes for Proposal<N> {
+    /// Reads the transmission from the buffer.
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Read the version.
+        let version = u8::read_le(&mut reader)?;
+        // Ensure the version is valid.
+        if version != 1 {
+            return Err(error("Invalid proposal version"));
+        }
+        // Read the batch_header
+        let batch_header = BatchHeader::<N>::read_le(&mut reader)?;
+        // Read the transmissions
+        let num_transmissions = u64::read_le(&mut reader)?;
+        let mut transmissions = IndexMap::new();
+        for _ in 0..num_transmissions {
+            let transmission = <(TransmissionID::<N>, Transmission::<N>)>::read_le(&mut reader)?;
+            transmissions.insert(transmission.0, transmission.1);
+        }
+        // Read the signatures
+        let num_signatures = u64::read_le(&mut reader)?;
+        let mut signatures = IndexSet::new();
+        for _ in 0..num_signatures {
+            signatures.insert(Signature::<N>::read_le(&mut reader)?);
+        }
+
+        Ok(Self { batch_header, transmissions, signatures })
+    }
+}
+
+impl<N: Network> ToBytes for Proposal<N> {
+    /// Writes the transmission to the buffer.
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Write the version.
+        1u8.write_le(&mut writer)?;
+        // Write the batch_header.
+        self.batch_header.write_le(&mut writer)?;
+        // Write the transmissions.
+        (self.transmissions.len() as u64).write_le(&mut writer)?;
+        for t in &self.transmissions {
+            t.write_le(&mut writer)?;
+        }
+        // Write the signatures.
+        (self.signatures.len() as u64).write_le(&mut writer)?;
+        for s in &self.signatures {
+            s.write_le(&mut writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl<N: Network> Display for Proposal<N> {
+    /// Displays the proposal as a JSON-string.
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", serde_json::to_string(self).map_err::<std::fmt::Error, _>(serde::ser::Error::custom)?)
+    }
+}
+
+impl<N: Network> FromStr for Proposal<N> {
+    type Err = Error;
+
+    /// Initializes the proposal from a JSON-string.
+    fn from_str(header: &str) -> Result<Self, Self::Err> {
+        Ok(serde_json::from_str(header)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use snarkvm::{utilities::TestRng, prelude::{Testnet3, narwhal::{batch_header::test_helpers::sample_batch_header, transmission::test_helpers::sample_transmissions}}};
+    type CurrentNetwork = Testnet3;
+    use std::{fmt::{Debug, Display}, str::FromStr};
+    use snarkvm::utilities::ToBytes;
+    use rand::Rng;
+
+    use super::*;
+
+    /// Returns a sample proposal, sampled at random.
+    pub fn sample_proposals(rng: &mut TestRng) -> Vec<Proposal<CurrentNetwork>> {
+        let mut sample = Vec::with_capacity(10);
+        for _ in 0..10 {
+            // let transmission_ids = sample_transmission_ids(rng);
+            let transmissions = sample_transmissions(rng);
+            let batch_header = sample_batch_header(rng);
+            let mut committee = IndexMap::new();
+            committee.insert(batch_header.author(), (1000000000000u64, true));
+            committee.insert(Address::<CurrentNetwork>::new(rng.gen()), (1000000000000u64, true));
+            committee.insert(Address::<CurrentNetwork>::new(rng.gen()), (1000000000000u64, true));
+            committee.insert(Address::<CurrentNetwork>::new(rng.gen()), (1000000000000u64, true));
+            let transmissions: IndexMap<_,_> = batch_header.transmission_ids().iter().copied().zip_eq(transmissions).collect();
+            let proposal = Proposal::new(
+                Committee::<CurrentNetwork>::new(1, committee).unwrap(),
+                batch_header,
+                transmissions,
+            ).unwrap();
+            sample.push(proposal);
+        }
+        sample
+    }
+
+    #[test]
+    fn test_bytes() {
+        let rng = &mut TestRng::default();
+
+        for expected in sample_proposals(rng) {
+            // Check the byte representation.
+            let expected_bytes = expected.to_bytes_le().unwrap();
+            assert_eq!(expected, Proposal::read_le(&expected_bytes[..]).unwrap());
+        }
+    }
+
+    fn check_serde_json<
+        T: Serialize + for<'a> Deserialize<'a> + Debug + Display + PartialEq + Eq + FromStr + ToBytes + FromBytes,
+    >(
+        expected: T,
+    ) {
+        // Serialize
+        let expected_string = &expected.to_string();
+        let candidate_string = serde_json::to_string(&expected).unwrap();
+        assert_eq!(expected_string, &serde_json::Value::from_str(&candidate_string).unwrap().to_string());
+
+        // Deserialize
+        assert_eq!(expected, T::from_str(expected_string).unwrap_or_else(|_| panic!("FromStr: {expected_string}")));
+        assert_eq!(expected, serde_json::from_str(&candidate_string).unwrap());
+    }
+
+    fn check_bincode<T: Serialize + for<'a> Deserialize<'a> + Debug + PartialEq + Eq + ToBytes + FromBytes>(
+        expected: T,
+    ) {
+        // Serialize
+        let expected_bytes = expected.to_bytes_le().unwrap();
+        let expected_bytes_with_size_encoding = bincode::serialize(&expected).unwrap();
+        assert_eq!(&expected_bytes[..], &expected_bytes_with_size_encoding[8..]);
+
+        // Deserialize
+        assert_eq!(expected, T::read_le(&expected_bytes[..]).unwrap());
+        assert_eq!(expected, bincode::deserialize(&expected_bytes_with_size_encoding[..]).unwrap());
+    }
+
+    #[test]
+    fn test_serde_json() {
+        let rng = &mut TestRng::default();
+
+        for expected in sample_proposals(rng) {
+            check_serde_json(expected);
+        }
+    }
+
+    #[test]
+    fn test_bincode() {
+        let rng = &mut TestRng::default();
+
+        for expected in sample_proposals(rng) {
+            check_bincode(expected);
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod prop_tests {

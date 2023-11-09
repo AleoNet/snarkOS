@@ -124,6 +124,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/latest/committee", get(Self::latest_committee))
             // ------------------------------------------------------
 
+            // GET ../validation/..
+            .route("/testnet3/validation/start", get(Self::start_validation))
+            .route("/testnet3/validation/stop", get(Self::stop_validation))
+
             // GET ../block/..
             .route("/testnet3/block/height/latest", get(Self::get_block_height_latest))
             .route("/testnet3/block/hash/latest", get(Self::get_block_hash_latest))
@@ -162,6 +166,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
             .route("/testnet3/stateRoot/latest", get(Self::get_state_root_latest))
             .route("/testnet3/committee/latest", get(Self::get_committee_latest))
+            .route("/testnet3/proposed_batch/latest", get(Self::get_proposed_batch_latest))
+            .route("/testnet3/transactions/queue", get(Self::get_transactions_queue))
 
             // Pass in `Rest` to make things convenient.
             .with_state(self.clone())
