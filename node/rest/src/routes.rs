@@ -334,4 +334,24 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             None => Err(RestError("Route isn't available for this node type".to_string())),
         }
     }
+
+    // GET /testnet3/ham/start
+    pub(crate) async fn go_ham(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => {
+                Ok(ErasedJson::pretty(consensus.go_ham()))
+            }
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
+    // GET /testnet3/ham/stop
+    pub(crate) async fn release_ham(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => {
+                Ok(ErasedJson::pretty(consensus.release_ham()))
+            }
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
 }

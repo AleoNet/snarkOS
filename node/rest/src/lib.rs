@@ -127,8 +127,9 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             // GET ../validation/..
             .route("/testnet3/validation/start", get(Self::start_validation))
             .route("/testnet3/validation/stop", get(Self::stop_validation))
+            .route("/testnet3/ham/start", get(Self::go_ham))
+            .route("/testnet3/ham/stop", get(Self::release_ham))
 
-            // GET ../block/..
             .route("/testnet3/block/height/latest", get(Self::get_block_height_latest))
             .route("/testnet3/block/hash/latest", get(Self::get_block_hash_latest))
             .route("/testnet3/block/latest", get(Self::get_block_latest))

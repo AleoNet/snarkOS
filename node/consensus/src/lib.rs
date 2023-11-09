@@ -190,6 +190,16 @@ impl<N: Network> Consensus<N> {
         true
     }
 
+    /// go ham
+    pub fn go_ham(&self) {
+        self.bft.go_ham();
+    }
+
+    /// release ham
+    pub fn release_ham(&self) {
+        self.bft.release_ham();
+    }
+
     /// Get latest proposed batch
     pub fn latest_proposed_batch(&self) -> Option<Proposal<N>> {
         (*self.bft.primary().proposed_batch().read()).clone()

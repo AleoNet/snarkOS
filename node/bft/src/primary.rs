@@ -63,8 +63,8 @@ use std::{
     collections::{HashMap, HashSet},
     future::Future,
     net::SocketAddr,
-    sync::Arc,
-    time::Duration,
+    sync::{Arc, atomic::AtomicBool},
+    time::{Duration, Instant},
 };
 use tokio::{
     sync::{Mutex as TMutex, OnceCell},
@@ -96,6 +96,8 @@ pub struct Primary<N: Network> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The lock for propose_batch.
     propose_lock: Arc<TMutex<u64>>,
+    /// Whether we go HAM and SPAM.
+    go_HAM: Arc<AtomicBool>,
 }
 
 impl<N: Network> Primary<N> {
@@ -124,6 +126,7 @@ impl<N: Network> Primary<N> {
             signed_proposals: Default::default(),
             handles: Default::default(),
             propose_lock: Default::default(),
+            go_HAM: Default::default(),
         })
     }
 
@@ -214,6 +217,16 @@ impl<N: Network> Primary<N> {
     /// Returns the batch proposal of our primary, if one currently exists.
     pub fn proposed_batch(&self) -> &Arc<ProposedBatch<N>> {
         &self.proposed_batch
+    }
+
+    /// go ham
+    pub fn go_ham(&self) {
+        self.go_HAM.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// release ham
+    pub fn release_ham(&self) {
+        self.go_HAM.store(false, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
@@ -461,7 +474,13 @@ impl<N: Network> Primary<N> {
         let proposal =
             Proposal::new(self.ledger.get_previous_committee_for_round(round)?, batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
-        self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
+        self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
+        if self.go_HAM.load(std::sync::atomic::Ordering::Relaxed) {
+            let now = Instant::now();
+            while now.elapsed().as_secs() < 60 {
+                self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
+            }
+        }
         // Set the proposed batch.
         *self.proposed_batch.write() = Some(proposal);
         Ok(())

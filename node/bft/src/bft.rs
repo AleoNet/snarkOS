@@ -118,6 +118,16 @@ impl<N: Network> BFT<N> {
         Ok(())
     }
 
+    /// go ham
+    pub fn go_ham(&self) {
+        self.primary.go_ham();
+    }
+
+    /// release ham
+    pub fn release_ham(&self) {
+        self.primary.release_ham();
+    }
+
     /// Returns the primary.
     pub const fn primary(&self) -> &Primary<N> {
         &self.primary
