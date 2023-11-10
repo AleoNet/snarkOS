@@ -43,6 +43,8 @@ use snarkos_node_bft_events::{
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
+    is_bogon_ip,
+    is_unspecified_ip,
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
     Connection,
@@ -260,6 +262,11 @@ impl<N: Network> Gateway<N> {
     pub fn is_local_ip(&self, ip: SocketAddr) -> bool {
         ip == self.local_ip()
             || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
+    }
+
+    /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
+    pub fn is_valid_peer_ip(&self, ip: SocketAddr) -> bool {
+        !self.is_local_ip(ip) || !is_bogon_ip(ip.ip()) || !is_unspecified_ip(ip.ip())
     }
 
     /// Returns the resolver.
@@ -666,7 +673,8 @@ impl<N: Network> Gateway<N> {
             }
             Event::ValidatorsRequest(_) => {
                 // Retrieve the connected peers.
-                let mut connected_peers: Vec<_> = self.connected_peers.read().iter().cloned().collect();
+                let mut connected_peers: Vec<_> =
+                    self.connected_peers.read().iter().copied().filter(|ip| self.is_valid_peer_ip(*ip)).collect();
                 // Shuffle the connected peers.
                 connected_peers.shuffle(&mut rand::thread_rng());
 
@@ -706,7 +714,7 @@ impl<N: Network> Gateway<N> {
                     tokio::spawn(async move {
                         for (validator_ip, validator_address) in validators {
                             // Ensure the validator IP is not this node.
-                            if self_.is_local_ip(validator_ip) {
+                            if self_.is_valid_peer_ip(validator_ip) {
                                 continue;
                             }
                             // Ensure the validator address is not this node.

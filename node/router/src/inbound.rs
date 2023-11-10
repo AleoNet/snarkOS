@@ -27,7 +27,7 @@ use crate::{
     Outbound,
     Peer,
 };
-use snarkos_node_tcp::{protocols::Reading};
+use snarkos_node_tcp::protocols::Reading;
 use snarkvm::prelude::{
     block::{Block, Header, Transaction},
     coinbase::{EpochChallenge, ProverSolution},
@@ -265,11 +265,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// Handles a `PeerResponse` message.
     fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
         // Filter out bogon and unspecified addresses.
-        let peers = peers
-            .iter()
-            .copied()
-            .filter(|ip| self.router().is_valid_peer_ip(ip))
-            .collect::<Vec<_>>();
+        let peers = peers.iter().copied().filter(|ip| self.router().is_valid_peer_ip(ip)).collect::<Vec<_>>();
         // Adds the given peer IPs to the list of candidate peers.
         self.router().insert_candidate_peers(&peers);
         true

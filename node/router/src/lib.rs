@@ -41,7 +41,7 @@ pub use routing::*;
 
 use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_tcp::{Config, is_bogon_ip, is_unspecified_ip, Tcp};
+use snarkos_node_tcp::{is_bogon_ip, is_unspecified_ip, Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
