@@ -57,8 +57,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             None => bail!("Unable to resolve the (ambiguous) peer address '{peer_addr}'"),
         };
 
-        // Drop the peer, if they have sent more than MESSAGE_LIMIT messages
-        // in the last MESSAGE_LIMIT_TIME_FRAME_IN_SECS seconds.
+        // Drop the peer, if they have sent more than `MESSAGE_LIMIT` messages
+        // in the last `MESSAGE_LIMIT_TIME_FRAME_IN_SECS` seconds.
         let num_messages = self.router().cache.insert_inbound_message(peer_ip, Self::MESSAGE_LIMIT_TIME_FRAME_IN_SECS);
         if num_messages > Self::MESSAGE_LIMIT {
             bail!("Dropping '{peer_ip}' for spamming messages (num_messages = {num_messages})")
