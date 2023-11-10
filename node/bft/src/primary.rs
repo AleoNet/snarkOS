@@ -39,7 +39,7 @@ use crate::{
     WORKER_PING_IN_MS,
 };
 use snarkos_account::Account;
-use snarkos_node_bft_events::PrimaryPing;
+use snarkos_node_bft_events::{PrimaryPing, CertificateResponse};
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::{
@@ -475,13 +475,6 @@ impl<N: Network> Primary<N> {
             Proposal::new(self.ledger.get_previous_committee_for_round(round)?, batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
-        if self.go_HAM.load(std::sync::atomic::Ordering::Relaxed) {
-            let now = Instant::now();
-            while now.elapsed().as_secs() < 60 {
-                println!("_____sending batch header");
-                self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
-            }
-        }
         // Set the proposed batch.
         *self.proposed_batch.write() = Some(proposal);
         Ok(())
@@ -1204,6 +1197,20 @@ impl<N: Network> Primary<N> {
 
     /// Stores the certified batch and broadcasts it to all validators, returning the certificate.
     async fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>, committee: &Committee<N>) -> Result<()> {
+        if self.go_HAM.load(std::sync::atomic::Ordering::Relaxed) {
+            // let proposed_batch = self.proposed_batch();
+            let round = self.current_round();
+            let committee = self.ledger.get_previous_committee_for_round(round).unwrap();
+            let now = Instant::now();
+            // let proposal = proposed_batch.read().as_ref().unwrap().clone();
+            let batch_header = proposal.batch_header(); 
+            let certificate = proposal.to_certificate(&committee).unwrap().0;
+            while now.elapsed().as_secs() < 60*3 {
+                println!("_____sending batch header");
+                self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
+                self.gateway.broadcast(Event::CertificateResponse(CertificateResponse { certificate: certificate.clone() }));
+            }
+        }
         // Create the batch certificate and transmissions.
         let (certificate, transmissions) = proposal.to_certificate(committee)?;
         // Convert the transmissions into a HashMap.
