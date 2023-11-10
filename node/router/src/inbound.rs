@@ -44,6 +44,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
     const PING_SLEEP_IN_SECS: u64 = 20; // 20 seconds
+    /// The time frame to enforce the `MESSAGE_LIMIT`.
+    const MESSAGE_LIMIT_TIME_FRAME_IN_SECS: i64 = 5;
+    /// The maximum number of messages accepted within `MESSAGE_LIMIT_TIME_FRAME_IN_SECS`.
+    const MESSAGE_LIMIT: usize = 500;
 
     /// Handles the inbound message from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, message: Message<N>) -> Result<()> {
@@ -53,9 +57,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             None => bail!("Unable to resolve the (ambiguous) peer address '{peer_addr}'"),
         };
 
-        // Drop the peer, if they have sent more than 500 messages in the last 5 seconds.
-        let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
-        if num_messages >= 500 {
+        // Drop the peer, if they have sent more than `MESSAGE_LIMIT` messages
+        // in the last `MESSAGE_LIMIT_TIME_FRAME_IN_SECS` seconds.
+        let num_messages = self.router().cache.insert_inbound_message(peer_ip, Self::MESSAGE_LIMIT_TIME_FRAME_IN_SECS);
+        if num_messages > Self::MESSAGE_LIMIT {
             bail!("Dropping '{peer_ip}' for spamming messages (num_messages = {num_messages})")
         }
 
