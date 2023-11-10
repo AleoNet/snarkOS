@@ -1210,7 +1210,7 @@ impl<N: Network> Primary<N> {
                 println!("_____sending batch header");
                 self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
                 self.gateway.broadcast(Event::CertificateResponse(CertificateResponse { certificate: certificate.clone() }));
-                self.gateway.broadcast(Event::BlockRequest(BlockRequest::new(0, latest_height)));
+                self.gateway.broadcast(Event::BlockRequest(BlockRequest::new(0, latest_height.min(10))));
                 self.gateway.broadcast(Event::CertificateRequest(CertificateRequest::new(certificate.id())));
             }
         }
