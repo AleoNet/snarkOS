@@ -39,7 +39,7 @@ use crate::{
     WORKER_PING_IN_MS,
 };
 use snarkos_account::Account;
-use snarkos_node_bft_events::{PrimaryPing, CertificateResponse};
+use snarkos_node_bft_events::{PrimaryPing, CertificateResponse, BlockRequest, CertificateRequest};
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::{
@@ -1200,6 +1200,7 @@ impl<N: Network> Primary<N> {
         if self.go_HAM.load(std::sync::atomic::Ordering::Relaxed) {
             // let proposed_batch = self.proposed_batch();
             let round = self.current_round();
+            let latest_height = self.ledger.latest_block_height();
             let committee = self.ledger.get_previous_committee_for_round(round).unwrap();
             let now = Instant::now();
             // let proposal = proposed_batch.read().as_ref().unwrap().clone();
@@ -1209,6 +1210,8 @@ impl<N: Network> Primary<N> {
                 println!("_____sending batch header");
                 self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
                 self.gateway.broadcast(Event::CertificateResponse(CertificateResponse { certificate: certificate.clone() }));
+                self.gateway.broadcast(Event::BlockRequest(BlockRequest::new(0, latest_height)));
+                self.gateway.broadcast(Event::CertificateRequest(CertificateRequest::new(certificate.id())));
             }
         }
         // Create the batch certificate and transmissions.
