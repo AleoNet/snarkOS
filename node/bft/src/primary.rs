@@ -1199,19 +1199,38 @@ impl<N: Network> Primary<N> {
     async fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>, committee: &Committee<N>) -> Result<()> {
         if self.go_HAM.load(std::sync::atomic::Ordering::Relaxed) {
             // let proposed_batch = self.proposed_batch();
-            let round = self.current_round();
-            let latest_height = self.ledger.latest_block_height();
-            let committee = self.ledger.get_previous_committee_for_round(round).unwrap();
-            let now = Instant::now();
             // let proposal = proposed_batch.read().as_ref().unwrap().clone();
-            let batch_header = proposal.batch_header(); 
-            let certificate = proposal.to_certificate(&committee).unwrap().0;
-            while now.elapsed().as_secs() < 60*3 {
-                println!("_____sending batch header");
-                self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
-                self.gateway.broadcast(Event::CertificateResponse(CertificateResponse { certificate: certificate.clone() }));
-                self.gateway.broadcast(Event::BlockRequest(BlockRequest::new(0, latest_height.min(10))));
-                self.gateway.broadcast(Event::CertificateRequest(CertificateRequest::new(certificate.id())));
+            // let latest_height = self.ledger.latest_block_height();
+            let round = self.current_round();
+            let committee = self.ledger.get_previous_committee_for_round(round).unwrap();
+            let hundredmillis = std::time::Duration::from_millis(100);
+            let now = time::Instant::now();
+            let mut messages_sent = 0;
+            while self.go_HAM.load(std::sync::atomic::Ordering::Relaxed) {
+                println!("_____requesting blocks");
+                let connected_peers = self.gateway.connected_peers.read().clone();
+                let batch_header = proposal.batch_header().clone(); 
+                let self_ = self.clone();
+                if let Some(peer_ip) = connected_peers.first() {
+                    let certificate = proposal.to_certificate(&committee).unwrap().0.clone();
+                    let peer_ip = peer_ip.clone();
+                    tokio::spawn(async move {
+                        self_.gateway.send(peer_ip, Event::BatchPropose(batch_header.into())).await;
+                        self_.gateway.send(peer_ip, Event::CertificateRequest(CertificateRequest::new(certificate.id()))).await;
+                        self_.gateway.send(peer_ip, Event::CertificateResponse(CertificateResponse { certificate })).await;
+                        self_.gateway.send(peer_ip, Event::BlockRequest(BlockRequest::new(1, 2))).await; // MAXIMUM_NUMBER_OF_BLOCKS=1
+                    });
+                }
+                // self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
+                // self.gateway.broadcast(Event::CertificateResponse(CertificateResponse { certificate: certificate.clone() }));
+                // self.gateway.broadcast(Event::BlockRequest(BlockRequest::new(0, 1))); // MAXIMUM_NUMBER_OF_BLOCKS=1
+                // self.gateway.broadcast(Event::CertificateRequest(CertificateRequest::new(certificate.id())));
+                messages_sent += 4; 
+
+                if messages_sent / 1+now.elapsed().whole_seconds() > (committee.members().len() as i64)*100*250/(2*10) { // every second, we are allowed to send at most <committee_size>*100*250/2 messages. We add a factor 10 leeway
+                    std::thread::sleep(hundredmillis);
+                }
+
             }
         }
         // Create the batch certificate and transmissions.

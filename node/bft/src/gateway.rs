@@ -108,7 +108,7 @@ pub struct Gateway<N: Network> {
     /// The set of trusted validators.
     trusted_validators: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
-    connected_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
+    pub connected_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
     /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
