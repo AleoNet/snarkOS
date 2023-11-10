@@ -27,7 +27,7 @@ use crate::{
     Outbound,
     Peer,
 };
-use snarkos_node_tcp::{is_bogon_address, protocols::Reading};
+use snarkos_node_tcp::{protocols::Reading};
 use snarkvm::prelude::{
     block::{Block, Header, Transaction},
     coinbase::{EpochChallenge, ProverSolution},
@@ -256,7 +256,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Retrieve the connected peers.
         let peers = self.router().connected_peers();
         // Filter out bogon addresses.
-        let peers = peers.into_iter().filter(|addr| !is_bogon_address(addr.ip())).collect();
+        let peers = peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).collect();
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
         true
@@ -264,8 +264,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
     /// Handles a `PeerResponse` message.
     fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
-        // Filter out bogon addresses.
-        let peers = peers.iter().copied().filter(|addr| !is_bogon_address(addr.ip())).collect::<Vec<_>>();
+        // Filter out bogon and unspecified addresses.
+        let peers = peers
+            .iter()
+            .copied()
+            .filter(|ip| self.router().is_valid_peer_ip(ip))
+            .collect::<Vec<_>>();
         // Adds the given peer IPs to the list of candidate peers.
         self.router().insert_candidate_peers(&peers);
         true

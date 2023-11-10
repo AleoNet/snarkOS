@@ -41,7 +41,7 @@ pub use routing::*;
 
 use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_tcp::{Config, Tcp};
+use snarkos_node_tcp::{Config, is_bogon_ip, is_unspecified_ip, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
@@ -213,6 +213,11 @@ impl<N: Network> Router<N> {
     pub fn is_local_ip(&self, ip: &SocketAddr) -> bool {
         *ip == self.local_ip()
             || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
+    }
+
+    /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
+    pub fn is_valid_peer_ip(&self, ip: &SocketAddr) -> bool {
+        !self.is_local_ip(ip) || !is_bogon_ip(ip.ip()) || !is_unspecified_ip(ip.ip())
     }
 
     /// Returns the node type.
