@@ -39,7 +39,7 @@ pub struct Cache<N: Network> {
     /// The ordered timestamp map of peer IPs and their cache hits on transmission requests.
     seen_outbound_transmissions: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
     /// The map of IPs to the number of validators requests.
-    seen_outbound_validators_requests: RwLock<HashMap<SocketAddr, u16>>,
+    seen_outbound_validators_requests: RwLock<HashMap<SocketAddr, u32>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -111,12 +111,12 @@ impl<N: Network> Cache<N> {
     }
 
     /// Increment the IP's number of validators requests, returning the updated number of validators requests.
-    pub fn increment_outbound_validators_requests(&self, peer_ip: SocketAddr) -> u16 {
+    pub fn increment_outbound_validators_requests(&self, peer_ip: SocketAddr) -> u32 {
         Self::increment_counter(&self.seen_outbound_validators_requests, peer_ip)
     }
 
     /// Decrement the IP's number of validators requests, returning the updated number of validators requests.
-    pub fn decrement_outbound_validators_requests(&self, peer_ip: SocketAddr) -> u16 {
+    pub fn decrement_outbound_validators_requests(&self, peer_ip: SocketAddr) -> u32 {
         Self::decrement_counter(&self.seen_outbound_validators_requests, peer_ip)
     }
 }
@@ -162,7 +162,7 @@ impl<N: Network> Cache<N> {
     }
 
     /// Increments the key's counter in the map, returning the updated counter.
-    fn increment_counter<K: Hash + Eq>(map: &RwLock<HashMap<K, u16>>, key: K) -> u16 {
+    fn increment_counter<K: Hash + Eq>(map: &RwLock<HashMap<K, u32>>, key: K) -> u32 {
         let mut map_write = map.write();
         // Load the entry for the key, and increment the counter.
         let entry = map_write.entry(key).or_default();
@@ -172,7 +172,7 @@ impl<N: Network> Cache<N> {
     }
 
     /// Decrements the key's counter in the map, returning the updated counter.
-    fn decrement_counter<K: Copy + Hash + Eq>(map: &RwLock<HashMap<K, u16>>, key: K) -> u16 {
+    fn decrement_counter<K: Copy + Hash + Eq>(map: &RwLock<HashMap<K, u32>>, key: K) -> u32 {
         let mut map_write = map.write();
         // Load the entry for the key, and decrement the counter.
         let entry = map_write.entry(key).or_default();
