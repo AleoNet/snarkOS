@@ -266,7 +266,7 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
     pub fn is_valid_peer_ip(&self, ip: SocketAddr) -> bool {
-        !self.is_local_ip(ip) || !is_bogon_ip(ip.ip()) || !is_unspecified_ip(ip.ip())
+        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_ip(ip.ip())
     }
 
     /// Returns the resolver.
@@ -713,8 +713,8 @@ impl<N: Network> Gateway<N> {
                     let self_ = self.clone();
                     tokio::spawn(async move {
                         for (validator_ip, validator_address) in validators {
-                            // Ensure the validator IP is not this node.
-                            if self_.is_valid_peer_ip(validator_ip) {
+                            // Ensure the validator IP is not this node and is well-formed.
+                            if !self_.is_valid_peer_ip(validator_ip) {
                                 continue;
                             }
                             // Ensure the validator address is not this node.
