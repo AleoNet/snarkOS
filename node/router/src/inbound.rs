@@ -255,7 +255,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn peer_request(&self, peer_ip: SocketAddr) -> bool {
         // Retrieve the connected peers.
         let peers = self.router().connected_peers();
-        // Filter out bogon addresses.
+        // Filter out invalid addresses.
         let peers = peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).collect();
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
