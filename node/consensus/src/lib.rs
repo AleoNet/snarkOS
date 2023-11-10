@@ -200,13 +200,13 @@ impl<N: Network> Consensus<N> {
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > N::MAX_PROVER_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         // Retrieve the solutions.
         let solutions = {
             // Determine the available capacity.
-            let capacity = N::MAX_PROVER_SOLUTIONS.saturating_sub(num_unconfirmed);
+            let capacity = N::MAX_SOLUTIONS.saturating_sub(num_unconfirmed);
             // Acquire the lock on the queue.
             let mut queue = self.solutions_queue.lock();
             // Determine the number of solutions to send.
