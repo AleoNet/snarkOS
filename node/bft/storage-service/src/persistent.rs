@@ -42,8 +42,16 @@ pub struct BFTPersistentStorage<N: Network> {
 
 impl<N: Network> BFTPersistentStorage<N> {
     /// Initializes a new BFT persistent storage service.
-    pub fn new(dev: Option<u16>) -> Result<Self> {
+    pub fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self { transmissions: internal::RocksDB::open_map(N::ID, dev, MapID::BFT(BFTMap::Transmissions))? })
+    }
+
+    /// Initializes a new BFT persistent storage service.
+    #[cfg(any(test, feature = "test"))]
+    pub fn open_testing(temp_dir: std::path::PathBuf, dev: Option<u16>) -> Result<Self> {
+        Ok(Self {
+            transmissions: internal::RocksDB::open_map_testing(temp_dir, dev, MapID::BFT(BFTMap::Transmissions))?,
+        })
     }
 }
 
