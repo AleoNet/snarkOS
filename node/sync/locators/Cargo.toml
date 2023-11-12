@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-sync-locators"
-version = "2.1.7"
+version = "2.2.4"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Locators to synchronize a decentralized operating system"
 homepage = "https://aleo.org"
@@ -24,7 +24,7 @@ test = [ ]
 version = "1.0"
 
 [dependencies.indexmap]
-version = "2.0"
+version = "2.1"
 features = [ "serde", "rayon" ]
 
 [dependencies.serde]

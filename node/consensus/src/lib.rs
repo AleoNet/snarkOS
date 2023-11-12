@@ -18,7 +18,7 @@
 extern crate tracing;
 
 use snarkos_account::Account;
-use snarkos_node_narwhal::{
+use snarkos_node_bft::{
     helpers::{
         fmt_id,
         init_consensus_channels,
@@ -32,7 +32,7 @@ use snarkos_node_narwhal::{
     MAX_GC_ROUNDS,
     MAX_TRANSMISSIONS_PER_BATCH,
 };
-use snarkos_node_narwhal_ledger_service::LedgerService;
+use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     ledger::{
         block::Transaction,
@@ -43,6 +43,7 @@ use snarkvm::{
 };
 
 use anyhow::Result;
+use colored::Colorize;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::Mutex;
@@ -187,24 +188,25 @@ impl<N: Network> Consensus<N> {
             }
             // Check if the solution already exists in the ledger.
             if self.ledger.contains_transmission(&TransmissionID::from(solution_id))? {
-                bail!("Solution '{}' already exists in the ledger", fmt_id(solution_id));
+                bail!("Solution '{}' exists in the ledger {}", fmt_id(solution_id), "(skipping)".dimmed());
             }
             // Add the solution to the memory pool.
             trace!("Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
-            if self.solutions_queue.lock().insert(solution_id, solution).is_some() {
-                bail!("Solution '{}' already exists in the memory pool", fmt_id(solution_id));
-            }
+            // TODO (howardwu) - Attention, this is being disabled temporarily until transmission storage is updated.
+            // if self.solutions_queue.lock().insert(solution_id, solution).is_some() {
+            //     bail!("Solution '{}' exists in the memory pool", fmt_id(solution_id));
+            // }
         }
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > N::MAX_PROVER_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         // Retrieve the solutions.
         let solutions = {
             // Determine the available capacity.
-            let capacity = N::MAX_PROVER_SOLUTIONS.saturating_sub(num_unconfirmed);
+            let capacity = N::MAX_SOLUTIONS.saturating_sub(num_unconfirmed);
             // Acquire the lock on the queue.
             let mut queue = self.solutions_queue.lock();
             // Determine the number of solutions to send.
@@ -230,6 +232,10 @@ impl<N: Network> Consensus<N> {
         {
             let transaction_id = transaction.id();
 
+            // Check that the transaction is not a fee transaction.
+            if transaction.is_fee() {
+                bail!("Transaction '{}' is a fee transaction {}", fmt_id(transaction_id), "(skipping)".dimmed());
+            }
             // Check if the transaction was recently seen.
             if self.seen_transactions.lock().put(transaction_id, ()).is_some() {
                 // If the transaction was recently seen, return early.
@@ -237,12 +243,12 @@ impl<N: Network> Consensus<N> {
             }
             // Check if the transaction already exists in the ledger.
             if self.ledger.contains_transmission(&TransmissionID::from(&transaction_id))? {
-                bail!("Transaction '{}' already exists in the ledger", fmt_id(transaction_id));
+                bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
             // Add the transaction to the memory pool.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
             if self.transactions_queue.lock().insert(transaction_id, transaction).is_some() {
-                bail!("Transaction '{}' already exists in the memory pool", fmt_id(transaction_id));
+                bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
             }
         }
 

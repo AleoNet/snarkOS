@@ -48,7 +48,7 @@ pub struct Cache<N: Network> {
     /// The map of peer IPs to their block requests.
     seen_outbound_block_requests: RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>,
     /// The map of peer IPs to the number of puzzle requests.
-    seen_outbound_puzzle_requests: RwLock<IndexMap<SocketAddr, u16>>,
+    seen_outbound_puzzle_requests: RwLock<IndexMap<SocketAddr, u32>>,
     /// The map of solution commitments to their last seen timestamp.
     seen_outbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
@@ -140,12 +140,12 @@ impl<N: Network> Cache<N> {
     }
 
     /// Increment the peer IP's number of puzzle requests, returning the updated number of puzzle requests.
-    pub fn increment_outbound_puzzle_requests(&self, peer_ip: SocketAddr) -> u16 {
+    pub fn increment_outbound_puzzle_requests(&self, peer_ip: SocketAddr) -> u32 {
         Self::increment_counter(&self.seen_outbound_puzzle_requests, peer_ip)
     }
 
     /// Decrement the peer IP's number of puzzle requests, returning the updated number of puzzle requests.
-    pub fn decrement_outbound_puzzle_requests(&self, peer_ip: SocketAddr) -> u16 {
+    pub fn decrement_outbound_puzzle_requests(&self, peer_ip: SocketAddr) -> u32 {
         Self::decrement_counter(&self.seen_outbound_puzzle_requests, peer_ip)
     }
 
@@ -192,7 +192,7 @@ impl<N: Network> Cache<N> {
     }
 
     /// Increments the key's counter in the map, returning the updated counter.
-    fn increment_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, u16>>, key: K) -> u16 {
+    fn increment_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, u32>>, key: K) -> u32 {
         let mut map_write = map.write();
         // Load the entry for the key, and increment the counter.
         let entry = map_write.entry(key).or_default();
@@ -202,7 +202,7 @@ impl<N: Network> Cache<N> {
     }
 
     /// Decrements the key's counter in the map, returning the updated counter.
-    fn decrement_counter<K: Copy + Hash + Eq>(map: &RwLock<IndexMap<K, u16>>, key: K) -> u16 {
+    fn decrement_counter<K: Copy + Hash + Eq>(map: &RwLock<IndexMap<K, u32>>, key: K) -> u32 {
         let mut map_write = map.write();
         // Load the entry for the key, and decrement the counter.
         let entry = map_write.entry(key).or_default();
@@ -231,8 +231,12 @@ impl<N: Network> Cache<N> {
         map: &RwLock<LinkedHashMap<K, OffsetDateTime>>,
         key: K,
     ) -> Option<OffsetDateTime> {
+        // Insert the key, and return the previous timestamp if it existed.
+        let previous_timestamp = map.write().insert(key, OffsetDateTime::now_utc());
+        // Refresh the cache.
         Self::refresh(map);
-        map.write().insert(key, OffsetDateTime::now_utc())
+        // Return the previous timestamp.
+        previous_timestamp
     }
 }
 

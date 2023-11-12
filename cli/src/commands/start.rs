@@ -14,7 +14,7 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{narwhal::MEMORY_POOL_PORT, router::messages::NodeType, Node};
+use snarkos_node::{bft::MEMORY_POOL_PORT, router::messages::NodeType, Node};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
@@ -31,7 +31,7 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
@@ -49,8 +49,6 @@ const RECOMMENDED_MIN_NOFILES_LIMIT: u64 = 2048;
 const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 /// The development mode number of genesis committee members.
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
-/// The development mode number of nodes with public balance.
-const DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE: u16 = 50;
 
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
@@ -79,16 +77,15 @@ pub struct Start {
     /// Specify the IP address and port for the node server
     #[clap(default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
+    /// Specify the IP address and port for the BFT
+    #[clap(long = "bft")]
+    pub bft: Option<SocketAddr>,
     /// Specify the IP address and port of the peer(s) to connect to
     #[clap(default_value = "", long = "peers")]
     pub peers: String,
     /// Specify the IP address and port of the validator(s) to connect to
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
-
-    // Specify the IP address and port for narwhal.
-    #[clap(long = "narwhal")]
-    pub narwhal: Option<SocketAddr>,
 
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
@@ -110,6 +107,10 @@ pub struct Start {
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
+    /// If the flag is set, the node will not prefresh from a CDN
+    #[clap(long)]
+    pub nocdn: bool,
+
     /// Enables development mode, specify a unique ID for this node
     #[clap(long)]
     pub dev: Option<u16>,
@@ -196,7 +197,7 @@ impl Start {
         //  2. The user has explicitly disabled CDN.
         //  3. The node is a prover (no need to sync).
         //  4. The node type is not declared (defaults to client) (no need to sync).
-        if self.dev.is_some() || self.cdn.is_empty() || self.prover || is_no_node_type {
+        if self.dev.is_some() || self.cdn.is_empty() || self.nocdn || self.prover || is_no_node_type {
             None
         }
         // Enable the CDN otherwise.
@@ -208,33 +209,35 @@ impl Start {
     /// Read the private key directly from an argument or from a filesystem location,
     /// returning the Aleo account.
     fn parse_private_key<N: Network>(&self) -> Result<Account<N>> {
-        match (&self.private_key, &self.private_key_file) {
-            // Parse the private key directly.
-            (Some(private_key), None) => Account::from_str(private_key.trim()),
-            // Parse the private key from a file.
-            (None, Some(path)) => Account::from_str(std::fs::read_to_string(path)?.trim()),
-            // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
-            (None, None) => {
-                if self.client {
-                    Account::new(&mut rand::thread_rng())
-                } else if let Some(dev) = self.dev {
-                    // Sample the private key of this node.
-                    Account::try_from({
-                        // Initialize the (fixed) RNG.
-                        let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
-                        // Iterate through 'dev' address instances to match the account.
-                        for _ in 0..dev {
-                            let _ = PrivateKey::<N>::new(&mut rng)?;
-                        }
-                        PrivateKey::<N>::new(&mut rng)?
-                    })
-                } else {
-                    bail!("Missing the '--private-key' or '--private-key-file' argument")
+        match self.dev {
+            None => match (&self.private_key, &self.private_key_file) {
+                // Parse the private key directly.
+                (Some(private_key), None) => Account::from_str(private_key.trim()),
+                // Parse the private key from a file.
+                (None, Some(path)) => Account::from_str(std::fs::read_to_string(path)?.trim()),
+                // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
+                (None, None) => match self.client {
+                    true => Account::new(&mut rand::thread_rng()),
+                    false => bail!("Missing the '--private-key' or '--private-key-file' argument"),
+                },
+                // Ensure only one private key flag is provided to the CLI.
+                (Some(_), Some(_)) => {
+                    bail!("Cannot use '--private-key' and '--private-key-file' simultaneously, please use only one")
                 }
-            }
-            // Ensure only one private key flag is provided to the CLI.
-            (Some(_), Some(_)) => {
-                bail!("Cannot use '--private-key' and '--private-key-file' simultaneously, please use only one")
+            },
+            Some(dev) => {
+                // Sample the private key of this node.
+                Account::try_from({
+                    // Initialize the (fixed) RNG.
+                    let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
+                    // Iterate through 'dev' address instances to match the account.
+                    for _ in 0..dev {
+                        let _ = PrivateKey::<N>::new(&mut rng)?;
+                    }
+                    let private_key = PrivateKey::<N>::new(&mut rng)?;
+                    println!("🔑 Your development private key for node {dev} is {}\n", private_key.to_string().bold());
+                    private_key
+                })
             }
         }
     }
@@ -257,6 +260,7 @@ impl Start {
                     }
                 }
             }
+            // Add the dev nodes to the trusted validators.
             if trusted_validators.is_empty() {
                 // To avoid ambiguity, we define the first few nodes to be the trusted validators to connect to.
                 for i in 0..2 {
@@ -267,8 +271,11 @@ impl Start {
             }
             // Set the node IP to `4130 + dev`.
             self.node = SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?;
-            // Set the REST IP to `3030 + dev`.
-            if !self.norest {
+            // If the `norest` flag is not set, and the `bft` flag was not overridden,
+            // then set the REST IP to `3030 + dev`.
+            //
+            // Note: the reason the `bft` flag is an option is to detect for remote devnet testing.
+            if !self.norest && self.bft.is_none() {
                 self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
             }
         }
@@ -280,43 +287,61 @@ impl Start {
     fn parse_genesis<N: Network>(&self) -> Result<Block<N>> {
         if self.dev.is_some() {
             // Determine the number of genesis committee members.
-            let num_genesis_committee_members = match self.dev_num_validators {
-                Some(num_genesis_committee_members) => num_genesis_committee_members,
+            let num_committee_members = match self.dev_num_validators {
+                Some(num_committee_members) => num_committee_members,
                 None => DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
             };
+            ensure!(
+                num_committee_members >= DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
+                "Number of genesis committee members is too low"
+            );
 
             // Initialize the (fixed) RNG.
             let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
             // Initialize the development private keys.
-            let development_private_keys = (0..DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE)
-                .map(|_| PrivateKey::<N>::new(&mut rng))
-                .collect::<Result<Vec<_>>>()?;
+            let development_private_keys =
+                (0..num_committee_members).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
 
-            // Construct the committee members.
-            let members = development_private_keys
-                .iter()
-                .take(num_genesis_committee_members as usize)
-                .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_VALIDATOR_STAKE, true))))
-                .collect::<Result<indexmap::IndexMap<_, _>>>()?;
             // Construct the committee.
-            let committee = Committee::<N>::new(0u64, members)?;
+            let committee = {
+                // Calculate the committee stake per member.
+                let stake_per_member =
+                    N::STARTING_SUPPLY.saturating_div(2).saturating_div(num_committee_members as u64);
+                ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
 
-            // Determine the public balance per validator.
-            let public_balance_per_validator = (N::STARTING_SUPPLY
-                - (num_genesis_committee_members as u64 * MIN_VALIDATOR_STAKE))
-                / (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64);
-            assert_eq!(
-                N::STARTING_SUPPLY,
-                (num_genesis_committee_members as u64 * MIN_VALIDATOR_STAKE)
-                    + (DEVELOPMENT_MODE_NUM_NODES_WITH_PUBLIC_BALANCE as u64 * public_balance_per_validator),
-                "The public balance per validator is not correct."
-            );
+                // Construct the committee members and distribute stakes evenly among committee members.
+                let members = development_private_keys
+                    .iter()
+                    .map(|private_key| Ok((Address::try_from(private_key)?, (stake_per_member, true))))
+                    .collect::<Result<indexmap::IndexMap<_, _>>>()?;
 
-            // Construct the public balances.
-            let public_balances = development_private_keys
+                // Output the committee.
+                Committee::<N>::new(0u64, members)?
+            };
+
+            // Calculate the public balance per validator.
+            let remaining_balance = N::STARTING_SUPPLY.saturating_sub(committee.total_stake());
+            let public_balance_per_validator = remaining_balance.saturating_div(num_committee_members as u64);
+
+            // Construct the public balances with fairly equal distribution.
+            let mut public_balances = development_private_keys
                 .iter()
                 .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+
+            // If there is some leftover balance, add it to the 0-th validator.
+            let leftover =
+                remaining_balance.saturating_sub(public_balance_per_validator * num_committee_members as u64);
+            if leftover > 0 {
+                let (_, balance) = public_balances.get_index_mut(0).unwrap();
+                *balance += leftover;
+            }
+
+            // Check if the sum of committee stakes and public balances equals the total starting supply.
+            let public_balances_sum: u64 = public_balances.values().copied().sum();
+            if committee.total_stake() + public_balances_sum != N::STARTING_SUPPLY {
+                bail!("Sum of committee stakes and public balances does not equal total starting supply.");
+            }
 
             // Construct the genesis block.
             load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
@@ -404,9 +429,9 @@ impl Start {
         crate::helpers::check_validator_machine(node_type);
 
         // Initialize the node.
-        let narwhal_ip = if self.dev.is_some() { self.narwhal } else { None };
+        let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, narwhal_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, bft_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
         }
@@ -423,9 +448,9 @@ impl Start {
             // Efficiency mode
             4..=8 => 2,
             // Standard mode
-            9..=16 => 4,
+            9..=16 => 8,
             // Performance mode
-            _ => 8,
+            _ => 16,
         };
 
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
@@ -464,19 +489,19 @@ fn load_or_compute_genesis<N: Network>(
     preimage.extend(committee.to_bytes_le()?);
     preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
 
-    // Input the parameters.
-    preimage.extend(snarkvm::parameters::testnet3::BondPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::UnbondPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::UnbondDelegatorAsValidatorVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::ClaimUnbondPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::SetValidatorStateVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::TransferPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateToPublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::TransferPublicToPrivateVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::FeePrivateVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::FeePublicVerifier::load_bytes()?);
-    preimage.extend(snarkvm::parameters::testnet3::InclusionVerifier::load_bytes()?);
+    // Input the parameters' metadata.
+    preimage.extend(snarkvm::parameters::testnet3::BondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::UnbondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::UnbondDelegatorAsValidatorVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::SetValidatorStateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::TransferPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::FeePrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::FeePublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::testnet3::InclusionVerifier::METADATA.as_bytes());
 
     // Initialize the hasher.
     let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;

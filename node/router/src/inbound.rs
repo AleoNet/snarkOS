@@ -27,7 +27,7 @@ use crate::{
     Outbound,
     Peer,
 };
-use snarkos_node_tcp::{is_bogon_address, protocols::Reading};
+use snarkos_node_tcp::protocols::Reading;
 use snarkvm::prelude::{
     block::{Block, Header, Transaction},
     coinbase::{EpochChallenge, ProverSolution},
@@ -43,7 +43,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// The maximum number of puzzle requests per interval.
     const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 9; // 9 seconds
+    const PING_SLEEP_IN_SECS: u64 = 20; // 20 seconds
+    /// The time frame to enforce the `MESSAGE_LIMIT`.
+    const MESSAGE_LIMIT_TIME_FRAME_IN_SECS: i64 = 5;
+    /// The maximum number of messages accepted within `MESSAGE_LIMIT_TIME_FRAME_IN_SECS`.
+    const MESSAGE_LIMIT: usize = 500;
 
     /// Handles the inbound message from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, message: Message<N>) -> Result<()> {
@@ -53,9 +57,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             None => bail!("Unable to resolve the (ambiguous) peer address '{peer_addr}'"),
         };
 
-        // Drop the peer, if they have sent more than 1000 messages in the last 5 seconds.
-        let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
-        if num_messages >= 1000 {
+        // Drop the peer, if they have sent more than `MESSAGE_LIMIT` messages
+        // in the last `MESSAGE_LIMIT_TIME_FRAME_IN_SECS` seconds.
+        let num_messages = self.router().cache.insert_inbound_message(peer_ip, Self::MESSAGE_LIMIT_TIME_FRAME_IN_SECS);
+        if num_messages > Self::MESSAGE_LIMIT {
             bail!("Dropping '{peer_ip}' for spamming messages (num_messages = {num_messages})")
         }
 
@@ -145,15 +150,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 {
                     bail!("[Ping] {error}");
                 }
-
-                // TODO (howardwu): For this case, check that the peer is not within NUM_RECENTS, and disconnect.
-                //  As the validator, you should disconnect any node type that is not caught up.
-
-                // // If this node is a validator, the peer is not a validator and is syncing, proceed to disconnect.
-                // if self.node_type == NodeType::Validator && node_type != NodeType::Validator && peer_status == Status::Syncing {
-                //     warn!("Dropping '{peer_addr}' as this node is ahead");
-                //     return Some(DisconnectReason::INeedToSyncFirst);
-                // }
 
                 // Process the ping message.
                 match self.ping(peer_ip, message) {
@@ -259,8 +255,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn peer_request(&self, peer_ip: SocketAddr) -> bool {
         // Retrieve the connected peers.
         let peers = self.router().connected_peers();
-        // Filter out bogon addresses.
-        let peers = peers.into_iter().filter(|addr| !is_bogon_address(addr.ip())).collect();
+        // Filter out invalid addresses.
+        let peers = peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).collect();
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
         true
@@ -268,8 +264,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
     /// Handles a `PeerResponse` message.
     fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
-        // Filter out bogon addresses.
-        let peers = peers.iter().copied().filter(|addr| !is_bogon_address(addr.ip())).collect::<Vec<_>>();
+        // Filter out invalid addresses.
+        let peers = peers.iter().copied().filter(|ip| self.router().is_valid_peer_ip(ip)).collect::<Vec<_>>();
         // Adds the given peer IPs to the list of candidate peers.
         self.router().insert_candidate_peers(&peers);
         true

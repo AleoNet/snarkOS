@@ -16,7 +16,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_narwhal::ledger_service::ProverLedgerService;
+use snarkos_node_bft::ledger_service::ProverLedgerService;
 use snarkos_node_router::{
     messages::{Message, NodeType, UnconfirmedSolution},
     Heartbeat,

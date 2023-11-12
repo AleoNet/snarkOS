@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node"
-version = "2.1.7"
+version = "2.2.4"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -39,7 +39,7 @@ version = "0.3"
 features = [ "sink" ]
 
 [dependencies.indexmap]
-version = "2.0"
+version = "2.1"
 
 [dependencies.num_cpus]
 version = "1"
@@ -64,35 +64,35 @@ features = [ "preserve_order" ]
 
 [dependencies.snarkos-account]
 path = "../account"
-version = "=2.1.7"
+version = "=2.2.4"
+
+[dependencies.snarkos-node-bft]
+path = "./bft"
+version = "=2.2.4"
 
 [dependencies.snarkos-node-cdn]
 path = "./cdn"
-version = "=2.1.7"
+version = "=2.2.4"
 
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
-version = "=2.1.7"
-
-[dependencies.snarkos-node-narwhal]
-path = "./narwhal"
-version = "=2.1.7"
+version = "=2.2.4"
 
 [dependencies.snarkos-node-rest]
 path = "./rest"
-version = "=2.1.7"
+version = "=2.2.4"
 
 [dependencies.snarkos-node-router]
 path = "./router"
-version = "=2.1.7"
+version = "=2.2.4"
 
 [dependencies.snarkos-node-sync]
 path = "./sync"
-version = "=2.1.7"
+version = "=2.2.4"
 
 [dependencies.snarkos-node-tcp]
 path = "./tcp"
-version = "=2.1.7"
+version = "=2.2.4"
 
 [dependencies.snarkvm]
 workspace = true

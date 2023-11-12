@@ -16,7 +16,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_narwhal::ledger_service::CoreLedgerService;
+use snarkos_node_bft::ledger_service::CoreLedgerService;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
     messages::{Message, NodeType, UnconfirmedSolution},
@@ -170,9 +170,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                 // Sleep briefly to avoid triggering spam detection.
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                 // Perform the sync routine.
-                if let Err(error) = node.sync.try_block_sync(&node).await {
-                    warn!("Sync error - {error}");
-                }
+                node.sync.try_block_sync(&node).await;
             }
         }));
     }
