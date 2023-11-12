@@ -14,15 +14,16 @@
 
 use crate::helpers::{check_timestamp_for_liveness, fmt_id};
 use snarkos_node_bft_ledger_service::LedgerService;
+use snarkos_node_bft_storage_service::StorageService;
 use snarkvm::{
     ledger::{
         block::Block,
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{bail, cfg_iter, ensure, Address, Field, Network, Result},
+    prelude::{anyhow, bail, cfg_iter, ensure, Address, Field, Network, Result},
 };
 
-use indexmap::{map::Entry, IndexMap, IndexSet};
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use std::{
@@ -85,12 +86,16 @@ pub struct StorageInner<N: Network> {
     /// The map of `batch ID` to `round`.
     batch_ids: RwLock<IndexMap<Field<N>, u64>>,
     /// The map of `transmission ID` to `(transmission, certificate IDs)` entries.
-    transmissions: RwLock<IndexMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>>,
+    transmissions: Arc<dyn StorageService<N>>,
 }
 
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
-    pub fn new(ledger: Arc<dyn LedgerService<N>>, max_gc_rounds: u64) -> Self {
+    pub fn new(
+        ledger: Arc<dyn LedgerService<N>>,
+        transmissions: Arc<dyn StorageService<N>>,
+        max_gc_rounds: u64,
+    ) -> Self {
         // Retrieve the current committee.
         let committee = ledger.current_committee().expect("Ledger is missing a committee.");
         // Retrieve the current round.
@@ -106,7 +111,7 @@ impl<N: Network> Storage<N> {
             rounds: Default::default(),
             certificates: Default::default(),
             batch_ids: Default::default(),
-            transmissions: Default::default(),
+            transmissions,
         }));
         // Update the storage to the current round.
         storage.update_current_round(current_round);
@@ -235,15 +240,13 @@ impl<N: Network> Storage<N> {
 
     /// Returns `true` if the storage contains the specified `transmission ID`.
     pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
-        // Check if the transmission ID exists in storage.
-        self.transmissions.read().contains_key(&transmission_id.into())
+        self.transmissions.contains_transmission(transmission_id.into())
     }
 
     /// Returns the transmission for the given `transmission ID`.
     /// If the transmission ID does not exist in storage, `None` is returned.
     pub fn get_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Transmission<N>> {
-        // Get the transmission.
-        self.transmissions.read().get(&transmission_id.into()).map(|(transmission, _)| transmission).cloned()
+        self.transmissions.get_transmission(transmission_id.into())
     }
 
     /// Returns the round for the given `certificate ID`.
@@ -320,7 +323,7 @@ impl<N: Network> Storage<N> {
     pub fn check_batch_header(
         &self,
         batch_header: &BatchHeader<N>,
-        mut transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+        transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>> {
         // Retrieve the round.
         let round = batch_header.round();
@@ -335,33 +338,22 @@ impl<N: Network> Storage<N> {
         }
 
         // Retrieve the previous committee for the batch round.
-        let Ok(previous_commitee) = self.ledger.get_previous_committee_for_round(round) else {
+        let Ok(previous_committee) = self.ledger.get_previous_committee_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
         // Ensure the author is in the committee.
-        if !previous_commitee.is_committee_member(batch_header.author()) {
+        if !previous_committee.is_committee_member(batch_header.author()) {
             bail!("Author {} is not in the committee for round {round} {gc_log}", batch_header.author())
         }
 
         // Check the timestamp for liveness.
         check_timestamp_for_liveness(batch_header.timestamp())?;
 
-        // Initialize a list for the missing transmissions from storage.
-        let mut missing_transmissions = HashMap::new();
-        // Lock the existing transmissions.
-        let known_transmissions = self.transmissions.read();
-        // Ensure the declared transmission IDs are all present in storage or the given transmissions map.
-        for transmission_id in batch_header.transmission_ids() {
-            // If the transmission ID does not exist, ensure it was provided by the caller.
-            if !known_transmissions.contains_key(transmission_id) {
-                // Retrieve the transmission.
-                let Some(transmission) = transmissions.remove(transmission_id) else {
-                    bail!("Failed to provide a transmission for round {round} {gc_log}");
-                };
-                // Append the transmission.
-                missing_transmissions.insert(*transmission_id, transmission);
-            }
-        }
+        // Retrieve the missing transmissions in storage from the given transmissions.
+        let missing_transmissions = self
+            .transmissions
+            .find_missing_transmissions(batch_header, transmissions)
+            .map_err(|e| anyhow!("{e} for round {round} {gc_log}"))?;
 
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
@@ -514,7 +506,7 @@ impl<N: Network> Storage<N> {
     fn insert_certificate_atomic(
         &self,
         certificate: BatchCertificate<N>,
-        mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+        missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
         // Retrieve the round.
         let round = certificate.round();
@@ -533,24 +525,8 @@ impl<N: Network> Storage<N> {
         self.certificates.write().insert(certificate_id, certificate);
         // Insert the batch ID.
         self.batch_ids.write().insert(batch_id, round);
-        // Acquire the transmissions write lock.
-        let mut transmissions = self.transmissions.write();
-        // Inserts the following:
-        //   - Inserts **only the missing** transmissions from storage.
-        //   - Inserts the certificate ID into the corresponding set for **all** transmissions.
-        for transmission_id in transmission_ids {
-            // Retrieve the transmission entry.
-            transmissions.entry(transmission_id)
-                // Insert **only the missing** transmissions from storage.
-                .or_insert_with( || {
-                    // Retrieve the missing transmission.
-                    let transmission = missing_transmissions.remove(&transmission_id).expect("Missing transmission not found");
-                    // Return the transmission and an empty set of certificate IDs.
-                    (transmission, Default::default())
-                })
-                // Insert the certificate ID into the corresponding set for **all** transmissions.
-                .1.insert(certificate_id);
-        }
+        // Insert the certificate ID for each of the transmissions into storage.
+        self.transmissions.insert_transmissions(certificate_id, transmission_ids, missing_transmissions);
     }
 
     /// Removes the given `certificate ID` from storage.
@@ -572,7 +548,7 @@ impl<N: Network> Storage<N> {
         // Compute the author of the batch.
         let author = certificate.author();
 
-        // Insert the round.
+        // Update the round.
         {
             // Acquire the write lock.
             let mut rounds = self.rounds.write();
@@ -587,25 +563,8 @@ impl<N: Network> Storage<N> {
         self.certificates.write().remove(&certificate_id);
         // Remove the batch ID.
         self.batch_ids.write().remove(&batch_id);
-        // Acquire the transmissions write lock.
-        let mut transmissions = self.transmissions.write();
-        // If this is the last certificate ID for the transmission ID, remove the transmission.
-        for transmission_id in certificate.transmission_ids() {
-            // Remove the certificate ID for the transmission ID, and determine if there are any more certificate IDs.
-            match transmissions.entry(*transmission_id) {
-                Entry::Occupied(mut occupied_entry) => {
-                    let (_, certificate_ids) = occupied_entry.get_mut();
-                    // Remove the certificate ID for the transmission ID.
-                    certificate_ids.remove(&certificate_id);
-                    // If there are no more certificate IDs for the transmission ID, remove the transmission.
-                    if certificate_ids.is_empty() {
-                        // Remove the entry for the transmission ID.
-                        occupied_entry.remove();
-                    }
-                }
-                Entry::Vacant(_) => {}
-            }
-        }
+        // Remove the transmission entries in the certificate from storage.
+        self.transmissions.remove_transmissions(&certificate_id, certificate.transmission_ids());
         // Return successfully.
         true
     }
@@ -738,7 +697,7 @@ impl<N: Network> Storage<N> {
     pub fn transmissions_iter(
         &self,
     ) -> impl Iterator<Item = (TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>))> {
-        self.transmissions.read().clone().into_iter()
+        self.transmissions.as_iterator()
     }
 
     /// Inserts the given `certificate` into storage.
@@ -763,23 +722,14 @@ impl<N: Network> Storage<N> {
         self.certificates.write().insert(certificate_id, certificate);
         // Insert the batch ID.
         self.batch_ids.write().insert(batch_id, round);
-        // Acquire the transmissions write lock.
-        let mut transmissions = self.transmissions.write();
-        // Inserts the following:
-        //   - Inserts **only the missing** transmissions from storage.
-        //   - Inserts the certificate ID into the corresponding set for **all** transmissions.
-        for transmission_id in transmission_ids {
-            // Retrieve the transmission entry.
-            transmissions.entry(transmission_id)
-                // Insert **only the missing** transmissions from storage.
-                .or_insert_with( || {
-                    // Return the transmission and an empty set of certificate IDs.
-                    let dummy = snarkvm::ledger::narwhal::Data::Buffer(bytes::Bytes::new());
-                    (Transmission::Transaction(dummy), Default::default())
-                })
-                // Insert the certificate ID into the corresponding set for **all** transmissions.
-                .1.insert(certificate_id);
-        }
+
+        // Construct the dummy missing transmissions (for testing purposes).
+        let missing_transmissions = transmission_ids
+            .iter()
+            .map(|id| (*id, Transmission::Transaction(snarkvm::ledger::narwhal::Data::Buffer(bytes::Bytes::new()))))
+            .collect::<HashMap<_, _>>();
+        // Insert the certificate ID for each of the transmissions into storage.
+        self.transmissions.insert_transmissions(certificate_id, transmission_ids, missing_transmissions);
     }
 }
 
@@ -787,6 +737,7 @@ impl<N: Network> Storage<N> {
 mod tests {
     use super::*;
     use snarkos_node_bft_ledger_service::MockLedgerService;
+    use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         ledger::narwhal::Data,
         prelude::{Rng, TestRng},
@@ -867,7 +818,7 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), 1);
 
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());
@@ -933,7 +884,7 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), 1);
 
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());
@@ -989,6 +940,7 @@ pub mod prop_tests {
         MAX_GC_ROUNDS,
     };
     use snarkos_node_bft_ledger_service::MockLedgerService;
+    use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         ledger::{
             coinbase::PuzzleCommitment,
@@ -1021,7 +973,7 @@ pub mod prop_tests {
             (any::<CommitteeContext>(), 0..MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
                     let ledger = Arc::new(MockLedgerService::new(committee));
-                    Storage::<CurrentNetwork>::new(ledger, gc_rounds)
+                    Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), gc_rounds)
                 })
                 .boxed()
         }
@@ -1030,7 +982,7 @@ pub mod prop_tests {
             (Just(context), 0..MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
                     let ledger = Arc::new(MockLedgerService::new(committee));
-                    Storage::<CurrentNetwork>::new(ledger, gc_rounds)
+                    Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), gc_rounds)
                 })
                 .boxed()
         }
@@ -1146,7 +1098,7 @@ pub mod prop_tests {
 
         // Initialize the storage.
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), 1);
 
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());

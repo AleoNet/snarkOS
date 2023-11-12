@@ -13,11 +13,41 @@
 // limitations under the License.
 
 use snarkvm::{
-    ledger::narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+    ledger::narwhal::{BatchHeader, Transmission, TransmissionID},
     prelude::{Field, Network, Result},
 };
 
-use indexmap::IndexMap;
-use std::{fmt::Debug, ops::Range};
+use indexmap::{map::IntoIter, IndexSet};
+use std::{collections::HashMap, fmt::Debug};
 
-pub trait StorageService<N: Network>: Debug + Send + Sync {}
+pub trait StorageService<N: Network>: Debug + Send + Sync {
+    /// Returns `true` if the storage contains the specified `transmission ID`.
+    fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool;
+
+    /// Returns the transmission for the given `transmission ID`.
+    /// If the transmission ID does not exist in storage, `None` is returned.
+    fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>>;
+
+    /// Returns an iterator over the `(transmission ID, (transmission, certificate IDs))` entries.
+    fn as_iterator(&self) -> IntoIter<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>;
+
+    /// Returns the missing transmissions in storage from the given transmissions.
+    fn find_missing_transmissions(
+        &self,
+        batch_header: &BatchHeader<N>,
+        transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>>;
+
+    /// Inserts the given certificate ID for each of the transmission IDs, using the missing transmissions map, into storage.
+    fn insert_transmissions(
+        &self,
+        certificate_id: Field<N>,
+        transmission_ids: IndexSet<TransmissionID<N>>,
+        missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+    );
+
+    /// Removes the certificate ID for the transmissions from storage.
+    ///
+    /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
+    fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>);
+}

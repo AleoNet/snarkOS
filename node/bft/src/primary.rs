@@ -1451,6 +1451,7 @@ impl<N: Network> Primary<N> {
 mod tests {
     use super::*;
     use snarkos_node_bft_ledger_service::MockLedgerService;
+    use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
         prelude::{Address, Signature},
@@ -1484,7 +1485,7 @@ mod tests {
 
         let account = accounts.first().unwrap().1.clone();
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
 
         // Initialize the primary.
         let mut primary = Primary::new(account, storage, ledger, None, &[], None).unwrap();

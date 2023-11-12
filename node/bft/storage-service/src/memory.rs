@@ -14,12 +14,17 @@
 
 use crate::StorageService;
 use snarkvm::{
-    ledger::narwhal::{Data, Transmission, TransmissionID},
+    ledger::narwhal::{BatchHeader, Transmission, TransmissionID},
     prelude::{bail, Field, Network, Result},
 };
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{
+    map::{Entry, IntoIter},
+    IndexMap,
+    IndexSet,
+};
 use parking_lot::RwLock;
+use std::collections::HashMap;
 
 /// A BFT in-memory storage service.
 #[derive(Debug)]
@@ -42,4 +47,99 @@ impl<N: Network> BFTMemoryService<N> {
     }
 }
 
-impl<N: Network> StorageService<N> for BFTMemoryService<N> {}
+impl<N: Network> StorageService<N> for BFTMemoryService<N> {
+    /// Returns `true` if the storage contains the specified `transmission ID`.
+    fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
+        // Check if the transmission ID exists in storage.
+        self.transmissions.read().contains_key(&transmission_id)
+    }
+
+    /// Returns the transmission for the given `transmission ID`.
+    /// If the transmission ID does not exist in storage, `None` is returned.
+    fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
+        // Get the transmission.
+        self.transmissions.read().get(&transmission_id).map(|(transmission, _)| transmission).cloned()
+    }
+
+    /// Returns an iterator over the `(transmission ID, (transmission, certificate IDs))` entries.
+    fn as_iterator(&self) -> IntoIter<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)> {
+        self.transmissions.read().clone().into_iter()
+    }
+
+    /// Returns the missing transmissions in storage from the given transmissions.
+    fn find_missing_transmissions(
+        &self,
+        batch_header: &BatchHeader<N>,
+        mut transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>> {
+        // Initialize a list for the missing transmissions from storage.
+        let mut missing_transmissions = HashMap::new();
+        // Lock the existing transmissions.
+        let known_transmissions = self.transmissions.read();
+        // Ensure the declared transmission IDs are all present in storage or the given transmissions map.
+        for transmission_id in batch_header.transmission_ids() {
+            // If the transmission ID does not exist, ensure it was provided by the caller.
+            if !known_transmissions.contains_key(transmission_id) {
+                // Retrieve the transmission.
+                let Some(transmission) = transmissions.remove(transmission_id) else {
+                    bail!("Failed to provide a transmission");
+                };
+                // Append the transmission.
+                missing_transmissions.insert(*transmission_id, transmission);
+            }
+        }
+        Ok(missing_transmissions)
+    }
+
+    /// Inserts the given certificate ID for each of the transmission IDs, using the missing transmissions map, into storage.
+    fn insert_transmissions(
+        &self,
+        certificate_id: Field<N>,
+        transmission_ids: IndexSet<TransmissionID<N>>,
+        mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+    ) {
+        // Acquire the transmissions write lock.
+        let mut transmissions = self.transmissions.write();
+        // Inserts the following:
+        //   - Inserts **only the missing** transmissions from storage.
+        //   - Inserts the certificate ID into the corresponding set for **all** transmissions.
+        for transmission_id in transmission_ids {
+            // Retrieve the transmission entry.
+            transmissions.entry(transmission_id)
+                // Insert **only the missing** transmissions from storage.
+                .or_insert_with(|| {
+                    // Retrieve the missing transmission.
+                    let transmission = missing_transmissions.remove(&transmission_id).expect("Missing transmission not found");
+                    // Return the transmission and an empty set of certificate IDs.
+                    (transmission, Default::default())
+                })
+                // Insert the certificate ID into the corresponding set for **all** transmissions.
+                .1.insert(certificate_id);
+        }
+    }
+
+    /// Removes the certificate ID for the transmissions from storage.
+    ///
+    /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
+    fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>) {
+        // Acquire the transmissions write lock.
+        let mut transmissions = self.transmissions.write();
+        // If this is the last certificate ID for the transmission ID, remove the transmission.
+        for transmission_id in transmission_ids {
+            // Remove the certificate ID for the transmission ID, and determine if there are any more certificate IDs.
+            match transmissions.entry(*transmission_id) {
+                Entry::Occupied(mut occupied_entry) => {
+                    let (_, certificate_ids) = occupied_entry.get_mut();
+                    // Remove the certificate ID for the transmission ID.
+                    certificate_ids.remove(certificate_id);
+                    // If there are no more certificate IDs for the transmission ID, remove the transmission.
+                    if certificate_ids.is_empty() {
+                        // Remove the entry for the transmission ID.
+                        occupied_entry.remove();
+                    }
+                }
+                Entry::Vacant(_) => {}
+            }
+        }
+    }
+}

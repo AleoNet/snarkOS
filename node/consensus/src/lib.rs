@@ -28,6 +28,7 @@ use snarkos_node_bft::{
         Storage as NarwhalStorage,
     },
     spawn_blocking,
+    storage_service::BFTMemoryService,
     BFT,
     MAX_GC_ROUNDS,
     MAX_TRANSMISSIONS_PER_BATCH,
@@ -82,8 +83,11 @@ impl<N: Network> Consensus<N> {
         trusted_validators: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
+        // Initialize the Narwhal transmissions.
+        // TODO (howardwu): Switch this to a persistent storage service.
+        let transmissions = Arc::new(BFTMemoryService::new());
         // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new(ledger.clone(), MAX_GC_ROUNDS);
+        let storage = NarwhalStorage::new(ledger.clone(), transmissions, MAX_GC_ROUNDS);
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
         // Return the consensus.

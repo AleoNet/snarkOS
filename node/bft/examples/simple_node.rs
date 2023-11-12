@@ -24,6 +24,7 @@ use snarkos_node_bft::{
     MEMORY_POOL_PORT,
 };
 use snarkos_node_bft_ledger_service::MockLedgerService;
+use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
     ledger::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
@@ -115,7 +116,7 @@ pub async fn start_bft(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the storage.
-    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
+    let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -152,7 +153,7 @@ pub async fn start_primary(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the storage.
-    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
+    let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
