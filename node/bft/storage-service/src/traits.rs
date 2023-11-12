@@ -17,7 +17,7 @@ use snarkvm::{
     prelude::{Field, Network, Result},
 };
 
-use indexmap::{map::IntoIter, IndexSet};
+use indexmap::IndexSet;
 use std::{collections::HashMap, fmt::Debug};
 
 pub trait StorageService<N: Network>: Debug + Send + Sync {
@@ -27,9 +27,6 @@ pub trait StorageService<N: Network>: Debug + Send + Sync {
     /// Returns the transmission for the given `transmission ID`.
     /// If the transmission ID does not exist in storage, `None` is returned.
     fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>>;
-
-    /// Returns an iterator over the `(transmission ID, (transmission, certificate IDs))` entries.
-    fn as_iterator(&self) -> IntoIter<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>;
 
     /// Returns the missing transmissions in storage from the given transmissions.
     fn find_missing_transmissions(
@@ -50,4 +47,8 @@ pub trait StorageService<N: Network>: Debug + Send + Sync {
     ///
     /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
     fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>);
+
+    /// Returns a HashMap over the `(transmission ID, (transmission, certificate IDs))` entries.
+    #[cfg(any(test, feature = "test"))]
+    fn as_hashmap(&self) -> HashMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>;
 }

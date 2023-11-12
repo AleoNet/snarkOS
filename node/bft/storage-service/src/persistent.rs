@@ -14,48 +14,65 @@
 
 use crate::StorageService;
 use snarkvm::{
-    ledger::narwhal::{BatchHeader, Transmission, TransmissionID},
+    ledger::{
+        narwhal::{BatchHeader, Transmission, TransmissionID},
+        store::helpers::{
+            rocksdb::{
+                internal::{self, BFTMap, Database, MapID},
+                DataMap,
+            },
+            Map,
+            MapRead,
+        },
+    },
     prelude::{bail, Field, Network, Result},
 };
 
-use indexmap::{indexset, map::Entry, IndexMap, IndexSet};
-use parking_lot::RwLock;
-use std::collections::HashMap;
+use indexmap::{indexset, IndexSet};
+use snarkvm::ledger::store::cow_to_cloned;
+use std::{borrow::Cow, collections::HashMap};
 use tracing::error;
 
-/// A BFT in-memory storage service.
+/// A BFT persistent storage service.
 #[derive(Debug)]
-pub struct BFTMemoryService<N: Network> {
+pub struct BFTPersistentStorage<N: Network> {
     /// The map of `transmission ID` to `(transmission, certificate IDs)` entries.
-    transmissions: RwLock<IndexMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>>,
+    transmissions: DataMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>,
 }
 
-impl<N: Network> Default for BFTMemoryService<N> {
-    /// Initializes a new BFT in-memory storage service.
-    fn default() -> Self {
-        Self::new()
+impl<N: Network> BFTPersistentStorage<N> {
+    /// Initializes a new BFT persistent storage service.
+    pub fn new(dev: Option<u16>) -> Result<Self> {
+        Ok(Self { transmissions: internal::RocksDB::open_map(N::ID, dev, MapID::BFT(BFTMap::Transmissions))? })
     }
 }
 
-impl<N: Network> BFTMemoryService<N> {
-    /// Initializes a new BFT in-memory storage service.
-    pub fn new() -> Self {
-        Self { transmissions: Default::default() }
-    }
-}
-
-impl<N: Network> StorageService<N> for BFTMemoryService<N> {
+impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     /// Returns `true` if the storage contains the specified `transmission ID`.
     fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
         // Check if the transmission ID exists in storage.
-        self.transmissions.read().contains_key(&transmission_id)
+        let result = self.transmissions.contains_key_confirmed(&transmission_id);
+        // If the result is an error, log the error.
+        if let Err(error) = &result {
+            error!("Failed to check if transmission ID exists in storage - {error}");
+        }
+        // Return the result.
+        result.unwrap_or(false)
     }
 
     /// Returns the transmission for the given `transmission ID`.
     /// If the transmission ID does not exist in storage, `None` is returned.
     fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
         // Get the transmission.
-        self.transmissions.read().get(&transmission_id).map(|(transmission, _)| transmission).cloned()
+        match self.transmissions.get_confirmed(&transmission_id) {
+            Ok(Some(Cow::Owned((transmission, _)))) => Some(transmission),
+            Ok(Some(Cow::Borrowed((transmission, _)))) => Some(transmission.clone()),
+            Ok(None) => None,
+            Err(error) => {
+                error!("Failed to get transmission from storage - {error}");
+                None
+            }
+        }
     }
 
     /// Returns the missing transmissions in storage from the given transmissions.
@@ -66,12 +83,10 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
     ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>> {
         // Initialize a list for the missing transmissions from storage.
         let mut missing_transmissions = HashMap::new();
-        // Lock the existing transmissions.
-        let known_transmissions = self.transmissions.read();
         // Ensure the declared transmission IDs are all present in storage or the given transmissions map.
         for transmission_id in batch_header.transmission_ids() {
             // If the transmission ID does not exist, ensure it was provided by the caller.
-            if !known_transmissions.contains_key(transmission_id) {
+            if !self.contains_transmission(*transmission_id) {
                 // Retrieve the transmission.
                 let Some(transmission) = transmissions.remove(transmission_id) else {
                     bail!("Failed to provide a transmission");
@@ -90,20 +105,23 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
         transmission_ids: IndexSet<TransmissionID<N>>,
         mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
-        // Acquire the transmissions write lock.
-        let mut transmissions = self.transmissions.write();
         // Inserts the following:
         //   - Inserts **only the missing** transmissions from storage.
         //   - Inserts the certificate ID into the corresponding set for **all** transmissions.
         'outer: for transmission_id in transmission_ids {
             // Retrieve the transmission entry.
-            match transmissions.entry(transmission_id) {
-                Entry::Occupied(mut occupied_entry) => {
-                    let (_, certificate_ids) = occupied_entry.get_mut();
+            match self.transmissions.get_confirmed(&transmission_id) {
+                Ok(Some(entry)) => {
+                    let (transmission, mut certificate_ids) = cow_to_cloned!(entry);
                     // Insert the certificate ID into the set.
                     certificate_ids.insert(certificate_id);
+                    // Update the transmission entry.
+                    if let Err(e) = self.transmissions.insert(transmission_id, (transmission, certificate_ids)) {
+                        error!("Failed to insert transmission {transmission_id} into storage - {e}");
+                        continue 'outer;
+                    }
                 }
-                Entry::Vacant(vacant_entry) => {
+                Ok(None) => {
                     // Retrieve the missing transmission.
                     let Some(transmission) = missing_transmissions.remove(&transmission_id) else {
                         error!("Failed to provide a missing transmission {transmission_id}");
@@ -112,7 +130,14 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
                     // Prepare the set of certificate IDs.
                     let certificate_ids = indexset! { certificate_id };
                     // Insert the transmission and a new set with the certificate ID.
-                    vacant_entry.insert((transmission, certificate_ids));
+                    if let Err(e) = self.transmissions.insert(transmission_id, (transmission, certificate_ids)) {
+                        error!("Failed to insert transmission {transmission_id} into storage - {e}");
+                        continue 'outer;
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to process the 'insert' for transmission {transmission_id} into storage - {e}");
+                    continue 'outer;
                 }
             }
         }
@@ -122,23 +147,38 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
     ///
     /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
     fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>) {
-        // Acquire the transmissions write lock.
-        let mut transmissions = self.transmissions.write();
         // If this is the last certificate ID for the transmission ID, remove the transmission.
-        for transmission_id in transmission_ids {
-            // Remove the certificate ID for the transmission ID, and determine if there are any more certificate IDs.
-            match transmissions.entry(*transmission_id) {
-                Entry::Occupied(mut occupied_entry) => {
-                    let (_, certificate_ids) = occupied_entry.get_mut();
-                    // Remove the certificate ID for the transmission ID.
+        'outer: for transmission_id in transmission_ids {
+            // Retrieve the transmission entry.
+            match self.transmissions.get_confirmed(transmission_id) {
+                Ok(Some(entry)) => {
+                    let (transmission, mut certificate_ids) = cow_to_cloned!(entry);
+                    // Insert the certificate ID into the set.
                     certificate_ids.remove(certificate_id);
                     // If there are no more certificate IDs for the transmission ID, remove the transmission.
                     if certificate_ids.is_empty() {
-                        // Remove the entry for the transmission ID.
-                        occupied_entry.remove();
+                        // Remove the transmission entry.
+                        if let Err(e) = self.transmissions.remove(transmission_id) {
+                            error!("Failed to remove transmission {transmission_id} (now empty) from storage - {e}");
+                            continue 'outer;
+                        }
+                    }
+                    // Otherwise, update the transmission entry.
+                    else {
+                        // Update the transmission entry.
+                        if let Err(e) = self.transmissions.insert(*transmission_id, (transmission, certificate_ids)) {
+                            error!(
+                                "Failed to remove transmission {transmission_id} for certificate {certificate_id} from storage - {e}"
+                            );
+                            continue 'outer;
+                        }
                     }
                 }
-                Entry::Vacant(_) => {}
+                Ok(None) => { /* no-op */ }
+                Err(e) => {
+                    error!("Failed to process the 'remove' for transmission {transmission_id} from storage - {e}");
+                    continue 'outer;
+                }
             }
         }
     }
@@ -146,6 +186,7 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
     /// Returns a HashMap over the `(transmission ID, (transmission, certificate IDs))` entries.
     #[cfg(any(test, feature = "test"))]
     fn as_hashmap(&self) -> HashMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)> {
-        self.transmissions.read().clone().into_iter().collect()
+        use snarkvm::ledger::store::cow_to_copied;
+        self.transmissions.iter_confirmed().map(|(k, v)| (cow_to_copied!(k), cow_to_cloned!(v))).collect()
     }
 }

@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ ]
 memory = [ "parking_lot", "tracing" ]
+persistent = [ ]
 test = [ "memory" ]
 
 [dependencies.indexmap]

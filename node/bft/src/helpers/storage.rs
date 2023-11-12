@@ -697,7 +697,7 @@ impl<N: Network> Storage<N> {
     pub fn transmissions_iter(
         &self,
     ) -> impl Iterator<Item = (TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>))> {
-        self.transmissions.as_iterator()
+        self.transmissions.as_hashmap().into_iter()
     }
 
     /// Inserts the given `certificate` into storage.

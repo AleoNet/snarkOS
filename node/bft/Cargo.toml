@@ -144,6 +144,10 @@ path = "./ledger-service"
 default-features = false
 features = [ "test" ]
 
+[dev-dependencies.snarkos-node-bft-storage-service]
+path = "./storage-service"
+features = [ "test" ]
+
 [dev-dependencies.snarkvm]
 workspace = true
 features = [ "test-helpers" ]

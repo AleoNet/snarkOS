@@ -20,5 +20,10 @@ pub mod memory;
 #[cfg(feature = "memory")]
 pub use memory::*;
 
+#[cfg(feature = "persistent")]
+pub mod persistent;
+#[cfg(feature = "persistent")]
+pub use persistent::*;
+
 pub mod traits;
 pub use traits::*;
