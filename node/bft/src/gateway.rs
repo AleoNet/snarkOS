@@ -17,7 +17,7 @@ use crate::{
     helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
     spawn_blocking,
     CONTEXT,
-    MAX_BATCH_DELAY,
+    MAX_BATCH_DELAY_IN_MS,
     MAX_GC_ROUNDS,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_TRANSMISSIONS_PER_WORKER_PING,
@@ -43,6 +43,8 @@ use snarkos_node_bft_events::{
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
+    is_bogon_ip,
+    is_unspecified_ip,
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
     Connection,
@@ -71,14 +73,14 @@ use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
 /// The maximum interval of events to cache.
-const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
+const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY_IN_MS / 1000) as i64; // seconds
 /// The maximum interval of requests to cache.
-const CACHE_REQUESTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
+const CACHE_REQUESTS_INTERVAL: i64 = (MAX_BATCH_DELAY_IN_MS / 1000) as i64; // seconds
 
 /// The maximum number of connection attempts in an interval.
 const MAX_CONNECTION_ATTEMPTS: usize = 10;
 /// The maximum interval to restrict a peer.
-const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DELAY / 1000) as i64; // seconds
+const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DELAY_IN_MS / 1000) as i64; // seconds
 
 /// The minimum number of validators to maintain a connection to.
 const MIN_CONNECTED_VALIDATORS: usize = 175;
@@ -260,6 +262,11 @@ impl<N: Network> Gateway<N> {
     pub fn is_local_ip(&self, ip: SocketAddr) -> bool {
         ip == self.local_ip()
             || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
+    }
+
+    /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
+    pub fn is_valid_peer_ip(&self, ip: SocketAddr) -> bool {
+        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_ip(ip.ip())
     }
 
     /// Returns the resolver.
@@ -500,7 +507,7 @@ impl<N: Network> Gateway<N> {
             // Retrieve the certificate ID.
             let certificate_id = match &event {
                 Event::CertificateRequest(CertificateRequest { certificate_id }) => *certificate_id,
-                Event::CertificateResponse(CertificateResponse { certificate }) => certificate.certificate_id(),
+                Event::CertificateResponse(CertificateResponse { certificate }) => certificate.id(),
                 _ => unreachable!(),
             };
             // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
@@ -666,7 +673,8 @@ impl<N: Network> Gateway<N> {
             }
             Event::ValidatorsRequest(_) => {
                 // Retrieve the connected peers.
-                let mut connected_peers: Vec<_> = self.connected_peers.read().iter().cloned().collect();
+                let mut connected_peers: Vec<_> =
+                    self.connected_peers.read().iter().copied().filter(|ip| self.is_valid_peer_ip(*ip)).collect();
                 // Shuffle the connected peers.
                 connected_peers.shuffle(&mut rand::thread_rng());
 
@@ -705,8 +713,8 @@ impl<N: Network> Gateway<N> {
                     let self_ = self.clone();
                     tokio::spawn(async move {
                         for (validator_ip, validator_address) in validators {
-                            // Ensure the validator IP is not this node.
-                            if self_.is_local_ip(validator_ip) {
+                            // Ensure the validator IP is not this node and is well-formed.
+                            if !self_.is_valid_peer_ip(validator_ip) {
                                 continue;
                             }
                             // Ensure the validator address is not this node.

@@ -16,7 +16,8 @@ use crate::{
     helpers::{BFTSender, Pending, Storage, SyncReceiver},
     Gateway,
     Transport,
-    MAX_BATCH_DELAY,
+    MAX_BATCH_DELAY_IN_MS,
+    PRIMARY_PING_IN_MS,
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -79,6 +80,8 @@ impl<N: Network> Sync<N> {
             self.bft_sender.set(bft_sender).expect("BFT sender already set in gateway");
         }
 
+        info!("Syncing storage with the ledger...");
+
         // Sync the storage with the ledger.
         self.sync_storage_with_ledger_at_bootup().await?;
 
@@ -89,13 +92,11 @@ impl<N: Network> Sync<N> {
         self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // Sleep briefly to avoid triggering spam detection.
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(PRIMARY_PING_IN_MS)).await;
                 // Perform the sync routine.
                 let communication = &self_.gateway;
                 // let communication = &node.router;
-                if let Err(error) = self_.block_sync.try_block_sync(communication).await {
-                    warn!("Sync error - {error}");
-                }
+                self_.block_sync.try_block_sync(communication).await;
             }
         }));
 
@@ -191,6 +192,8 @@ impl<N: Network> Sync<N> {
         // Acquire the sync lock.
         let _lock = self.lock.lock().await;
 
+        debug!("Syncing storage with the ledger from block {} to {}...", gc_height, block_height.saturating_add(1));
+
         /* Sync storage */
 
         // Sync the height with the block.
@@ -258,6 +261,7 @@ impl<N: Network> Sync<N> {
         let mut current_height = self.ledger.latest_block_height() + 1;
         // Try to advance the ledger with sync blocks.
         while let Some(block) = self.block_sync.process_next_block(current_height) {
+            info!("Syncing the BFT to block {}...", block.height());
             // Sync the storage with the block.
             self.sync_storage_with_block(block).await?;
             // Update the current height.
@@ -335,7 +339,7 @@ impl<N: Network> Sync<N> {
             }
         }
         // Wait for the certificate to be fetched.
-        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
+        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
@@ -360,12 +364,12 @@ impl<N: Network> Sync<N> {
     fn finish_certificate_request(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) {
         let certificate = response.certificate;
         // Check if the peer IP exists in the pending queue for the given certificate ID.
-        let exists = self.pending.get(certificate.certificate_id()).unwrap_or_default().contains(&peer_ip);
+        let exists = self.pending.get(certificate.id()).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
             // TODO: Validate the certificate.
             // Remove the certificate ID from the pending queue.
-            self.pending.remove(certificate.certificate_id(), Some(certificate));
+            self.pending.remove(certificate.id(), Some(certificate));
         }
     }
 }

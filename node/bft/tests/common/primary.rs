@@ -22,7 +22,7 @@ use snarkos_node_bft::{
     helpers::{init_primary_channels, PrimarySender, Storage},
     Primary,
     BFT,
-    MAX_BATCH_DELAY,
+    MAX_BATCH_DELAY_IN_MS,
     MAX_GC_ROUNDS,
 };
 use snarkvm::{
@@ -281,7 +281,7 @@ impl TestNetwork {
     // Checks if all the nodes have stopped progressing.
     pub async fn is_halted(&self) -> bool {
         let halt_round = self.validators.values().map(|v| v.primary.current_round()).max().unwrap();
-        sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
+        sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS * 2)).await;
         self.validators.values().all(|v| v.primary.current_round() <= halt_round)
     }
 

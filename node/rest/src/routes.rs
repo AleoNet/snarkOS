@@ -155,6 +155,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_transaction(tx_id)?))
     }
 
+    // GET /testnet3/transaction/confirmed/{transactionID}
+    pub(crate) async fn get_confirmed_transaction(
+        State(rest): State<Self>,
+        Path(tx_id): Path<N::TransactionID>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_confirmed_transaction(tx_id)?))
+    }
+
     // GET /testnet3/memoryPool/transmissions
     pub(crate) async fn get_memory_pool_transmissions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {

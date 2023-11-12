@@ -63,7 +63,6 @@ pub mod prop_tests {
         console::{
             account::Signature,
             prelude::{FromBytes, ToBytes},
-            types::Field,
         },
         ledger::{
             committee::prop_tests::{CommitteeContext, ValidatorSet},
@@ -73,7 +72,7 @@ pub mod prop_tests {
     };
 
     use bytes::{Buf, BufMut, BytesMut};
-    use indexmap::IndexMap;
+    use indexmap::IndexSet;
     use proptest::{
         collection::vec,
         prelude::{any, BoxedStrategy, Just, Strategy},
@@ -102,7 +101,7 @@ pub mod prop_tests {
             .prop_map(|(committee, batch_header)| {
                 let CommitteeContext(_, validator_set) = committee;
                 let mut rng = TestRng::default();
-                BatchCertificate::new(batch_header.clone(), sign_batch_header(&validator_set, &batch_header, &mut rng))
+                BatchCertificate::from(batch_header.clone(), sign_batch_header(&validator_set, &batch_header, &mut rng))
                     .unwrap()
             })
             .boxed()
@@ -112,13 +111,11 @@ pub mod prop_tests {
         validator_set: &ValidatorSet,
         batch_header: &BatchHeader<CurrentNetwork>,
         rng: &mut TestRng,
-    ) -> IndexMap<Signature<CurrentNetwork>, i64> {
-        let mut signatures = IndexMap::with_capacity(validator_set.0.len());
+    ) -> IndexSet<Signature<CurrentNetwork>> {
+        let mut signatures = IndexSet::with_capacity(validator_set.0.len());
         for validator in validator_set.0.iter() {
             let private_key = validator.private_key;
-            let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
-            let timestamp_field = Field::from_u64(timestamp as u64);
-            signatures.insert(private_key.sign(&[batch_header.batch_id(), timestamp_field], rng).unwrap(), timestamp);
+            signatures.insert(private_key.sign(&[batch_header.batch_id()], rng).unwrap());
         }
         signatures
     }

@@ -14,13 +14,13 @@
 
 use crate::StorageService;
 use snarkvm::{
+    console::types::Field,
     ledger::narwhal::{Transmission, TransmissionID},
     prelude::{bail, Network, Result},
 };
 
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
-use snarkvm::prelude::Field;
 use std::collections::HashMap;
 
 /// A BFT in-memory storage service.
