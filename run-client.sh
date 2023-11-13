@@ -3,7 +3,7 @@
 # USAGE examples: 
   # CLI :  ./run-client.sh
 
-COMMAND='cargo run --release -- start --nodisplay --client'
+COMMAND='cargo run --release -- start --nodisplay --beacon'
 
 for word in $*;
 do
