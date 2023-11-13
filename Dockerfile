@@ -14,4 +14,4 @@ EXPOSE 4133/tcp
 RUN pwd
 RUN ls
 RUN cargo install --path . --locked
-RUN ./run-client.sh
+ENTRYPOINT ["./run-client.sh"]
