@@ -230,6 +230,10 @@ impl<N: Network> Consensus<N> {
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        tracing::info!(
+            "{{\"event\": \"add_uncomfirmed_transaction_to_mempool\", \"transactoin\":\"{:?}\"}}",
+            transaction,
+        );
         // Process the unconfirmed transaction.
         {
             let transaction_id = transaction.id();

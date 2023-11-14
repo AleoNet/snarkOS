@@ -542,7 +542,9 @@ fn load_or_compute_genesis<N: Network>(
 mod tests {
     use super::*;
     use crate::commands::{Command, CLI};
+    use rand::thread_rng;
     use snarkvm::prelude::Testnet3;
+    use std::{fs::File, io::Write};
 
     type CurrentNetwork = Testnet3;
 
@@ -786,6 +788,47 @@ mod tests {
             assert_eq!(start.validators, "IP1,IP2,IP3");
         } else {
             panic!("Unexpected result of clap parsing!");
+        }
+    }
+
+    #[test]
+    fn print_keys() {
+        // Sample the private key of this node.
+        // Initialize the (fixed) RNG.
+        // Iterate through 'dev' address instances to match the account.
+        for i in 0..50 {
+            let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
+            for _ in 0..i {
+                let _ = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
+            }
+            let private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
+            println!("[\"{}\",\"{}\"]", private_key, Address::try_from(&private_key).unwrap());
+        }
+    }
+
+    #[test]
+    fn private_keys() {
+        // Sample the private key of this node.
+        // Initialize the (fixed) RNG.
+        // Iterate through 'dev' address instances to match the account.
+        for _ in 0..250000 {
+            let mut rng = thread_rng();
+            let private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
+            println!("[\"{}\",\"{}\"]", private_key, Address::try_from(&private_key).unwrap());
+        }
+    }
+
+    #[test]
+    fn private_keys_to_file() {
+        // Sample the private key of this node.
+        // Initialize the (fixed) RNG.
+        // Iterate through 'dev' address instances to match the account.
+        let mut file = File::create("output.txt").expect("unable to create file");
+        for _ in 0..250000 {
+            let mut rng = thread_rng();
+            let private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
+            let output = format!("[\"{}\",\"{}\"]\n", private_key, Address::try_from(&private_key).unwrap());
+            file.write_all(output.as_bytes()).expect("unable to write");
         }
     }
 }
