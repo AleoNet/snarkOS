@@ -53,11 +53,13 @@ pub struct Sync<N: Network> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The sync lock.
     lock: Arc<TMutex<()>>,
+    /// Whether we are in dev mode
+    dev: Option<u16>,
 }
 
 impl<N: Network> Sync<N> {
     /// Initializes a new sync instance.
-    pub fn new(gateway: Gateway<N>, storage: Storage<N>, ledger: Arc<dyn LedgerService<N>>) -> Self {
+    pub fn new(gateway: Gateway<N>, storage: Storage<N>, ledger: Arc<dyn LedgerService<N>>, dev: Option<u16>) -> Self {
         // Initialize the block sync module.
         let block_sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
         // Return the sync instance.
@@ -70,6 +72,7 @@ impl<N: Network> Sync<N> {
             bft_sender: Default::default(),
             handles: Default::default(),
             lock: Default::default(),
+            dev,
         }
     }
 
@@ -352,16 +355,24 @@ impl<N: Network> Sync<N> {
     fn send_certificate_response(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
         // Attempt to retrieve the certificate.
         if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
-            if self.ledger.current_committee().unwrap().get_leader(certificate.round()).unwrap()
-                != self.gateway.account().address()
-            {
+            if let Some(dev) = self.dev {
+                if  dev != 1 || 
+                    self.ledger.current_committee().unwrap().get_leader(certificate.round()).unwrap() != self.gateway.account().address()
+                {
+                    // Send the certificate response to the peer.
+                    let self_ = self.clone();
+                    tokio::spawn(async move {
+                        let _ = self_.gateway.send(peer_ip, Event::CertificateResponse(certificate.into())).await;
+                    });
+                } else {
+                    println!("\n\nSKIPPING SENDING CERTIFICATE RESPONSE FOR ROUND {}\n\n", certificate.round());
+                }
+            } else {
                 // Send the certificate response to the peer.
                 let self_ = self.clone();
                 tokio::spawn(async move {
                     let _ = self_.gateway.send(peer_ip, Event::CertificateResponse(certificate.into())).await;
                 });
-            } else {
-                println!("\n\nSKIPPING SENDING CERTIFICATE RESPONSE FOR ROUND {}\n\n", certificate.round());
             }
         }
     }

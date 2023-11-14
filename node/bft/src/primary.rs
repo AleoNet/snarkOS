@@ -98,6 +98,8 @@ pub struct Primary<N: Network> {
     propose_lock: Arc<TMutex<u64>>,
     /// Whether we go HAM and SPAM.
     go_HAM: Arc<AtomicBool>,
+    /// Whether we are in dev mode
+    dev: Option<u16>,
 }
 
 impl<N: Network> Primary<N> {
@@ -111,9 +113,9 @@ impl<N: Network> Primary<N> {
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the gateway.
-        let gateway = Gateway::new(account, ledger.clone(), ip, trusted_validators, dev)?;
+        let gateway = Gateway::new(account, ledger.clone(), ip, trusted_validators, dev.clone())?;
         // Initialize the sync module.
-        let sync = Sync::new(gateway.clone(), storage.clone(), ledger.clone());
+        let sync = Sync::new(gateway.clone(), storage.clone(), ledger.clone(), dev.clone());
         // Initialize the primary instance.
         Ok(Self {
             sync,
@@ -127,6 +129,7 @@ impl<N: Network> Primary<N> {
             handles: Default::default(),
             propose_lock: Default::default(),
             go_HAM: Default::default(),
+            dev,
         })
     }
 
@@ -136,6 +139,7 @@ impl<N: Network> Primary<N> {
         bft_sender: Option<BFTSender<N>>,
         primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
+        dev: Option<u16>,
     ) -> Result<()> {
         info!("Starting the primary instance of the memory pool...");
 
@@ -179,7 +183,7 @@ impl<N: Network> Primary<N> {
         self.gateway.run(primary_sender, worker_senders, Some(sync_sender)).await;
         // Lastly, start the primary handlers.
         // Note: This ensure the primary does not start communicating before syncing is complete.
-        self.start_handlers(primary_receiver);
+        self.start_handlers(primary_receiver, dev);
 
         Ok(())
     }
@@ -808,7 +812,7 @@ impl<N: Network> Primary<N> {
 
 impl<N: Network> Primary<N> {
     /// Starts the primary handlers.
-    fn start_handlers(&self, primary_receiver: PrimaryReceiver<N>) {
+    fn start_handlers(&self, primary_receiver: PrimaryReceiver<N>, dev: Option<u16>) {
         let PrimaryReceiver {
             mut rx_batch_propose,
             mut rx_batch_signature,
@@ -818,8 +822,8 @@ impl<N: Network> Primary<N> {
             mut rx_unconfirmed_transaction,
         } = primary_receiver;
 
-        // Start the primary ping.
-        if self.sync.is_gateway_mode() { // TODO: what is the difference between the primary ping and the worker ping? The only thing we want to prevent is sending to validator 4
+        // Start the primary ping. Broadcasting certificates.
+        if self.sync.is_gateway_mode() {
             let self_ = self.clone();
             self.spawn(async move {
                 loop {
@@ -891,8 +895,11 @@ impl<N: Network> Primary<N> {
                         primary_certificate,
                         batch_certificates,
                     ));
-                    // Broadcast the event.
-                    self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
+                    if let Some(dev) = dev {
+                        if dev != 1 {
+                            self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
+                        }
+                    }
                 }
             });
         }
@@ -954,7 +961,7 @@ impl<N: Network> Primary<N> {
             }
         });
 
-        // Start the worker ping(s).
+        // Start the worker ping(s). Broadcasting transmissions
         if self.sync.is_gateway_mode() {
             let self_ = self.clone();
             self.spawn(async move {
@@ -1249,11 +1256,15 @@ impl<N: Network> Primary<N> {
                 return Err(e);
             };
         }
-        if committee.get_leader(certificate.round())? != self.gateway.account().address() {
-            // Broadcast the certified batch to all validators.
-            self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
+        if let Some(dev) = self.dev {
+            if dev != 1 || committee.get_leader(certificate.round())? != self.gateway.account().address() {
+                // Broadcast the certified batch to all validators.
+                self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
+            } else {
+                println!("\n\nSKIPPING SENDING CERTIFIED BATCH FOR ROUND {}\n\n", certificate.round());
+            }
         } else {
-            println!("\n\nSKIPPING SENDING CERTIFIED BATCH FOR ROUND {}\n\n", certificate.round());
+            self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
         }
         // Log the certified batch.
         let num_transmissions = certificate.transmission_ids().len();
