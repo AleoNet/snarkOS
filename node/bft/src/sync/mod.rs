@@ -312,7 +312,8 @@ impl<N: Network> Sync<N> {
 
     /// Returns `true` if the node is in gateway mode.
     pub const fn is_gateway_mode(&self) -> bool {
-        self.block_sync.mode().is_gateway()
+        false
+        // self.block_sync.mode().is_gateway()
     }
 
     /// Returns the current block locators of the node.

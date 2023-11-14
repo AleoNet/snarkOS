@@ -819,7 +819,7 @@ impl<N: Network> Primary<N> {
         } = primary_receiver;
 
         // Start the primary ping.
-        if self.sync.is_gateway_mode() {
+        if self.sync.is_gateway_mode() { // TODO: what is the difference between the primary ping and the worker ping? The only thing we want to prevent is sending to validator 4
             let self_ = self.clone();
             self.spawn(async move {
                 loop {
