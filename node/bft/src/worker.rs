@@ -399,9 +399,52 @@ impl<N: Network> Worker<N> {
         let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
-            // TODO: Validate the transmission.
-            // TODO (howardwu): Deserialize the transmission, and ensure it matches the transmission ID.
-            //  Note: This is difficult for testing and example purposes, since those transmissions are fake.
+            // Validate the transmission.
+            #[cfg(not(test))]
+            match (transmission_id, &transmission) {
+                (TransmissionID::Ratification, Transmission::Ratification) => {}
+                (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction)) => {
+                    match transaction.clone().deserialize_blocking() {
+                        Ok(transaction) => {
+                            if transaction.id() != expected_transaction_id {
+                                warn!(
+                                    "Received mismatching transaction ID from peer '{peer_ip}' - expected {}, found {}",
+                                    fmt_id(expected_transaction_id),
+                                    fmt_id(transaction.id()),
+                                );
+                                return;
+                            }
+                        }
+                        Err(err) => {
+                            warn!("Failed to deserialize transaction from peer '{}': {err}", peer_ip);
+                            return;
+                        }
+                    }
+                }
+                (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution)) => {
+                    match solution.clone().deserialize_blocking() {
+                        Ok(solution) => {
+                            if solution.commitment() != expected_commitment {
+                                warn!(
+                                    "Received mismatching solution ID from peer '{peer_ip}' - expected {}, found {}",
+                                    fmt_id(expected_commitment),
+                                    fmt_id(solution.commitment()),
+                                );
+                                return;
+                            }
+                        }
+                        Err(err) => {
+                            warn!("Failed to deserialize solution from peer '{}': {err}", peer_ip);
+                            return;
+                        }
+                    }
+                }
+                _ => {
+                    warn!("Mismatched transmission type from peer '{}'", peer_ip);
+                    return;
+                }
+            }
+
             // Remove the transmission ID from the pending queue.
             self.pending.remove(transmission_id, Some(transmission));
         }
