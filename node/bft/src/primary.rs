@@ -620,6 +620,8 @@ impl<N: Network> Primary<N> {
         // Retrieve the signer.
         let signer = spawn_blocking!(Ok(signature.to_address()))?;
 
+        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+
         // Ensure the batch signature is signed by the validator.
         if self.gateway.resolver().get_address(peer_ip).map_or(true, |address| address != signer) {
             // Proceed to disconnect the validator.
@@ -809,7 +811,13 @@ impl<N: Network> Primary<N> {
         if self.sync.is_gateway_mode() {
             let self_ = self.clone();
             self.spawn(async move {
+                let mut counter = 0;
+
                 loop {
+                    if counter > 10 {
+                        break;
+                    }
+
                     // Sleep briefly.
                     tokio::time::sleep(Duration::from_millis(PRIMARY_PING_IN_MS)).await;
 
@@ -880,6 +888,8 @@ impl<N: Network> Primary<N> {
                     ));
                     // Broadcast the event.
                     self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
+
+                    counter += 1;
                 }
             });
         }
