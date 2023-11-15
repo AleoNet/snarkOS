@@ -18,7 +18,7 @@ use snarkvm::{
         block::{Block, Transaction},
         coinbase::{CoinbaseVerifyingKey, ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
         Ledger,
     },
@@ -26,7 +26,6 @@ use snarkvm::{
 };
 
 use indexmap::IndexMap;
-use snarkvm::prelude::narwhal::BatchCertificate;
 use std::{fmt, ops::Range, sync::Arc};
 
 /// A core ledger service.

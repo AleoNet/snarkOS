@@ -25,6 +25,7 @@ use snarkos_node_bft::{
     MAX_BATCH_DELAY_IN_MS,
     MAX_GC_ROUNDS,
 };
+use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
     console::algorithms::BHP256,
     ledger::{
@@ -151,7 +152,7 @@ impl TestNetwork {
             let mut rng = TestRng::fixed(id as u64);
             let gen_ledger = genesis_ledger(gen_key, committee.clone(), balances.clone(), &mut rng);
             let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger));
-            let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
+            let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
 
             let (primary, bft) = if config.bft {
                 let bft = BFT::<CurrentNetwork>::new(account, storage, ledger, None, &[], Some(id as u16)).unwrap();

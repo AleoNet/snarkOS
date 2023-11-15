@@ -26,6 +26,7 @@ members = [
   "node/bft",
   "node/bft/events",
   "node/bft/ledger-service",
+  "node/bft/storage-service",
   "node/cdn",
   "node/consensus",
   "node/metrics",
