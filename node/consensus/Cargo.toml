@@ -52,6 +52,12 @@ version = "=2.2.4"
 default-features = false
 features = [ "ledger", "ledger-write" ]
 
+[dependencies.snarkos-node-bft-storage-service]
+path = "../bft/storage-service"
+version = "=2.2.4"
+default-features = false
+features = [ "persistent" ]
+
 [dependencies.snarkvm]
 workspace = true
 

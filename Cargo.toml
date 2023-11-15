@@ -26,6 +26,7 @@ members = [
   "node/bft",
   "node/bft/events",
   "node/bft/ledger-service",
+  "node/bft/storage-service",
   "node/cdn",
   "node/consensus",
   "node/metrics",
@@ -40,7 +41,9 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-version = "=0.16.9"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "36b5263d9"
+#version = "=0.16.9"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]

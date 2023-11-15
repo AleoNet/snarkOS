@@ -33,6 +33,7 @@ use snarkos_node_bft::{
     MAX_TRANSMISSIONS_PER_BATCH,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
+use snarkos_node_bft_storage_service::BFTPersistentStorage;
 use snarkvm::{
     ledger::{
         block::Transaction,
@@ -82,8 +83,10 @@ impl<N: Network> Consensus<N> {
         trusted_validators: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
+        // Initialize the Narwhal transmissions.
+        let transmissions = Arc::new(BFTPersistentStorage::open(dev)?);
         // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new(ledger.clone(), MAX_GC_ROUNDS);
+        let storage = NarwhalStorage::new(ledger.clone(), transmissions, MAX_GC_ROUNDS);
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
         // Return the consensus.
