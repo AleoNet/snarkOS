@@ -3216,6 +3216,7 @@ dependencies = [
  "snarkos-account",
  "snarkos-node-bft",
  "snarkos-node-bft-ledger-service",
+ "snarkos-node-bft-storage-service",
  "snarkvm",
  "tokio",
  "tracing",

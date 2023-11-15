@@ -28,12 +28,12 @@ use snarkos_node_bft::{
         Storage as NarwhalStorage,
     },
     spawn_blocking,
-    storage_service::BFTMemoryService,
     BFT,
     MAX_GC_ROUNDS,
     MAX_TRANSMISSIONS_PER_BATCH,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
+use snarkos_node_bft_storage_service::BFTPersistentStorage;
 use snarkvm::{
     ledger::{
         block::Transaction,
@@ -84,8 +84,7 @@ impl<N: Network> Consensus<N> {
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the Narwhal transmissions.
-        // TODO (howardwu): Switch this to a persistent storage service.
-        let transmissions = Arc::new(BFTMemoryService::new());
+        let transmissions = Arc::new(BFTPersistentStorage::open(dev)?);
         // Initialize the Narwhal storage.
         let storage = NarwhalStorage::new(ledger.clone(), transmissions, MAX_GC_ROUNDS);
         // Initialize the BFT.
