@@ -168,12 +168,12 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn ensure_transmission_id_matches(
         &self,
         transmission_id: TransmissionID<N>,
-        transmission: Transmission<N>,
+        transmission: &mut Transmission<N>,
     ) -> Result<()> {
         match (transmission_id, transmission) {
             (TransmissionID::Ratification, Transmission::Ratification) => {}
-            (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction)) => {
-                match transaction.deserialize_blocking() {
+            (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction_data)) => {
+                match transaction_data.clone().deserialize_blocking() {
                     Ok(transaction) => {
                         if transaction.id() != expected_transaction_id {
                             bail!(
@@ -182,14 +182,17 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                                 fmt_id(transaction.id()),
                             );
                         }
+
+                        // Update the transmission with the deserialized transaction.
+                        *transaction_data = Data::Object(transaction);
                     }
                     Err(err) => {
                         bail!("Failed to deserialize transaction: {err}");
                     }
                 }
             }
-            (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution)) => {
-                match solution.deserialize_blocking() {
+            (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution_data)) => {
+                match solution_data.clone().deserialize_blocking() {
                     Ok(solution) => {
                         if solution.commitment() != expected_commitment {
                             bail!(
@@ -198,6 +201,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                                 fmt_id(solution.commitment()),
                             );
                         }
+
+                        // Update the transmission with the deserialized solution.
+                        *solution_data = Data::Object(solution);
                     }
                     Err(err) => {
                         bail!("Failed to deserialize solution: {err}");

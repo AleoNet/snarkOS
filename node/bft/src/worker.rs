@@ -394,13 +394,13 @@ impl<N: Network> Worker<N> {
     /// Handles the incoming transmission response.
     /// This method ensures the transmission response is well-formed and matches the transmission ID.
     fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) {
-        let TransmissionResponse { transmission_id, transmission } = response;
+        let TransmissionResponse { transmission_id, mut transmission } = response;
         // Check if the peer IP exists in the pending queue for the given transmission ID.
         let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
             // Ensure the transmission ID matches the transmission.
-            match self.ledger.ensure_transmission_id_matches(transmission_id, transmission.clone()) {
+            match self.ledger.ensure_transmission_id_matches(transmission_id, &mut transmission) {
                 Ok(()) => {
                     // Remove the transmission ID from the pending queue.
                     self.pending.remove(transmission_id, Some(transmission));
@@ -489,7 +489,7 @@ mod tests {
             fn ensure_transmission_id_matches(
                 &self,
                 transmission_id: TransmissionID<N>,
-                transmission: Transmission<N>,
+                transmission: &mut Transmission<N>,
             ) -> Result<()>;
             async fn check_solution_basic(
                 &self,

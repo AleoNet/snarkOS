@@ -128,7 +128,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     fn ensure_transmission_id_matches(
         &self,
         _transmission_id: TransmissionID<N>,
-        _transmission: Transmission<N>,
+        _transmission: &mut Transmission<N>,
     ) -> Result<()> {
         Ok(())
     }

@@ -82,7 +82,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     fn ensure_transmission_id_matches(
         &self,
         transmission_id: TransmissionID<N>,
-        transmission: Transmission<N>,
+        transmission: &mut Transmission<N>,
     ) -> Result<()>;
 
     /// Checks the given solution is well-formed.
