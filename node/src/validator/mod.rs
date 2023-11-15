@@ -354,6 +354,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     return Ok(());
                 }
 
+                // Note: dev_tx_interval can be Some(Duration::from_millis(0)), which is handled after this
                 dev_tx_interval.unwrap_or(DEFAULT_INTERVAL)
             }
             None => {
@@ -372,6 +373,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 DEFAULT_INTERVAL
             }
         };
+        if interval.as_millis() == 0 {
+            // if the tx interval was explicitly set to 0, do not start the loop
+            return Ok(());
+        }
 
         let self_ = self.clone();
         self.spawn(async move {

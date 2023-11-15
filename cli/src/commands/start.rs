@@ -433,8 +433,7 @@ impl Start {
 
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
-        // Treat dev_tx_interval_ms=0 as Option<Duration>::None
-        let dev_tx_interval = self.dev_tx_interval_ms.filter(|msec| *msec > 0).map(|msec| Duration::from_millis(msec as u64));
+        let dev_tx_interval = self.dev_tx_interval_ms.map(|msec| Duration::from_millis(msec as u64));
         match node_type {
             NodeType::Validator => Node::new_validator(self.node, rest_ip, bft_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev, dev_tx_interval).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
