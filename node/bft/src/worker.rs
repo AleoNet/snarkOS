@@ -399,54 +399,14 @@ impl<N: Network> Worker<N> {
         let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
-            // Validate the transmission.
-            #[cfg(not(test))]
-            match (transmission_id, &transmission) {
-                (TransmissionID::Ratification, Transmission::Ratification) => {}
-                (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction)) => {
-                    match transaction.clone().deserialize_blocking() {
-                        Ok(transaction) => {
-                            if transaction.id() != expected_transaction_id {
-                                warn!(
-                                    "Received mismatching transaction ID from peer '{peer_ip}' - expected {}, found {}",
-                                    fmt_id(expected_transaction_id),
-                                    fmt_id(transaction.id()),
-                                );
-                                return;
-                            }
-                        }
-                        Err(err) => {
-                            warn!("Failed to deserialize transaction from peer '{}': {err}", peer_ip);
-                            return;
-                        }
-                    }
+            // Ensure the transmission ID matches the transmission.
+            match self.ledger.ensure_transmission_id_matches(transmission_id, transmission.clone()) {
+                Ok(()) => {
+                    // Remove the transmission ID from the pending queue.
+                    self.pending.remove(transmission_id, Some(transmission));
                 }
-                (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution)) => {
-                    match solution.clone().deserialize_blocking() {
-                        Ok(solution) => {
-                            if solution.commitment() != expected_commitment {
-                                warn!(
-                                    "Received mismatching solution ID from peer '{peer_ip}' - expected {}, found {}",
-                                    fmt_id(expected_commitment),
-                                    fmt_id(solution.commitment()),
-                                );
-                                return;
-                            }
-                        }
-                        Err(err) => {
-                            warn!("Failed to deserialize solution from peer '{}': {err}", peer_ip);
-                            return;
-                        }
-                    }
-                }
-                _ => {
-                    warn!("Mismatched transmission type from peer '{}'", peer_ip);
-                    return;
-                }
-            }
-
-            // Remove the transmission ID from the pending queue.
-            self.pending.remove(transmission_id, Some(transmission));
+                Err(err) => warn!("Failed to finish transmission response from peer '{peer_ip}': {err}"),
+            };
         }
     }
 
@@ -526,6 +486,11 @@ mod tests {
             fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
             fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
+            fn ensure_transmission_id_matches(
+                &self,
+                transmission_id: TransmissionID<N>,
+                transmission: Transmission<N>,
+            ) -> Result<()>;
             async fn check_solution_basic(
                 &self,
                 puzzle_commitment: PuzzleCommitment<N>,
