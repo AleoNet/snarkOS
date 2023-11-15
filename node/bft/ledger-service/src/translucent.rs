@@ -130,6 +130,15 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Always succeeds.
+    fn ensure_transmission_id_matches(
+        &self,
+        _transmission_id: TransmissionID<N>,
+        _transmission: Transmission<N>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    /// Always succeeds.
     async fn check_solution_basic(
         &self,
         _puzzle_commitment: PuzzleCommitment<N>,
