@@ -28,7 +28,7 @@ version = "2.1"
 features = [ "serde", "rayon" ]
 
 [dependencies.itertools]
-version = "0.11"
+version = "0.12"
 
 [dependencies.once_cell]
 version = "1"
