@@ -3,7 +3,7 @@
 # USAGE examples: 
   # CLI :  ./run-client.sh
 
-COMMAND='snarkos start --nodisplay --dev 0 --validator'
+COMMAND='cargo run --release -- start --nodisplay --client'
 
 for word in $*;
 do

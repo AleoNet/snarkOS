@@ -82,15 +82,20 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
+        println!("initializing signal node");
         // Initialize the signal handler.
         let signal_node = Self::handle_signals();
 
+        println!("initializing ledger");
         // Initialize the ledger.
         let ledger = Ledger::<N, C>::load(genesis.clone(), dev)?;
+        println!("initialized ledger");
         // TODO: Remove me after Phase 3.
         let ledger = crate::phase_3_reset(ledger, dev)?;
+        println!("completed phase 3 reset");
         // Initialize the CDN.
         if let Some(base_url) = cdn {
+            println!("initializing cdn... {}", base_url);
             // Sync the ledger with the CDN.
             if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
                 crate::log_clean_error(dev);
@@ -100,6 +105,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
 
         // Initialize the ledger service.
         let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
+        println!("initilalized ledger service");
         // Initialize the sync module.
         let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
 
@@ -126,15 +132,19 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             handles: Default::default(),
             shutdown: Default::default(),
         };
-
+        println!("initilalized node");
+        println!("initilalized rest server");
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
             node.rest = Some(Rest::start(rest_ip, None, ledger.clone(), Arc::new(node.clone()))?);
+            println!("initilalized rest server");
         }
         // Initialize the routing.
         node.initialize_routing().await;
+        println!("initilalized routing");
         // Initialize the sync module.
         node.initialize_sync();
+        println!("initilalized sync");
         // Initialize the notification message loop.
         node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.

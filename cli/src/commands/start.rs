@@ -197,7 +197,7 @@ impl Start {
         //  2. The user has explicitly disabled CDN.
         //  3. The node is a prover (no need to sync).
         //  4. The node type is not declared (defaults to client) (no need to sync).
-        if self.dev.is_some() || self.cdn.is_empty() || self.nocdn || self.prover || is_no_node_type {
+        if self.dev.is_some() || self.cdn.is_empty() || self.nocdn || self.prover {
             None
         }
         // Enable the CDN otherwise.
@@ -276,7 +276,8 @@ impl Start {
             //
             // Note: the reason the `bft` flag is an option is to detect for remote devnet testing.
             if !self.norest && self.bft.is_none() {
-                self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
+                self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3333 + dev))?;
+                println!("started rest server! {}", self.rest);
             }
         }
         Ok(())
@@ -409,7 +410,7 @@ impl Start {
             );
 
             // If the node is running a REST server, print the REST IP and JWT.
-            if node_type.is_validator() {
+            if node_type.is_validator() || node_type.is_client() {
                 if let Some(rest_ip) = rest_ip {
                     println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
 
