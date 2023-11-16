@@ -953,7 +953,7 @@ impl<N: Network> Transport<N> for Gateway<N> {
         // START MY DELTA 
         let account0: Account<N> = Account::try_from("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()).unwrap(); 
         let addr0:Address<N> = account0.address();
-        let ip3: SocketAddr = SocketAddr::from_str("18.220.116.82").unwrap();
+        let ip3: SocketAddr = SocketAddr::from_str("18.220.116.82:4133").unwrap();
 
         let mut current_round: Option<u64> = None; 
         if let Event::CertificateResponse(ref response) = event {
@@ -977,12 +977,7 @@ impl<N: Network> Transport<N> for Gateway<N> {
                     let _ = Transport::send(&self_, peer_ip, event.clone()).await;
                     
                     //END MYDELTA 
-                    // let _ = Transport::send(&self_, peer_ip, event.clone()).await;
-                     // After round 52, Node 0 will go offline 
-                   // } else if self.account().address() == addr0 && self.primary_sender().storage.current_round() > MAX_GC_ROUNDS + 1{
-                      //  continue; 
-
-                      // how do i make node 0 go offline after round 52????? any way to access round number in gateway???   
+            
                 }
             });
         }

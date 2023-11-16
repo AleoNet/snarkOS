@@ -286,10 +286,10 @@ impl<N: Network> Primary<N> {
         let addr2:Address<N> = account2.address();
         let addr3:Address<N> = account3.address();
 
-        let _ip0: SocketAddr = SocketAddr::from_str("3.137.187.113").unwrap(); 
-        let _ip1: SocketAddr = SocketAddr::from_str("18.226.172.54").unwrap();
-        let _ip2: SocketAddr = SocketAddr::from_str("52.15.134.109").unwrap();
-        let _ip3: SocketAddr = SocketAddr::from_str("18.220.116.82").unwrap();
+        let _ip0: SocketAddr = SocketAddr::from_str("3.137.187.113:4133").unwrap(); 
+        let _ip1: SocketAddr = SocketAddr::from_str("18.226.172.54:4133").unwrap();
+        let _ip2: SocketAddr = SocketAddr::from_str("52.15.134.109:4133").unwrap();
+        let _ip3: SocketAddr = SocketAddr::from_str("18.220.116.82:4133").unwrap();
         
         // END: MYDELTA 
 
@@ -795,7 +795,7 @@ impl<N: Network> Primary<N> {
 
         let account3:Account<N> = Account::try_from("APrivateKey1zkpBjpEgLo4arVUkQmcLdKQMiAKGaHAQVVwmF8HQby8vdYs".to_string()).unwrap(); 
         let addr3:Address<N> = account3.address();
-        let ip0: SocketAddr = SocketAddr::from_str("3.137.187.113").unwrap(); 
+        let ip0: SocketAddr = SocketAddr::from_str("3.137.187.113:4133").unwrap(); 
 
         // START MYDELTA: This is an extra sanity check to ensure Node 3 will NOT store any certificates from Node 0. 
         if self.gateway.account().address() == addr3 && peer_ip == ip0 {
