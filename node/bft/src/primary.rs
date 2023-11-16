@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+
 use crate::{
     events::{BatchPropose, BatchSignature, Event},
     helpers::{
@@ -70,6 +72,8 @@ use tokio::{
     sync::{Mutex as TMutex, OnceCell},
     task::JoinHandle,
 };
+
+
 
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
@@ -270,6 +274,25 @@ impl<N: Network> Primary<N> {
     /// 3. Set the batch proposal in the primary.
     /// 4. Broadcast the batch header to all validators for signing.
     pub async fn propose_batch(&self) -> Result<()> {
+
+        // START: MYDELTA 
+        let account0: Account<N> = Account::try_from("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()).unwrap(); 
+        let account1: Account<N>= Account::try_from("APrivateKey1zkp2RWGDcde3efb89rjhME1VYA8QMxcxep5DShNBR6n8Yjh".to_string()).unwrap();
+        let account2:Account<N> = Account::try_from("APrivateKey1zkp2GUmKbVsuc1NSj28pa1WTQuZaK5f1DQJAT6vPcHyWokG".to_string()).unwrap(); 
+        let account3:Account<N> = Account::try_from("APrivateKey1zkpBjpEgLo4arVUkQmcLdKQMiAKGaHAQVVwmF8HQby8vdYs".to_string()).unwrap(); 
+
+        let addr0:Address<N> = account0.address();
+        let addr1:Address<N> = account1.address();
+        let addr2:Address<N> = account2.address();
+        let addr3:Address<N> = account3.address();
+
+        let _ip0: SocketAddr = SocketAddr::from_str("3.137.187.113").unwrap(); 
+        let _ip1: SocketAddr = SocketAddr::from_str("18.226.172.54").unwrap();
+        let _ip2: SocketAddr = SocketAddr::from_str("52.15.134.109").unwrap();
+        let _ip3: SocketAddr = SocketAddr::from_str("18.220.116.82").unwrap();
+        
+        // END: MYDELTA 
+
         // This function isn't re-entrant.
         let mut lock_guard = self.propose_lock.lock().await;
 
@@ -351,11 +374,74 @@ impl<N: Network> Primary<N> {
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
         // Retrieve the previous certificates.
-        let previous_certificates = self.storage.get_certificates_for_round(previous_round);
+        // let previous_certificates = self.storage.get_certificates_for_round(previous_round);
+        //Q: is it fine if I clone it? Originally was immutable 
+        let mut previous_certificates = self.storage.get_certificates_for_round(previous_round).clone();
+
+        // START MYDELTA: Nodes 1,2,3 for round <= 49 (0 indexed) will only include references for each other in their certificates.
+        if self.current_round() < self.storage.max_gc_rounds() {
+            if self.gateway.account().address() == addr1
+                || self.gateway.account().address() == addr2
+                || self.gateway.account().address() == addr3
+            {
+                previous_certificates.retain(|certificate| {
+                    certificate.batch_header().author() != addr0
+                });
+            } else if self.gateway.account().address() == addr0 {
+                // Node 0 will only include references to itself, node 1, and node 2 in its batch headers
+                previous_certificates.retain(|certificate| {
+                    certificate.batch_header().author() != addr3
+                });
+            }
+        }
+        // END MYDELTA
+
 
         // Check if the batch is ready to be proposed.
         // Note: The primary starts at round 1, and round 0 contains no certificates, by definition.
         let mut is_ready = previous_round == 0;
+
+
+        // START MYDELTA: if round r = gc_limit, then Node 1 will reference Node 0's certificate 
+        let primary_is_node_1 = self.gateway.account().address() == addr1; 
+        let mut contains_certificate_from_node_0 = false;  
+
+        if self.current_round() == self.storage.max_gc_rounds() {
+            // If primary is Node 4, make sure that it DOES NOT have any certificates from Node 0 in its storage.
+            if self.gateway.account().address() == addr3 {
+                for r in 1..=self.current_round() + 1 {
+                    // Get the certificates for the current round
+                    if let Some(_certificate) = self.storage.get_certificate_for_round_with_author(r, addr0) {
+                        println!("ERROR: Found previous certificate from Node 0 when Node 3 is primary.");
+                        break;
+                    }
+                }
+            }
+            // If primary is Node 1, make sure that it DOES have a previous certificate from Node 0 in its storage.
+            if self.gateway.account().address() == addr1 {
+                // First, let's check that node 2 has a past certificate from node 0 in its storage
+                for r in 1..=self.current_round() + 1 {
+                    if let Some(_certificate) = self.storage.get_certificate_for_round_with_author(r, addr0) {
+                        println!("Sanity check: Found previous certificate from Node 0 when Node 1 is primary.");
+                        break;
+                    }
+                }
+                // If we are node 1 primary, we are not ready until we have seen a certificate from node 0 in 'previous' 
+                if let Some(_certificate) = self.storage.get_certificate_for_round_with_author(self.current_round(), addr0) {
+                    contains_certificate_from_node_0 = true; 
+                      
+                }
+                //Finally, if node 1 contains a certificate in this round from node 4, remove it. 
+                if let Some(_certificate) = self.storage.get_certificate_for_round_with_author(self.current_round(), addr3) {
+                    previous_certificates.retain(|certificate| {
+                        certificate.batch_header().author() != addr3
+                    });    
+                }
+            }    
+        }    
+        //END MYDELTA
+        
+
         // If the previous round is not 0, check if the previous certificates have reached the quorum threshold.
         if previous_round > 0 {
             // Retrieve the previous committee for the round.
@@ -369,6 +455,11 @@ impl<N: Network> Primary<N> {
                 is_ready = true;
             }
         }
+        
+        // START MYDELTA: we want check that 'if primary is node 1, then it has a certificate from node 0' AND that the certificates reache quorum threshold 
+        is_ready = (!primary_is_node_1 || contains_certificate_from_node_0) && is_ready; 
+        // END MYDELTA 
+
         // If the batch is not ready to be proposed, return early.
         if !is_ready {
             debug!(
@@ -376,6 +467,7 @@ impl<N: Network> Primary<N> {
                 format!("(previous round {previous_round} has not reached quorum)").dimmed()
             );
             return Ok(());
+
         }
 
         // Determined the required number of transmissions per worker.
@@ -448,6 +540,7 @@ impl<N: Network> Primary<N> {
         let transmission_ids = transmissions.keys().copied().collect();
         // Prepare the certificate IDs.
         let certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
+
         // Sign the batch header.
         let batch_header = spawn_blocking!(BatchHeader::new(
             &private_key,
@@ -700,6 +793,17 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
+
+        let account3:Account<N> = Account::try_from("APrivateKey1zkpBjpEgLo4arVUkQmcLdKQMiAKGaHAQVVwmF8HQby8vdYs".to_string()).unwrap(); 
+        let addr3:Address<N> = account3.address();
+        let ip0: SocketAddr = SocketAddr::from_str("3.137.187.113").unwrap(); 
+
+        // START MYDELTA: This is an extra sanity check to ensure Node 3 will NOT store any certificates from Node 0. 
+        if self.gateway.account().address() == addr3 && peer_ip == ip0 {
+            return Ok(()); 
+        }
+        // END MYDELTA 
+
         // Ensure storage does not already contain the certificate.
         if self.storage.contains_certificate(certificate.id()) {
             return Ok(());

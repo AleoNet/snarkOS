@@ -949,6 +949,18 @@ impl<N: Network> Transport<N> for Gateway<N> {
     // TODO(ljedrz): the event should be checked for the presence of Data::Object, and
     // serialized in advance if it's there.
     fn broadcast(&self, event: Event<N>) {
+
+        // START MY DELTA 
+        let account0: Account<N> = Account::try_from("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()).unwrap(); 
+        let addr0:Address<N> = account0.address();
+        let ip3: SocketAddr = SocketAddr::from_str("18.220.116.82").unwrap();
+
+        let mut current_round: Option<u64> = None; 
+        if let Event::CertificateResponse(ref response) = event {
+            current_round = Some(response.certificate.batch_header().round());
+        }
+        //END MY DELTA 
+
         // Ensure there are connected peers.
         if self.number_of_connected_peers() > 0 {
             let self_ = self.clone();
@@ -957,7 +969,20 @@ impl<N: Network> Transport<N> for Gateway<N> {
                 // Iterate through all connected peers.
                 for peer_ip in connected_peers {
                     // Send the event to the peer.
+
+                    //START MYDELTA: If primary is node 0, do not broadcast to node 3.  
+                    if self_.account().address() == addr0 && (peer_ip == ip3 || current_round > Some(MAX_GC_ROUNDS + 1_u64)) {
+                        continue; 
+                    } 
                     let _ = Transport::send(&self_, peer_ip, event.clone()).await;
+                    
+                    //END MYDELTA 
+                    // let _ = Transport::send(&self_, peer_ip, event.clone()).await;
+                     // After round 52, Node 0 will go offline 
+                   // } else if self.account().address() == addr0 && self.primary_sender().storage.current_round() > MAX_GC_ROUNDS + 1{
+                      //  continue; 
+
+                      // how do i make node 0 go offline after round 52????? any way to access round number in gateway???   
                 }
             });
         }
