@@ -479,6 +479,8 @@ impl<N: Network> BFT<N> {
         };
         // Initialize a map for the deduped transmissions.
         let mut transmissions = IndexMap::new();
+        // Initialize a set to track the spent input IDs.
+        let mut input_ids: IndexSet<Field<N>> = IndexSet::new();
         // Start from the oldest leader certificate.
         for certificate in commit_subdag.values().flatten() {
             // Update the DAG.
@@ -504,6 +506,30 @@ impl<N: Network> BFT<N> {
                         certificate.round()
                     );
                 };
+
+                // If the transmission is a transaction, check if it contains any duplicate or existing input IDs.
+                if let Transmission::Transaction(transaction) = &transmission {
+                    // TODO (raychu86): Get around this deserialization.
+                    // Deserialize the transaction.
+                    let Ok(transaction) = transaction.clone().deserialize_blocking() else {
+                        bail!(
+                            "BFT failed to deserialize transmission '{}' from round {}",
+                            fmt_id(transmission_id),
+                            certificate.round()
+                        );
+                    };
+
+                    // If the transaction contains any duplicate or already existing input IDs, skip it.
+                    if transaction.input_ids().any(|input_id| {
+                        input_ids.contains(input_id) || self.ledger().contains_input_id(input_id).unwrap_or(true)
+                    }) {
+                        continue;
+                    }
+
+                    // Add the input IDs to the set.
+                    input_ids.extend(transaction.input_ids());
+                };
+
                 // Add the transmission to the set.
                 transmissions.insert(*transmission_id, transmission);
             }
