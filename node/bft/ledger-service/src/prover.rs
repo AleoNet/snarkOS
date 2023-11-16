@@ -114,6 +114,11 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Previous committee for round {round} does not exist in prover")
     }
 
+    /// Returns `true` if the ledger contains the given input ID.
+    fn contains_input_id(&self, input_id: &Field<N>) -> Result<bool> {
+        bail!("Input '{input_id}' does not exist in prover")
+    }
+
     /// Returns `true` if the ledger contains the given certificate ID in block history.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
         bail!("Certificate '{certificate_id}' does not exist in prover")

@@ -132,6 +132,12 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Returns `false` for all queries.
+    fn contains_input_id(&self, input_id: &Field<N>) -> Result<bool> {
+        trace!("[MockLedgerService] Contains input ID {} - false", fmt_id(input_id));
+        Ok(false)
+    }
+
+    /// Returns `false` for all queries.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
         trace!("[MockLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));
         Ok(false)

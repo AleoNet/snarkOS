@@ -72,6 +72,9 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// If the previous round is in the future, then the current committee is returned.
     fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
 
+    /// Returns `true` if the ledger contains the given input ID.
+    fn contains_input_id(&self, input_id: &Field<N>) -> Result<bool>;
+
     /// Returns `true` if the ledger contains the given certificate ID.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
 

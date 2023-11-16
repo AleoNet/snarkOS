@@ -482,6 +482,7 @@ mod tests {
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
+            fn contains_input_id(&self, input_id: &Field<N>) -> Result<bool>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
             fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
             async fn check_solution_basic(

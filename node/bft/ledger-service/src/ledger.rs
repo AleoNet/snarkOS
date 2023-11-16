@@ -149,6 +149,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         self.get_committee_for_round(previous_round)
     }
 
+    /// Returns `true` if the ledger contains the given input ID.
+    fn contains_input_id(&self, input_id: &Field<N>) -> Result<bool> {
+        self.ledger.contains_input_id(input_id)
+    }
+
     /// Returns `true` if the ledger contains the given certificate ID in block history.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
         self.ledger.contains_certificate(certificate_id)
