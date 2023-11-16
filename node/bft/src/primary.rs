@@ -375,7 +375,6 @@ impl<N: Network> Primary<N> {
         let previous_round = round.saturating_sub(1);
         // Retrieve the previous certificates.
         // let previous_certificates = self.storage.get_certificates_for_round(previous_round);
-        //Q: is it fine if I clone it? Originally was immutable 
         let mut previous_certificates = self.storage.get_certificates_for_round(previous_round).clone();
 
         // START MYDELTA: Nodes 1,2,3 for round <= 49 (0 indexed) will only include references for each other in their certificates.
@@ -405,6 +404,7 @@ impl<N: Network> Primary<N> {
         // START MYDELTA: if round r = gc_limit, then Node 1 will reference Node 0's certificate 
         let primary_is_node_1 = self.gateway.account().address() == addr1; 
         let mut contains_certificate_from_node_0 = false;  
+        let mut is_round_gc = self.current_round() == self.storage.max_gc_rounds(); 
 
         if self.current_round() == self.storage.max_gc_rounds() {
             // If primary is Node 4, make sure that it DOES NOT have any certificates from Node 0 in its storage.
@@ -455,7 +455,7 @@ impl<N: Network> Primary<N> {
                 is_ready = true;
             }
             // START MYDELTA: we want check that 'if primary is node 1, then it has a certificate from node 0' AND that the certificates reache quorum threshold 
-            is_ready = (!primary_is_node_1 || contains_certificate_from_node_0) && is_ready; 
+            is_ready = (!(primary_is_node_1 && is_round_gc))|| contains_certificate_from_node_0) && is_ready; 
             // END MYDELTA 
         }
 
