@@ -454,11 +454,10 @@ impl<N: Network> Primary<N> {
             if previous_committee.is_quorum_threshold_reached(&authors) {
                 is_ready = true;
             }
+            // START MYDELTA: we want check that 'if primary is node 1, then it has a certificate from node 0' AND that the certificates reache quorum threshold 
+            is_ready = (!primary_is_node_1 || contains_certificate_from_node_0) && is_ready; 
+            // END MYDELTA 
         }
-        
-        // START MYDELTA: we want check that 'if primary is node 1, then it has a certificate from node 0' AND that the certificates reache quorum threshold 
-        is_ready = (!primary_is_node_1 || contains_certificate_from_node_0) && is_ready; 
-        // END MYDELTA 
 
         // If the batch is not ready to be proposed, return early.
         if !is_ready {
