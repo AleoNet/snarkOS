@@ -455,7 +455,7 @@ impl<N: Network> Primary<N> {
                 is_ready = true;
             }
             // START MYDELTA: we want check that 'if primary is node 1, then it has a certificate from node 0' AND that the certificates reache quorum threshold 
-            is_ready = (!(primary_is_node_1 && is_round_gc))|| contains_certificate_from_node_0) && is_ready; 
+            is_ready = (!(primary_is_node_1 && is_round_gc)|| contains_certificate_from_node_0) && is_ready; 
             // END MYDELTA 
         }
 
