@@ -94,14 +94,14 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         let ledger = crate::phase_3_reset(ledger, dev)?;
         println!("completed phase 3 reset");
         // Initialize the CDN.
-        if let Some(base_url) = cdn {
-            println!("initializing cdn... {}", base_url);
-            // Sync the ledger with the CDN.
-            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
-                crate::log_clean_error(dev);
-                return Err(error);
-            }
-        }
+        // if let Some(base_url) = cdn {
+        //     println!("initializing cdn... {}", base_url);
+        //     // Sync the ledger with the CDN.
+        //     if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+        //         crate::log_clean_error(dev);
+        //         return Err(error);
+        //     }
+        // }
 
         // Initialize the ledger service.
         let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
