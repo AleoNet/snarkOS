@@ -7,11 +7,12 @@ RUN git clone \
 WORKDIR snarkos
 RUN pwd
 RUN ls
-# RUN ["chmod", "+x", "build_ubuntu.sh"]
-# RUN ./build_ubuntu.sh
+RUN ["chmod", "+x", "build_ubuntu.sh"]
+RUN ./build_ubuntu.sh
+EXPOSE 5000/tcp
 EXPOSE 3033/tcp
 EXPOSE 4133/tcp
 # RUN pwd
 # RUN ls
 # RUN cargo install --path . --locked
-ENTRYPOINT ["./devnet.sh"]
+ENTRYPOINT ["./run-client.sh"]
