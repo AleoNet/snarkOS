@@ -211,7 +211,7 @@ impl TestNetwork {
         }
     }
 
-    // Starts the solution and trasnaction cannons for node.
+    // Starts the solution and transaction cannons for node.
     pub fn fire_transmissions_at(&mut self, id: u16, interval_ms: u64) {
         self.validators.get_mut(&id).unwrap().fire_transmissions(interval_ms);
     }
