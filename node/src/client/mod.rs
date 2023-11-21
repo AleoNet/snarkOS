@@ -133,7 +133,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             shutdown: Default::default(),
         };
         println!("initilalized node");
-        println!("initilalized rest server");
+        println!("initilalizing rest server");
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
             node.rest = Some(Rest::start(rest_ip, None, ledger.clone(), Arc::new(node.clone()))?);
