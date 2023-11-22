@@ -630,10 +630,9 @@ impl<N: Network> Primary<N> {
         if self.gateway.account().address() == signer {
             bail!("Invalid peer - received a batch signature from myself ({signer})");
         }
-
+        let mut proposed_batch = self.proposed_batch.write();
         let proposal = {
             // Acquire the write lock.
-            let mut proposed_batch = self.proposed_batch.write();
             // Add the signature to the batch, and determine if the batch is ready to be certified.
             match proposed_batch.as_mut() {
                 Some(proposal) => {
