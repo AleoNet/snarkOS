@@ -1115,8 +1115,6 @@ impl<N: Network> Primary<N> {
             while fast_forward_round < next_round.saturating_sub(1) {
                 // Update to the next round in storage.
                 fast_forward_round = self.storage.increment_to_next_round(fast_forward_round)?;
-                // Clear the proposed batch.
-                *self.proposed_batch.write() = None;
             }
         }
 
@@ -1150,7 +1148,8 @@ impl<N: Network> Primary<N> {
 
             // If the node is ready, propose a batch for the next round.
             if is_ready {
-                self.propose_batch().await?;
+                // TODO: This will cause deadlock
+                // self.propose_batch().await?;
             }
         }
         Ok(())
