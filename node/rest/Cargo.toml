@@ -52,6 +52,10 @@ version = "1"
 default-features = false
 features = [ "derive" ]
 
+[dependencies.serde_json]
+version = "1"
+features = [ "preserve_order" ]
+
 [dependencies.snarkos-node-consensus]
 path = "../consensus"
 version = "=2.2.4"
