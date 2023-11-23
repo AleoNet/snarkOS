@@ -312,7 +312,7 @@ impl Start {
                 // Construct the committee members and distribute stakes evenly among committee members.
                 let members = development_private_keys
                     .iter()
-                    .map(|private_key| Ok((Address::try_from(private_key)?, (stake_per_member, true))))
+                    .map(|private_key| Ok((Address::try_from(private_key)?, (0u8, stake_per_member, true))))
                     .collect::<Result<indexmap::IndexMap<_, _>>>()?;
 
                 // Output the committee.
