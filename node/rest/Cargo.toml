@@ -32,7 +32,7 @@ version = "0.8.0"
 features = [ "erased-json" ]
 
 [dependencies.http]
-version = "0.2"
+version = "1.0"
 
 [dependencies.indexmap]
 version = "2.1"
