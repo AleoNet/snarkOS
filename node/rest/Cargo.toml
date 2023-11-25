@@ -32,7 +32,7 @@ version = "0.8.0"
 features = [ "erased-json" ]
 
 [dependencies.http]
-version = "0.2"
+version = "1.0"
 
 [dependencies.indexmap]
 version = "2.1"
@@ -51,6 +51,10 @@ version = "0.12"
 version = "1"
 default-features = false
 features = [ "derive" ]
+
+[dependencies.serde_json]
+version = "1"
+features = [ "preserve_order" ]
 
 [dependencies.snarkos-node-consensus]
 path = "../consensus"

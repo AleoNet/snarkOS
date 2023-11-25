@@ -198,7 +198,7 @@ impl<N: Network> Gateway<N> {
 
 // Dynamic rate limiting.
 impl<N: Network> Gateway<N> {
-    /// The current maxiumum committee size.
+    /// The current maximum committee size.
     fn max_committee_size(&self) -> usize {
         self.ledger
             .current_committee()
