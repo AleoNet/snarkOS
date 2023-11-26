@@ -16,11 +16,9 @@ use crate::{
     events::{EventCodec, PrimaryPing},
     helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
     spawn_blocking,
+    Worker,
     CONTEXT,
     MAX_BATCH_DELAY_IN_MS,
-    MAX_GC_ROUNDS,
-    MAX_TRANSMISSIONS_PER_BATCH,
-    MAX_TRANSMISSIONS_PER_WORKER_PING,
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
@@ -54,7 +52,10 @@ use snarkos_node_tcp::{
 };
 use snarkvm::{
     console::prelude::*,
-    ledger::{committee::Committee, narwhal::Data},
+    ledger::{
+        committee::Committee,
+        narwhal::{BatchHeader, Data},
+    },
     prelude::Address,
 };
 
@@ -212,12 +213,12 @@ impl<N: Network> Gateway<N> {
 
     /// The maximum number of certificate requests to cache.
     fn max_cache_certificates(&self) -> usize {
-        2 * MAX_GC_ROUNDS as usize * self.max_committee_size()
+        2 * BatchHeader::<N>::MAX_GC_ROUNDS as usize * self.max_committee_size()
     }
 
     /// Thne maximum number of transmission requests to cache.
     fn max_cache_transmissions(&self) -> usize {
-        self.max_cache_certificates() * MAX_TRANSMISSIONS_PER_BATCH
+        self.max_cache_certificates() * BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH
     }
 
     /// The maximum number of duplicates for any particular request.
@@ -743,7 +744,7 @@ impl<N: Network> Gateway<N> {
             Event::WorkerPing(ping) => {
                 // Ensure the number of transmissions is not too large.
                 ensure!(
-                    ping.transmission_ids.len() <= MAX_TRANSMISSIONS_PER_WORKER_PING,
+                    ping.transmission_ids.len() <= Worker::<N>::MAX_TRANSMISSIONS_PER_WORKER_PING,
                     "{CONTEXT} Received too many transmissions"
                 );
                 // Retrieve the number of workers.
@@ -977,8 +978,10 @@ impl<N: Network> Reading for Gateway<N> {
     type Message = Event<N>;
 
     /// The maximum queue depth of incoming messages for a single peer.
-    const MESSAGE_QUEUE_DEPTH: usize =
-        2 * MAX_GC_ROUNDS as usize * Committee::<N>::MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
+    const MESSAGE_QUEUE_DEPTH: usize = 2
+        * BatchHeader::<N>::MAX_GC_ROUNDS as usize
+        * Committee::<N>::MAX_COMMITTEE_SIZE as usize
+        * BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH;
 
     /// Creates a [`Decoder`] used to interpret messages from the network.
     /// The `side` param indicates the connection side **from the node's perspective**.
@@ -1010,8 +1013,10 @@ impl<N: Network> Writing for Gateway<N> {
     type Message = Event<N>;
 
     /// The maximum queue depth of outgoing messages for a single peer.
-    const MESSAGE_QUEUE_DEPTH: usize =
-        2 * MAX_GC_ROUNDS as usize * Committee::<N>::MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
+    const MESSAGE_QUEUE_DEPTH: usize = 2
+        * BatchHeader::<N>::MAX_GC_ROUNDS as usize
+        * Committee::<N>::MAX_COMMITTEE_SIZE as usize
+        * BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH;
 
     /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
     /// The `side` parameter indicates the connection side **from the node's perspective**.

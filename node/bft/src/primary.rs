@@ -33,7 +33,6 @@ use crate::{
     Transport,
     Worker,
     MAX_BATCH_DELAY_IN_MS,
-    MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
     PRIMARY_PING_IN_MS,
     WORKER_PING_IN_MS,
@@ -379,7 +378,7 @@ impl<N: Network> Primary<N> {
         }
 
         // Determined the required number of transmissions per worker.
-        let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
+        let num_transmissions_per_worker = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         // Initialize the map of transmissions.
         let mut transmissions: IndexMap<_, _> = Default::default();
         // Initialize a tracker for the number of transactions.

@@ -29,8 +29,6 @@ use snarkos_node_bft::{
     },
     spawn_blocking,
     BFT,
-    MAX_GC_ROUNDS,
-    MAX_TRANSMISSIONS_PER_BATCH,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_bft_storage_service::BFTPersistentStorage;
@@ -38,7 +36,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        narwhal::{Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchHeader, Data, Subdag, Transmission, TransmissionID},
     },
     prelude::*,
 };
@@ -86,7 +84,7 @@ impl<N: Network> Consensus<N> {
         // Initialize the Narwhal transmissions.
         let transmissions = Arc::new(BFTPersistentStorage::open(dev)?);
         // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new(ledger.clone(), transmissions, MAX_GC_ROUNDS);
+        let storage = NarwhalStorage::new(ledger.clone(), transmissions, BatchHeader::<N>::MAX_GC_ROUNDS);
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
         // Return the consensus.
@@ -202,7 +200,7 @@ impl<N: Network> Consensus<N> {
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         // Retrieve the solutions.
@@ -256,13 +254,13 @@ impl<N: Network> Consensus<N> {
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         // Retrieve the transactions.
         let transactions = {
             // Determine the available capacity.
-            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+            let capacity = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
             // Acquire the lock on the queue.
             let mut queue = self.transactions_queue.lock();
             // Determine the number of transactions to send.
