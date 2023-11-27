@@ -341,7 +341,7 @@ impl<N: Network> Consensus<N> {
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<()> {
         #[cfg(feature = "metrics")]
-        let commited_certificates = subdag.commited_certificates();
+        let num_committed_certificates = subdag.values().map(|c| c.len()).sum::<usize>();
         #[cfg(feature = "metrics")]
         let start = subdag.leader_certificate().batch_header().timestamp();
         // Create the candidate next block.
@@ -357,7 +357,7 @@ impl<N: Network> Consensus<N> {
             gauge!(HEIGHT, next_block.height() as f64);
             counter!(TRANSACTIONS, next_block.transactions().len() as u64);
             gauge!(LAST_COMMITTED_ROUND, next_block.round() as f64);
-            gauge!(COMMITTED_CERTIFICATES, commited_certificates as f64);
+            gauge!(COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             let end = now();
             let elapsed = Duration::from_secs((end - start) as u64);
             histogram!(snarkos_node_metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());

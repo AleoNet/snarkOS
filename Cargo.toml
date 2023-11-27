@@ -41,8 +41,8 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-git = "https://github.com/joske/snarkVM.git"
-branch = "metrics-rebased"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "31d0bb5"
 #version = "=0.16.10"
 features = [ "circuit", "console", "rocks" ]
 
@@ -58,9 +58,6 @@ metrics = [
   "snarkos-node-bft/metrics",
   "snarkos-node-consensus/metrics",
   "snarkos-node-router/metrics",
-  "snarkos-cli/metrics",
-  "snarkos-account/metrics",
-  "snarkos-display/metrics",
 ]
 
 [dependencies.anyhow]
