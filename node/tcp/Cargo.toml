@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-tcp"
-version = "2.2.4"
+version = "2.2.5"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A TCP stack for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -47,7 +47,7 @@ default-features = false
 
 [dependencies.snarkos-node-metrics]
 path = "../metrics"
-version = "=2.2.4"
+version = "=2.2.5"
 optional = true
 
 [dependencies.metrics]
