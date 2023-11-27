@@ -48,7 +48,7 @@ use colored::Colorize;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
+use std::{future::Future, net::SocketAddr, num::NonZeroUsize, path::PathBuf, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -81,10 +81,11 @@ impl<N: Network> Consensus<N> {
         ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
+        storage: Option<PathBuf>,
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the Narwhal transmissions.
-        let transmissions = Arc::new(BFTPersistentStorage::open(dev)?);
+        let transmissions = Arc::new(BFTPersistentStorage::open(storage, dev)?);
         // Initialize the Narwhal storage.
         let storage = NarwhalStorage::new(ledger.clone(), transmissions, MAX_GC_ROUNDS);
         // Initialize the BFT.

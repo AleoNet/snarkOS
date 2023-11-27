@@ -46,6 +46,7 @@ use core::future::Future;
 use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
+    path::PathBuf,
     sync::{atomic::AtomicBool, Arc},
 };
 use tokio::task::JoinHandle;
@@ -79,6 +80,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
+        storage: Option<PathBuf>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -86,9 +88,9 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         let signal_node = Self::handle_signals();
 
         // Initialize the ledger.
-        let ledger = Ledger::<N, C>::load(genesis.clone(), dev)?;
+        let ledger = Ledger::<N, C>::load(genesis.clone(), storage.clone(), dev)?;
         // TODO: Remove me after Phase 3.
-        let ledger = crate::phase_3_reset(ledger, dev)?;
+        let ledger = crate::phase_3_reset(ledger, storage, dev)?;
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.

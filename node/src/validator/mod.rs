@@ -45,6 +45,7 @@ use core::future::Future;
 use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
+    path::PathBuf,
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
@@ -79,6 +80,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
+        storage: Option<PathBuf>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -86,9 +88,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let signal_node = Self::handle_signals();
 
         // Initialize the ledger.
-        let ledger = Ledger::load(genesis, dev)?;
+        let ledger = Ledger::load(genesis, storage.clone(), dev)?;
         // TODO: Remove me after Phase 3.
-        let ledger = crate::phase_3_reset(ledger, dev)?;
+        let ledger = crate::phase_3_reset(ledger, storage.clone(), dev)?;
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
@@ -104,7 +106,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service.clone());
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger_service, bft_ip, trusted_validators, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger_service, bft_ip, trusted_validators, storage, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.

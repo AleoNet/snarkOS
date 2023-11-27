@@ -25,7 +25,7 @@ use snarkvm::prelude::{
 };
 
 use anyhow::Result;
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
 pub enum Node<N: Network> {
     /// A validator is a full node, capable of validating blocks.
@@ -46,12 +46,24 @@ impl<N: Network> Node<N> {
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
+        storage: Option<PathBuf>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
-            Validator::new(node_ip, rest_ip, bft_ip, account, trusted_peers, trusted_validators, genesis, cdn, dev)
-                .await?,
+            Validator::new(
+                node_ip,
+                rest_ip,
+                bft_ip,
+                account,
+                trusted_peers,
+                trusted_validators,
+                genesis,
+                storage,
+                cdn,
+                dev,
+            )
+            .await?,
         )))
     }
 
@@ -73,10 +85,13 @@ impl<N: Network> Node<N> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
+        storage: Option<PathBuf>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Client(Arc::new(Client::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev).await?)))
+        Ok(Self::Client(Arc::new(
+            Client::new(node_ip, rest_ip, account, trusted_peers, genesis, storage, cdn, dev).await?,
+        )))
     }
 
     /// Returns the node type.

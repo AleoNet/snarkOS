@@ -26,7 +26,7 @@ use snarkvm::prelude::{
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
 /// Executes the `transfer_private` function in the `credits.aleo` program.
 #[derive(Debug, Parser)]
@@ -61,6 +61,9 @@ pub struct TransferPrivate {
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage")]
+    pub storage: Option<PathBuf>,
 }
 
 impl TransferPrivate {
@@ -86,7 +89,7 @@ impl TransferPrivate {
             let rng = &mut rand::thread_rng();
 
             // Initialize the VM.
-            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(self.storage, None)?;
             let vm = VM::from(store)?;
 
             // Prepare the fee.

@@ -30,7 +30,7 @@ use snarkvm::{
 
 use indexmap::{indexset, IndexSet};
 use snarkvm::ledger::store::cow_to_cloned;
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, path::PathBuf};
 use tracing::error;
 
 /// A BFT persistent storage service.
@@ -42,8 +42,8 @@ pub struct BFTPersistentStorage<N: Network> {
 
 impl<N: Network> BFTPersistentStorage<N> {
     /// Initializes a new BFT persistent storage service.
-    pub fn open(dev: Option<u16>) -> Result<Self> {
-        Ok(Self { transmissions: internal::RocksDB::open_map(N::ID, dev, MapID::BFT(BFTMap::Transmissions))? })
+    pub fn open(path: Option<PathBuf>, dev: Option<u16>) -> Result<Self> {
+        Ok(Self { transmissions: internal::RocksDB::open_map(N::ID, path, dev, MapID::BFT(BFTMap::Transmissions))? })
     }
 
     /// Initializes a new BFT persistent storage service.

@@ -86,6 +86,9 @@ pub struct Start {
     /// Specify the IP address and port of the validator(s) to connect to
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage")]
+    pub storage: Option<PathBuf>,
 
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
@@ -344,7 +347,13 @@ impl Start {
             }
 
             // Construct the genesis block.
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
+            load_or_compute_genesis(
+                development_private_keys[0],
+                committee,
+                public_balances,
+                self.storage.clone(),
+                &mut rng,
+            )
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
@@ -388,6 +397,8 @@ impl Start {
         let account = self.parse_private_key::<N>()?;
         // Parse the node type.
         let node_type = self.parse_node_type();
+        // Parse the path to the ledger.
+        let storage = std::mem::take(&mut self.storage);
 
         // Parse the REST IP.
         let rest_ip = match self.norest {
@@ -431,9 +442,9 @@ impl Start {
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, bft_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, bft_ip, account, &trusted_peers, &trusted_validators, genesis, storage, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
-            NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, storage, cdn, self.dev).await,
         }
     }
 
@@ -479,6 +490,7 @@ fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
+    storage: Option<PathBuf>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
@@ -529,7 +541,7 @@ fn load_or_compute_genesis<N: Network>(
     /* Otherwise, compute the genesis block and store it. */
 
     // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(storage, None)?)?;
     // Initialize the genesis block.
     let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng)?;
     // Write the genesis block to the file.

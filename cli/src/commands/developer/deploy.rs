@@ -30,7 +30,7 @@ use snarkvm::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
 /// Deploys an Aleo program.
 #[derive(Debug, Parser)]
@@ -61,6 +61,9 @@ pub struct Deploy {
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage")]
+    storage: Option<PathBuf>,
 }
 
 impl Deploy {
@@ -92,7 +95,7 @@ impl Deploy {
             let rng = &mut rand::thread_rng();
 
             // Initialize the VM.
-            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(self.storage, None)?;
             let vm = VM::from(store)?;
 
             // Compute the minimum deployment cost.

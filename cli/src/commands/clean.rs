@@ -15,6 +15,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
+use std::path::PathBuf;
 
 /// Cleans the snarkOS node storage.
 #[derive(Debug, Parser)]
@@ -22,6 +23,9 @@ pub struct Clean {
     /// Specify the network to remove from storage.
     #[clap(default_value = "3", long = "network")]
     pub network: u16,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage")]
+    pub storage: Option<PathBuf>,
     /// Enables development mode, specify the unique ID of the local node to clean.
     #[clap(long)]
     pub dev: Option<u16>,
@@ -31,13 +35,13 @@ impl Clean {
     /// Cleans the snarkOS node storage.
     pub fn parse(self) -> Result<String> {
         // Remove the specified ledger from storage.
-        Self::remove_ledger(self.network, self.dev)
+        Self::remove_ledger(self.network, self.storage.clone(), self.dev)
     }
 
     /// Removes the specified ledger from storage.
-    pub(crate) fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
+    pub(crate) fn remove_ledger(network: u16, path: Option<PathBuf>, dev: Option<u16>) -> Result<String> {
         // Construct the path to the ledger in storage.
-        let path = aleo_std::aleo_ledger_dir(network, dev);
+        let path = aleo_std::aleo_ledger_dir(network, path, dev);
 
         // Prepare the path string.
         let path_string = format!("(in \"{}\")", path.display()).dimmed();
