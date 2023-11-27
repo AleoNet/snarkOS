@@ -58,6 +58,11 @@ use snarkvm::{
     prelude::Address,
 };
 
+#[cfg(feature = "metrics")]
+use metrics::gauge;
+#[cfg(feature = "metrics")]
+use snarkos_node_metrics::consensus::CONNECTED;
+
 use colored::Colorize;
 use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
@@ -426,6 +431,11 @@ impl<N: Network> Gateway<N> {
         Ok(())
     }
 
+    #[cfg(feature = "metrics")]
+    fn update_metrics(&self) {
+        gauge!(CONNECTED, self.connected_peers.read().len() as f64);
+    }
+
     /// Inserts the given peer into the connected peers.
     #[cfg(not(test))]
     fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
@@ -433,6 +443,8 @@ impl<N: Network> Gateway<N> {
         self.resolver.insert_peer(peer_ip, peer_addr, address);
         // Add an transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Inserts the given peer into the connected peers.
@@ -460,6 +472,8 @@ impl<N: Network> Gateway<N> {
         self.resolver.remove_peer(peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().shift_remove(&peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Sends the given event to specified peer.

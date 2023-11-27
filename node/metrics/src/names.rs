@@ -17,11 +17,11 @@ pub const GAUGE_NAMES: [&str; 10] = [
     blocks::TRANSACTIONS,
     consensus::COMMITTED_CERTIFICATES,
     consensus::LAST_COMMITTED_ROUND,
+    consensus::CONNECTED,
     peers::CONNECTED,
     peers::CANDIDATE,
     peers::RESTRICTED,
     primary::CURRENT_ROUND,
-    network::TCP_CONNECTIONS,
     network::TCP_TASKS,
 ];
 
@@ -47,6 +47,7 @@ pub mod consensus {
     pub const COMMIT_ROUNDS_LATENCY: &str = "snarkos_consensus_commit_rounds_latency_secs";
     pub const LEADERS_ELECTED: &str = "snarkos_consensus_leaders_elected_total";
     pub const LAST_COMMITTED_ROUND: &str = "snarkos_consensus_last_committed_round";
+    pub const CONNECTED: &str = "snarkos_consensus_connected_total";
 }
 
 pub mod primary {
@@ -64,6 +65,5 @@ pub mod network {
     pub const NOISE_CODEC_DECRYPTION_TIME: &str = "snarkos_network_noise_codec_decryption_micros";
     pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_network_noise_codec_encryption_size";
     pub const NOISE_CODEC_DECRYPTION_SIZE: &str = "snarkos_network_noise_codec_decryption_size";
-    pub const TCP_CONNECTIONS: &str = "snarkos_network_tcp_connections_total";
     pub const TCP_TASKS: &str = "snarkos_network_tcp_tasks_total";
 }

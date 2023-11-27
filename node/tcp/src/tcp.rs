@@ -25,12 +25,8 @@ use std::{
     time::Duration,
 };
 
-#[cfg(feature = "metrics")]
-use metrics::gauge;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-#[cfg(feature = "metrics")]
-use snarkos_node_metrics::network::TCP_CONNECTIONS;
 use tokio::{
     io::split,
     net::{TcpListener, TcpStream},
@@ -267,8 +263,6 @@ impl Tcp {
         }
 
         let conn = self.connections.remove(addr);
-        #[cfg(feature = "metrics")]
-        gauge!(TCP_CONNECTIONS, self.num_connected() as f64);
 
         if let Some(ref conn) = conn {
             debug!(parent: self.span(), "Disconnecting from {}", conn.addr());
@@ -445,8 +439,6 @@ impl Tcp {
         let conn_ready_tx = connection.readiness_notifier.take();
 
         self.connections.add(connection);
-        #[cfg(feature = "metrics")]
-        gauge!(TCP_CONNECTIONS, self.num_connected() as f64);
         self.connecting.lock().remove(&peer_addr);
 
         // Send the aforementioned notification so that reading from the socket can commence.
