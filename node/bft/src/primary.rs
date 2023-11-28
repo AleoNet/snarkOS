@@ -1297,9 +1297,13 @@ impl<N: Network> Primary<N> {
             bail!("Round {batch_round} is too far in the past")
         }
 
+        // Check if quorum threshold is reached.
+        let certificates = self.storage.get_certificates_for_round(batch_round);
+        let authors = certificates.iter().map(BatchCertificate::author).collect();
+        let previous_committee = self.ledger.get_previous_committee_for_round(batch_round)?;
+        let quorum_threshold_reached = previous_committee.is_quorum_threshold_reached(&authors);
         // Check if our primary should move to the next round.
-        // TODO (howardwu): Re-evaluate whether we need to guard this to increment after quorum threshold is reached.
-        let is_behind_schedule = batch_round > self.current_round();
+        let is_behind_schedule = quorum_threshold_reached && batch_round > self.current_round();
         // Check if our primary is far behind the peer.
         let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();
         // If our primary is far behind the peer, update our committee to the batch round.
