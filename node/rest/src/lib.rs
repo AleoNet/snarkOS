@@ -124,6 +124,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/latest/committee", get(Self::latest_committee))
             // ------------------------------------------------------
 
+            // ../committee/..
+            .route("/testnet3/committee/:height", get(Self::get_committee_for_height))
+            .route("/testnet3/committees",get(Self::get_committees))
+
             // GET ../block/..
             .route("/testnet3/block/height/latest", get(Self::get_block_height_latest))
             .route("/testnet3/block/hash/latest", get(Self::get_block_hash_latest))
@@ -156,6 +160,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
             // GET misc endpoints.
             .route("/testnet3/blocks", get(Self::get_blocks))
+            .route("/testnet3/blocks/committees", get(Self::get_blocks_committees))
             .route("/testnet3/height/:hash", get(Self::get_height))
             .route("/testnet3/memoryPool/transmissions", get(Self::get_memory_pool_transmissions))
             .route("/testnet3/memoryPool/solutions", get(Self::get_memory_pool_solutions))
