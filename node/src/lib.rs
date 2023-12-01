@@ -139,6 +139,15 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             std::thread::sleep(std::time::Duration::from_secs(5));
             return Ledger::<N, C>::load(genesis.clone(), dev);
         }
+    } else if let Ok(block) = ledger.get_block(726845) {
+        if *block.hash() == *ID::<N>::from_str("ab1tf3v9qef0uh3ygsc0qqem7dzeyy2m8aqz583a80z60l8t5l22u9s84y38z")? {
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            return Ledger::<N, C>::load(genesis.clone(), dev);
+        }
     }
     Ok(ledger)
 }
