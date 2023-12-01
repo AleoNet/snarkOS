@@ -18,7 +18,7 @@ use snarkvm::{
         block::{Block, Transaction},
         coinbase::{CoinbaseVerifyingKey, ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
         Ledger,
     },
@@ -26,7 +26,6 @@ use snarkvm::{
 };
 
 use indexmap::IndexMap;
-use snarkvm::prelude::narwhal::BatchCertificate;
 use std::{fmt, ops::Range, sync::Arc};
 
 /// A core ledger service.
@@ -209,12 +208,12 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
         // Check the transaction is well-formed.
         let ledger = self.ledger.clone();
-        spawn_blocking!(ledger.check_transaction_basic(&transaction, None))
+        spawn_blocking!(ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()))
     }
 
     /// Checks the given block is valid next block.
     fn check_next_block(&self, block: &Block<N>) -> Result<()> {
-        self.ledger.check_next_block(block)
+        self.ledger.check_next_block(block, &mut rand::thread_rng())
     }
 
     /// Returns a candidate for the next block in the ledger, using a committed subdag and its transmissions.

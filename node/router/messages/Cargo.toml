@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-router-messages"
-version = "2.2.4"
+version = "2.2.5"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Node messages for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -38,17 +38,17 @@ version = "1"
 
 [dependencies.snarkos-node-bft-events]
 path = "../../bft/events"
-version = "=2.2.4"
+version = "=2.2.5"
 
 [dependencies.snarkos-node-sync-locators]
 path = "../../sync/locators"
-version = "=2.2.4"
+version = "=2.2.5"
 
 [dependencies.snarkvm]
 workspace = true
 
 [dependencies.snow]
-version = "0.9.3"
+version = "0.9.4"
 
 [dependencies.tokio]
 version = "1.28"
@@ -78,7 +78,7 @@ workspace = true
 features = [ "algorithms", "test-helpers" ]
 
 [dev-dependencies.proptest]
-version = "1.3.1"
+version = "1.4.0"
 
 [dev-dependencies.test-strategy]
 version = "0.3.1"

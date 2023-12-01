@@ -22,6 +22,7 @@ extern crate tracing;
 
 pub use snarkos_node_bft_events as events;
 pub use snarkos_node_bft_ledger_service as ledger_service;
+pub use snarkos_node_bft_storage_service as storage_service;
 
 pub mod helpers;
 
@@ -74,4 +75,16 @@ macro_rules! spawn_blocking {
             Err(error) => Err(anyhow::anyhow!("[tokio::spawn_blocking] {error}")),
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type CurrentNetwork = snarkvm::console::network::Testnet3;
+
+    #[test]
+    fn test_max_gc_rounds() {
+        assert_eq!(MAX_GC_ROUNDS as usize, snarkvm::ledger::narwhal::Subdag::<CurrentNetwork>::MAX_ROUNDS);
+    }
 }

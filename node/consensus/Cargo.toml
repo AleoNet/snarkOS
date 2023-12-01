@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-consensus"
-version = "2.2.4"
+version = "2.2.5"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node consensus for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -30,7 +30,7 @@ version = "2.1"
 features = [ "serde", "rayon" ]
 
 [dependencies.lru]
-version = "0.12.0"
+version = "0.12.1"
 
 [dependencies.parking_lot]
 version = "0.12"
@@ -40,17 +40,23 @@ version = "0.8"
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.2.4"
+version = "=2.2.5"
 
 [dependencies.snarkos-node-bft]
 path = "../bft"
-version = "=2.2.4"
+version = "=2.2.5"
 
 [dependencies.snarkos-node-bft-ledger-service]
 path = "../bft/ledger-service"
-version = "=2.2.4"
+version = "=2.2.5"
 default-features = false
 features = [ "ledger", "ledger-write" ]
+
+[dependencies.snarkos-node-bft-storage-service]
+path = "../bft/storage-service"
+version = "=2.2.5"
+default-features = false
+features = [ "persistent" ]
 
 [dependencies.snarkvm]
 workspace = true
@@ -63,7 +69,7 @@ features = [ "macros", "rt-multi-thread", "signal" ]
 version = "0.1"
 
 [dev-dependencies.itertools]
-version = "0.11"
+version = "0.12"
 
 [dev-dependencies.once_cell]
 version = "1.13"

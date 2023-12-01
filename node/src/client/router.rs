@@ -304,7 +304,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
             return true; // Maintain the connection.
         }
         // Check that the transaction is well-formed and unique.
-        if self.ledger.check_transaction_basic(&transaction, None).is_ok() {
+        if self.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok() {
             // Propagate the `UnconfirmedTransaction`.
             self.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
         }

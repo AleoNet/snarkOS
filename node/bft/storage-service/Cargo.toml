@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-node-sync-locators"
+name = "snarkos-node-bft-storage-service"
 version = "2.2.5"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "Locators to synchronize a decentralized operating system"
+description = "A storage service for the memory pool in a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -18,20 +18,25 @@ edition = "2021"
 
 [features]
 default = [ ]
-test = [ ]
-
-[dependencies.anyhow]
-version = "1.0"
+memory = [ "parking_lot", "tracing" ]
+persistent = [ ]
+test = [ "memory" ]
 
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
 
-[dependencies.serde]
-version = "1"
+[dependencies.parking_lot]
+version = "0.12"
+optional = true
 
 [dependencies.snarkvm]
 workspace = true
 
 [dependencies.tracing]
 version = "0.1"
+optional = true
+
+[dev-dependencies.snarkvm]
+workspace = true
+features = [ "test" ]

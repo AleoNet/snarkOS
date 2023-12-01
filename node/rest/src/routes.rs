@@ -18,6 +18,7 @@ use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -26,6 +27,12 @@ pub(crate) struct BlockRange {
     start: u32,
     /// The ending block height (exclusive).
     end: u32,
+}
+
+/// The `get_mapping_value` query object.
+#[derive(Deserialize, Serialize)]
+pub(crate) struct Metadata {
+    metadata: bool,
 }
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
@@ -234,6 +241,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_transaction(tx_id)?))
     }
 
+    // GET /testnet3/transaction/confirmed/{transactionID}
+    pub(crate) async fn get_confirmed_transaction(
+        State(rest): State<Self>,
+        Path(tx_id): Path<N::TransactionID>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_confirmed_transaction(tx_id)?))
+    }
+
     // GET /testnet3/memoryPool/transmissions
     pub(crate) async fn get_memory_pool_transmissions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
@@ -277,11 +292,25 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     }
 
     // GET /testnet3/program/{programID}/mapping/{mappingName}/{mappingKey}
+    // GET /testnet3/program/{programID}/mapping/{mappingName}/{mappingKey}?metadata={true}
     pub(crate) async fn get_mapping_value(
         State(rest): State<Self>,
         Path((id, name, key)): Path<(ProgramID<N>, Identifier<N>, Plaintext<N>)>,
+        metadata: Option<Query<Metadata>>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_confirmed(id, name, &key)?))
+        // Retrieve the mapping value.
+        let mapping_value = rest.ledger.vm().finalize_store().get_value_confirmed(id, name, &key)?;
+
+        // Check if metadata is requested and return the value with metadata if so.
+        if metadata.map(|q| q.metadata).unwrap_or(false) {
+            return Ok(ErasedJson::pretty(json!({
+                "data": mapping_value,
+                "height": rest.ledger.latest_height(),
+            })));
+        }
+
+        // Return the value without metadata.
+        Ok(ErasedJson::pretty(mapping_value))
     }
 
     // GET /testnet3/statePath/{commitment}

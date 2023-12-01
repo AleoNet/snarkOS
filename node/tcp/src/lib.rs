@@ -37,9 +37,17 @@ pub trait P2P {
 ///
 /// A bogon address is an IP address that should not appear on the public Internet.
 /// This includes private addresses, loopback addresses, and link-local addresses.
-pub fn is_bogon_address(ip: IpAddr) -> bool {
+pub fn is_bogon_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(ipv4) => ipv4.is_loopback() || ipv4.is_private() || ipv4.is_link_local(),
         IpAddr::V6(ipv6) => ipv6.is_loopback(),
+    }
+}
+
+/// Checks if the given IP address is unspecified or broadcast.
+pub fn is_unspecified_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ipv4) => ipv4.is_unspecified() || ipv4.is_broadcast(),
+        ipv6 => ipv6.is_unspecified(),
     }
 }

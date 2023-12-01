@@ -1,7 +1,6 @@
 **/*.idea/
 **/target
 **.DS_Store
-storage*/
 wasm/Cargo.lock
 **/build
 **.ledger-*
