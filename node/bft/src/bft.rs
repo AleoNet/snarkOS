@@ -822,7 +822,7 @@ mod tests {
 
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
-        assert!(result); // should now fall through to end of function
+        assert!(result); // should now fall through to the end of function
 
         // Set the timer to now().
         bft.leader_certificate_timer.store(now(), Ordering::SeqCst);
