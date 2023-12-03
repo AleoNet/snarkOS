@@ -1403,10 +1403,12 @@ impl<N: Network> Primary<N> {
         // Fetch the missing previous certificates.
         let missing_previous_certificates =
             self.fetch_missing_certificates(peer_ip, round, batch_header.previous_certificate_ids()).await?;
-        debug!(
-            "Fetched {} missing previous certificates for round {round} from '{peer_ip}'",
-            missing_previous_certificates.len(),
-        );
+        if !missing_previous_certificates.is_empty() {
+            debug!(
+                "Fetched {} missing previous certificates for round {round} from '{peer_ip}'",
+                missing_previous_certificates.len(),
+            );
+        }
         // Return the missing previous certificates.
         Ok(missing_previous_certificates)
     }
@@ -1427,10 +1429,12 @@ impl<N: Network> Primary<N> {
         // Fetch the missing election certificates.
         let missing_election_certificates =
             self.fetch_missing_certificates(peer_ip, round, batch_header.last_election_certificate_ids()).await?;
-        debug!(
-            "Fetched {} missing election certificates for round {round} from '{peer_ip}'",
-            missing_election_certificates.len(),
-        );
+        if !missing_election_certificates.is_empty() {
+            debug!(
+                "Fetched {} missing election certificates for round {round} from '{peer_ip}'",
+                missing_election_certificates.len(),
+            );
+        }
         // Return the missing election certificates.
         Ok(missing_election_certificates)
     }
