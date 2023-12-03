@@ -446,15 +446,21 @@ impl<N: Network> Primary<N> {
         let private_key = *self.gateway.account().private_key();
         // Prepare the transmission IDs.
         let transmission_ids = transmissions.keys().copied().collect();
-        // Prepare the certificate IDs.
-        let certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
+        // Prepare the previous batch certificate IDs.
+        let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
+        // Prepare the last election certificate IDs.
+        let last_election_certificate_ids = match self.bft_sender.get() {
+            Some(bft_sender) => bft_sender.get_last_election_certificate_ids().await?,
+            None => Default::default(),
+        };
         // Sign the batch header.
         let batch_header = spawn_blocking!(BatchHeader::new(
             &private_key,
             round,
             now(),
             transmission_ids,
-            certificate_ids,
+            previous_certificate_ids,
+            last_election_certificate_ids,
             &mut rand::thread_rng()
         ))?;
         // Construct the proposal.
@@ -1561,8 +1567,16 @@ mod tests {
         ]
         .into();
         // Sign the batch header.
-        let batch_header =
-            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
+        let batch_header = BatchHeader::new(
+            private_key,
+            round,
+            timestamp,
+            transmission_ids,
+            previous_certificate_ids,
+            Default::default(),
+            rng,
+        )
+        .unwrap();
         // Construct the proposal.
         Proposal::new(committee, batch_header, transmissions).unwrap()
     }
@@ -1629,8 +1643,16 @@ mod tests {
         ]
         .into();
 
-        let batch_header =
-            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
+        let batch_header = BatchHeader::new(
+            private_key,
+            round,
+            timestamp,
+            transmission_ids,
+            previous_certificate_ids,
+            Default::default(),
+            rng,
+        )
+        .unwrap();
         let signatures = peer_signatures_for_batch(primary_address, accounts, batch_header.batch_id(), rng);
         let certificate = BatchCertificate::<CurrentNetwork>::from(batch_header, signatures).unwrap();
         (certificate, transmissions)
