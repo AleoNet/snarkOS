@@ -115,7 +115,7 @@ impl TransferPrivate {
         let locator = Locator::<CurrentNetwork>::from_str("credits.aleo/transfer_private")?;
         println!("✅ Created private transfer of {} microcredits to {}\n", &self.amount, self.recipient);
 
-        // Determine if the transaction should be broadcast, stored, or displayed to user.
+        // Determine if the transaction should be broadcast, stored, or displayed to the user.
         Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
     }
 }
