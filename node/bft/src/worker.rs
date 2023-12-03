@@ -234,7 +234,7 @@ impl<N: Network> Worker<N> {
         // Attempt to fetch the transmission from the peer.
         let self_ = self.clone();
         tokio::spawn(async move {
-            // Send an transmission request to the peer.
+            // Send a transmission request to the peer.
             match self_.send_transmission_request(peer_ip, transmission_id).await {
                 // If the transmission was fetched, then process it.
                 Ok((candidate_id, transmission)) => {
