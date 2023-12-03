@@ -107,7 +107,7 @@ pub struct Start {
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
-    /// If the flag is set, the node will not prefresh from a CDN
+    /// If the flag is set, the node will not refresh from a CDN
     #[clap(long)]
     pub nocdn: bool,
 
