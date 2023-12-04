@@ -41,9 +41,9 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-#git = "https://github.com/AleoHQ/snarkVM.git"
-#rev = "31d0bb5"
-version = "=0.16.12"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "d5186a4"
+#version = "=0.16.11"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
