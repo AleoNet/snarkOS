@@ -50,7 +50,7 @@ where
     /// attacks.
     ///
     /// The default value is 1024.
-    const MESSAGE_QUEUE_DEPTH: usize = 256;
+    const MESSAGE_QUEUE_DEPTH: usize = 128;
 
     /// The initial size of a per-connection buffer for reading inbound messages. Can be set to the maximum expected size
     /// of the inbound message in order to only allocate it once.
