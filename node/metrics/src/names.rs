@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub const GAUGE_NAMES: [&str; 10] = [
+pub const GAUGE_NAMES: [&str; 11] = [
     blocks::HEIGHT,
     blocks::TRANSACTIONS,
     consensus::COMMITTED_CERTIFICATES,
     consensus::LAST_COMMITTED_ROUND,
+    consensus::LAST_CERTIFIED_ROUND,
     consensus::CONNECTED,
     peers::CONNECTED,
     peers::CANDIDATE,
     peers::RESTRICTED,
-    primary::CURRENT_ROUND,
+    primary::PROPOSAL_ROUND,
     network::TCP_TASKS,
 ];
 
@@ -47,11 +48,12 @@ pub mod consensus {
     pub const COMMIT_ROUNDS_LATENCY: &str = "snarkos_consensus_commit_rounds_latency_secs";
     pub const LEADERS_ELECTED: &str = "snarkos_consensus_leaders_elected_total";
     pub const LAST_COMMITTED_ROUND: &str = "snarkos_consensus_last_committed_round";
+    pub const LAST_CERTIFIED_ROUND: &str = "snarkos_consensus_last_certified_round";
     pub const CONNECTED: &str = "snarkos_consensus_connected_total";
 }
 
 pub mod primary {
-    pub const CURRENT_ROUND: &str = "snarkos_primary_current_round";
+    pub const PROPOSAL_ROUND: &str = "snarkos_primary_proposal_round";
 }
 
 pub mod peers {

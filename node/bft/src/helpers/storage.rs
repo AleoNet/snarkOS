@@ -34,6 +34,11 @@ use std::{
     },
 };
 
+#[cfg(feature = "metrics")]
+use metrics::gauge;
+#[cfg(feature = "metrics")]
+use snarkos_node_metrics::consensus::LAST_CERTIFIED_ROUND;
+
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network>(Arc<StorageInner<N>>);
 
@@ -174,6 +179,9 @@ impl<N: Network> Storage<N> {
 
         // Update the storage to the next round.
         self.update_current_round(next_round);
+
+        #[cfg(feature = "metrics")]
+        gauge!(LAST_CERTIFIED_ROUND, next_round as f64);
 
         // Retrieve the storage round.
         let storage_round = self.current_round();
