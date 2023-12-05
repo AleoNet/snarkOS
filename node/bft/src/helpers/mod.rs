@@ -15,6 +15,9 @@
 pub mod cache;
 pub use cache::*;
 
+pub mod cache_round;
+pub use cache_round::*;
+
 pub mod channels;
 pub use channels::*;
 

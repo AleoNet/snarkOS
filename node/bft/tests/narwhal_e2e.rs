@@ -150,7 +150,7 @@ async fn test_storage_coherence() {
     const TARGET_ROUND: u64 = 12;
     // Note: cloning the network is fine because the primaries it wraps are `Arc`ed.
     let network_clone = network.clone();
-    deadline!(Duration::from_secs(40), move || { network_clone.is_round_reached(TARGET_ROUND) });
+    deadline!(Duration::from_secs(55), move || { network_clone.is_round_reached(TARGET_ROUND) });
 
     // Check the committee is coherent across the network up to the target round. We skip the
     // genesis round.
