@@ -22,6 +22,7 @@ extern crate tracing;
 
 pub use snarkos_node_bft_events as events;
 pub use snarkos_node_bft_ledger_service as ledger_service;
+pub use snarkos_node_bft_storage_service as storage_service;
 
 pub mod helpers;
 
@@ -61,7 +62,7 @@ pub const MAX_TRANSMISSIONS_PER_WORKER_PING: usize = MAX_TRANSMISSIONS_PER_BATCH
 pub const MAX_WORKERS: u8 = 1; // workers
 
 /// The frequency at which each primary broadcasts a ping to every other node.
-pub const PRIMARY_PING_IN_MS: u64 = 2 * MAX_BATCH_DELAY_IN_MS; // ms
+pub const PRIMARY_PING_IN_MS: u64 = 4 * MAX_BATCH_DELAY_IN_MS; // ms
 /// The frequency at which each worker broadcasts a ping to every other node.
 pub const WORKER_PING_IN_MS: u64 = 4 * MAX_BATCH_DELAY_IN_MS; // ms
 

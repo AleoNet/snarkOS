@@ -142,7 +142,7 @@ impl Execute {
 
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
-        // Determine if the transaction should be broadcast, stored, or displayed to user.
+        // Determine if the transaction should be broadcast, stored, or displayed to the user.
         Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
     }
 }

@@ -234,7 +234,7 @@ impl<N: Network> Worker<N> {
         // Attempt to fetch the transmission from the peer.
         let self_ = self.clone();
         tokio::spawn(async move {
-            // Send an transmission request to the peer.
+            // Send a transmission request to the peer.
             match self_.send_transmission_request(peer_ip, transmission_id).await {
                 // If the transmission was fetched, then process it.
                 Ok((candidate_id, transmission)) => {
@@ -440,6 +440,7 @@ impl<N: Network> Worker<N> {
 mod tests {
     use super::*;
     use snarkos_node_bft_ledger_service::LedgerService;
+    use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         console::{network::Network, types::Field},
         ledger::{
@@ -524,7 +525,7 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -560,7 +561,7 @@ mod tests {
         mock_ledger.expect_ensure_transmission_id_matches().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -596,7 +597,7 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -634,7 +635,7 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -672,7 +673,7 @@ mod tests {
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -710,7 +711,7 @@ mod tests {
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();

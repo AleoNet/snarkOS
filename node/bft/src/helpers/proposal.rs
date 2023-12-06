@@ -207,6 +207,7 @@ mod prop_tests {
             now(),
             transmission_map.keys().cloned().collect(),
             Default::default(),
+            Default::default(),
             &mut rng,
         )
         .unwrap();

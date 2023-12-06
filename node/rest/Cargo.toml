@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-rest"
-version = "2.2.4"
+version = "2.2.5"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A REST API server for a decentralized virtual machine"
 homepage = "https://aleo.org"
@@ -32,14 +32,14 @@ version = "0.8.0"
 features = [ "erased-json" ]
 
 [dependencies.http]
-version = "0.2"
+version = "1.0"
 
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
 
 [dependencies.jsonwebtoken]
-version = "9.1"
+version = "9.2"
 
 [dependencies.once_cell]
 version = "1.18"
@@ -52,13 +52,17 @@ version = "1"
 default-features = false
 features = [ "derive" ]
 
+[dependencies.serde_json]
+version = "1"
+features = [ "preserve_order" ]
+
 [dependencies.snarkos-node-consensus]
 path = "../consensus"
-version = "=2.2.4"
+version = "=2.2.5"
 
 [dependencies.snarkos-node-router]
 path = "../router"
-version = "=2.2.4"
+version = "=2.2.5"
 
 [dependencies.rand]
 version = "0.8"

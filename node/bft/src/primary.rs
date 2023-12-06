@@ -57,7 +57,7 @@ use snarkvm::{
 
 use colored::Colorize;
 use futures::stream::{FuturesUnordered, StreamExt};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
@@ -175,7 +175,7 @@ impl<N: Network> Primary<N> {
         // Next, initialize the gateway.
         self.gateway.run(primary_sender, worker_senders, Some(sync_sender)).await;
         // Lastly, start the primary handlers.
-        // Note: This ensure the primary does not start communicating before syncing is complete.
+        // Note: This ensures the primary does not start communicating before syncing is complete.
         self.start_handlers(primary_receiver);
 
         Ok(())
@@ -446,15 +446,21 @@ impl<N: Network> Primary<N> {
         let private_key = *self.gateway.account().private_key();
         // Prepare the transmission IDs.
         let transmission_ids = transmissions.keys().copied().collect();
-        // Prepare the certificate IDs.
-        let certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
+        // Prepare the previous batch certificate IDs.
+        let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
+        // Prepare the last election certificate IDs.
+        let last_election_certificate_ids = match self.bft_sender.get() {
+            Some(bft_sender) => bft_sender.get_last_election_certificate_ids().await?,
+            None => Default::default(),
+        };
         // Sign the batch header.
         let batch_header = spawn_blocking!(BatchHeader::new(
             &private_key,
             round,
             now(),
             transmission_ids,
-            certificate_ids,
+            previous_certificate_ids,
+            last_election_certificate_ids,
             &mut rand::thread_rng()
         ))?;
         // Construct the proposal.
@@ -1297,9 +1303,19 @@ impl<N: Network> Primary<N> {
             bail!("Round {batch_round} is too far in the past")
         }
 
+        // Determine if quorum threshold is reached on the batch round.
+        let is_quorum_threshold_reached = {
+            let certificates = self.storage.get_certificates_for_round(batch_round);
+            let authors = certificates.iter().map(BatchCertificate::author).collect();
+            let previous_committee = self.ledger.get_previous_committee_for_round(batch_round)?;
+            previous_committee.is_quorum_threshold_reached(&authors)
+        };
+
         // Check if our primary should move to the next round.
-        // TODO (howardwu): Re-evaluate whether we need to guard this to increment after quorum threshold is reached.
-        let is_behind_schedule = batch_round > self.current_round();
+        // Note: Checking that quorum threshold is reached is important for mitigating a race condition,
+        // whereby Narwhal requires 2f+1, however the BFT only requires f+1. Without this check, the primary
+        // will advance to the next round assuming f+1, not 2f+1, which can lead to a network stall.
+        let is_behind_schedule = is_quorum_threshold_reached && batch_round > self.current_round();
         // Check if our primary is far behind the peer.
         let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();
         // If our primary is far behind the peer, update our committee to the batch round.
@@ -1309,12 +1325,19 @@ impl<N: Network> Primary<N> {
         }
 
         // Ensure the primary has all of the previous certificates.
-        let missing_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
+        let missing_previous_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
+        // Ensure the primary has all of the election certificates.
+        let missing_election_certificates = self.fetch_missing_election_certificates(peer_ip, batch_header).await?;
         // Ensure the primary has all of the transmissions.
         let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await?;
 
-        // Iterate through the missing certificates.
-        for batch_certificate in missing_certificates {
+        // Iterate through the missing previous certificates.
+        for batch_certificate in missing_previous_certificates {
+            // Store the batch certificate (recursively fetching any missing previous certificates).
+            self.sync_with_certificate_from_peer(peer_ip, batch_certificate).await?;
+        }
+        // Iterate through the missing election certificates.
+        for batch_certificate in missing_election_certificates {
             // Store the batch certificate (recursively fetching any missing previous certificates).
             self.sync_with_certificate_from_peer(peer_ip, batch_certificate).await?;
         }
@@ -1387,15 +1410,61 @@ impl<N: Network> Primary<N> {
             return Ok(Default::default());
         }
 
-        // Initialize a list for the missing previous certificates.
+        // Fetch the missing previous certificates.
+        let missing_previous_certificates =
+            self.fetch_missing_certificates(peer_ip, round, batch_header.previous_certificate_ids()).await?;
+        if !missing_previous_certificates.is_empty() {
+            debug!(
+                "Fetched {} missing previous certificates for round {round} from '{peer_ip}'",
+                missing_previous_certificates.len(),
+            );
+        }
+        // Return the missing previous certificates.
+        Ok(missing_previous_certificates)
+    }
+
+    /// Fetches any missing election certificates for the specified batch header from the specified peer.
+    async fn fetch_missing_election_certificates(
+        &self,
+        peer_ip: SocketAddr,
+        batch_header: &BatchHeader<N>,
+    ) -> Result<HashSet<BatchCertificate<N>>> {
+        // Retrieve the round.
+        let round = batch_header.round();
+        // If the previous round is 0, or is <= the GC round, return early.
+        if round == 1 || round <= self.storage.gc_round() + 1 {
+            return Ok(Default::default());
+        }
+
+        // Fetch the missing election certificates.
+        let missing_election_certificates =
+            self.fetch_missing_certificates(peer_ip, round, batch_header.last_election_certificate_ids()).await?;
+        if !missing_election_certificates.is_empty() {
+            debug!(
+                "Fetched {} missing election certificates for round {round} from '{peer_ip}'",
+                missing_election_certificates.len(),
+            );
+        }
+        // Return the missing election certificates.
+        Ok(missing_election_certificates)
+    }
+
+    /// Fetches any missing certificates for the specified batch header from the specified peer.
+    async fn fetch_missing_certificates(
+        &self,
+        peer_ip: SocketAddr,
+        round: u64,
+        certificate_ids: &IndexSet<Field<N>>,
+    ) -> Result<HashSet<BatchCertificate<N>>> {
+        // Initialize a list for the missing certificates.
         let mut fetch_certificates = FuturesUnordered::new();
-        // Iterate through the previous certificate IDs.
-        for certificate_id in batch_header.previous_certificate_ids() {
+        // Iterate through the certificate IDs.
+        for certificate_id in certificate_ids {
             // Check if the certificate already exists in the ledger.
             if self.ledger.contains_certificate(certificate_id)? {
                 continue;
             }
-            // If we do not have the previous certificate, request it.
+            // If we do not have the certificate, request it.
             if !self.storage.contains_certificate(*certificate_id) {
                 trace!("Primary - Found a new certificate ID for round {round} from '{peer_ip}'");
                 // TODO (howardwu): Limit the number of open requests we send to a peer.
@@ -1404,28 +1473,24 @@ impl<N: Network> Primary<N> {
             }
         }
 
-        // If there are no missing previous certificates, return early.
+        // If there are no missing certificates, return early.
         match fetch_certificates.is_empty() {
             true => return Ok(Default::default()),
             false => trace!(
-                "Fetching {} missing previous certificates for round {round} from '{peer_ip}'...",
+                "Fetching {} missing certificates for round {round} from '{peer_ip}'...",
                 fetch_certificates.len(),
             ),
         }
 
-        // Initialize a set for the missing previous certificates.
-        let mut missing_previous_certificates = HashSet::with_capacity(fetch_certificates.len());
-        // Wait for all of the missing previous certificates to be fetched.
+        // Initialize a set for the missing certificates.
+        let mut missing_certificates = HashSet::with_capacity(fetch_certificates.len());
+        // Wait for all of the missing certificates to be fetched.
         while let Some(result) = fetch_certificates.next().await {
-            // Insert the missing previous certificate into the set.
-            missing_previous_certificates.insert(result?);
+            // Insert the missing certificate into the set.
+            missing_certificates.insert(result?);
         }
-        debug!(
-            "Fetched {} missing previous certificates for round {round} from '{peer_ip}'",
-            missing_previous_certificates.len(),
-        );
-        // Return the missing previous certificates.
-        Ok(missing_previous_certificates)
+        // Return the missing certificates.
+        Ok(missing_certificates)
     }
 }
 
@@ -1451,6 +1516,7 @@ impl<N: Network> Primary<N> {
 mod tests {
     use super::*;
     use snarkos_node_bft_ledger_service::MockLedgerService;
+    use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
         prelude::{Address, Signature},
@@ -1484,7 +1550,7 @@ mod tests {
 
         let account = accounts.first().unwrap().1.clone();
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), 10);
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
 
         // Initialize the primary.
         let mut primary = Primary::new(account, storage, ledger, None, &[], None).unwrap();
@@ -1560,8 +1626,16 @@ mod tests {
         ]
         .into();
         // Sign the batch header.
-        let batch_header =
-            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
+        let batch_header = BatchHeader::new(
+            private_key,
+            round,
+            timestamp,
+            transmission_ids,
+            previous_certificate_ids,
+            Default::default(),
+            rng,
+        )
+        .unwrap();
         // Construct the proposal.
         Proposal::new(committee, batch_header, transmissions).unwrap()
     }
@@ -1628,8 +1702,16 @@ mod tests {
         ]
         .into();
 
-        let batch_header =
-            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
+        let batch_header = BatchHeader::new(
+            private_key,
+            round,
+            timestamp,
+            transmission_ids,
+            previous_certificate_ids,
+            Default::default(),
+            rng,
+        )
+        .unwrap();
         let signatures = peer_signatures_for_batch(primary_address, accounts, batch_header.batch_id(), rng);
         let certificate = BatchCertificate::<CurrentNetwork>::from(batch_header, signatures).unwrap();
         (certificate, transmissions)
