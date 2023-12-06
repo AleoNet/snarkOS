@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{spawn_blocking, LedgerService};
+use crate::{fmt_id, spawn_blocking, LedgerService};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
@@ -161,6 +161,60 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             TransmissionID::Solution(puzzle_commitment) => self.ledger.contains_puzzle_commitment(puzzle_commitment),
             TransmissionID::Transaction(transaction_id) => self.ledger.contains_transaction_id(transaction_id),
         }
+    }
+
+    /// Ensures the given transmission ID matches the given transmission.
+    fn ensure_transmission_id_matches(
+        &self,
+        transmission_id: TransmissionID<N>,
+        transmission: &mut Transmission<N>,
+    ) -> Result<()> {
+        match (transmission_id, transmission) {
+            (TransmissionID::Ratification, Transmission::Ratification) => {}
+            (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction_data)) => {
+                match transaction_data.clone().deserialize_blocking() {
+                    Ok(transaction) => {
+                        if transaction.id() != expected_transaction_id {
+                            bail!(
+                                "Received mismatching transaction ID  - expected {}, found {}",
+                                fmt_id(expected_transaction_id),
+                                fmt_id(transaction.id()),
+                            );
+                        }
+
+                        // Update the transmission with the deserialized transaction.
+                        *transaction_data = Data::Object(transaction);
+                    }
+                    Err(err) => {
+                        bail!("Failed to deserialize transaction: {err}");
+                    }
+                }
+            }
+            (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution_data)) => {
+                match solution_data.clone().deserialize_blocking() {
+                    Ok(solution) => {
+                        if solution.commitment() != expected_commitment {
+                            bail!(
+                                "Received mismatching solution ID - expected {}, found {}",
+                                fmt_id(expected_commitment),
+                                fmt_id(solution.commitment()),
+                            );
+                        }
+
+                        // Update the transmission with the deserialized solution.
+                        *solution_data = Data::Object(solution);
+                    }
+                    Err(err) => {
+                        bail!("Failed to deserialize solution: {err}");
+                    }
+                }
+            }
+            _ => {
+                bail!("Mismatching `(transmission_id, transmission)` pair");
+            }
+        }
+
+        Ok(())
     }
 
     /// Checks the given solution is well-formed.
