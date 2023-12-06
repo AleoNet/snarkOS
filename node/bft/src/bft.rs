@@ -765,8 +765,7 @@ impl<N: Network> BFT<N> {
                 // Note: Because we will be committing the latest leader certificate after this,
                 // technically we do not need to be updating the last election certificate IDs
                 // for intermediate leader certificates. However, this is a safety mechanic to ensure completeness.
-                last_election_certificate_ids.clear();
-                last_election_certificate_ids.extend(election_certificate_ids);
+                *last_election_certificate_ids = election_certificate_ids;
             }
         }
         // Commit the latest leader certificate.
