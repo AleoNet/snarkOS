@@ -431,7 +431,7 @@ impl<N: Network> Gateway<N> {
     fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr, address);
-        // Add an transmission for this peer in the connected peers.
+        // Add a transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
     }
 
@@ -441,7 +441,7 @@ impl<N: Network> Gateway<N> {
     pub fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr, address);
-        // Add an transmission for this peer in the connected peers.
+        // Add a transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
     }
 
@@ -522,7 +522,7 @@ impl<N: Network> Gateway<N> {
                 Event::TransmissionResponse(TransmissionResponse { transmission_id, .. }) => *transmission_id,
                 _ => unreachable!(),
             };
-            // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
+            // Skip processing this certificate if the rate limit was exceeded (i.e. someone is spamming a specific certificate).
             let num_events = self.cache.insert_inbound_transmission(transmission_id, CACHE_REQUESTS_INTERVAL);
             if num_events >= self.max_cache_duplicates() {
                 return Ok(());
