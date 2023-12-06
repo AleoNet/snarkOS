@@ -569,8 +569,7 @@ impl<N: Network> BFT<N> {
         // Update the last election certificate IDs.
         {
             let mut last_election_certificate_ids = self.last_election_certificate_ids.write();
-            last_election_certificate_ids.clear();
-            last_election_certificate_ids.extend(election_certificate_ids);
+            *last_election_certificate_ids = election_certificate_ids;
         }
         Ok(())
     }
