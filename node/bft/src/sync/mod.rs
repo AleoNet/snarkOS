@@ -222,7 +222,9 @@ impl<N: Network> Sync<N> {
                     // If the block authority is a beacon, then skip the block.
                     Authority::Beacon(_) => None,
                     // If the block authority is a subdag, then retrieve the certificates.
-                    Authority::Quorum(subdag) => Some(subdag.leader_certificate().clone()),
+                    Authority::Quorum(subdag) => {
+                        Some((subdag.leader_certificate().clone(), subdag.election_certificate_ids().clone()))
+                    }
                 }
             })
             .collect::<Vec<_>>();
