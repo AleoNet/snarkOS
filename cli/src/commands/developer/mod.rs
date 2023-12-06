@@ -54,7 +54,7 @@ use std::{path::PathBuf, str::FromStr};
 type CurrentAleo = snarkvm::circuit::AleoV0;
 type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-/// Some useful developer tools
+/// Commands to deploy and execute transactions
 #[derive(Debug, Parser)]
 pub enum Developer {
     /// Decrypt a ciphertext.
