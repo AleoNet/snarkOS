@@ -175,7 +175,7 @@ impl<N: Network> Primary<N> {
         // Next, initialize the gateway.
         self.gateway.run(primary_sender, worker_senders, Some(sync_sender)).await;
         // Lastly, start the primary handlers.
-        // Note: This ensure the primary does not start communicating before syncing is complete.
+        // Note: This ensures the primary does not start communicating before syncing is complete.
         self.start_handlers(primary_receiver);
 
         Ok(())
@@ -1303,9 +1303,19 @@ impl<N: Network> Primary<N> {
             bail!("Round {batch_round} is too far in the past")
         }
 
+        // Determine if quorum threshold is reached on the batch round.
+        let is_quorum_threshold_reached = {
+            let certificates = self.storage.get_certificates_for_round(batch_round);
+            let authors = certificates.iter().map(BatchCertificate::author).collect();
+            let previous_committee = self.ledger.get_previous_committee_for_round(batch_round)?;
+            previous_committee.is_quorum_threshold_reached(&authors)
+        };
+
         // Check if our primary should move to the next round.
-        // TODO (howardwu): Re-evaluate whether we need to guard this to increment after quorum threshold is reached.
-        let is_behind_schedule = batch_round > self.current_round();
+        // Note: Checking that quorum threshold is reached is important for mitigating a race condition,
+        // whereby Narwhal requires 2f+1, however the BFT only requires f+1. Without this check, the primary
+        // will advance to the next round assuming f+1, not 2f+1, which can lead to a network stall.
+        let is_behind_schedule = is_quorum_threshold_reached && batch_round > self.current_round();
         // Check if our primary is far behind the peer.
         let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();
         // If our primary is far behind the peer, update our committee to the batch round.
