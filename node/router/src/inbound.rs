@@ -263,7 +263,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     }
 
     /// Handles a `PeerResponse` message.
-    fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
+    fn peer_response(&self, peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
+        // Catch if the message was unsolicited and thus a protocol violation.
+        if !self.router().remove_peer_request(peer_ip) {
+            return false;
+        }
+
         // Filter out invalid addresses.
         let peers = peers.iter().copied().filter(|ip| self.router().is_valid_peer_ip(ip)).collect::<Vec<_>>();
         // Adds the given peer IPs to the list of candidate peers.
