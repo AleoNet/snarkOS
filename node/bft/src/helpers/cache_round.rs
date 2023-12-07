@@ -63,11 +63,7 @@ impl<N: Network> RoundCache<N> {
     fn insert_validator_at_round(&mut self, round: u64, validator: AddressWithCoordinate<N>) {
         match self.highest_rounds.binary_search_by_key(&round, |(r, _)| *r) {
             Ok(new_address_index) => self.highest_rounds[new_address_index].1.push(validator),
-            Err(new_address_index) => {
-                let mut validators = Vec::with_capacity(200);
-                validators.push(validator);
-                self.highest_rounds.insert(new_address_index, (round, validators))
-            }
+            Err(new_address_index) => self.highest_rounds.insert(new_address_index, (round, vec![validator])),
         }
     }
 
