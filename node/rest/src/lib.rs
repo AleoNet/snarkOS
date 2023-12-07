@@ -36,7 +36,7 @@ use snarkvm::{
 use anyhow::Result;
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
-    http::{header::CONTENT_TYPE, Method, Request, StatusCode},
+    http::{header::CONTENT_TYPE, HeaderValue, Method, Request, StatusCode},
     middleware,
     middleware::Next,
     response::Response,
@@ -48,7 +48,7 @@ use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::task::JoinHandle;
 use tower_http::{
-    cors::{Any, CorsLayer},
+    cors::{AllowOrigin, CorsLayer},
     trace::TraceLayer,
 };
 
@@ -72,11 +72,12 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
         consensus: Option<Consensus<N>>,
         ledger: Ledger<N, C>,
         routing: Arc<R>,
+        allowed_origins: Vec<String>,
     ) -> Result<Self> {
         // Initialize the server.
         let mut server = Self { consensus, ledger, routing, handles: Default::default() };
         // Spawn the server.
-        server.spawn_server(rest_ip);
+        server.spawn_server(rest_ip, allowed_origins);
         // Return the server.
         Ok(server)
     }
@@ -95,9 +96,15 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
-    fn spawn_server(&mut self, rest_ip: SocketAddr) {
+    fn spawn_server(&mut self, rest_ip: SocketAddr, allowed_origins: Vec<String>) {
+        let allowed_origins = if allowed_origins.is_empty() {
+            AllowOrigin::any()
+        } else {
+            let origins = allowed_origins.iter().map(|s| HeaderValue::from_str(s).expect("Invalid CORS origin"));
+            AllowOrigin::list(origins)
+        };
         let cors = CorsLayer::new()
-            .allow_origin(Any)
+            .allow_origin(allowed_origins)
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers([CONTENT_TYPE]);
 
