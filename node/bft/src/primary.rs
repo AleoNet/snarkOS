@@ -1321,17 +1321,24 @@ impl<N: Network> Primary<N> {
         // will advance to the next round assuming f+1, not 2f+1, which can lead to a network stall.
         let is_behind_schedule = is_quorum_threshold_reached && batch_round > self.current_round();
 
-        // Get the highest round seen from a quorum of the current committee
-        let committee = self.ledger.get_committee_for_round(self.current_round())?;
-        let round_with_quorum =
-            (*self.batch_round_cache.write()).update(batch_round, batch_header.author(), &committee)?;
-
         // Check if our primary is far behind the peer.
-        let is_peer_far_in_future = round_with_quorum > self.current_round() + self.storage.max_gc_rounds();
-        // If our primary is far behind the peer, update our committee to the batch round.
-        if is_behind_schedule || is_peer_far_in_future {
+        let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();
+
+        // If our primary is behind shedule, update our committee to the batch round.
+        if is_behind_schedule {
             // If the batch round is greater than the current committee round, update the committee.
-            self.try_increment_to_the_next_round(round_with_quorum).await?;
+            self.try_increment_to_the_next_round(batch_round).await?;
+        // If our peer is far ahead, check if a quorum of peers is ahead and consider updating our committee.
+        } else if is_peer_far_in_future {
+            // Get the highest round seen from a quorum of the current committee
+            let committee = self.ledger.get_committee_for_round(self.current_round())?;
+            let round_with_quorum =
+                (*self.batch_round_cache.write()).update(batch_round, batch_header.author(), &committee)?;
+            let is_quorum_far_in_future = round_with_quorum > self.current_round() + self.storage.max_gc_rounds();
+            // If our primary is far behind a quorum of peers, update our committee to the round_with_quorum.
+            if is_quorum_far_in_future {
+                self.try_increment_to_the_next_round(round_with_quorum).await?;
+            }
         }
 
         // Ensure the primary has all of the previous certificates.
