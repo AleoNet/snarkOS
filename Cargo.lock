@@ -622,9 +622,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.4.8"
+version = "4.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2275f18819641850fa26c89acc84d465c1bf91ce57bc2748b28c420473352f64"
+checksum = "bfaff671f6b22ca62406885ece523383b9b64022e341e53e009a62ebc47a45f2"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -632,9 +632,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.4.8"
+version = "4.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07cdf1b148b25c1e1f7a42225e30a0d99a615cd4637eae7365548dd4529b95bc"
+checksum = "a216b506622bb1d316cd51328dce24e07bdff4a6128a47c7e7fad11878d5adbb"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1235,8 +1235,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe9006bed769170c11f845cf00c7c1e9092aeb3f268e007c3e760ac68008070f"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1610,11 +1612,12 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
-version = "9.1.0"
+version = "9.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "155c4d7e39ad04c172c5e3a99c434ea3b4a7ba7960b38ecd562b270b097cce09"
+checksum = "5c7ea04a7c5c055c175f189b6dc6ba036fd62306b58c66c9f6389036c503a3f4"
 dependencies = [
  "base64",
+ "js-sys",
  "pem",
  "ring",
  "serde",
@@ -2091,9 +2094,9 @@ dependencies = [
 
 [[package]]
 name = "openssl"
-version = "0.10.59"
+version = "0.10.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a257ad03cd8fb16ad4172fedf8094451e1af1c4b70097636ef2eac9a5f0cc33"
+checksum = "79a4c6c3a2b158f7f8f2a2fc5a969fa3a068df6fc9dbb4a43845436e3af7c800"
 dependencies = [
  "bitflags 2.4.1",
  "cfg-if",
@@ -2123,9 +2126,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.95"
+version = "0.9.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40a4130519a360279579c2053038317e40eff64d13fd3f004f9e1b72b8a6aaf9"
+checksum = "3812c071ba60da8b5677cc12bcb1d42989a65553772897a7e0355545a819838f"
 dependencies = [
  "cc",
  "libc",
@@ -3387,7 +3390,7 @@ dependencies = [
 [[package]]
 name = "snarkvm"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "anstyle",
  "anyhow",
@@ -3417,7 +3420,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-algorithms"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3447,7 +3450,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-account",
  "snarkvm-circuit-algorithms",
@@ -3461,7 +3464,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-account"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-algorithms",
  "snarkvm-circuit-network",
@@ -3472,7 +3475,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-algorithms"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-types",
  "snarkvm-console-algorithms",
@@ -3482,7 +3485,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-collections"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-algorithms",
  "snarkvm-circuit-types",
@@ -3492,7 +3495,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-environment"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "indexmap 2.1.0",
  "itertools 0.11.0",
@@ -3510,12 +3513,12 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-environment-witness"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 
 [[package]]
 name = "snarkvm-circuit-network"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-algorithms",
  "snarkvm-circuit-collections",
@@ -3526,7 +3529,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-program"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "paste",
  "snarkvm-circuit-account",
@@ -3541,7 +3544,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-address",
@@ -3556,7 +3559,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-address"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3569,7 +3572,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-boolean"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-console-types-boolean",
@@ -3578,7 +3581,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-field"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3588,7 +3591,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-group"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3600,7 +3603,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-integers"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3612,7 +3615,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-scalar"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3623,7 +3626,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-string"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3635,7 +3638,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console-account",
  "snarkvm-console-algorithms",
@@ -3648,7 +3651,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-account"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "bs58",
  "snarkvm-console-network",
@@ -3659,7 +3662,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-algorithms"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "blake2s_simd",
  "smallvec",
@@ -3672,7 +3675,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-collections"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "rayon",
@@ -3683,7 +3686,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-network"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "anyhow",
  "indexmap 2.1.0",
@@ -3706,7 +3709,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-network-environment"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "anyhow",
  "bech32",
@@ -3724,7 +3727,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-program"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "enum_index",
  "enum_index_derive",
@@ -3745,7 +3748,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-address",
@@ -3760,7 +3763,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-address"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3771,7 +3774,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-boolean"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console-network-environment",
 ]
@@ -3779,7 +3782,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-field"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3789,7 +3792,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-group"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3800,7 +3803,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-integers"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3811,7 +3814,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-scalar"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3822,7 +3825,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-string"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3833,7 +3836,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-curves"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "rand",
  "rayon",
@@ -3847,7 +3850,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-fields"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3865,7 +3868,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3890,7 +3893,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-authority"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "anyhow",
  "rand",
@@ -3902,7 +3905,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-block"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "indexmap 2.1.0",
  "rayon",
@@ -3920,7 +3923,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-coinbase"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3940,7 +3943,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-committee"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "anyhow",
  "indexmap 2.1.0",
@@ -3956,7 +3959,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-narwhal"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-ledger-narwhal-batch-certificate",
  "snarkvm-ledger-narwhal-batch-header",
@@ -3969,7 +3972,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-narwhal-batch-certificate"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "indexmap 2.1.0",
  "serde_json",
@@ -3981,7 +3984,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-narwhal-batch-header"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "indexmap 2.1.0",
  "serde_json",
@@ -3993,7 +3996,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-narwhal-data"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "bytes",
  "serde_json",
@@ -4004,7 +4007,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-narwhal-subdag"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "indexmap 2.1.0",
  "rayon",
@@ -4018,7 +4021,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-narwhal-transmission"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "bytes",
  "serde_json",
@@ -4031,7 +4034,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-narwhal-transmission-id"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "snarkvm-console",
  "snarkvm-ledger-coinbase",
@@ -4040,7 +4043,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-query"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "async-trait",
  "reqwest",
@@ -4053,7 +4056,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-store"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -4078,7 +4081,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-ledger-test-helpers"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "once_cell",
  "snarkvm-circuit",
@@ -4093,7 +4096,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-parameters"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -4117,7 +4120,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-synthesizer"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -4142,7 +4145,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-synthesizer-process"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "colored",
@@ -4165,7 +4168,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-synthesizer-program"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "indexmap 2.1.0",
  "paste",
@@ -4179,7 +4182,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-synthesizer-snark"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "bincode",
  "once_cell",
@@ -4192,7 +4195,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-utilities"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -4213,7 +4216,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-utilities-derives"
 version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=b7c5f49#b7c5f49ba0a6b573f5a1f6850338507152827f8c"
 dependencies = [
  "proc-macro2",
  "quote 1.0.33",

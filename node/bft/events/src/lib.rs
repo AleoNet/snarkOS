@@ -88,6 +88,9 @@ pub trait EventTrait: ToBytes + FromBytes {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+// TODO (howardwu): For mainnet - Remove this clippy lint. The CertificateResponse should not
+//  be a large enum variant, after removing the versioning.
+#[allow(clippy::large_enum_variant)]
 pub enum Event<N: Network> {
     BatchPropose(BatchPropose<N>),
     BatchSignature(BatchSignature<N>),
@@ -115,7 +118,7 @@ impl<N: Network> From<DisconnectReason> for Event<N> {
 
 impl<N: Network> Event<N> {
     /// The version of the event protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 3;
+    pub const VERSION: u32 = 4;
 
     /// Returns the event name.
     #[inline]
