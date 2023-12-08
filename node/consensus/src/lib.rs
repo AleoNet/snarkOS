@@ -232,21 +232,25 @@ impl<N: Network> Consensus<N> {
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
         // Process the unconfirmed transaction.
         {
+            trace!("------------------------------- add_unconfirmed_transaction:235");
             let transaction_id = transaction.id();
 
             // Check that the transaction is not a fee transaction.
             if transaction.is_fee() {
                 bail!("Transaction '{}' is a fee transaction {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
+            trace!("------------------------------- add_unconfirmed_transaction:242");
             // Check if the transaction was recently seen.
             if self.seen_transactions.lock().put(transaction_id, ()).is_some() {
                 // If the transaction was recently seen, return early.
                 return Ok(());
             }
+            trace!("------------------------------- add_unconfirmed_transaction:248");
             // Check if the transaction already exists in the ledger.
             if self.ledger.contains_transmission(&TransmissionID::from(&transaction_id))? {
                 bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
+            trace!("------------------------------- add_unconfirmed_transaction:254");
             // Add the transaction to the memory pool.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
             if self.transactions_queue.lock().insert(transaction_id, transaction).is_some() {
@@ -259,6 +263,7 @@ impl<N: Network> Consensus<N> {
         if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
+        trace!("------------------------------- add_unconfirmed_transaction:266");
         // Retrieve the transactions.
         let transactions = {
             // Determine the available capacity.
@@ -270,6 +275,7 @@ impl<N: Network> Consensus<N> {
             // Drain the solutions from the queue.
             queue.drain(..num_transactions).collect::<Vec<_>>()
         };
+        trace!("------------------------------- add_unconfirmed_transaction:277");
         // Iterate over the transactions.
         for (_, transaction) in transactions.into_iter() {
             let transaction_id = transaction.id();
@@ -281,6 +287,7 @@ impl<N: Network> Consensus<N> {
                 warn!("Failed to add unconfirmed transaction '{}' to the memory pool - {e}", fmt_id(transaction_id));
             }
         }
+        trace!("------------------------------- add_unconfirmed_transaction:288");
         Ok(())
     }
 }
