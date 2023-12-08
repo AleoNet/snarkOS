@@ -18,7 +18,7 @@ use snarkvm::{
     ledger::committee::Committee,
     prelude::Network,
 };
-use std::collections::{HashSet, VecDeque};
+use std::collections::HashSet;
 
 #[derive(Copy, Clone, Debug)]
 struct AddressWithCoordinate<N: Network> {
@@ -37,7 +37,7 @@ pub struct RoundCache<N: Network> {
     /// The current highest round which has (stake-weighted) quorum
     last_highest_round_with_quorum: u64,
     /// A list of (round, Vec<AddressWithCoordinate<N>>), indicating the last seen highest round for each address
-    highest_rounds: VecDeque<(u64, Vec<AddressWithCoordinate<N>>)>,
+    highest_rounds: Vec<(u64, Vec<AddressWithCoordinate<N>>)>,
     /// A list of (AddressWithCoordinate<N>, round) to quickly find an Address' round by their x coordinate
     address_rounds: Vec<(AddressWithCoordinate<N>, u64)>,
 }
@@ -153,9 +153,11 @@ impl<N: Network> RoundCache<N> {
                 Ok(quorum_index) => quorum_index,
                 Err(quorum_index) => quorum_index,
             };
-        for (_, addresses) in self.highest_rounds.range(quorum_index..) {
-            validators_in_support.extend(addresses.iter().map(|a| a.address));
-        }
+        if let Some(highest_rounds) = self.highest_rounds.get(quorum_index..) {
+            for (_, addresses) in highest_rounds {
+                validators_in_support.extend(addresses.iter().map(|a| a.address));
+            }
+        };
         Ok(validators_in_support)
     }
 
