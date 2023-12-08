@@ -374,7 +374,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
             // Start the transaction loop.
             loop {
-                tokio::time::sleep(Duration::from_millis(5000)).await;
+                tokio::time::sleep(Duration::from_millis(50000)).await;
 
                 // Prepare the inputs.
                 let inputs = [Value::from(Literal::Address(self_.address())), Value::from(Literal::U64(U64::new(1)))];
