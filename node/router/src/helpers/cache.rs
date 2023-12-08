@@ -53,6 +53,8 @@ pub struct Cache<N: Network> {
     seen_outbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
     seen_outbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
+    /// The map of peer IPs to the number of sent peer requests.
+    seen_outbound_peer_requests: RwLock<IndexMap<SocketAddr, u32>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -75,6 +77,7 @@ impl<N: Network> Cache<N> {
             seen_outbound_puzzle_requests: Default::default(),
             seen_outbound_solutions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
             seen_outbound_transactions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
+            seen_outbound_peer_requests: Default::default(),
         }
     }
 }
@@ -165,6 +168,21 @@ impl<N: Network> Cache<N> {
         transaction: N::TransactionID,
     ) -> Option<OffsetDateTime> {
         Self::refresh_and_insert(&self.seen_outbound_transactions, (peer_ip, transaction))
+    }
+
+    /// Returns `true` if the cache contains a peer request from the given peer.
+    pub fn contains_outbound_peer_request(&self, peer_ip: SocketAddr) -> bool {
+        self.seen_outbound_peer_requests.read().get(&peer_ip).map(|r| *r > 0).unwrap_or(false)
+    }
+
+    /// Increment the peer IP's number of peer requests, returning the updated number of peer requests.
+    pub fn increment_outbound_peer_requests(&self, peer_ip: SocketAddr) -> u32 {
+        Self::increment_counter(&self.seen_outbound_peer_requests, peer_ip)
+    }
+
+    /// Decrement the peer IP's number of peer requests, returning the updated number of peer requests.
+    pub fn decrement_outbound_peer_requests(&self, peer_ip: SocketAddr) -> u32 {
+        Self::decrement_counter(&self.seen_outbound_peer_requests, peer_ip)
     }
 }
 
@@ -335,5 +353,36 @@ mod tests {
 
         // Check that the cache still contains the transaction.
         assert_eq!(cache.seen_outbound_transactions.read().len(), 1);
+    }
+
+    #[test]
+    fn test_outbound_peer_request() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let peer_ip = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1234);
+
+        // Check the cache is empty.
+        assert!(cache.seen_outbound_peer_requests.read().is_empty());
+        assert!(!cache.contains_outbound_peer_request(peer_ip));
+
+        // Increment the peer requests.
+        assert_eq!(cache.increment_outbound_peer_requests(peer_ip), 1);
+
+        // Check the cache contains the peer request.
+        assert!(cache.contains_outbound_peer_request(peer_ip));
+
+        // Increment the peer requests again for the same peer IP.
+        assert_eq!(cache.increment_outbound_peer_requests(peer_ip), 2);
+
+        // Check the cache still contains the peer request.
+        assert!(cache.contains_outbound_peer_request(peer_ip));
+
+        // Decrement the peer requests.
+        assert_eq!(cache.decrement_outbound_peer_requests(peer_ip), 1);
+
+        // Decrement the peer requests again.
+        assert_eq!(cache.decrement_outbound_peer_requests(peer_ip), 0);
+
+        // Check the cache is empty.
+        assert!(!cache.contains_outbound_peer_request(peer_ip));
     }
 }

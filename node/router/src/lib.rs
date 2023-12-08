@@ -85,9 +85,6 @@ pub struct InnerRouter<N: Network> {
     candidate_peers: RwLock<IndexSet<SocketAddr>>,
     /// The set of restricted peer IPs.
     restricted_peers: RwLock<IndexMap<SocketAddr, Instant>>,
-    /// The set of addresses we've sent a `PeerRequest` to. Used to detect
-    /// unsolicited `PeerResponse`s.
-    peer_requests: RwLock<HashSet<SocketAddr>>,
     /// The spawned handles.
     handles: Mutex<Vec<JoinHandle<()>>>,
     /// The boolean flag for the development mode.
@@ -128,7 +125,6 @@ impl<N: Network> Router<N> {
             connecting_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
-            peer_requests: Default::default(),
             handles: Default::default(),
             is_dev,
         })))
@@ -475,14 +471,6 @@ impl<N: Network> Router<N> {
     /// Spawns a task with the given future; it should only be used for long-running tasks.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
         self.handles.lock().push(tokio::spawn(future));
-    }
-
-    pub fn insert_peer_request(&self, peer_ip: SocketAddr) {
-        self.peer_requests.write().insert(peer_ip);
-    }
-
-    pub fn remove_peer_request(&self, peer_ip: SocketAddr) -> bool {
-        self.peer_requests.write().remove(&peer_ip)
     }
 
     /// Shuts down the router.

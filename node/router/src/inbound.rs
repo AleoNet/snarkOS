@@ -117,10 +117,16 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 true => Ok(()),
                 false => bail!("Peer '{peer_ip}' sent an invalid peer request"),
             },
-            Message::PeerResponse(message) => match self.peer_response(peer_ip, &message.peers) {
-                true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
-            },
+            Message::PeerResponse(message) => {
+                if !self.router().cache.contains_outbound_peer_request(peer_ip) {
+                    bail!("Peer '{peer_ip}' is not following the protocol (unexpected peer response)")
+                }
+
+                match self.peer_response(peer_ip, &message.peers) {
+                    true => Ok(()),
+                    false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
+                }
+            }
             Message::Ping(message) => {
                 // Ensure the message protocol version is not outdated.
                 if message.version < Message::<N>::VERSION {
@@ -263,12 +269,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     }
 
     /// Handles a `PeerResponse` message.
-    fn peer_response(&self, peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
-        // Catch if the message was unsolicited and thus a protocol violation.
-        if !self.router().remove_peer_request(peer_ip) {
-            return false;
-        }
-
+    fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
         // Filter out invalid addresses.
         let peers = peers.iter().copied().filter(|ip| self.router().is_valid_peer_ip(ip)).collect::<Vec<_>>();
         // Adds the given peer IPs to the list of candidate peers.

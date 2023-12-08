@@ -59,6 +59,10 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         if matches!(message, Message::PuzzleRequest(_)) {
             self.router().cache.increment_outbound_puzzle_requests(peer_ip);
         }
+        // If the message type is a peer request, increment the cache.
+        if matches!(message, Message::PeerRequest(_)) {
+            self.router().cache.increment_outbound_peer_requests(peer_ip);
+        }
         // Retrieve the message name.
         let name = message.name();
         // Send the message to the peer.
