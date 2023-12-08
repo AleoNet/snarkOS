@@ -83,10 +83,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        if let Some(1) = dev {
-            // Initialize the console subscriber.
-            console_subscriber::init();
-        }
         // Initialize the signal handler.
         let signal_node = Self::handle_signals();
 

@@ -103,8 +103,12 @@ pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile
         false => Some(log_sender),
     };
 
+    // Initialize the tokio-console layer.
+    let console_layer = console_subscriber::spawn();
+
     // Initialize tracing.
     let _ = tracing_subscriber::registry()
+        .with(console_layer)
         .with(
             // Add layer using LogWriter for stdout / terminal
             tracing_subscriber::fmt::Layer::default()
