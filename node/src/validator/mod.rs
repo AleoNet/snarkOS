@@ -133,7 +133,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             shutdown: Default::default(),
         };
         // Initialize the transaction pool.
-        node.initialize_transaction_pool(dev)?;
+        // node.initialize_transaction_pool(dev)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
