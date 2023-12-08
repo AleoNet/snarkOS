@@ -41,7 +41,6 @@ use snarkvm::prelude::{
 };
 
 use anyhow::Result;
-use console_subscriber;
 use core::future::Future;
 use parking_lot::Mutex;
 use std::{
