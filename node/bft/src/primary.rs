@@ -1087,7 +1087,7 @@ impl<N: Network> Primary<N> {
                     // Retrieve the worker.
                     let worker = &self_.workers[worker_id as usize];
                     // Process the unconfirmed transaction.
-                    trace!("Primary - Sending unconfirmed transaction to worker.")
+                    trace!("Primary - Sending unconfirmed transaction to worker.");
                     let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
                     // Send the result to the callback.
                     callback.send(result).ok();
