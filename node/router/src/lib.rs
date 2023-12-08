@@ -25,7 +25,6 @@ mod helpers;
 pub use helpers::*;
 
 mod handshake;
-pub use handshake::*;
 
 mod heartbeat;
 pub use heartbeat::*;
