@@ -309,15 +309,15 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
-        trace!("------------------------------- transaction_broadcast:312");
+        debug!("------------------------------- transaction_broadcast:312");
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
-            trace!("------------------------------- transaction_broadcast:316");
+            debug!("------------------------------- transaction_broadcast:316");
             consensus.add_unconfirmed_transaction(tx.clone()).await?;
         }
 
-        trace!("------------------------------- transaction_broadcast:320");
+        debug!("------------------------------- transaction_broadcast:320");
         // Prepare the unconfirmed transaction message.
         let tx_id = tx.id();
         let message = Message::UnconfirmedTransaction(UnconfirmedTransaction {
@@ -328,7 +328,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         // Broadcast the transaction.
         rest.routing.propagate(message, &[]);
 
-        trace!("------------------------------- transaction_broadcast:331");
+        debug!("------------------------------- transaction_broadcast:331");
         Ok(ErasedJson::pretty(tx_id))
     }
 }

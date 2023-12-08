@@ -232,7 +232,7 @@ impl<N: Network> Consensus<N> {
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
         // Process the unconfirmed transaction.
         {
-            trace!("------------------------------- add_unconfirmed_transaction:235");
+            debug!("------------------------------- add_unconfirmed_transaction:235");
             let transaction_id = transaction.id();
 
             // Check that the transaction is not a fee transaction.

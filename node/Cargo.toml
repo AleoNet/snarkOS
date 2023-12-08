@@ -102,10 +102,7 @@ version = "0.3"
 
 [dependencies.tokio]
 version = "1.28"
-features = [ "rt", "signal", "tracing" ]
-
-[dependencies.console-subscriber]
-version = "0.2.0"
+features = [ "rt", "signal"]
 
 [dependencies.tokio-util]
 version = "0.7"

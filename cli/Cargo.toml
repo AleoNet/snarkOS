@@ -101,10 +101,7 @@ version = "1.0"
 
 [dependencies.tokio]
 version = "1.28"
-features = [ "rt", "tracing" ]
-
-[dependencies.console-subscriber]
-version = "0.2.0"
+features = [ "rt" ]
 
 [dependencies.tracing-subscriber]
 version = "0.3"
