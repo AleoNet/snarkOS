@@ -59,7 +59,7 @@ impl Updater {
         Ok(status)
     }
 
-    /// Check if there is an available update for `aleo` and return the newest release.
+    /// Check if there is an available update for `snarkos` and return the newest release.
     pub fn update_available() -> Result<String, UpdaterError> {
         let updater = github::Update::configure()
             .repo_owner(Self::SNARKOS_REPO_OWNER)
