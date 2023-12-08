@@ -41,8 +41,8 @@ use snarkvm::prelude::{
 };
 
 use anyhow::Result;
-use core::future::Future;
 use console_subscriber;
+use core::future::Future;
 use parking_lot::Mutex;
 use std::{
     net::SocketAddr,

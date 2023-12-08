@@ -103,29 +103,48 @@ pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile
         false => Some(log_sender),
     };
 
-    // Initialize the tokio-console layer.
-    let console_layer = console_subscriber::spawn();
-
     // Initialize tracing.
-    let _ = tracing_subscriber::registry()
-        .with(console_layer)
-        .with(
-            // Add layer using LogWriter for stdout / terminal
-            tracing_subscriber::fmt::Layer::default()
-                .with_ansi(log_sender.is_none() && io::stdout().is_tty())
-                .with_writer(move || LogWriter::new(&log_sender))
-                .with_target(verbosity > 2)
-                .with_filter(filter),
-        )
-        .with(
-            // Add layer redirecting logs to the file
-            tracing_subscriber::fmt::Layer::default()
-                .with_ansi(false)
-                .with_writer(logfile)
-                .with_target(verbosity > 2)
-                .with_filter(filter2),
-        )
-        .try_init();
+    let registry = tracing_subscriber::registry();
+    // If the TOKIO_CONSOLE_LOG env var is set, add the console layer to the registry.
+    let _ = match std::env::var("TOKIO_CONSOLE_LOG") {
+        Ok(_) => registry
+            .with(console_subscriber::spawn())
+            .with(
+                // Add layer using LogWriter for stdout / terminal
+                tracing_subscriber::fmt::Layer::default()
+                    .with_ansi(log_sender.is_none() && io::stdout().is_tty())
+                    .with_writer(move || LogWriter::new(&log_sender))
+                    .with_target(verbosity > 2)
+                    .with_filter(filter),
+            )
+            .with(
+                // Add layer redirecting logs to the file
+                tracing_subscriber::fmt::Layer::default()
+                    .with_ansi(false)
+                    .with_writer(logfile)
+                    .with_target(verbosity > 2)
+                    .with_filter(filter2),
+            )
+            .try_init(),
+        Err(_) => registry
+            .with(
+                // Add layer using LogWriter for stdout / terminal
+                tracing_subscriber::fmt::Layer::default()
+                    .with_ansi(log_sender.is_none() && io::stdout().is_tty())
+                    .with_writer(move || LogWriter::new(&log_sender))
+                    .with_target(verbosity > 2)
+                    .with_filter(filter),
+            )
+            .with(
+                // Add layer redirecting logs to the file
+                tracing_subscriber::fmt::Layer::default()
+                    .with_ansi(false)
+                    .with_writer(logfile)
+                    .with_target(verbosity > 2)
+                    .with_filter(filter2),
+            )
+            .try_init(),
+    };
 
     log_receiver
 }
