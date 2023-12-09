@@ -151,6 +151,12 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Before running the command above (`snarkos account new`) try `source ~/.bashrc`
 - Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
 
+### 4. How do I use the CLI to sign and verify a message?
+
+1. Generate an account with `snarkos account new` if you haven't already
+2. Sign a message with your private key using `snarkos account sign -m "Message" -k APrivateKey1PasteYourKey`
+3. Verify your signature with `snarkos account verify -m "Message" -s sign1SignatureHere -a aleo1YourAccountAddress`
+
 ## 5. Command Line Interface
 
 To run a node with custom settings, refer to the full list of options and flags available in the `snarkOS` CLI.
