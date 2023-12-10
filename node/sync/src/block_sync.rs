@@ -58,7 +58,7 @@ pub enum BlockSyncMode {
 }
 
 impl BlockSyncMode {
-    /// Returns `true` if the node is in router moder.
+    /// Returns `true` if the node is in router mode.
     pub const fn is_router(&self) -> bool {
         matches!(self, Self::Router)
     }
@@ -75,7 +75,7 @@ impl BlockSyncMode {
 /// - When a request is inserted, the `requests` map and `request_timestamps` map insert an entry for the request height.
 /// - When a response is inserted, the `requests` map inserts the entry for the request height.
 /// - When a request is completed, the `requests` map still has the entry, but its `sync_ips` is empty;
-/// - the `request_timestamps` map remains unchanged.
+///   the `request_timestamps` map remains unchanged.
 /// - When a response is removed/completed, the `requests` map and `request_timestamps` map also remove the entry for the request height.
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
 #[derive(Clone, Debug)]

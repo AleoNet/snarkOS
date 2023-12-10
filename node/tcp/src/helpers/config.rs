@@ -26,7 +26,9 @@ pub struct Config {
     /// A user-friendly identifier of the Tcp. It is visible in the logs, where it allows Tcp instances to be
     /// distinguished more easily if multiple are run at the same time.
     ///
-    /// note: If set to `None`, Tcp will automatically be assigned a sequential, zero-based numeric identifier.
+    /// note: If set to `None` when the configuration is initially created, it will be automatically assigned
+    /// (the string representation of) a sequential, zero-based numeric identifier. So this is essentially never
+    /// `None`, in a running node.
     pub name: Option<String>,
     /// The IP address the Tcp's connection listener should bind to.
     ///
