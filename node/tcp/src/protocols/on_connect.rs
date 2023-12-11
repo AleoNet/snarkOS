@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Opt-in protocols available to the node; each protocol is expected to spawn its own task that runs throughout the
-//! node's lifetime and handles a specific functionality. The communication with these tasks is done via dedicated
-//! handler objects.
-
 use std::net::SocketAddr;
 
 use tokio::sync::{mpsc, oneshot};
