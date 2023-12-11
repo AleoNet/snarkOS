@@ -223,6 +223,7 @@ impl<N: Network> BlockSync<N> {
         if block_requests.is_empty() && !self.responses.read().is_empty() {
             trace!("No block requests to send - try handling responses we already have");
             self.handle_responses(self.canon.latest_block_height());
+            return;
         }
 
         // Process the block requests.
