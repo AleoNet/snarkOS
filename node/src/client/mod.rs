@@ -82,8 +82,11 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
+        // Prepare a flag to stop CDN syncing in case of interruption via Ctrl-C.
+        let stop_sync = if cdn.is_some() { Some(Default::default()) } else { None };
+
         // Initialize the signal handler.
-        let signal_node = Self::handle_signals();
+        let signal_node = Self::handle_signals(stop_sync.clone());
 
         // Initialize the ledger.
         let ledger = Ledger::<N, C>::load(genesis.clone(), dev)?;
@@ -92,7 +95,8 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
-            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone(), stop_sync).await
+            {
                 crate::log_clean_error(dev);
                 return Err(error);
             }

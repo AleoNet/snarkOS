@@ -16,7 +16,10 @@ use snarkos_node_router::{messages::NodeType, Routing};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use once_cell::sync::OnceCell;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 #[async_trait]
 pub trait NodeInterface<N: Network>: Routing<N> {
@@ -46,8 +49,9 @@ pub trait NodeInterface<N: Network>: Routing<N> {
     }
 
     /// Handles OS signals for the node to intercept and perform a clean shutdown.
+    /// The optional `stop_sync` flag can be used to cleanly terminate the syncing process.
     /// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
-    fn handle_signals() -> Arc<OnceCell<Self>> {
+    fn handle_signals(stop_sync: Option<Arc<AtomicBool>>) -> Arc<OnceCell<Self>> {
         // In order for the signal handler to be started as early as possible, a reference to the node needs
         // to be passed to it at a later time.
         let node: Arc<OnceCell<Self>> = Default::default();
@@ -56,6 +60,13 @@ pub trait NodeInterface<N: Network>: Routing<N> {
         tokio::task::spawn(async move {
             match tokio::signal::ctrl_c().await {
                 Ok(()) => {
+                    // Check if the `stop_sync` flag is present.
+                    if let Some(flag) = stop_sync {
+                        // Set it to notify the sync that it should halt.
+                        flag.store(true, Ordering::Relaxed);
+                        // For simplicity, the shutdown will be triggered from within sync internals.
+                        return;
+                    }
                     if let Some(node) = node_clone.get() {
                         node.shut_down().await;
                     }

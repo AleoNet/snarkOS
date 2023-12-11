@@ -254,7 +254,7 @@ impl Scan {
 
         // Scan the blocks via the CDN.
         rt.block_on(async move {
-            let _ = snarkos_node_cdn::load_blocks(&cdn, cdn_request_start, Some(cdn_request_end), move |block| {
+            let _ = snarkos_node_cdn::load_blocks(&cdn, cdn_request_start, Some(cdn_request_end), None, move |block| {
                 // Check if the block is within the requested range.
                 if block.height() < start_height || block.height() > end_height {
                     return Ok(());

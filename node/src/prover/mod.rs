@@ -91,7 +91,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the signal handler.
-        let signal_node = Self::handle_signals();
+        let signal_node = Self::handle_signals(None);
 
         // Initialize the ledger service.
         let ledger_service = Arc::new(ProverLedgerService::new());
