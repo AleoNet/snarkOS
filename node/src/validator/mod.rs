@@ -82,11 +82,11 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        // Prepare a flag to stop CDN syncing in case of interruption via Ctrl-C.
-        let stop_sync = if cdn.is_some() { Some(Default::default()) } else { None };
+        // Prepare the shutdown flag.
+        let shutdown: Arc<AtomicBool> = Default::default();
 
         // Initialize the signal handler.
-        let signal_node = Self::handle_signals(stop_sync.clone());
+        let signal_node = Self::handle_signals(shutdown.clone());
 
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
@@ -95,7 +95,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
-            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone(), stop_sync).await
+            if let Err((_, error)) =
+                snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone(), shutdown.clone()).await
             {
                 crate::log_clean_error(dev);
                 return Err(error);
@@ -103,7 +104,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         }
 
         // Initialize the ledger service.
-        let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone()));
+        let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), shutdown.clone()));
         // Initialize the sync module.
         let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service.clone());
 
@@ -133,7 +134,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             rest: None,
             sync,
             handles: Default::default(),
-            shutdown: Default::default(),
+            shutdown,
         };
         // Initialize the transaction pool.
         node.initialize_transaction_pool(dev)?;

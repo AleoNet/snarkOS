@@ -48,13 +48,13 @@ const NETWORK_ID: u16 = 3;
 pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(
     base_url: &str,
     ledger: Ledger<N, C>,
-    stop_sync: Option<Arc<AtomicBool>>,
+    shutdown: Arc<AtomicBool>,
 ) -> Result<u32, (u32, anyhow::Error)> {
     // Fetch the node height.
     let start_height = ledger.latest_height() + 1;
     // Load the blocks from the CDN into the ledger.
     let ledger_clone = ledger.clone();
-    let result = load_blocks(base_url, start_height, None, stop_sync, move |block: Block<N>| {
+    let result = load_blocks(base_url, start_height, None, shutdown, move |block: Block<N>| {
         ledger_clone.advance_to_next_block(&block)
     })
     .await;
@@ -95,7 +95,7 @@ pub async fn load_blocks<N: Network>(
     base_url: &str,
     start_height: u32,
     end_height: Option<u32>,
-    stop_sync: Option<Arc<AtomicBool>>,
+    shutdown: Arc<AtomicBool>,
     process: impl FnMut(Block<N>) -> Result<()> + Clone + Send + Sync + 'static,
 ) -> Result<u32, (u32, anyhow::Error)> {
     // If the network is not supported, return.
@@ -154,12 +154,13 @@ pub async fn load_blocks<N: Network>(
 
     futures::stream::iter(cdn_range.clone().step_by(BLOCKS_PER_FILE as usize))
         .map(|start| {
-            // If signalled to stop the sync, log it and exit.
-            if let Some(stop_sync) = &stop_sync {
-                if stop_sync.load(Ordering::Relaxed) {
-                    info!("Stopping block sync");
-                    std::process::exit(0);
-                }
+            // Stop syncing if the shutdown has begun.
+            if shutdown.load(Ordering::Relaxed) {
+                info!("Stopping block sync");
+                // Calling it from here isn't ideal, but the CDN sync happens before
+                // the node is even initialized, so it doesn't result in any other
+                // functionalities being shut down abruptly.
+                std::process::exit(0);
             }
 
             // Prepare the end height.
@@ -430,7 +431,7 @@ mod tests {
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let completed_height = load_blocks(TEST_BASE_URL, start, end, None, process).await.unwrap();
+            let completed_height = load_blocks(TEST_BASE_URL, start, end, Default::default(), process).await.unwrap();
             assert_eq!(blocks.read().len(), expected);
             if expected > 0 {
                 assert_eq!(blocks.read().last().unwrap().height(), completed_height);
