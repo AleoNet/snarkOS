@@ -444,7 +444,10 @@ impl Start {
         // Determine the number of main cores.
         let main_cores = match num_cores {
             // Insufficient
-            0..=3 => unreachable!("The number of cores is insufficient"),
+            0..=3 => {
+                println!("The number of cores is insufficient, at least 4");
+                std::thread::exit(1);
+            }
             // Efficiency mode
             4..=8 => 2,
             // Standard mode
