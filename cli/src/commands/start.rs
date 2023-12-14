@@ -445,8 +445,8 @@ impl Start {
         let main_cores = match num_cores {
             // Insufficient
             0..=3 => {
-                println!("The number of cores is insufficient, at least 4");
-                std::thread::exit(1);
+                println!("The number of cores is insufficient, at least 4 are needed.");
+                std::process::exit(1);
             }
             // Efficiency mode
             4..=8 => 2,
