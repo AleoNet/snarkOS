@@ -4113,8 +4113,9 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-metrics"
-version = "0.16.12"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=d5186a4#d5186a489f47f1fc6310a0f5e9e8891d283eb3a8"
+version = "0.16.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02c3ded1c33e103ed71e92828bd81f2205d485f87e87d14745c823de211a3b73"
 dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
