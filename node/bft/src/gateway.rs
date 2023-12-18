@@ -215,7 +215,7 @@ impl<N: Network> Gateway<N> {
         2 * MAX_GC_ROUNDS as usize * self.max_committee_size()
     }
 
-    /// Thne maximum number of transmission requests to cache.
+    /// The maximum number of transmission requests to cache.
     fn max_cache_transmissions(&self) -> usize {
         self.max_cache_certificates() * MAX_TRANSMISSIONS_PER_BATCH
     }

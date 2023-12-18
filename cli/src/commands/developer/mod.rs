@@ -100,7 +100,7 @@ impl Developer {
         Ok(package)
     }
 
-    /// Parses the record string. If the string is a plaintext, then attempt to decrypt it.
+    /// Parses the record string. If the string is a ciphertext, then attempt to decrypt it.
     fn parse_record(
         private_key: &PrivateKey<CurrentNetwork>,
         record: &str,
