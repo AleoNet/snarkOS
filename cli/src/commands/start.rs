@@ -107,7 +107,7 @@ pub struct Start {
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
-    /// If the flag is set, the node will not prefresh from a CDN
+    /// If the flag is set, the node will not prefetch from a CDN
     #[clap(long)]
     pub nocdn: bool,
 
@@ -444,7 +444,10 @@ impl Start {
         // Determine the number of main cores.
         let main_cores = match num_cores {
             // Insufficient
-            0..=3 => unreachable!("The number of cores is insufficient"),
+            0..=3 => {
+                eprintln!("The number of cores is insufficient, at least 4 are needed.");
+                std::process::exit(1);
+            }
             // Efficiency mode
             4..=8 => 2,
             // Standard mode

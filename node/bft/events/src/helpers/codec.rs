@@ -92,18 +92,18 @@ impl<N: Network> Decoder for EventCodec<N> {
     type Item = Event<N>;
 
     fn decode(&mut self, source: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // Decode a frame containing bytes belonging to a event.
+        // Decode a frame containing bytes belonging to an event.
         let bytes = match self.codec.decode(source)? {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
 
-        // Convert the bytes to a event, or fail if it is not valid.
+        // Convert the bytes to an event, or fail if it is not valid.
         let reader = bytes.reader();
         match Event::read_le(reader) {
             Ok(event) => Ok(Some(event)),
             Err(error) => {
-                error!("Failed to deserialize a event: {}", error);
+                error!("Failed to deserialize an event: {}", error);
                 Err(std::io::ErrorKind::InvalidData.into())
             }
         }
@@ -112,7 +112,7 @@ impl<N: Network> Decoder for EventCodec<N> {
 
 /* NOISE CODEC */
 
-// The maximum message size for noise messages. If the data to be encrypted exceedes it, it is chunked.
+// The maximum message size for noise messages. If the data to be encrypted exceeds it, it is chunked.
 const MAX_MESSAGE_LEN: usize = 65535;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

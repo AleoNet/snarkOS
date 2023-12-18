@@ -85,7 +85,7 @@ version = "2.0"
 version = "0.12"
 
 [dev-dependencies.once_cell]
-version = "1.13"
+version = "1.19"
 
 [dev-dependencies.tracing-test]
 version = "0.2"

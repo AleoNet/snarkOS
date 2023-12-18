@@ -54,7 +54,7 @@ use std::{path::PathBuf, str::FromStr};
 type CurrentAleo = snarkvm::circuit::AleoV0;
 type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-/// Commands to manage Aleo accounts.
+/// Commands to deploy and execute transactions
 #[derive(Debug, Parser)]
 pub enum Developer {
     /// Decrypt a ciphertext.
@@ -100,7 +100,7 @@ impl Developer {
         Ok(package)
     }
 
-    /// Parses the record string. If the string is a plaintext, then attempt to decrypt it.
+    /// Parses the record string. If the string is a ciphertext, then attempt to decrypt it.
     fn parse_record(
         private_key: &PrivateKey<CurrentNetwork>,
         record: &str,

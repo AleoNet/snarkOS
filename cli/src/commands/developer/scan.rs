@@ -125,7 +125,7 @@ impl Scan {
                 let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
                 let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
-                // Print warning message if the user is attempting to scan the whole chain.
+                // Print a warning message if the user is attempting to scan the whole chain.
                 if start == 0 {
                     println!("⚠️  Attention - Scanning the entire chain. This may take a while...\n");
                 }
@@ -222,7 +222,7 @@ impl Scan {
             request_start = request_start.saturating_add(num_blocks_to_request);
         }
 
-        // Print final complete message.
+        // Print the final complete message.
         println!("\rScanning {total_blocks} blocks for records (100% complete)...   \n");
         stdout().flush()?;
 
