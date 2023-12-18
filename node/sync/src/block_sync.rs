@@ -40,7 +40,7 @@ pub const REDUNDANCY_FACTOR: usize = 3;
 const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
 const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
-const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
+const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 25; // 25 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
