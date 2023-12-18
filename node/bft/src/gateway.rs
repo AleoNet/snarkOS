@@ -44,7 +44,7 @@ use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
     is_bogon_ip,
-    is_unspecified_ip,
+    is_unspecified_or_broadcast_ip,
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
     Connection,
@@ -266,7 +266,7 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
     pub fn is_valid_peer_ip(&self, ip: SocketAddr) -> bool {
-        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_ip(ip.ip())
+        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_or_broadcast_ip(ip.ip())
     }
 
     /// Returns the resolver.

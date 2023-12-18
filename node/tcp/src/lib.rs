@@ -45,7 +45,7 @@ pub fn is_bogon_ip(ip: IpAddr) -> bool {
 }
 
 /// Checks if the given IP address is unspecified or broadcast.
-pub fn is_unspecified_ip(ip: IpAddr) -> bool {
+pub fn is_unspecified_or_broadcast_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(ipv4) => ipv4.is_unspecified() || ipv4.is_broadcast(),
         ipv6 => ipv6.is_unspecified(),
