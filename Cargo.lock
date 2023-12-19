@@ -3257,7 +3257,6 @@ dependencies = [
  "futures-util",
  "indexmap 2.1.0",
  "linked-hash-map",
- "metrics",
  "parking_lot",
  "peak_alloc",
  "rand",

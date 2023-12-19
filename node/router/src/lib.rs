@@ -44,11 +44,6 @@ use snarkos_account::Account;
 use snarkos_node_tcp::{is_bogon_ip, is_unspecified_or_broadcast_ip, Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
-#[cfg(feature = "metrics")]
-use metrics::gauge;
-#[cfg(feature = "metrics")]
-use snarkos_node_metrics::peers::{CANDIDATE, CONNECTED, RESTRICTED};
-
 use anyhow::{bail, Result};
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
@@ -395,9 +390,9 @@ impl<N: Network> Router<N> {
 
     #[cfg(feature = "metrics")]
     fn update_metrics(&self) {
-        gauge!(CONNECTED, self.connected_peers.read().len() as f64);
-        gauge!(CANDIDATE, self.candidate_peers.read().len() as f64);
-        gauge!(RESTRICTED, self.restricted_peers.read().len() as f64);
+        metrics::gauge(metrics::router::CONNECTED, self.connected_peers.read().len() as f64);
+        metrics::gauge(metrics::router::CANDIDATE, self.candidate_peers.read().len() as f64);
+        metrics::gauge(metrics::router::RESTRICTED, self.restricted_peers.read().len() as f64);
     }
 
     /// Inserts the given peer into the connected peers.

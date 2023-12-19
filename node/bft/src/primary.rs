@@ -45,7 +45,7 @@ use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
 use snarkos_node_bft_ledger_service::LedgerService;
 #[cfg(feature = "metrics")]
-use snarkos_node_metrics::primary::PROPOSAL_ROUND;
+use snarkos_node_metrics::bft::PROPOSAL_ROUND;
 use snarkvm::{
     console::{
         account::Signature,

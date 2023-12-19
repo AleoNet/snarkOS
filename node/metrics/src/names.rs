@@ -15,16 +15,16 @@
 pub(super) const COUNTER_NAMES: [&str; 1] = [consensus::LEADERS_ELECTED];
 
 pub(super) const GAUGE_NAMES: [&str; 11] = [
+    bft::PROPOSAL_ROUND,
     blocks::HEIGHT,
     blocks::TRANSACTIONS,
     consensus::COMMITTED_CERTIFICATES,
+    consensus::CONNECTED,
     consensus::LAST_COMMITTED_ROUND,
     consensus::LAST_CERTIFIED_ROUND,
-    consensus::CONNECTED,
-    peers::CONNECTED,
-    peers::CANDIDATE,
-    peers::RESTRICTED,
-    primary::PROPOSAL_ROUND,
+    router::CONNECTED,
+    router::CANDIDATE,
+    router::RESTRICTED,
     tcp::TCP_TASKS,
 ];
 
@@ -37,35 +37,35 @@ pub(super) const HISTOGRAM_NAMES: [&str; 6] = [
     tcp::NOISE_CODEC_DECRYPTION_SIZE,
 ];
 
+pub mod bft {
+    pub const PROPOSAL_ROUND: &str = "snarkos_bft_primary_proposal_round";
+}
+
 pub mod blocks {
     pub const HEIGHT: &str = "snarkos_blocks_height_total";
     pub const TRANSACTIONS: &str = "snarkos_blocks_transactions_total";
 }
 
 pub mod consensus {
-    pub const COMMITTED_CERTIFICATES: &str = "snarkos_consensus_committed_certificates_total";
     pub const CERTIFICATE_COMMIT_LATENCY: &str = "snarkos_consensus_certificate_commit_latency_secs";
     pub const COMMIT_ROUNDS_LATENCY: &str = "snarkos_consensus_commit_rounds_latency_secs";
-    pub const LEADERS_ELECTED: &str = "snarkos_consensus_leaders_elected_total";
+    pub const COMMITTED_CERTIFICATES: &str = "snarkos_consensus_committed_certificates_total";
+    pub const CONNECTED: &str = "snarkos_consensus_connected_total";
     pub const LAST_COMMITTED_ROUND: &str = "snarkos_consensus_last_committed_round";
     pub const LAST_CERTIFIED_ROUND: &str = "snarkos_consensus_last_certified_round";
-    pub const CONNECTED: &str = "snarkos_consensus_connected_total";
+    pub const LEADERS_ELECTED: &str = "snarkos_consensus_leaders_elected_total";
 }
 
-pub mod primary {
-    pub const PROPOSAL_ROUND: &str = "snarkos_primary_proposal_round";
-}
-
-pub mod peers {
-    pub const CONNECTED: &str = "snarkos_peers_connected_total";
-    pub const CANDIDATE: &str = "snarkos_peers_candidate_total";
-    pub const RESTRICTED: &str = "snarkos_peers_restricted_total";
+pub mod router {
+    pub const CONNECTED: &str = "snarkos_router_connected_total";
+    pub const CANDIDATE: &str = "snarkos_router_candidate_total";
+    pub const RESTRICTED: &str = "snarkos_router_restricted_total";
 }
 
 pub mod tcp {
-    pub const NOISE_CODEC_ENCRYPTION_TIME: &str = "snarkos_network_noise_codec_encryption_micros";
-    pub const NOISE_CODEC_DECRYPTION_TIME: &str = "snarkos_network_noise_codec_decryption_micros";
-    pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_network_noise_codec_encryption_size";
-    pub const NOISE_CODEC_DECRYPTION_SIZE: &str = "snarkos_network_noise_codec_decryption_size";
-    pub const TCP_TASKS: &str = "snarkos_network_tcp_tasks_total";
+    pub const NOISE_CODEC_ENCRYPTION_TIME: &str = "snarkos_tcp_noise_codec_encryption_micros";
+    pub const NOISE_CODEC_DECRYPTION_TIME: &str = "snarkos_tcp_noise_codec_decryption_micros";
+    pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_encryption_size";
+    pub const NOISE_CODEC_DECRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_decryption_size";
+    pub const TCP_TASKS: &str = "snarkos_tcp_tasks_total";
 }
