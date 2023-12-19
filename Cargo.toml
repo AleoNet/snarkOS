@@ -52,13 +52,7 @@ path = "snarkos/main.rs"
 
 [features]
 jemalloc = [ "tikv-jemallocator" ]
-metrics = [
-  "snarkos-node/metrics",
-  "snarkos-node-tcp/metrics",
-  "snarkos-node-bft/metrics",
-  "snarkos-node-consensus/metrics",
-  "snarkos-node-router/metrics",
-]
+metrics = [ "snarkos-node-metrics", "snarkos-node/metrics" ]
 
 [dependencies.anyhow]
 version = "1.0.75"
@@ -82,11 +76,6 @@ version = "=2.2.6"
 path = "./display"
 version = "=2.2.6"
 
-[dependencies.snarkos-node-metrics]
-path = "./node/metrics"
-version = "=2.2.6"
-optional = true
-
 [dependencies.snarkos-node]
 path = "./node"
 version = "=2.2.6"
@@ -102,6 +91,11 @@ version = "=2.2.6"
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
 version = "=2.2.6"
+
+[dependencies.snarkos-node-metrics]
+path = "./node/metrics"
+version = "=2.2.6"
+optional = true
 
 [dependencies.snarkos-node-rest]
 path = "./node/rest"
