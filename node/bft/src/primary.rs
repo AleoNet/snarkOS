@@ -1338,7 +1338,7 @@ impl<N: Network> Primary<N> {
             Ok(missing_election_certificates) => missing_election_certificates,
             Err(e) => {
                 // TODO (howardwu): Change this to return early, once we have persistence on the election certificates.
-                warn!("Failed to fetch missing election certificates for round {batch_round} from '{peer_ip}' - {e}");
+                error!("Failed to fetch missing election certificates for round {batch_round} from '{peer_ip}' - {e}");
                 // Note: We do not return early on error, because we can still proceed without the election certificates,
                 // albeit with reduced safety guarantees for commits. This is not a long-term solution.
                 Default::default()
