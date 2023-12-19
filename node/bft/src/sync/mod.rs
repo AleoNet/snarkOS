@@ -353,8 +353,12 @@ impl<N: Network> Sync<N> {
 
     /// Handles the incoming certificate request.
     fn send_certificate_response(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
-        // Attempt to retrieve the certificate.
-        if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
+        // Attempt to retrieve the certificate. First check the storage, then the ledger.
+        if let Some(certificate) = self
+            .storage
+            .get_certificate(request.certificate_id)
+            .or_else(|| self.ledger.get_batch_certificate(&request.certificate_id).ok())
+        {
             // Send the certificate response to the peer.
             let self_ = self.clone();
             tokio::spawn(async move {
