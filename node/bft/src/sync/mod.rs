@@ -341,7 +341,7 @@ impl<N: Network> Sync<N> {
             }
         }
         // Wait for the certificate to be fetched.
-        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY_IN_MS * 3), callback_receiver)
+        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY_IN_MS * 2), callback_receiver)
             .await
         {
             // If the certificate was fetched, return it.
