@@ -19,7 +19,6 @@ edition = "2021"
 [features]
 default = [ ]
 test = [ ]
-metrics = [ "snarkvm/metrics" ]
 
 [dependencies.anyhow]
 version = "1.0"
