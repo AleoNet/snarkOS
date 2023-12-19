@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub const GAUGE_NAMES: [&str; 11] = [
+pub(super) const COUNTER_NAMES: [&str; 1] = [consensus::LEADERS_ELECTED];
+
+pub(super) const GAUGE_NAMES: [&str; 11] = [
     blocks::HEIGHT,
     blocks::TRANSACTIONS,
     consensus::COMMITTED_CERTIFICATES,
@@ -23,19 +25,17 @@ pub const GAUGE_NAMES: [&str; 11] = [
     peers::CANDIDATE,
     peers::RESTRICTED,
     primary::PROPOSAL_ROUND,
-    network::TCP_TASKS,
+    tcp::TCP_TASKS,
 ];
 
-pub const HISTOGRAM_NAMES: [&str; 6] = [
+pub(super) const HISTOGRAM_NAMES: [&str; 6] = [
     consensus::CERTIFICATE_COMMIT_LATENCY,
     consensus::COMMIT_ROUNDS_LATENCY,
-    network::NOISE_CODEC_ENCRYPTION_TIME,
-    network::NOISE_CODEC_DECRYPTION_TIME,
-    network::NOISE_CODEC_ENCRYPTION_SIZE,
-    network::NOISE_CODEC_DECRYPTION_SIZE,
+    tcp::NOISE_CODEC_ENCRYPTION_TIME,
+    tcp::NOISE_CODEC_DECRYPTION_TIME,
+    tcp::NOISE_CODEC_ENCRYPTION_SIZE,
+    tcp::NOISE_CODEC_DECRYPTION_SIZE,
 ];
-
-pub const COUNTER_NAMES: [&str; 1] = [consensus::LEADERS_ELECTED];
 
 pub mod blocks {
     pub const HEIGHT: &str = "snarkos_blocks_height_total";
@@ -62,7 +62,7 @@ pub mod peers {
     pub const RESTRICTED: &str = "snarkos_peers_restricted_total";
 }
 
-pub mod network {
+pub mod tcp {
     pub const NOISE_CODEC_ENCRYPTION_TIME: &str = "snarkos_network_noise_codec_encryption_micros";
     pub const NOISE_CODEC_DECRYPTION_TIME: &str = "snarkos_network_noise_codec_decryption_micros";
     pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_network_noise_codec_encryption_size";

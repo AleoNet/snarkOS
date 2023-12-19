@@ -18,6 +18,8 @@ mod names;
 pub use metrics::*;
 // Expose the names at the crate level for easy access.
 pub use names::*;
+// Re-export the snarkVM metrics.
+pub use snarkvm::metrics::*;
 
 /// Initialises the metrics and returns a handle to the task running the metrics exporter.
 pub fn initialize() -> tokio::task::JoinHandle<()> {
@@ -33,23 +35,23 @@ pub fn initialize() -> tokio::task::JoinHandle<()> {
     });
 
     // Register the metrics so they exist on init.
-    register_metrics();
-
-    // Register the snarkVM metrics.
-    snarkvm::metrics::register_metrics();
+    crate::register_metrics();
 
     // Return the exporter's task handle to be tracked by the node's task handling.
     metrics_exporter_task
 }
 
 fn register_metrics() {
-    for name in GAUGE_NAMES {
-        register_gauge!(name);
+    // Register the snarkVM metrics.
+    snarkvm::metrics::register_metrics();
+
+    for name in crate::names::GAUGE_NAMES {
+        register_gauge(name);
     }
-    for name in COUNTER_NAMES {
-        register_counter!(name);
+    for name in crate::names::COUNTER_NAMES {
+        register_counter(name);
     }
-    for name in HISTOGRAM_NAMES {
-        register_histogram!(name);
+    for name in crate::names::HISTOGRAM_NAMES {
+        register_histogram(name);
     }
 }
