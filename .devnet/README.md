@@ -149,3 +149,9 @@ This script stops snarkOS on the EC2 instances.
 ## 8. `clean.sh`
 
 This script stops snarkOS on the EC2 instances, and removes the ledger DB from the EC2 instances.
+
+## 9. `restore-snapshot.sh` (optional)
+
+This script downloads and restores a RocksDB snapshot for the ledger DB to the EC2 instances.
+
+Note: This will delete any existing ledger DB on the EC2 instances.
