@@ -3006,6 +3006,7 @@ dependencies = [
  "snarkos-display",
  "snarkos-node",
  "snarkos-node-cdn",
+ "snarkos-node-metrics",
  "snarkos-node-rest",
  "snarkvm",
  "sys-info",

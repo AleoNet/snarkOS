@@ -14,8 +14,6 @@
 
 mod names;
 
-// Re-export the metrics macros.
-pub use metrics::*;
 // Expose the names at the crate level for easy access.
 pub use names::*;
 // Re-export the snarkVM metrics.
