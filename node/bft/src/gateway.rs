@@ -428,7 +428,8 @@ impl<N: Network> Gateway<N> {
 
     #[cfg(feature = "metrics")]
     fn update_metrics(&self) {
-        metrics::gauge(metrics::consensus::CONNECTED, self.connected_peers.read().len() as f64);
+        metrics::gauge(metrics::bft::CONNECTED, self.connected_peers.read().len() as f64);
+        metrics::gauge(metrics::bft::CONNECTING, self.connecting_peers.lock().len() as f64);
     }
 
     /// Inserts the given peer into the connected peers.

@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub(super) const COUNTER_NAMES: [&str; 1] = [consensus::LEADERS_ELECTED];
+pub(super) const COUNTER_NAMES: [&str; 1] = [bft::LEADERS_ELECTED];
 
-pub(super) const GAUGE_NAMES: [&str; 11] = [
+pub(super) const GAUGE_NAMES: [&str; 12] = [
+    bft::CONNECTED,
+    bft::CONNECTING,
+    bft::LAST_STORED_ROUND,
     bft::PROPOSAL_ROUND,
     blocks::HEIGHT,
     blocks::TRANSACTIONS,
     consensus::COMMITTED_CERTIFICATES,
-    consensus::CONNECTED,
     consensus::LAST_COMMITTED_ROUND,
-    consensus::LAST_CERTIFIED_ROUND,
     router::CONNECTED,
     router::CANDIDATE,
     router::RESTRICTED,
@@ -29,8 +30,8 @@ pub(super) const GAUGE_NAMES: [&str; 11] = [
 ];
 
 pub(super) const HISTOGRAM_NAMES: [&str; 6] = [
+    bft::COMMIT_ROUNDS_LATENCY,
     consensus::CERTIFICATE_COMMIT_LATENCY,
-    consensus::COMMIT_ROUNDS_LATENCY,
     tcp::NOISE_CODEC_ENCRYPTION_TIME,
     tcp::NOISE_CODEC_DECRYPTION_TIME,
     tcp::NOISE_CODEC_ENCRYPTION_SIZE,
@@ -38,6 +39,11 @@ pub(super) const HISTOGRAM_NAMES: [&str; 6] = [
 ];
 
 pub mod bft {
+    pub const COMMIT_ROUNDS_LATENCY: &str = "snarkos_bft_commit_rounds_latency_secs"; // <-- This one doesn't even make sense.
+    pub const CONNECTED: &str = "snarkos_bft_connected_total";
+    pub const CONNECTING: &str = "snarkos_bft_connecting_total";
+    pub const LAST_STORED_ROUND: &str = "snarkos_bft_last_stored_round";
+    pub const LEADERS_ELECTED: &str = "snarkos_bft_leaders_elected_total";
     pub const PROPOSAL_ROUND: &str = "snarkos_bft_primary_proposal_round";
 }
 
@@ -48,12 +54,8 @@ pub mod blocks {
 
 pub mod consensus {
     pub const CERTIFICATE_COMMIT_LATENCY: &str = "snarkos_consensus_certificate_commit_latency_secs";
-    pub const COMMIT_ROUNDS_LATENCY: &str = "snarkos_consensus_commit_rounds_latency_secs";
     pub const COMMITTED_CERTIFICATES: &str = "snarkos_consensus_committed_certificates_total";
-    pub const CONNECTED: &str = "snarkos_consensus_connected_total";
     pub const LAST_COMMITTED_ROUND: &str = "snarkos_consensus_last_committed_round";
-    pub const LAST_CERTIFIED_ROUND: &str = "snarkos_consensus_last_certified_round";
-    pub const LEADERS_ELECTED: &str = "snarkos_consensus_leaders_elected_total";
 }
 
 pub mod router {

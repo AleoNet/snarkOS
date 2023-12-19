@@ -219,7 +219,7 @@ impl<N: Network> BFT<N> {
             if start > 0 {
                 let end = now();
                 let elapsed = std::time::Duration::from_secs((end - start) as u64);
-                metrics::histogram(metrics::consensus::COMMIT_ROUNDS_LATENCY, elapsed.as_secs_f64());
+                metrics::histogram(metrics::bft::COMMIT_ROUNDS_LATENCY, elapsed.as_secs_f64());
             }
         }
 
@@ -237,7 +237,7 @@ impl<N: Network> BFT<N> {
                     true => {
                         info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author());
                         #[cfg(feature = "metrics")]
-                        metrics::increment_counter(metrics::consensus::LEADERS_ELECTED);
+                        metrics::increment_counter(metrics::bft::LEADERS_ELECTED);
                     }
                     false => warn!("BFT failed to elect a leader for round {current_round} (!= {leader_round})"),
                 }

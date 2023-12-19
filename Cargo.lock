@@ -3131,6 +3131,7 @@ dependencies = [
  "proptest",
  "rayon",
  "serde",
+ "snarkos-node-metrics",
  "snarkos-node-sync-locators",
  "snarkvm",
  "snow",
