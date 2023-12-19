@@ -103,6 +103,9 @@ pub struct Start {
     /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
+    /// Enables the metrics exporter
+    #[clap(default_value = "false", long = "metrics")]
+    pub metrics: bool,
 
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
@@ -427,6 +430,11 @@ impl Start {
         }
         // Check if the machine meets the minimum requirements for a validator.
         crate::helpers::check_validator_machine(node_type);
+
+        // Initialize the metrics.
+        if self.metrics {
+            metrics::initialize_metrics();
+        }
 
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };

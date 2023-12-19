@@ -442,6 +442,9 @@ struct Args {
     /// Enables the solution and transaction cannons, and optionally the interval in ms to run them on.
     #[arg(long, value_name = "INTERVAL_MS")]
     fire_transmissions: Option<Option<u64>>,
+    /// Enables the metrics exporter.
+    #[clap(long, default_value = "false")]
+    metrics: bool,
 }
 
 /// A helper method to parse the peers provided to the CLI.
@@ -507,6 +510,13 @@ async fn main() -> Result<()> {
         }
         _ => (),
     };
+
+    // Initialize the metrics.
+    #[cfg(feature = "metrics")]
+    if args.metrics {
+        info!("Initializing metrics...");
+        metrics::initialize_metrics();
+    }
 
     // Start the monitoring server.
     start_server(bft_holder, primary, args.id).await;

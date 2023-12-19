@@ -18,6 +18,7 @@ edition = "2021"
 
 [features]
 test = [ ]
+metrics = [ "dep:metrics" ]
 
 [dependencies.anyhow]
 version = "1.0.75"
@@ -44,6 +45,12 @@ features = [ "serde", "rayon" ]
 
 [dependencies.linked-hash-map]
 version = "0.5"
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../metrics"
+version = "=2.2.6"
+optional = true
 
 [dependencies.parking_lot]
 version = "0.12"

@@ -55,7 +55,11 @@ for validator_index in "${validator_indices[@]}"; do
   tmux new-window -t "devnet:$validator_index" -n "window$validator_index"
 
   # Send the command to start the validator to the new window and capture output to the log file
-  tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
+  if [ "$validator_index" -eq 0 ]; then
+    tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file --metrics" C-m
+  else
+    tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
+  fi
 done
 
 # Attach to the tmux session to view and interact with the windows

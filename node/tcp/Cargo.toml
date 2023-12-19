@@ -16,30 +16,40 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = [ ]
+metrics = [ "dep:metrics" ]
+
 [dependencies]
 async-trait = "0.1"
 bytes = "1"
 parking_lot = "0.12"
 
-  [dependencies.futures-util]
-  version = "0.3"
-  features = [ "sink" ]
+[dependencies.futures-util]
+version = "0.3"
+features = [ "sink" ]
 
-  [dependencies.once_cell]
-  version = "1"
-  features = [ "parking_lot" ]
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../metrics"
+version = "=2.2.6"
+optional = true
 
-  [dependencies.tokio]
-  version = "1.28"
-  features = [ "io-util", "net", "parking_lot", "rt", "sync", "time" ]
+[dependencies.once_cell]
+version = "1"
+features = [ "parking_lot" ]
 
-  [dependencies.tokio-util]
-  version = "0.7"
-  features = [ "codec" ]
+[dependencies.tokio]
+version = "1.28"
+features = [ "io-util", "net", "parking_lot", "rt", "sync", "time" ]
 
-  [dependencies.tracing]
-  version = "0.1"
-  default-features = false
+[dependencies.tokio-util]
+version = "0.7"
+features = [ "codec" ]
+
+[dependencies.tracing]
+version = "0.1"
+default-features = false
 
 [dev-dependencies.tokio]
 version = "1.28"

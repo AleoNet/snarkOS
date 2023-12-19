@@ -16,6 +16,10 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = [ ]
+metrics = [ "dep:metrics" ]
+
 [dependencies.anyhow]
 version = "1.0"
 
@@ -25,6 +29,12 @@ version = "1"
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../../metrics"
+version = "=2.2.6"
+optional = true
 
 [dependencies.rayon]
 version = "1"
