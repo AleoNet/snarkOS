@@ -22,7 +22,7 @@ pub use names::*;
 pub use snarkvm::metrics::*;
 
 /// Initialises the metrics and returns a handle to the task running the metrics exporter.
-pub fn initialize() -> tokio::task::JoinHandle<()> {
+pub fn initialize_metrics() -> tokio::task::JoinHandle<()> {
     use metrics_exporter_prometheus::PrometheusBuilder;
 
     // Build the recorder and set as global.

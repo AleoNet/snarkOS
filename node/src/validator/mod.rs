@@ -15,9 +15,6 @@
 mod router;
 
 use crate::traits::NodeInterface;
-use anyhow::Result;
-use core::future::Future;
-use parking_lot::Mutex;
 use snarkos_account::Account;
 use snarkos_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_node_consensus::Consensus;
@@ -42,15 +39,16 @@ use snarkvm::prelude::{
     Ledger,
     Network,
 };
+
+use anyhow::Result;
+use core::future::Future;
+use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
 use tokio::task::JoinHandle;
-
-#[cfg(feature = "metrics")]
-use snarkos_node_metrics as metrics;
 
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
@@ -147,11 +145,11 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
 
+        // Initialize the metrics.
         #[cfg(feature = "metrics")]
-        if dev == Some(0) {
-            // initialize metrics
-            info!("Initializing metrics");
-            metrics::initialize();
+        if dev.is_none() || dev == Some(0) {
+            info!("Initializing metrics...");
+            metrics::initialize_metrics();
         }
         // Return the node.
         Ok(node)

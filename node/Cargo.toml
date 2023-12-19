@@ -20,7 +20,7 @@ edition = "2021"
 default = [ "parallel" ]
 parallel = [ "rayon" ]
 timer = [ "aleo-std/timer" ]
-metrics = [ "dep:snarkos-node-metrics", "snarkvm/metrics" ]
+metrics = [ "dep:metrics" ]
 
 [dependencies.aleo-std]
 version = "0.1.18"
@@ -41,6 +41,12 @@ features = [ "sink" ]
 
 [dependencies.indexmap]
 version = "2.1"
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "./metrics"
+version = "=2.2.6"
+optional = true
 
 [dependencies.num_cpus]
 version = "1"
@@ -78,11 +84,6 @@ version = "=2.2.6"
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
 version = "=2.2.6"
-
-[dependencies.snarkos-node-metrics]
-path = "./metrics"
-version = "=2.2.6"
-optional = true
 
 [dependencies.snarkos-node-rest]
 path = "./rest"
