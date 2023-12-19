@@ -512,6 +512,7 @@ async fn main() -> Result<()> {
     };
 
     // Initialize the metrics.
+    #[cfg(feature = "metrics")]
     if args.metrics {
         info!("Initializing metrics...");
         metrics::initialize_metrics();
