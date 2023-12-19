@@ -1328,9 +1328,17 @@ impl<N: Network> Primary<N> {
         }
 
         // Ensure the primary has all of the previous certificates.
-        let missing_previous_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
+        let missing_previous_certificates =
+            self.fetch_missing_previous_certificates(peer_ip, batch_header).await.map_err(|e| {
+                anyhow!("Failed to fetch missing previous certificates for round {batch_round} from '{peer_ip}' - {e}")
+            })?;
         // Ensure the primary has all of the election certificates.
-        let missing_election_certificates = self.fetch_missing_election_certificates(peer_ip, batch_header).await?;
+        let missing_election_certificates =
+            self.fetch_missing_election_certificates(peer_ip, batch_header).await.map_err(|e| {
+                anyhow!("Failed to fetch missing election certificates for round {batch_round} from '{peer_ip}' - {e}")
+                // // Note: We do not return early on error, because we can still proceed without the election certificates.
+                // Default::default()
+            })?;
         // Ensure the primary has all of the transmissions.
         let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await?;
 
