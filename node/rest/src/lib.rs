@@ -157,6 +157,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/program/:id", get(Self::get_program))
             .route("/testnet3/program/:id/mappings", get(Self::get_mapping_names))
             .route("/testnet3/program/:id/mapping/:name/:key", get(Self::get_mapping_value))
+            .route("/testnet3/program/:id/mapping/:name/values",get(Self::get_mapping_values))
 
             // GET misc endpoints.
             .route("/testnet3/blocks", get(Self::get_blocks))
