@@ -1640,7 +1640,7 @@ mod tests {
         Proposal::new(committee, batch_header, transmissions).unwrap()
     }
 
-    // Creates a signature of the primary's current proposal for each committe member (excluding
+    // Creates a signature of the primary's current proposal for each committee member (excluding
     // the primary).
     fn peer_signatures_for_proposal(
         primary: &Primary<CurrentNetwork>,
