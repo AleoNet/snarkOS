@@ -310,6 +310,9 @@ impl<N: Network> Primary<N> {
         // Retrieve the current round.
         let round = self.current_round();
 
+        #[cfg(feature = "metrics")]
+        metrics::gauge(metrics::bft::PROPOSAL_ROUND, round as f64);
+
         // Ensure the primary has not proposed a batch for this round before.
         if self.storage.contains_certificate_in_round_from(round, self.gateway.account().address()) {
             // If a BFT sender was provided, attempt to advance the current round.

@@ -16,6 +16,9 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = [ "snarkos-node/metrics" ]
+
 [dependencies.aleo-std]
 version = "0.1.18"
 default-features = false
@@ -42,6 +45,11 @@ version = "0.27"
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../node/metrics"
+version = "=2.2.6"
 
 [dependencies.num_cpus]
 version = "1"

@@ -16,11 +16,18 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+metrics = [ "snarkvm/metrics" ]
+
 [dependencies.metrics]
 version = "0.21"
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.12"
+
+[dependencies.snarkvm]
+workspace = true
+features = [ "metrics" ]
 
 [dependencies.tokio]
 version = "1.28"

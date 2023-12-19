@@ -212,6 +212,17 @@ impl<N: Network> BFT<N> {
             false => self.is_leader_quorum_or_nonleaders_available(current_round),
         };
 
+        #[cfg(feature = "metrics")]
+        {
+            let start = self.leader_certificate_timer.load(Ordering::SeqCst);
+            // Only log if the timer was set, otherwise we get a time difference since the EPOCH.
+            if start > 0 {
+                let end = now();
+                let elapsed = std::time::Duration::from_secs((end - start) as u64);
+                metrics::histogram(metrics::bft::COMMIT_ROUNDS_LATENCY, elapsed.as_secs_f64());
+            }
+        }
+
         // Log whether the round is going to update.
         if current_round % 2 == 0 {
             // Determine if there is a leader certificate.
@@ -223,7 +234,11 @@ impl<N: Network> BFT<N> {
                 // Log the leader election.
                 let leader_round = leader_certificate.round();
                 match leader_round == current_round {
-                    true => info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author()),
+                    true => {
+                        info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author());
+                        #[cfg(feature = "metrics")]
+                        metrics::increment_counter(metrics::bft::LEADERS_ELECTED);
+                    }
                     false => warn!("BFT failed to elect a leader for round {current_round} (!= {leader_round})"),
                 }
             } else {
