@@ -27,12 +27,8 @@ use crate::{
     Primary,
     MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
 };
-#[cfg(feature = "metrics")]
-use metrics::{histogram, increment_counter};
 use snarkos_account::Account;
 use snarkos_node_bft_ledger_service::LedgerService;
-#[cfg(feature = "metrics")]
-use snarkos_node_metrics::consensus::LEADERS_ELECTED;
 use snarkvm::{
     console::account::Address,
     ledger::{
@@ -47,8 +43,6 @@ use snarkvm::{
 use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-#[cfg(feature = "metrics")]
-use std::time::Duration;
 use std::{
     collections::{BTreeMap, HashSet},
     future::Future,
@@ -221,11 +215,11 @@ impl<N: Network> BFT<N> {
         #[cfg(feature = "metrics")]
         {
             let start = self.leader_certificate_timer.load(Ordering::SeqCst);
+            // Only log if the timer was set, otherwise we get a time difference since the EPOCH.
             if start > 0 {
-                // only log if the timer is set, otherwise we get a time difference since the EPOCH
                 let end = now();
-                let elapsed = Duration::from_secs((end - start) as u64);
-                histogram!(snarkos_node_metrics::consensus::COMMIT_ROUNDS_LATENCY, elapsed.as_secs_f64());
+                let elapsed = std::time::Duration::from_secs((end - start) as u64);
+                metrics::histogram(metrics::consensus::COMMIT_ROUNDS_LATENCY, elapsed.as_secs_f64());
             }
         }
 
@@ -243,7 +237,7 @@ impl<N: Network> BFT<N> {
                     true => {
                         info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author());
                         #[cfg(feature = "metrics")]
-                        increment_counter!(LEADERS_ELECTED);
+                        metrics::increment_counter(metrics::consensus::LEADERS_ELECTED);
                     }
                     false => warn!("BFT failed to elect a leader for round {current_round} (!= {leader_round})"),
                 }

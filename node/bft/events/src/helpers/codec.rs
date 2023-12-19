@@ -15,27 +15,13 @@
 use crate::Event;
 use snarkvm::prelude::{FromBytes, Network, ToBytes};
 
-#[cfg(feature = "metrics")]
-use metrics::histogram;
-#[cfg(feature = "metrics")]
-use snarkos_node_metrics::network::{
-    NOISE_CODEC_DECRYPTION_SIZE,
-    NOISE_CODEC_DECRYPTION_TIME,
-    NOISE_CODEC_ENCRYPTION_SIZE,
-    NOISE_CODEC_ENCRYPTION_TIME,
-};
-
-use ::bytes::{Buf, BufMut, BytesMut};
-use bytes::Bytes;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use core::marker::PhantomData;
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     prelude::ParallelSlice,
 };
 use snow::{HandshakeState, StatelessTransportState};
-
-#[cfg(feature = "metrics")]
-use std::time::Instant;
 use std::{io, sync::Arc};
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 use tracing::*;
@@ -199,7 +185,8 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
 
     fn encode(&mut self, message_or_bytes: EventOrBytes<N>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         #[cfg(feature = "metrics")]
-        let start = Instant::now();
+        let start = std::time::Instant::now();
+
         let ciphertext = match self.noise_state {
             NoiseState::Handshake(ref mut noise) => {
                 match message_or_bytes {
@@ -212,7 +199,7 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
                             .map_err(|e| Self::Error::new(io::ErrorKind::InvalidInput, e))?;
 
                         #[cfg(feature = "metrics")]
-                        histogram!(NOISE_CODEC_ENCRYPTION_SIZE, len as f64);
+                        metrics::histogram(metrics::tcp::NOISE_CODEC_ENCRYPTION_SIZE, len as f64);
 
                         buffer[..len].into()
                     }
@@ -229,7 +216,7 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
                 }
 
                 #[cfg(feature = "metrics")]
-                histogram!(NOISE_CODEC_ENCRYPTION_SIZE, bytes.len() as f64);
+                metrics::histogram(metrics::tcp::NOISE_CODEC_ENCRYPTION_SIZE, bytes.len() as f64);
 
                 // Chunk the payload if necessary and encrypt with Noise.
                 //
@@ -270,8 +257,9 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
         // Encode the resulting ciphertext using the length-delimited codec.
         #[allow(clippy::let_and_return)]
         let result = self.codec.encode(ciphertext.freeze(), dst);
+
         #[cfg(feature = "metrics")]
-        histogram!(NOISE_CODEC_ENCRYPTION_TIME, start.elapsed().as_micros() as f64);
+        metrics::histogram(metrics::tcp::NOISE_CODEC_ENCRYPTION_TIME, start.elapsed().as_micros() as f64);
         result
     }
 }
@@ -282,9 +270,10 @@ impl<N: Network> Decoder for NoiseCodec<N> {
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         #[cfg(feature = "metrics")]
-        histogram!(NOISE_CODEC_DECRYPTION_SIZE, src.len() as f64);
+        metrics::histogram(metrics::tcp::NOISE_CODEC_DECRYPTION_SIZE, src.len() as f64);
         #[cfg(feature = "metrics")]
-        let start = Instant::now();
+        let start = std::time::Instant::now();
+
         // Decode the ciphertext with the length-delimited codec.
         let Some(bytes) = self.codec.decode(src)? else {
             return Ok(None);
@@ -333,7 +322,7 @@ impl<N: Network> Decoder for NoiseCodec<N> {
         };
 
         #[cfg(feature = "metrics")]
-        histogram!(NOISE_CODEC_DECRYPTION_TIME, start.elapsed().as_micros() as f64);
+        metrics::histogram(metrics::tcp::NOISE_CODEC_DECRYPTION_TIME, start.elapsed().as_micros() as f64);
         Ok(msg)
     }
 }

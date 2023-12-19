@@ -38,14 +38,9 @@ use crate::{
     PRIMARY_PING_IN_MS,
     WORKER_PING_IN_MS,
 };
-
-#[cfg(feature = "metrics")]
-use metrics::gauge;
 use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
 use snarkos_node_bft_ledger_service::LedgerService;
-#[cfg(feature = "metrics")]
-use snarkos_node_metrics::bft::PROPOSAL_ROUND;
 use snarkvm::{
     console::{
         account::Signature,
@@ -316,7 +311,7 @@ impl<N: Network> Primary<N> {
         let round = self.current_round();
 
         #[cfg(feature = "metrics")]
-        gauge!(PROPOSAL_ROUND, round as f64);
+        metrics::gauge(metrics::bft::PROPOSAL_ROUND, round as f64);
 
         // Ensure the primary has not proposed a batch for this round before.
         if self.storage.contains_certificate_in_round_from(round, self.gateway.account().address()) {

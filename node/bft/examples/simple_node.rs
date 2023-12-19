@@ -511,9 +511,10 @@ async fn main() -> Result<()> {
         _ => (),
     };
 
+    // Initialize the metrics.
     if args.metrics {
-        // Starte the prometheus exporter.
-        // snarkos_node_metrics::initialize();
+        info!("Initializing metrics...");
+        metrics::initialize_metrics();
     }
 
     // Start the monitoring server.

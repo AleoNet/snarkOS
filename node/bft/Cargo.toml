@@ -18,7 +18,7 @@ edition = "2021"
 
 [features]
 default = [ ]
-metrics = [ "snarkvm/metrics", "dep:snarkos-node-metrics", "dep:metrics" ]
+metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics" ]
 
 [dependencies.anyhow]
 version = "1.0.70"
@@ -42,6 +42,12 @@ features = [ "thread-pool" ]
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../metrics"
+version = "=2.2.6"
+optional = true
 
 [dependencies.parking_lot]
 version = "0.12"
@@ -85,11 +91,6 @@ version = "=2.2.6"
 path = "../tcp"
 version = "=2.2.6"
 
-[dependencies.snarkos-node-metrics]
-path = "../metrics"
-version = "=2.2.6"
-optional = true
-
 [dependencies.snarkvm]
 workspace = true
 
@@ -112,10 +113,6 @@ features = [ "codec" ]
 
 [dependencies.tracing]
 version = "0.1"
-
-[dependencies.metrics]
-version = "0.21"
-optional = true
 
 [dev-dependencies.axum]
 version = "0.6"

@@ -58,11 +58,6 @@ use snarkvm::{
     prelude::Address,
 };
 
-#[cfg(feature = "metrics")]
-use metrics::gauge;
-#[cfg(feature = "metrics")]
-use snarkos_node_metrics::consensus::CONNECTED;
-
 use colored::Colorize;
 use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
@@ -433,7 +428,7 @@ impl<N: Network> Gateway<N> {
 
     #[cfg(feature = "metrics")]
     fn update_metrics(&self) {
-        gauge!(CONNECTED, self.connected_peers.read().len() as f64);
+        metrics::gauge(metrics::consensus::CONNECTED, self.connected_peers.read().len() as f64);
     }
 
     /// Inserts the given peer into the connected peers.
