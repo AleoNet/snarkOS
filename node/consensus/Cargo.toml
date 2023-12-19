@@ -18,7 +18,7 @@ edition = "2021"
 
 [features]
 default = [ ]
-metrics = [ "snarkvm/metrics", "dep:snarkos-node-metrics", "dep:metrics" ]
+metrics = [ "dep:metrics" ]
 
 [dependencies.anyhow]
 version = "1.0.75"
@@ -32,6 +32,12 @@ features = [ "serde", "rayon" ]
 
 [dependencies.lru]
 version = "0.12.1"
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../metrics"
+version = "=2.2.6"
+optional = true
 
 [dependencies.parking_lot]
 version = "0.12"
@@ -59,11 +65,6 @@ version = "=2.2.6"
 default-features = false
 features = [ "persistent" ]
 
-[dependencies.snarkos-node-metrics]
-path = "../metrics"
-version = "=2.2.6"
-optional = true
-
 [dependencies.snarkvm]
 workspace = true
 
@@ -73,10 +74,6 @@ features = [ "macros", "rt-multi-thread", "signal" ]
 
 [dependencies.tracing]
 version = "0.1"
-
-[dependencies.metrics]
-version = "0.21"
-optional = true
 
 [dev-dependencies.indexmap]
 version = "2.0"

@@ -17,11 +17,7 @@
 #[macro_use]
 extern crate tracing;
 
-#[cfg(feature = "metrics")]
-use metrics::{counter, gauge, histogram};
 use snarkos_account::Account;
-#[cfg(feature = "metrics")]
-use snarkos_node_bft::helpers::now;
 use snarkos_node_bft::{
     helpers::{
         fmt_id,
@@ -36,12 +32,6 @@ use snarkos_node_bft::{
     MAX_GC_ROUNDS,
     MAX_TRANSMISSIONS_PER_BATCH,
 };
-#[cfg(feature = "metrics")]
-use snarkos_node_metrics::{
-    blocks::{HEIGHT, TRANSACTIONS},
-    consensus::{COMMITTED_CERTIFICATES, LAST_COMMITTED_ROUND},
-};
-
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_bft_storage_service::BFTPersistentStorage;
 use snarkvm::{
@@ -58,8 +48,6 @@ use colored::Colorize;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::Mutex;
-#[cfg(feature = "metrics")]
-use std::time::Duration;
 use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
@@ -341,9 +329,10 @@ impl<N: Network> Consensus<N> {
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<()> {
         #[cfg(feature = "metrics")]
-        let num_committed_certificates = subdag.values().map(|c| c.len()).sum::<usize>();
-        #[cfg(feature = "metrics")]
         let start = subdag.leader_certificate().batch_header().timestamp();
+        #[cfg(feature = "metrics")]
+        let num_committed_certificates = subdag.values().map(|c| c.len()).sum::<usize>();
+
         // Create the candidate next block.
         let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
         // Check that the block is well-formed.
@@ -351,16 +340,15 @@ impl<N: Network> Consensus<N> {
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
 
-        // Update metrics.
         #[cfg(feature = "metrics")]
         {
-            gauge!(HEIGHT, next_block.height() as f64);
-            counter!(TRANSACTIONS, next_block.transactions().len() as u64);
-            gauge!(LAST_COMMITTED_ROUND, next_block.round() as f64);
-            gauge!(COMMITTED_CERTIFICATES, num_committed_certificates as f64);
-            let end = now();
-            let elapsed = Duration::from_secs((end - start) as u64);
-            histogram!(snarkos_node_metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
+            let elapsed = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - start) as u64);
+
+            metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
+            metrics::counter(metrics::blocks::TRANSACTIONS, next_block.transactions().len() as u64);
+            metrics::gauge(metrics::consensus::LAST_COMMITTED_ROUND, next_block.round() as f64);
+            metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
+            metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
         }
 
         Ok(())
