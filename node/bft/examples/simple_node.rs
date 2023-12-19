@@ -442,8 +442,8 @@ struct Args {
     /// Enables the solution and transaction cannons, and optionally the interval in ms to run them on.
     #[arg(long, value_name = "INTERVAL_MS")]
     fire_transmissions: Option<Option<u64>>,
-    /// Enables the prometheus metrics exporter if set to true.
-    #[clap(long, default_missing_value = "false")]
+    /// Enables the metrics exporter.
+    #[clap(long, default_value = "false")]
     metrics: bool,
 }
 

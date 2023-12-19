@@ -144,13 +144,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
-
-        // Initialize the metrics.
-        #[cfg(feature = "metrics")]
-        if dev.is_none() || dev == Some(0) {
-            info!("Initializing metrics...");
-            metrics::initialize_metrics();
-        }
         // Return the node.
         Ok(node)
     }
