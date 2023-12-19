@@ -148,6 +148,24 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             std::thread::sleep(std::time::Duration::from_secs(5));
             return Ledger::<N, C>::load(genesis.clone(), dev);
         }
+    } else if let Ok(block) = ledger.get_block(997810) {
+        if *block.hash() == *ID::<N>::from_str("ab1pap9sxh5fcskw7l3msax4fq2mrqd80kxp0epx9dguxua2e8dacys78key5")? {
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            return Ledger::<N, C>::load(genesis.clone(), dev);
+        }
+    } else if let Ok(block) = ledger.get_block(997810) {
+        if *block.hash() == *ID::<N>::from_str("ab1fx4mpz0fdqx75djf3n9grsjkc229xfs8fzmjqsxkajtj8j8sdurqufgvyz")? {
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            return Ledger::<N, C>::load(genesis.clone(), dev);
+        }
     }
     Ok(ledger)
 }
