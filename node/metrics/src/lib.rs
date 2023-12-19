@@ -32,17 +32,10 @@ pub fn initialize_metrics() -> tokio::task::JoinHandle<()> {
         exporter.await.expect("can't await the prometheus exporter");
     });
 
-    // Register the metrics so they exist on init.
-    crate::register_metrics();
-
-    // Return the exporter's task handle to be tracked by the node's task handling.
-    metrics_exporter_task
-}
-
-fn register_metrics() {
     // Register the snarkVM metrics.
     snarkvm::metrics::register_metrics();
 
+    // Register the metrics so they exist on init.
     for name in crate::names::GAUGE_NAMES {
         register_gauge(name);
     }
@@ -52,4 +45,7 @@ fn register_metrics() {
     for name in crate::names::HISTOGRAM_NAMES {
         register_histogram(name);
     }
+
+    // Return the exporter's task handle to be tracked by the node's task handling.
+    metrics_exporter_task
 }
