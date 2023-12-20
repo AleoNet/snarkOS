@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-rest"
-version = "2.2.6"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A REST API server for a decentralized virtual machine"
 homepage = "https://aleo.org"
@@ -58,11 +58,11 @@ features = [ "preserve_order" ]
 
 [dependencies.snarkos-node-consensus]
 path = "../consensus"
-version = "=2.2.6"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-router]
 path = "../router"
-version = "=2.2.6"
+version = "=2.2.7"
 
 [dependencies.rand]
 version = "0.8"
