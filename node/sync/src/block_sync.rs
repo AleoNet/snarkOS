@@ -24,7 +24,7 @@ use snarkvm::prelude::{block::Block, Network};
 use anyhow::{bail, ensure, Result};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
 use std::{
     collections::BTreeMap,
@@ -106,6 +106,8 @@ pub struct BlockSync<N: Network> {
     request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
     /// The boolean indicator of whether the node is synced up to the latest block (within the given tolerance).
     is_block_synced: Arc<AtomicBool>,
+    /// The lock to guarantee advance_with_sync_blocks() is called only once at a time.
+    advance_with_sync_blocks_lock: Arc<Mutex<()>>,
 }
 
 impl<N: Network> BlockSync<N> {
@@ -121,6 +123,7 @@ impl<N: Network> BlockSync<N> {
             request_timestamps: Default::default(),
             request_timeouts: Default::default(),
             is_block_synced: Default::default(),
+            advance_with_sync_blocks_lock: Default::default(),
         }
     }
 
@@ -270,6 +273,12 @@ impl<N: Network> BlockSync<N> {
         // Process the block response from the given peer IP.
         self.process_block_response(peer_ip, blocks)?;
 
+        // Acquire the lock to ensure this function is called only once at a time.
+        // If the lock is already acquired, return early.
+        let Some(_lock) = self.advance_with_sync_blocks_lock.try_lock() else {
+            return Ok(());
+        };
+
         // Retrieve the latest block height.
         let mut current_height = self.canon.latest_block_height();
         // Try to advance the ledger with the sync pool.
@@ -289,8 +298,8 @@ impl<N: Network> BlockSync<N> {
                 warn!("{error}");
                 break;
             }
-            // Increment the latest height.
-            current_height += 1;
+            // Update the latest height.
+            current_height = self.canon.latest_block_height();
         }
         Ok(())
     }
