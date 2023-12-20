@@ -276,6 +276,7 @@ impl<N: Network> BlockSync<N> {
         // Acquire the lock to ensure this function is called only once at a time.
         // If the lock is already acquired, return early.
         let Some(_lock) = self.advance_with_sync_blocks_lock.try_lock() else {
+            trace!("Skipping a call to advance_with_sync_blocks() as it is already in progress");
             return Ok(());
         };
 
