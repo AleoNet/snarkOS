@@ -289,8 +289,8 @@ impl<N: Network> BlockSync<N> {
                 warn!("{error}");
                 break;
             }
-            // Increment the latest height.
-            current_height += 1;
+            // Update the latest height.
+            current_height = self.canon.latest_block_height();
         }
         Ok(())
     }
