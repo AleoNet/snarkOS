@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use snarkvm::{
-    circuit::prelude::PrimeField,
+    circuit::{environment::ToFields, prelude::PrimeField, Eject},
     console::{
         account::{Address, PrivateKey, Signature},
         prelude::{Environment, Uniform},
@@ -30,6 +30,7 @@ use rand_chacha::ChaChaRng;
 use rayon::prelude::*;
 
 type Network = snarkvm::prelude::Testnet3;
+type A = snarkvm::circuit::AleoV0;
 
 /// Commands to manage Aleo accounts.
 #[derive(Debug, Parser)]
@@ -65,6 +66,14 @@ pub enum Account {
         #[clap(short = 'm', long)]
         message: String,
     },
+}
+
+/// Parse a raw leo input into fields
+fn aleo_literal_to_fields(input: &str) -> Result<Vec<Field<Network>>> {
+    let literal = snarkvm::circuit::Literal::<A>::from_str(input)?;
+    let plaintext = snarkvm::circuit::Plaintext::<A>::from(literal);
+    let value = snarkvm::circuit::Value::<A>::Plaintext(plaintext);
+    Ok(value.to_fields().into_iter().map(|f| f.eject_value()).collect())
 }
 
 impl Account {
@@ -194,10 +203,13 @@ impl Account {
         let private_key =
             PrivateKey::<Network>::from_str(&key).map_err(|_| anyhow!("Failed to parse a valid private key"))?;
         // Sign the message
-        let signature = private_key
-            .sign_bytes(message.as_bytes(), &mut rng)
-            .map_err(|_| anyhow!("Failed to sign the message"))?
-            .to_string();
+        let signature = if let Ok(fields) = aleo_literal_to_fields(&message) {
+            private_key.sign(&fields, &mut rng)
+        } else {
+            private_key.sign_bytes(message.as_bytes(), &mut rng)
+        }
+        .map_err(|_| anyhow!("Failed to sign the message"))?
+        .to_string();
         // Return the signature as a string
         Ok(signature)
     }
@@ -210,7 +222,11 @@ impl Account {
         let signature =
             Signature::<Network>::from_str(&signature).map_err(|_| anyhow!("Failed to parse a valid signature"))?;
         // Verify the signature
-        let verified = signature.verify_bytes(&address, message.as_bytes());
+        let verified = if let Ok(fields) = aleo_literal_to_fields(&message) {
+            signature.verify(&address, &fields)
+        } else {
+            signature.verify_bytes(&address, message.as_bytes())
+        };
 
         // Return the verification result
         Ok(if verified { "verified" } else { "invalid" }.to_string())
@@ -292,11 +308,30 @@ mod tests {
     }
 
     #[test]
+    fn test_signature_field() {
+        let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
+        let message = "5field".to_string();
+        let account = Account::Sign { key, message, seed: None };
+        assert!(account.parse().is_ok());
+    }
+
+    #[test]
     fn test_seeded_signature() {
         let seed = Some("38868010450269069756484274649022187108349082664538872491798902858296683054657".to_string());
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "Hello, world!".to_string();
         let expected = "sign1t2hsaqfhcgvsfg2q3q2stxsffyrvdx98pl0ddkdqngqqtn3vsuprhkv9tkeyzs878ccqp62mfptvvp7m5hjcfnf06cc9pu4khxtkkp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkksrwh0";
+        let account = Account::Sign { key, message, seed };
+        let actual = account.parse().unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_seeded_signature_field() {
+        let seed = Some("38868010450269069756484274649022187108349082664538872491798902858296683054657".to_string());
+        let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
+        let message = "5field".to_string();
+        let expected = "sign16f464jk7zrq0az5jne2zvamhlfkksfj23508tqvmj836jpplkuqefcshgk8k8rx9xxu284fuwaua7fcz3jajvnqynwtymfm0p692vq8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk3re27j";
         let account = Account::Sign { key, message, seed };
         let actual = account.parse().unwrap();
         assert_eq!(expected, actual);
@@ -330,6 +365,39 @@ mod tests {
         // test a valid signature of "Different Message"
         let signature = "sign1424ztyt9hcm77nq450gvdszrvtg9kvhc4qadg4nzy9y0ah7wdqq7t36cxal42p9jj8e8pjpmc06lfev9nvffcpqv0cxwyr0a2j2tjqlesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk3yrr50".to_string();
         let message = "Different Message".to_string();
+        let account = Account::Verify { address: address.to_string(), signature, message };
+        let actual = account.parse().unwrap();
+        assert_eq!("verified", actual);
+    }
+
+    #[test]
+    fn test_verify_field() {
+        // test signature of 5u8
+        let address = "aleo1zecnqchckrzw7dlsyf65g6z5le2rmys403ecwmcafrag0e030yxqrnlg8j";
+        let signature = "sign1j7swjfnyujt2vme3ulu88wdyh2ddj85arh64qh6c6khvrx8wvsp8z9wtzde0sahqj2qwz8rgzt803c0ceega53l4hks2mf5sfsv36qhesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkdetews".to_string();
+        let message = "5field".to_string();
+        let account = Account::Verify { address: address.to_string(), signature, message };
+        let actual = account.parse().unwrap();
+        assert_eq!("verified", actual);
+
+        // test signature of 5u8 against the message 10u8
+        let signature = "sign1j7swjfnyujt2vme3ulu88wdyh2ddj85arh64qh6c6khvrx8wvsp8z9wtzde0sahqj2qwz8rgzt803c0ceega53l4hks2mf5sfsv36qhesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkdetews".to_string();
+        let message = "10field".to_string();
+        let account = Account::Verify { address: address.to_string(), signature, message };
+        let actual = account.parse().unwrap();
+        assert_eq!("invalid", actual);
+
+        // test signature of 5u8 against the wrong address
+        let signature = "sign1j7swjfnyujt2vme3ulu88wdyh2ddj85arh64qh6c6khvrx8wvsp8z9wtzde0sahqj2qwz8rgzt803c0ceega53l4hks2mf5sfsv36qhesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkdetews".to_string();
+        let message = "5field".to_string();
+        let wrong_address = "aleo1uxl69laseuv3876ksh8k0nd7tvpgjt6ccrgccedpjk9qwyfensxst9ftg5".to_string();
+        let account = Account::Verify { address: wrong_address, signature, message };
+        let actual = account.parse().unwrap();
+        assert_eq!("invalid", actual);
+
+        // test a valid signature of 10u8
+        let signature = "sign1t9v2t5tljk8pr5t6vkcqgkus0a3v69vryxmfrtwrwg0xtj7yv5qj2nz59e5zcyl50w23lhntxvt6vzeqfyu6dt56698zvfj2l6lz6q0esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk8rh9kt".to_string();
+        let message = "10field".to_string();
         let account = Account::Verify { address: address.to_string(), signature, message };
         let actual = account.parse().unwrap();
         assert_eq!("verified", actual);
