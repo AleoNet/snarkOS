@@ -13,12 +13,13 @@
 // limitations under the License.
 
 use snarkvm::{
-    circuit::{environment::ToFields, prelude::PrimeField, Eject},
+    circuit::{environment::ToFields, Eject},
     console::{
         account::{Address, PrivateKey, Signature},
         prelude::{Environment, Uniform},
         types::Field,
     },
+    utilities::ToBytes,
 };
 
 use anyhow::{anyhow, bail, Result};
@@ -186,14 +187,9 @@ impl Account {
                 let field: Field<_> = Field::<Network>::new(
                     <Network as Environment>::Field::from_str(&seed).map_err(|e| anyhow!("Invalid seed - {e}"))?,
                 );
-                let seed_bigint = field.to_bigint().0;
 
-                let mut seed_bytes = [0u8; 32];
-                seed_bytes[0..8].copy_from_slice(&seed_bigint[0].to_le_bytes());
-                seed_bytes[8..16].copy_from_slice(&seed_bigint[1].to_le_bytes());
-                seed_bytes[16..24].copy_from_slice(&seed_bigint[2].to_le_bytes());
-                seed_bytes[24..32].copy_from_slice(&seed_bigint[3].to_le_bytes());
-                ChaChaRng::from_seed(seed_bytes)
+                // field is always 32 bytes
+                ChaChaRng::from_seed(field.to_bytes_le()?.try_into().map_err(|_v| anyhow!("Invalid seed length"))?)
             }
             // Sample a random field element.
             None => ChaChaRng::from_entropy(),
