@@ -154,8 +154,11 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ### 4. How do I use the CLI to sign and verify a message?
 
 1. Generate an account with `snarkos account new` if you haven't already
-2. Sign a message with your private key using `snarkos account sign -m "Message" -k APrivateKey1PasteYourKey`
-3. Verify your signature with `snarkos account verify -m "Message" -s sign1SignatureHere -a aleo1YourAccountAddress`
+2. Sign a message with your private key using `snarkos account sign --raw -m "Message" -k APrivateKey1PasteYourKey`
+3. Verify your signature with `snarkos account verify --raw -m "Message" -s sign1SignatureHere -a aleo1YourAccountAddress`
+
+Note, using the `--raw` flag with the command will sign plaintext messages as bytes rather than [leo](https://leo-lang.org/) values such as `1u8` or `100field`.
+
 
 ## 5. Command Line Interface
 
