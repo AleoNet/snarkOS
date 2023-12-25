@@ -23,7 +23,7 @@ metrics = [ "snarkvm/metrics" ]
 version = "0.21"
 
 [dependencies.metrics-exporter-prometheus]
-version = "0.12"
+version = "0.13"
 
 [dependencies.snarkvm]
 workspace = true

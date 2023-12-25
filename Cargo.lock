@@ -1777,6 +1777,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77b9e10a211c839210fd7f99954bda26e5f8e26ec686ad68da6a32df7c80e782"
+dependencies = [
+ "ahash",
+ "portable-atomic",
+]
+
+[[package]]
 name = "metrics-exporter-prometheus"
 version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1786,9 +1796,28 @@ dependencies = [
  "hyper",
  "indexmap 1.9.3",
  "ipnet",
- "metrics",
- "metrics-util",
- "quanta",
+ "metrics 0.21.1",
+ "metrics-util 0.15.1",
+ "quanta 0.11.1",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "metrics-exporter-prometheus"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83a4c4718a371ddfb7806378f23617876eea8b82e5ff1324516bcd283249d9ea"
+dependencies = [
+ "base64",
+ "hyper",
+ "hyper-tls",
+ "indexmap 1.9.3",
+ "ipnet",
+ "metrics 0.22.0",
+ "metrics-util 0.16.0",
+ "quanta 0.12.1",
  "thiserror",
  "tokio",
  "tracing",
@@ -1814,9 +1843,24 @@ dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
  "hashbrown 0.13.1",
- "metrics",
+ "metrics 0.21.1",
  "num_cpus",
- "quanta",
+ "quanta 0.11.1",
+ "sketches-ddsketch",
+]
+
+[[package]]
+name = "metrics-util"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2670b8badcc285d486261e2e9f1615b506baff91427b61bd336a472b65bbf5ed"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+ "hashbrown 0.13.1",
+ "metrics 0.22.0",
+ "num_cpus",
+ "quanta 0.12.1",
  "sketches-ddsketch",
 ]
 
@@ -2340,7 +2384,23 @@ dependencies = [
  "libc",
  "mach2",
  "once_cell",
- "raw-cpuid",
+ "raw-cpuid 10.7.0",
+ "wasi",
+ "web-sys",
+ "winapi",
+]
+
+[[package]]
+name = "quanta"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "577c55a090a94ed7da0e6580cc38a553558e2d736398b5d8ebf81bc9880f8acd"
+dependencies = [
+ "crossbeam-utils",
+ "libc",
+ "mach2",
+ "once_cell",
+ "raw-cpuid 11.0.1",
  "wasi",
  "web-sys",
  "winapi",
@@ -2432,6 +2492,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c297679cb867470fa8c9f67dbba74a78d78e3e98d7cf2b08d6d71540f797332"
 dependencies = [
  "bitflags 1.3.2",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "11.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d86a7c4638d42c44551f4791a20e687dbb4c3de1f33c43dd71e355cd429def1"
+dependencies = [
+ "bitflags 2.4.1",
 ]
 
 [[package]]
@@ -3212,8 +3281,8 @@ dependencies = [
 name = "snarkos-node-metrics"
 version = "2.2.7"
 dependencies = [
- "metrics",
- "metrics-exporter-prometheus",
+ "metrics 0.21.1",
+ "metrics-exporter-prometheus 0.13.0",
  "snarkvm",
  "tokio",
 ]
@@ -4116,8 +4185,8 @@ version = "0.16.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89c911acab53cd3e0b76f5ea7289f71c84dceab4511af0e523113ce4aeb719e"
 dependencies = [
- "metrics",
- "metrics-exporter-prometheus",
+ "metrics 0.21.1",
+ "metrics-exporter-prometheus 0.12.2",
 ]
 
 [[package]]
