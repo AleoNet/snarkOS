@@ -60,7 +60,7 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     future::Future,
     net::SocketAddr,
     sync::Arc,
@@ -70,6 +70,8 @@ use tokio::{
     sync::{Mutex as TMutex, OnceCell},
     task::JoinHandle,
 };
+
+const MAX_OUTSTANDING_CERTIFICATE_REQUESTS: u32 = 20;
 
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
@@ -96,6 +98,8 @@ pub struct Primary<N: Network> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The lock for propose_batch.
     propose_lock: Arc<TMutex<u64>>,
+    /// The outstanding requests to a peer.
+    outstanding_certificate_requests: Arc<RwLock<HashMap<(SocketAddr, u64), u32>>>,
 }
 
 impl<N: Network> Primary<N> {
@@ -124,6 +128,7 @@ impl<N: Network> Primary<N> {
             signed_proposals: Default::default(),
             handles: Default::default(),
             propose_lock: Default::default(),
+            outstanding_certificate_requests: Default::default(),
         })
     }
 
@@ -1127,6 +1132,7 @@ impl<N: Network> Primary<N> {
                 fast_forward_round = self.storage.increment_to_next_round(fast_forward_round)?;
                 // Clear the proposed batch.
                 *self.proposed_batch.write() = None;
+                self.outstanding_certificate_requests.write().clear();
             }
         }
 
@@ -1485,7 +1491,26 @@ impl<N: Network> Primary<N> {
             // If we do not have the certificate, request it.
             if !self.storage.contains_certificate(*certificate_id) {
                 trace!("Primary - Found a new certificate ID for round {round} from '{peer_ip}'");
-                // TODO (howardwu): Limit the number of open requests we send to a peer.
+                let mut outstanding_requests = self.outstanding_certificate_requests.write();
+                let mut value = 1;
+                let entry = outstanding_requests.entry((peer_ip, round));
+                match entry {
+                    Entry::Occupied(mut entry) => {
+                        *entry.get_mut() += 1;
+                        value = *entry.get();
+                        if value > MAX_OUTSTANDING_CERTIFICATE_REQUESTS {
+                            self.outstanding_certificate_requests.write().remove(&(peer_ip, round));
+                            return Err(anyhow!(
+                                "Too many outstanding certificate requests ({}) for peer '{peer_ip}'",
+                                value
+                            ));
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(1);
+                    }
+                }
+                debug!("Sending a certificate request to '{peer_ip}' ({value} outstanding)");
                 // Send an certificate request to the peer.
                 fetch_certificates.push(self.sync.send_certificate_request(peer_ip, *certificate_id));
             }
