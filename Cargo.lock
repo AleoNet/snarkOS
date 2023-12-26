@@ -2953,6 +2953,7 @@ version = "2.2.7"
 dependencies = [
  "anyhow",
  "clap",
+ "crossterm 0.27.0",
  "once_cell",
  "rusty-hook",
  "snarkos-account",
@@ -2977,6 +2978,7 @@ version = "2.2.7"
 dependencies = [
  "anyhow",
  "colored",
+ "crossterm 0.27.0",
  "rand",
  "snarkvm",
 ]
