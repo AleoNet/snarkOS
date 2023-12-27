@@ -66,7 +66,7 @@ The following are **minimum** requirements to run an Aleo node:
     - Provers: CUDA-enabled GPU (optional)
     - Validators: Not required at this time
 
-Just so you know, to run an Aleo Prover that is **competitive**, the machine will need more than these requirements.
+Please note that in order to run an Aleo Prover that is **competitive**, the machine will need more than these requirements.
 
 ### 2.2 Installation
 
