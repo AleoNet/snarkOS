@@ -21,8 +21,6 @@ use snarkvm::{
 
 use colored::*;
 use core::fmt;
-use crossterm::ExecutableCommand;
-use std::io::{Read, Write};
 
 /// A helper struct for an Aleo account.
 #[derive(Clone, Debug)]
@@ -148,41 +146,17 @@ impl<N: Network> FromStr for Account<N> {
 impl<N: Network> Display for Account<N> {
     /// Renders the account as a string.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        display_string_discreetly(
-            &format!("{:>12}  {}", "Private Key".cyan().bold(), self.private_key),
-            "### Do not share or lose this private key! Press any key to complete. ###",
-        )
-        .unwrap();
         write!(
             f,
-            " {:>12}  {}\n {:>12}  {}",
+            " {:>12}  {}\n {:>12}  {}\n {:>12}  {}",
+            "Private Key".cyan().bold(),
+            self.private_key,
             "View Key".cyan().bold(),
             self.view_key,
             "Address".cyan().bold(),
             self.address
         )
     }
-}
-
-// Print the string to an alternate screen, so that the string won't been printed to the terminal.
-fn display_string_discreetly(discreet_string: &str, continue_message: &str) -> Result<()> {
-    use crossterm::{
-        style::Print,
-        terminal::{EnterAlternateScreen, LeaveAlternateScreen},
-    };
-    let mut stdout = std::io::stdout();
-    stdout.execute(EnterAlternateScreen)?;
-    // print msg on the alternate screen
-    stdout.execute(Print(format!("{discreet_string}\n{continue_message}")))?;
-    stdout.flush()?;
-    wait_for_keypress();
-    stdout.execute(LeaveAlternateScreen)?;
-    Ok(())
-}
-
-fn wait_for_keypress() {
-    let mut single_key = [0u8];
-    std::io::stdin().read_exact(&mut single_key).unwrap();
 }
 
 #[cfg(test)]

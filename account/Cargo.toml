@@ -22,9 +22,6 @@ version = "1.0.75"
 [dependencies.colored]
 version = "2"
 
-[dependencies.crossterm]
-version = "0.27.0"
-
 [dependencies.rand]
 version = "0.8"
 default-features = false
