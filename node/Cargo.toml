@@ -126,6 +126,9 @@ version = "0.1"
 [dev-dependencies.deadline]
 version = "0.2"
 
+[dev-dependencies.paste]
+version = "1"
+
 [dev-dependencies.pea2pea]
 version = "0.46"
 
