@@ -36,7 +36,7 @@ version = "1"
 version = "2"
 
 [dependencies.futures]
-version = "0.3.29"
+version = "0.3.30"
 features = [ "thread-pool" ]
 
 [dependencies.indexmap]
