@@ -218,11 +218,15 @@ impl<N: Network> BlockSync<N> {
         let block_requests = self.prepare_block_requests();
         trace!("Prepared {} block requests", block_requests.len());
 
-        // If there are no block requests, then try if we can advance with responses we already
-        // have in the sync pool.
+        // If there are no block requests, but there are pending block responses in the sync pool,
+        // then try to advance the ledger using these pending block responses.
         if block_requests.is_empty() && !self.responses.read().is_empty() {
-            trace!("No block requests to send - try handling responses we already have");
-            self.handle_responses(self.canon.latest_block_height());
+            // Retrieve the latest block height.
+            let current_height = self.canon.latest_block_height();
+            // Try to advance the ledger with the sync pool.
+            trace!("No block requests to send - try advancing with block responses (at block {current_height})");
+            self.try_advancing_with_block_responses(current_height);
+            // Return early.
             return;
         }
 
@@ -291,12 +295,12 @@ impl<N: Network> BlockSync<N> {
         // Retrieve the latest block height.
         let current_height = self.canon.latest_block_height();
         // Try to advance the ledger with the sync pool.
-        self.handle_responses(current_height);
+        self.try_advancing_with_block_responses(current_height);
         Ok(())
     }
 
     /// Handles the block responses from the sync pool.
-    fn handle_responses(&self, mut current_height: u32) {
+    fn try_advancing_with_block_responses(&self, mut current_height: u32) {
         while let Some(block) = self.remove_block_response(current_height + 1) {
             // Ensure the block height matches.
             if block.height() != current_height + 1 {
@@ -587,7 +591,7 @@ impl<N: Network> BlockSync<N> {
 
     /// Removes all block requests for the given peer IP.
     fn remove_block_requests_to_peer(&self, peer_ip: &SocketAddr) {
-        trace!("Block sync is removing all block requests to peer {peer_ip}");
+        trace!("Block sync is removing all block requests to peer {peer_ip}...");
         // Acquire the write lock on the requests map.
         let mut requests = self.requests.write();
         // Acquire the read lock on the responses map.
