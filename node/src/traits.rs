@@ -63,12 +63,11 @@ pub trait NodeInterface<N: Network>: Routing<N> {
         tokio::task::spawn(async move {
             match tokio::signal::ctrl_c().await {
                 Ok(()) => {
-                    // If the node is already available, shut it down.
-                    if let Some(node) = node_clone.get() {
-                        node.shut_down().await;
-                    } else {
-                        // If the node is not available yet, set the shutdown flag individually.
-                        shutdown_flag.store(true, Ordering::Relaxed);
+                    match node_clone.get() {
+                        // If the node is already initialized, then shut it down.
+                        Some(node) => node.shut_down().await,
+                        // Otherwise, if the node is not yet initialized, then set the shutdown flag directly.
+                        None => shutdown_flag.store(true, Ordering::Relaxed),
                     }
 
                     // A best-effort attempt to let any ongoing activity conclude.

@@ -154,10 +154,10 @@ pub async fn load_blocks<N: Network>(
 
     futures::stream::iter(cdn_range.clone().step_by(BLOCKS_PER_FILE as usize))
         .map(|start| {
-            // Stop syncing if the shutdown has begun.
+            // If the Ctrl-C handler registered the signal, then stop the sync.
             if shutdown.load(Ordering::Relaxed) {
-                info!("Stopping block sync");
-                // Calling it from here isn't ideal, but the CDN sync happens before
+                info!("Skipping block sync (at {start}) - The node is shutting down");
+                // Note: Calling 'exit' from here is not ideal, but the CDN sync happens before
                 // the node is even initialized, so it doesn't result in any other
                 // functionalities being shut down abruptly.
                 std::process::exit(0);
