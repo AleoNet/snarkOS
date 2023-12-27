@@ -82,8 +82,11 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
+        // Prepare the shutdown flag.
+        let shutdown: Arc<AtomicBool> = Default::default();
+
         // Initialize the signal handler.
-        let signal_node = Self::handle_signals();
+        let signal_node = Self::handle_signals(shutdown.clone());
 
         // Initialize the ledger.
         let ledger = Ledger::<N, C>::load(genesis.clone(), dev)?;
@@ -92,14 +95,16 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
-            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+            if let Err((_, error)) =
+                snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone(), shutdown.clone()).await
+            {
                 crate::log_clean_error(dev);
                 return Err(error);
             }
         }
 
         // Initialize the ledger service.
-        let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
+        let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone(), shutdown.clone()));
         // Initialize the sync module.
         let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
 
@@ -124,7 +129,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             genesis,
             coinbase_puzzle,
             handles: Default::default(),
-            shutdown: Default::default(),
+            shutdown,
         };
 
         // Initialize the REST server.

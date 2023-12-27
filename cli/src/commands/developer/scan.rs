@@ -252,25 +252,41 @@ impl Scan {
         // Construct the runtime.
         let rt = tokio::runtime::Runtime::new()?;
 
+        // Create a placeholder shutdown flag.
+        let _shutdown = Default::default();
+
         // Scan the blocks via the CDN.
         rt.block_on(async move {
-            let _ = snarkos_node_cdn::load_blocks(&cdn, cdn_request_start, Some(cdn_request_end), move |block| {
-                // Check if the block is within the requested range.
-                if block.height() < start_height || block.height() > end_height {
-                    return Ok(());
-                }
+            let _ = snarkos_node_cdn::load_blocks(
+                &cdn,
+                cdn_request_start,
+                Some(cdn_request_end),
+                _shutdown,
+                move |block| {
+                    // Check if the block is within the requested range.
+                    if block.height() < start_height || block.height() > end_height {
+                        return Ok(());
+                    }
 
-                // Log the progress.
-                let percentage_complete =
-                    block.height().saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
-                print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
-                stdout().flush()?;
+                    // Log the progress.
+                    let percentage_complete =
+                        block.height().saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
+                    print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
+                    stdout().flush()?;
 
-                // Scan the block for records.
-                Self::scan_block(&block, &endpoint, private_key, &view_key, &address_x_coordinate, records.clone())?;
+                    // Scan the block for records.
+                    Self::scan_block(
+                        &block,
+                        &endpoint,
+                        private_key,
+                        &view_key,
+                        &address_x_coordinate,
+                        records.clone(),
+                    )?;
 
-                Ok(())
-            })
+                    Ok(())
+                },
+            )
             .await;
         });
 

@@ -90,8 +90,11 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         genesis: Block<N>,
         dev: Option<u16>,
     ) -> Result<Self> {
+        // Prepare the shutdown flag.
+        let shutdown: Arc<AtomicBool> = Default::default();
+
         // Initialize the signal handler.
-        let signal_node = Self::handle_signals();
+        let signal_node = Self::handle_signals(shutdown.clone());
 
         // Initialize the ledger service.
         let ledger_service = Arc::new(ProverLedgerService::new());
@@ -123,7 +126,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             puzzle_instances: Default::default(),
             max_puzzle_instances: u8::try_from(max_puzzle_instances)?,
             handles: Default::default(),
-            shutdown: Default::default(),
+            shutdown,
             _phantom: Default::default(),
         };
         // Initialize the routing.

@@ -26,19 +26,27 @@ use snarkvm::{
 };
 
 use indexmap::IndexMap;
-use std::{fmt, ops::Range, sync::Arc};
+use std::{
+    fmt,
+    ops::Range,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 /// A core ledger service.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
+    shutdown: Arc<AtomicBool>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
-    pub fn new(ledger: Ledger<N, C>) -> Self {
+    pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
         let coinbase_verifying_key = Arc::new(ledger.coinbase_puzzle().coinbase_verifying_key().clone());
-        Self { ledger, coinbase_verifying_key }
+        Self { ledger, coinbase_verifying_key, shutdown }
     }
 }
 
@@ -283,6 +291,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Adds the given block as the next block in the ledger.
     #[cfg(feature = "ledger-write")]
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
+        // If the Ctrl-C handler registered the signal, then skip advancing to the next block.
+        if self.shutdown.load(Ordering::Relaxed) {
+            bail!("Skipping advancing to block {} - The node is shutting down", block.height());
+        }
+        // Advance to the next block.
         self.ledger.advance_to_next_block(block)?;
         tracing::info!("\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());
         Ok(())
