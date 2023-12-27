@@ -388,8 +388,8 @@ impl<N: Network> BFT<N> {
         let (stake_with_leader, stake_without_leader) =
             self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &previous_committee);
         // Return 'true' if any of the following conditions hold:
-        stake_with_leader >= previous_committee.availability_threshold()
-            || stake_without_leader >= previous_committee.quorum_threshold()
+        stake_with_leader >= previous_committee.quorum_threshold()
+            || stake_without_leader >= previous_committee.availability_threshold()
             || self.is_timer_expired()
     }
 
