@@ -73,8 +73,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes a new validator node.
     pub async fn new(
         node_ip: SocketAddr,
-        rest_ip: Option<SocketAddr>,
         bft_ip: Option<SocketAddr>,
+        rest_ip: Option<SocketAddr>,
+        rest_rps: u32,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
@@ -141,7 +142,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger.clone(), Arc::new(node.clone()))?);
+            node.rest =
+                Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone(), Arc::new(node.clone())).await?);
         }
         // Initialize the routing.
         node.initialize_routing().await;
@@ -483,8 +485,9 @@ mod tests {
 
         let validator = Validator::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
             node,
-            Some(rest),
             None,
+            Some(rest),
+            10,
             account,
             &[],
             &[],

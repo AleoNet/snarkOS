@@ -35,18 +35,23 @@ use snarkvm::{
 
 use anyhow::Result;
 use axum::{
+    body::Body,
+    error_handling::HandleErrorLayer,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
     http::{header::CONTENT_TYPE, Method, Request, StatusCode},
     middleware,
     middleware::Next,
     response::Response,
     routing::{get, post},
+    BoxError,
     Json,
 };
 use axum_extra::response::ErasedJson;
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::task::JoinHandle;
+use tokio::{net::TcpListener, task::JoinHandle};
+use tower::ServiceBuilder;
+use tower_governor::{errors::display_error, governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -67,8 +72,9 @@ pub struct Rest<N: Network, C: ConsensusStorage<N>, R: Routing<N>> {
 
 impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     /// Initializes a new instance of the server.
-    pub fn start(
+    pub async fn start(
         rest_ip: SocketAddr,
+        rest_rps: u32,
         consensus: Option<Consensus<N>>,
         ledger: Ledger<N, C>,
         routing: Arc<R>,
@@ -76,7 +82,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
         // Initialize the server.
         let mut server = Self { consensus, ledger, routing, handles: Default::default() };
         // Spawn the server.
-        server.spawn_server(rest_ip);
+        server.spawn_server(rest_ip, rest_rps).await;
         // Return the server.
         Ok(server)
     }
@@ -95,11 +101,23 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
-    fn spawn_server(&mut self, rest_ip: SocketAddr) {
+    async fn spawn_server(&mut self, rest_ip: SocketAddr, rest_rps: u32) {
         let cors = CorsLayer::new()
             .allow_origin(Any)
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers([CONTENT_TYPE]);
+
+        // Log the REST rate limit per IP.
+        debug!("REST rate limit per IP - {rest_rps} RPS");
+
+        // Prepare the rate limiting setup.
+        let governor_config = Box::new(
+            GovernorConfigBuilder::default()
+                .per_second(1)
+                .burst_size(rest_rps)
+                .finish()
+                .expect("Couldn't set up rate limiting for the REST server!"),
+        );
 
         let router = {
             axum::Router::new()
@@ -174,25 +192,34 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .layer(cors)
             // Cap body size at 10MB.
             .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
+            .layer(
+                ServiceBuilder::new()
+                    // this middleware goes above `GovernorLayer` because it will receive
+                    // errors returned by `GovernorLayer`
+                    .layer(HandleErrorLayer::new(|e: BoxError| async move {
+                        display_error(e)
+                    }))
+                    .layer(GovernorLayer {
+                        // We can leak this because it is created only once and it persists.
+                        config: Box::leak(governor_config),
+                    }),
+            )
         };
 
+        let rest_listener = TcpListener::bind(rest_ip).await.unwrap();
         self.handles.lock().push(tokio::spawn(async move {
-            axum::Server::bind(&rest_ip)
-                .serve(router.into_make_service_with_connect_info::<SocketAddr>())
+            axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>())
                 .await
                 .expect("couldn't start rest server");
         }))
     }
 }
 
-async fn log_middleware<B>(
+async fn log_middleware(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    request: Request<B>,
-    next: Next<B>,
-) -> Result<Response, StatusCode>
-where
-    B: Send,
-{
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
     info!("Received '{} {}' from '{addr}'", request.method(), request.uri());
 
     Ok(next.run(request).await)
