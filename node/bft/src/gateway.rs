@@ -205,7 +205,7 @@ impl<N: Network> Gateway<N> {
             .map_or_else(|_e| Committee::<N>::MAX_COMMITTEE_SIZE as usize, |committee| committee.num_members())
     }
 
-    /// The maxixmum number of events to cache.
+    /// The maximum number of events to cache.
     fn max_cache_events(&self) -> usize {
         self.max_cache_transmissions()
     }

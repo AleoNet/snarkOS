@@ -21,7 +21,7 @@ default = [ ]
 metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics" ]
 
 [dependencies.anyhow]
-version = "1.0.70"
+version = "1.0.76"
 
 [dependencies.async-recursion]
 version = "1.0"
@@ -36,7 +36,7 @@ version = "1"
 version = "2"
 
 [dependencies.futures]
-version = "0.3.29"
+version = "0.3.30"
 features = [ "thread-pool" ]
 
 [dependencies.indexmap]
@@ -177,4 +177,4 @@ features = [ "env-filter" ]
 version = "0.1"
 
 [dev-dependencies.mockall]
-version = "0.12.0"
+version = "0.12.1"

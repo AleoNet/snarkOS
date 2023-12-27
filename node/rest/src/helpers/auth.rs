@@ -17,11 +17,14 @@ use snarkvm::prelude::*;
 use ::time::OffsetDateTime;
 use anyhow::{anyhow, Result};
 use axum::{
-    headers::authorization::{Authorization, Bearer},
+    body::Body,
     http::{Request, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
     RequestPartsExt,
+};
+use axum_extra::{
+    headers::authorization::{Authorization, Bearer},
     TypedHeader,
 };
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
@@ -70,10 +73,7 @@ impl Claims {
     }
 }
 
-pub async fn auth_middleware<B>(request: Request<B>, next: Next<B>) -> Result<Response, Response>
-where
-    B: Send,
-{
+pub async fn auth_middleware(request: Request<Body>, next: Next) -> Result<Response, Response> {
     // Deconstruct the request to extract the auth token.
     let (mut parts, body) = request.into_parts();
     let auth: TypedHeader<Authorization<Bearer>> =

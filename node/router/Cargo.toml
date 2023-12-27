@@ -21,7 +21,7 @@ test = [ ]
 metrics = [ "dep:metrics" ]
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0.76"
 
 [dependencies.async-trait]
 version = "0.1"
@@ -36,7 +36,7 @@ version = "1"
 version = "2"
 
 [dependencies.futures]
-version = "0.3.29"
+version = "0.3.30"
 features = [ "thread-pool" ]
 
 [dependencies.indexmap]
