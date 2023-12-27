@@ -587,7 +587,7 @@ impl<N: Network> BlockSync<N> {
 
     /// Removes all block requests for the given peer IP.
     fn remove_block_requests_to_peer(&self, peer_ip: &SocketAddr) {
-        trace!("Removing all block requests to peer {peer_ip}");
+        trace!("Block sync is removing all block requests to peer {peer_ip}");
         // Acquire the write lock on the requests map.
         let mut requests = self.requests.write();
         // Acquire the read lock on the responses map.
