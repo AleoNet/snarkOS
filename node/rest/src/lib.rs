@@ -74,6 +74,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
     /// Initializes a new instance of the server.
     pub async fn start(
         rest_ip: SocketAddr,
+        rest_rps: u32,
         consensus: Option<Consensus<N>>,
         ledger: Ledger<N, C>,
         routing: Arc<R>,
@@ -81,7 +82,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
         // Initialize the server.
         let mut server = Self { consensus, ledger, routing, handles: Default::default() };
         // Spawn the server.
-        server.spawn_server(rest_ip).await;
+        server.spawn_server(rest_ip, rest_rps).await;
         // Return the server.
         Ok(server)
     }
@@ -100,17 +101,20 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
-    async fn spawn_server(&mut self, rest_ip: SocketAddr) {
+    async fn spawn_server(&mut self, rest_ip: SocketAddr, rest_rps: u32) {
         let cors = CorsLayer::new()
             .allow_origin(Any)
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers([CONTENT_TYPE]);
 
+        // Log the REST rate limit per IP.
+        debug!("REST rate limit per IP - {rest_rps} RPS");
+
         // Prepare the rate limiting setup.
-        let governor_conf = Box::new(
+        let governor_config = Box::new(
             GovernorConfigBuilder::default()
-                .per_second(3)
-                .burst_size(5)
+                .per_second(1)
+                .burst_size(rest_rps)
                 .finish()
                 .expect("Couldn't set up rate limiting for the REST server!"),
         );
@@ -197,7 +201,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
                     }))
                     .layer(GovernorLayer {
                         // We can leak this because it is created only once and it persists.
-                        config: Box::leak(governor_conf),
+                        config: Box::leak(governor_config),
                     }),
             )
         };
