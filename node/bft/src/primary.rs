@@ -99,7 +99,7 @@ pub struct Primary<N: Network> {
     /// The lock for propose_batch.
     propose_lock: Arc<TMutex<u64>>,
     /// The outstanding requests to a peer.
-    outstanding_certificate_requests: Arc<RwLock<HashMap<(SocketAddr, u64), u32>>>,
+    outstanding_certificate_requests: Arc<Mutex<HashMap<(SocketAddr, u64), u32>>>,
 }
 
 impl<N: Network> Primary<N> {
@@ -1132,7 +1132,7 @@ impl<N: Network> Primary<N> {
                 fast_forward_round = self.storage.increment_to_next_round(fast_forward_round)?;
                 // Clear the proposed batch.
                 *self.proposed_batch.write() = None;
-                self.outstanding_certificate_requests.write().clear();
+                self.outstanding_certificate_requests.lock().clear();
             }
         }
 
@@ -1491,7 +1491,7 @@ impl<N: Network> Primary<N> {
             // If we do not have the certificate, request it.
             if !self.storage.contains_certificate(*certificate_id) {
                 trace!("Primary - Found a new certificate ID for round {round} from '{peer_ip}'");
-                let mut outstanding_requests = self.outstanding_certificate_requests.write();
+                let mut outstanding_requests = self.outstanding_certificate_requests.lock();
                 let mut value = 1;
                 let entry = outstanding_requests.entry((peer_ip, round));
                 match entry {
@@ -1499,7 +1499,7 @@ impl<N: Network> Primary<N> {
                         *entry.get_mut() += 1;
                         value = *entry.get();
                         if value > MAX_OUTSTANDING_CERTIFICATE_REQUESTS {
-                            self.outstanding_certificate_requests.write().remove(&(peer_ip, round));
+                            entry.remove();
                             return Err(anyhow!(
                                 "Too many outstanding certificate requests ({}) for peer '{peer_ip}'",
                                 value
