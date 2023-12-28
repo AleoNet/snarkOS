@@ -29,7 +29,10 @@ use futures::{Future, StreamExt};
 use parking_lot::RwLock;
 use reqwest::Client;
 use std::{
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 
@@ -45,14 +48,16 @@ const NETWORK_ID: u16 = 3;
 pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(
     base_url: &str,
     ledger: Ledger<N, C>,
+    shutdown: Arc<AtomicBool>,
 ) -> Result<u32, (u32, anyhow::Error)> {
     // Fetch the node height.
     let start_height = ledger.latest_height() + 1;
     // Load the blocks from the CDN into the ledger.
     let ledger_clone = ledger.clone();
-    let result =
-        load_blocks(base_url, start_height, None, move |block: Block<N>| ledger_clone.advance_to_next_block(&block))
-            .await;
+    let result = load_blocks(base_url, start_height, None, shutdown, move |block: Block<N>| {
+        ledger_clone.advance_to_next_block(&block)
+    })
+    .await;
 
     // TODO (howardwu): Find a way to resolve integrity failures.
     // If the sync failed, check the integrity of the ledger.
@@ -90,6 +95,7 @@ pub async fn load_blocks<N: Network>(
     base_url: &str,
     start_height: u32,
     end_height: Option<u32>,
+    shutdown: Arc<AtomicBool>,
     process: impl FnMut(Block<N>) -> Result<()> + Clone + Send + Sync + 'static,
 ) -> Result<u32, (u32, anyhow::Error)> {
     // If the network is not supported, return.
@@ -148,6 +154,15 @@ pub async fn load_blocks<N: Network>(
 
     futures::stream::iter(cdn_range.clone().step_by(BLOCKS_PER_FILE as usize))
         .map(|start| {
+            // If the Ctrl-C handler registered the signal, then stop the sync.
+            if shutdown.load(Ordering::Relaxed) {
+                info!("Skipping block sync (at {start}) - The node is shutting down");
+                // Note: Calling 'exit' from here is not ideal, but the CDN sync happens before
+                // the node is even initialized, so it doesn't result in any other
+                // functionalities being shut down abruptly.
+                std::process::exit(0);
+            }
+
             // Prepare the end height.
             let end = start + BLOCKS_PER_FILE;
 
@@ -416,7 +431,7 @@ mod tests {
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let completed_height = load_blocks(TEST_BASE_URL, start, end, process).await.unwrap();
+            let completed_height = load_blocks(TEST_BASE_URL, start, end, Default::default(), process).await.unwrap();
             assert_eq!(blocks.read().len(), expected);
             if expected > 0 {
                 assert_eq!(blocks.read().last().unwrap().height(), completed_height);

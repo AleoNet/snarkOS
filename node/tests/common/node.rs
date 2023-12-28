@@ -23,6 +23,7 @@ pub async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
     Client::new(
         "127.0.0.1:0".parse().unwrap(),
         None,
+        10,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         sample_genesis_block(),
@@ -50,6 +51,7 @@ pub async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNet
         "127.0.0.1:0".parse().unwrap(),
         None,
         None,
+        10,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         &[],

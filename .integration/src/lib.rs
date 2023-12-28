@@ -42,7 +42,8 @@ mod tests {
         // Perform the sync.
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let completed_height = sync_ledger_with_cdn(TEST_BASE_URL, ledger.clone()).await.unwrap();
+            let completed_height =
+                sync_ledger_with_cdn(TEST_BASE_URL, ledger.clone(), Default::default()).await.unwrap();
             assert_eq!(completed_height, ledger.latest_height());
         });
     }
