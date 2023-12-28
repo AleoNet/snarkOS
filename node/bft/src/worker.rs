@@ -368,7 +368,7 @@ impl<N: Network> Worker<N> {
         });
     }
 
-    /// Sends an transmission request to the specified peer.
+    /// Sends a transmission request to the specified peer.
     async fn send_transmission_request(
         &self,
         peer_ip: SocketAddr,
