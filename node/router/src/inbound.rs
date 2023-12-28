@@ -67,7 +67,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         trace!("Received '{}' from '{peer_ip}'", message.name());
 
         // This match statement handles the inbound message by deserializing the message,
-        // checking the message is valid, and then calling the appropriate (trait) handler.
+        // checking that the message is valid, and then calling the appropriate (trait) handler.
         match message {
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
