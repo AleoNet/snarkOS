@@ -27,7 +27,7 @@ default-features = false
 version = "1"
 
 [dependencies.anyhow]
-version = "1.0.76"
+version = "1.0.77"
 
 [dependencies.bincode]
 version = "1.0"
