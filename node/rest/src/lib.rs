@@ -57,6 +57,10 @@ use tower_http::{
     trace::TraceLayer,
 };
 
+use signal_hook::consts::signal::SIGINT;
+use signal_hook::low_level::raise;
+use axum::response::IntoResponse;
+
 /// A REST API server for the ledger.
 #[derive(Clone)]
 pub struct Rest<N: Network, C: ConsensusStorage<N>, R: Routing<N>> {
@@ -98,6 +102,24 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     pub const fn handles(&self) -> &Arc<Mutex<Vec<JoinHandle<()>>>> {
         &self.handles
     }
+
+    async fn shutdown_server() -> impl IntoResponse {
+        match raise(SIGINT) {
+            Ok(_) => {
+                info!("Shutdown signal (SIGINT) sent successfully.");
+                Response::new("Server is shutting down".into())
+            }
+            Err(e) => {
+                error!("Failed to send shutdown signal: {:?}", e);
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body("Failed to send shutdown signal".to_string())  // Use to_string()
+                    .unwrap()
+            }
+        }
+    }
+
+
 }
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
@@ -181,6 +203,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
             .route("/testnet3/stateRoot/latest", get(Self::get_state_root_latest))
             .route("/testnet3/committee/latest", get(Self::get_committee_latest))
+
+            .route("/testnet3/shutdown", get(Rest::<N, C, R>::shutdown_server))
 
             // Pass in `Rest` to make things convenient.
             .with_state(self.clone())
