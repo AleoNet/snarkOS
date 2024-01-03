@@ -60,7 +60,7 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     future::Future,
     net::SocketAddr,
     sync::Arc,
@@ -1492,25 +1492,16 @@ impl<N: Network> Primary<N> {
             if !self.storage.contains_certificate(*certificate_id) {
                 trace!("Primary - Found a new certificate ID for round {round} from '{peer_ip}'");
                 let mut outstanding_requests = self.outstanding_certificate_requests.lock();
-                let mut value = 1;
                 let entry = outstanding_requests.entry((peer_ip, round));
-                match entry {
-                    Entry::Occupied(mut entry) => {
-                        *entry.get_mut() += 1;
-                        value = *entry.get();
-                        if value > MAX_OUTSTANDING_CERTIFICATE_REQUESTS {
-                            entry.remove();
-                            return Err(anyhow!(
-                                "Too many outstanding certificate requests ({}) for peer '{peer_ip}'",
-                                value
-                            ));
-                        }
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert(1);
-                    }
+                // Get the number of outstanding requests for the peer. Note: the map is cleared on each round.
+                let num_outstanding_requests = entry.and_modify(|value| *value += 1).or_insert(1);
+                if *num_outstanding_requests > MAX_OUTSTANDING_CERTIFICATE_REQUESTS {
+                    return Err(anyhow!(
+                        "Too many outstanding certificate requests ({}) for peer '{peer_ip}'",
+                        num_outstanding_requests
+                    ));
                 }
-                debug!("Sending a certificate request to '{peer_ip}' ({value} outstanding)");
+                debug!("Sending a certificate request to '{peer_ip}' ({num_outstanding_requests} outstanding)");
                 // Send an certificate request to the peer.
                 fetch_certificates.push(self.sync.send_certificate_request(peer_ip, *certificate_id));
             }
