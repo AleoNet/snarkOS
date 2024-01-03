@@ -123,6 +123,11 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
+
+    /// Specify the IP address and port of the not trusted validator(s) to connect to
+    #[clap(default_value = "", long = "nottrustedvalidators")]
+    pub not_trusted_validators: String,
+    
 }
 
 impl Start {
@@ -174,6 +179,25 @@ impl Start {
                 .collect()),
         }
     }
+
+        /// Returns the initial not trusted validator(s) to connect to, from the given configurations.
+        fn parse_not_trusted_validators(&self) -> Result<Vec<SocketAddr>> {
+            match self.not_trusted_validators.is_empty() {
+                true => Ok(vec![]),
+                false => Ok(self
+                    .not_trusted_validators
+                    .split(',')
+                    .flat_map(|ip| match ip.parse::<SocketAddr>() {
+                        Ok(ip) => Some(ip),
+                        Err(e) => {
+                            eprintln!("The IP supplied to --nottrustedvalidators ('{ip}') is malformed: {e}");
+                            None
+                        }
+                    })
+                    .collect()),
+            }
+        }
+    
 
     /// Returns the initial validator(s) to connect to, from the given configurations.
     fn parse_trusted_validators(&self) -> Result<Vec<SocketAddr>> {
@@ -439,10 +463,12 @@ impl Start {
             metrics::initialize_metrics();
         }
 
+        let not_trusted_validators = self.parse_not_trusted_validators()?;
+
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, &not_trusted_validators, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, self.dev).await,
         }

@@ -44,12 +44,24 @@ impl<N: Network> Node<N> {
         rest_ip: Option<SocketAddr>,
         rest_rps: u32,
         account: Account<N>,
-        trusted_peers: &[SocketAddr],
+        _trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
+        not_trusted_validators: &[SocketAddr], // Add this parameter
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
+        // Filter out not trusted validators from trusted validators
+        let filtered_trusted_validators: Vec<SocketAddr> = trusted_validators
+        .iter()
+        .filter(|&addr| !not_trusted_validators.contains(addr))
+        .cloned()
+        .collect();
+
+        info!("_trusted_peers, not used: {:?}", _trusted_peers);
+        info!("trusted_validators: {:?}", trusted_validators);
+        info!("filtered_trusted_validators: {:?}", filtered_trusted_validators);
+    
         Ok(Self::Validator(Arc::new(
             Validator::new(
                 node_ip,
@@ -57,8 +69,8 @@ impl<N: Network> Node<N> {
                 rest_ip,
                 rest_rps,
                 account,
-                trusted_peers,
-                trusted_validators,
+                &[], // Pass an empty slice for trusted_peers
+                &filtered_trusted_validators, // Pass the filtered trusted validators
                 genesis,
                 cdn,
                 dev,
