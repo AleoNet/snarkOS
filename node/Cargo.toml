@@ -48,6 +48,9 @@ features = [ "sink" ]
 [dependencies.indexmap]
 version = "2.1"
 
+[dependencies.lru]
+version = "0.12.1"
+
 [dependencies.metrics]
 package = "snarkos-node-metrics"
 path = "./metrics"

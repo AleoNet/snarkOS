@@ -16,10 +16,10 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_bft::ledger_service::CoreLedgerService;
+use snarkos_node_bft::{ledger_service::CoreLedgerService, MAX_TRANSMISSIONS_PER_BATCH};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
-    messages::{Message, NodeType, UnconfirmedSolution},
+    messages::{Message, NodeType, UnconfirmedSolution, UnconfirmedTransaction},
     Heartbeat,
     Inbound,
     Outbound,
@@ -39,16 +39,26 @@ use snarkvm::{
         store::ConsensusStorage,
         Ledger,
     },
+    prelude::block::Transaction,
 };
 
 use anyhow::Result;
 use core::future::Future;
+use lru::LruCache;
 use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
+    num::NonZeroUsize,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed},
+        Arc,
+    },
 };
 use tokio::task::JoinHandle;
+
+const VERIFICATION_CONCURRENCY_LIMIT: usize = 6; // 8 deployments of MAX_NUM_CONSTRAINTS will run out of memory.
+
+type TransactionContents<N> = (SocketAddr, UnconfirmedTransaction<N>, Transaction<N>);
 
 /// A client node is a full node, capable of querying with the network.
 #[derive(Clone)]
@@ -65,6 +75,10 @@ pub struct Client<N: Network, C: ConsensusStorage<N>> {
     genesis: Block<N>,
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
+    /// The unconfirmed transactions queue.
+    transaction_queue: Arc<Mutex<LruCache<N::TransactionID, TransactionContents<N>>>>,
+    /// The amount of transactions being verified concurrently.
+    verification_counter: Arc<AtomicUsize>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -129,6 +143,10 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             sync: Arc::new(sync),
             genesis,
             coinbase_puzzle,
+            transaction_queue: Arc::new(Mutex::new(LruCache::new(
+                NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
+            ))),
+            verification_counter: Default::default(),
             handles: Default::default(),
             shutdown,
         };
@@ -141,6 +159,8 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         node.initialize_routing().await;
         // Initialize the sync module.
         node.initialize_sync();
+        // Initialize transaction verification.
+        node.initialize_transaction_verification();
         // Initialize the notification message loop.
         node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
@@ -168,7 +188,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
-                if node.shutdown.load(std::sync::atomic::Ordering::Relaxed) {
+                if node.shutdown.load(Relaxed) {
                     info!("Shutting down block production");
                     break;
                 }
@@ -177,6 +197,72 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 // Perform the sync routine.
                 node.sync.try_block_sync(&node).await;
+            }
+        }));
+    }
+
+    /// Initializes transaction verification.
+    fn initialize_transaction_verification(&self) {
+        // Start the transaction verification loop.
+        let node = self.clone();
+        self.handles.lock().push(tokio::spawn(async move {
+            loop {
+                // If the Ctrl-C handler registered the signal, stop the node.
+                if node.shutdown.load(Relaxed) {
+                    info!("Shutting down transaction verification");
+                    break;
+                }
+
+                // Sleep briefly to allow transactions to be validated.
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+                // Determine the length of the queue.
+                let queue_len = node.transaction_queue.lock().len();
+
+                // If we don't have any transactions to verify, try again later.
+                if queue_len == 0 {
+                    continue;
+                }
+
+                // Determine how many transactions we want to verify.
+                let num_transactions = VERIFICATION_CONCURRENCY_LIMIT.min(queue_len);
+
+                // Check if we have room to verify the transactions and update the counter accordingly.
+                let previous_verification_counter = node.verification_counter.fetch_update(Relaxed, Relaxed, |c| {
+                    // If we are already verifying sufficient transactions, don't verify any more for now.
+                    if c >= VERIFICATION_CONCURRENCY_LIMIT {
+                        None
+                    // If we have space to verify more transactions, verify as many as we can.
+                    } else {
+                        // Consider verifying the full transaction queue, but limit to the concurrency limit.
+                        Some((c + queue_len).min(VERIFICATION_CONCURRENCY_LIMIT))
+                    }
+                });
+
+                // Determine how many transactions we cán verify.
+                let num_transactions = match previous_verification_counter {
+                    // Determine how many transactions we can verify.
+                    Ok(previous_value) => num_transactions.saturating_sub(previous_value),
+                    // If we are already verifying sufficient transactions, don't verify any more for now.
+                    Err(_) => continue,
+                };
+
+                // For each transaction, spawn a task to verify it.
+                for _ in 0..num_transactions {
+                    if let Some((_, (peer_ip, serialized, transaction))) = node.transaction_queue.lock().pop_lru() {
+                        let _node = node.clone();
+                        tokio::spawn(async move {
+                            // Check the transaction.
+                            if _node.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok()
+                            {
+                                // Propagate the `UnconfirmedTransaction`.
+                                _node.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+                            }
+                            // Reduce the verification counter.
+                            _node.verification_counter.fetch_sub(1, Relaxed);
+                        });
+                    }
+                }
             }
         }));
     }
