@@ -67,6 +67,7 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
+    first_node_in_partition: bool,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
@@ -82,6 +83,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
+        first_node_in_partition: bool,
     ) -> Result<Self> {
         // Prepare the shutdown flag.
         let shutdown: Arc<AtomicBool> = Default::default();
@@ -136,9 +138,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             sync,
             handles: Default::default(),
             shutdown,
+            first_node_in_partition,
         };
         // Initialize the transaction pool.
-        node.initialize_transaction_pool(dev)?;
+        node.initialize_transaction_pool()?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
@@ -338,7 +341,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     // }
 
     /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self, dev: Option<u16>) -> Result<()> {
+    fn initialize_transaction_pool(&self) -> Result<()> {
         use snarkvm::console::{
             program::{Identifier, Literal, ProgramID, Value},
             types::U64,
@@ -348,29 +351,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Initialize the locator.
         let locator = (ProgramID::from_str("credits.aleo")?, Identifier::from_str("transfer_public")?);
 
-        // Determine whether to start the loop.
-        match dev {
-            // If the node is running in development mode, only generate if you are allowed.
-            Some(dev) => {
-                // If the node is not the first node, do not start the loop.
-                //if dev != 0 {
-                //    return Ok(());
-                //}
-            }
-            None => {
-                // Retrieve the genesis committee.
-                let Ok(Some(committee)) = self.ledger.get_committee_for_round(0) else {
-                    // If the genesis committee is not available, do not start the loop.
-                    return Ok(());
-                };
-                // Retrieve the first member.
-                // Note: It is guaranteed that the committee has at least one member.
-                let first_member = committee.members().first().unwrap().0;
-                // If the node is not the first member, do not start the loop.
-                if self.address() != *first_member {
-                    return Ok(());
-                }
-            }
+        // Determine whether to start the loop based on `first_node_in_partition`.
+        if !self.first_node_in_partition {
+            return Ok(());
         }
 
         let self_ = self.clone();

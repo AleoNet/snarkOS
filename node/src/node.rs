@@ -50,6 +50,7 @@ impl<N: Network> Node<N> {
         not_trusted_validators: &[SocketAddr], // Add this parameter
         cdn: Option<String>,
         dev: Option<u16>,
+        first_node_in_partition: bool,
     ) -> Result<Self> {
         // Filter out not trusted validators from trusted validators
         let filtered_trusted_validators: Vec<SocketAddr> = trusted_validators
@@ -74,6 +75,7 @@ impl<N: Network> Node<N> {
                 genesis,
                 cdn,
                 dev,
+                first_node_in_partition,
             )
             .await?,
         )))
