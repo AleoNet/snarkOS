@@ -80,7 +80,7 @@ pub struct Client<N: Network, C: ConsensusStorage<N>> {
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The unconfirmed transactions queue.
     transaction_queue: Arc<Mutex<LruCache<N::TransactionID, TransactionContents<N>>>>,
-    /// The amount of transactions being verified concurrently.
+    /// The amount of transactions currently being verified.
     verification_counter: Arc<AtomicUsize>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
