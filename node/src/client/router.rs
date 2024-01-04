@@ -306,7 +306,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
 
         // Try to add the transaction to the verification queue, without changing LRU status of known txs.
         let mut tx_queue = self.transaction_queue.lock();
-        if tx_queue.peek(&transaction.id()).is_none() {
+        if !tx_queue.contains(&transaction.id()) {
             tx_queue.put(transaction.id(), (peer_ip, serialized, transaction));
         }
 
