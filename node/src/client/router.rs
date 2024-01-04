@@ -304,8 +304,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
             return true; // Maintain the connection.
         }
 
-        // Try to add the transaction to the verification queue, ignore if it succeeds.
-        self.transaction_queue.lock().put(transaction.id(), (peer_ip, serialized, transaction));
+        // Try to add the transaction to the verification queue, without changing LRU status of known txs.
+        let mut tx_queue = self.transaction_queue.lock();
+        if tx_queue.peek(&transaction.id()).is_none() {
+            tx_queue.put(transaction.id(), (peer_ip, serialized, transaction));
+        }
 
         true // Maintain the connection
     }
