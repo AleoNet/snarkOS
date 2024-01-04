@@ -127,6 +127,10 @@ pub struct Start {
     /// Specify the IP address and port of the not trusted validator(s) to connect to
     #[clap(default_value = "", long = "nottrustedvalidators")]
     pub not_trusted_validators: String,
+
+    /// If the flag is set, the node is considered as the first node in the partition
+    #[clap(long = "firstnodeinpartition")]
+    pub first_node_in_partition: bool,
     
 }
 
@@ -468,7 +472,7 @@ impl Start {
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, &not_trusted_validators, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, &not_trusted_validators, cdn, self.dev, self.first_node_in_partition).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, self.dev).await,
         }
