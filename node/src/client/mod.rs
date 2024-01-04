@@ -53,8 +53,9 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed},
         Arc,
     },
+    time::Duration,
 };
-use tokio::task::JoinHandle;
+use tokio::{task::JoinHandle, time::sleep};
 
 const VERIFICATION_CONCURRENCY_LIMIT: usize = 6; // 8 deployments of MAX_NUM_CONSTRAINTS will run out of memory.
 
@@ -215,23 +216,30 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                     break;
                 }
 
-                // Sleep briefly to allow transactions to be validated.
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
-                // Determine the length of the queue.
+                // Determine the current length of the queue and counter.
                 let queue_len = node.transaction_queue.lock().len();
+                let counter = node.verification_counter.load(Relaxed);
 
-                // If we don't have any transactions to verify, try again later.
-                if queue_len == 0 {
-                    continue;
-                }
+                // Sleep to allow the queue to be filled and transactions to be validated.
+                match (queue_len, counter) {
+                    // If the queue is empty, sleep longer and retry.
+                    (0, _) => {
+                        sleep(Duration::from_millis(500)).await;
+                        continue;
+                    }
+                    // If the counter is 0, we can verify transactions immediately.
+                    (_, 0) => {}
+                    // Otherwise, sleep briefly to let transactions be verified.
+                    _ => sleep(Duration::from_millis(50)).await,
+                };
 
                 // Determine how many transactions we want to verify.
+                let queue_len = node.transaction_queue.lock().len();
                 let num_transactions = VERIFICATION_CONCURRENCY_LIMIT.min(queue_len);
 
                 // Check if we have room to verify the transactions and update the counter accordingly.
                 let previous_verification_counter = node.verification_counter.fetch_update(Relaxed, Relaxed, |c| {
-                    // If we are already verifying sufficient transactions, don't verify any more for now.
+                    // If we are still verifying sufficient transactions, don't verify any more for now.
                     if c >= VERIFICATION_CONCURRENCY_LIMIT {
                         None
                     // If we have space to verify more transactions, verify as many as we can.
