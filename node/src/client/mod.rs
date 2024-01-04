@@ -216,26 +216,20 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                     break;
                 }
 
-                // Determine the current length of the queue and counter.
-                let queue_len = node.transaction_queue.lock().len();
-                let counter = node.verification_counter.load(Relaxed);
+                // Determine if the queue contains txs to verify.
+                let queue_is_empty = node.transaction_queue.lock().is_empty();
+                // Determine if our verification counter has space to verify new txs.
+                let counter_is_full = node.verification_counter.load(Relaxed) >= VERIFICATION_CONCURRENCY_LIMIT;
 
-                // Sleep to allow the queue to be filled and transactions to be validated.
-                match (queue_len, counter) {
-                    // If the queue is empty, sleep longer and retry.
-                    (0, _) => {
-                        sleep(Duration::from_millis(500)).await;
-                        continue;
-                    }
-                    // If the counter is 0, we can verify transactions immediately.
-                    (_, 0) => {}
-                    // Otherwise, sleep briefly to let transactions be verified.
-                    _ => sleep(Duration::from_millis(50)).await,
-                };
+                // Sleep to allow the queue to be filled or transactions to be validated.
+                if queue_is_empty || counter_is_full {
+                    sleep(Duration::from_millis(50)).await;
+                    continue;
+                }
 
                 // Determine how many transactions we want to verify.
                 let queue_len = node.transaction_queue.lock().len();
-                let num_transactions = VERIFICATION_CONCURRENCY_LIMIT.min(queue_len);
+                let num_transactions = queue_len.min(VERIFICATION_CONCURRENCY_LIMIT);
 
                 // Check if we have room to verify the transactions and update the counter accordingly.
                 let previous_verification_counter = node.verification_counter.fetch_update(Relaxed, Relaxed, |c| {
@@ -244,8 +238,8 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                         None
                     // If we have space to verify more transactions, verify as many as we can.
                     } else {
-                        // Consider verifying the full transaction queue, but limit to the concurrency limit.
-                        Some((c + queue_len).min(VERIFICATION_CONCURRENCY_LIMIT))
+                        // Consider verifying all desired txs, but limit to the concurrency limit.
+                        Some((c + num_transactions).min(VERIFICATION_CONCURRENCY_LIMIT))
                     }
                 });
 
