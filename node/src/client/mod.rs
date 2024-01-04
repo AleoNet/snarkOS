@@ -58,6 +58,8 @@ use tokio::task::JoinHandle;
 
 const VERIFICATION_CONCURRENCY_LIMIT: usize = 6; // 8 deployments of MAX_NUM_CONSTRAINTS will run out of memory.
 
+/// Transaction details needed for propagation.
+/// We preserve the serialized transaction for faster propagation.
 type TransactionContents<N> = (SocketAddr, UnconfirmedTransaction<N>, Transaction<N>);
 
 /// A client node is a full node, capable of querying with the network.
