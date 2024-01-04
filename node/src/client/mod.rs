@@ -250,8 +250,9 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                 };
 
                 // For each transaction, spawn a task to verify it.
+                let mut tx_queue = node.transaction_queue.lock();
                 for _ in 0..num_transactions {
-                    if let Some((_, (peer_ip, serialized, transaction))) = node.transaction_queue.lock().pop_lru() {
+                    if let Some((_, (peer_ip, serialized, transaction))) = tx_queue.pop_lru() {
                         let _node = node.clone();
                         tokio::spawn(async move {
                             // Check the transaction.
