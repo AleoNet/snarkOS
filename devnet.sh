@@ -51,13 +51,12 @@ for validator_index in "${validator_indices[@]}"; do
   # Generate a unique and incrementing log file name based on the validator index
   log_file="$log_dir/validator-$validator_index.log"
 
-  # Create a new window with a unique name
-  tmux new-window -t "devnet:$validator_index" -n "window$validator_index"
-
   # Send the command to start the validator to the new window and capture output to the log file
   if [ "$validator_index" -eq 0 ]; then
     tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file --metrics" C-m
   else
+    # Create a new window with a unique name
+    tmux new-window -t "devnet:$validator_index" -n "window$validator_index"
     tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
   fi
 done
