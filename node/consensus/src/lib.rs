@@ -481,10 +481,7 @@ mod tests {
         let fee_amounts = [100_000, 200_000, 300_000, 300_000];
         let priority_fees = fee_amounts.into_iter().map(U64::new).collect_vec();
 
-        // Sample Genesis Block.
-        // let block = sample_genesis_block(rng);
-        // Retrieve transactions.
-        // let transactions = block.transactions().iter().take(4).collect_vec();
+        // Sample Transactions
         let transactions = (0..4).map(|_| sample_deployment_transaction(false, rng)).collect_vec();
 
         // Save Transaction ids.
