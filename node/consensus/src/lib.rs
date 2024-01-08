@@ -22,6 +22,7 @@ use snarkos_node_bft::{
     helpers::{
         fmt_id,
         init_consensus_channels,
+        now,
         ConsensusReceiver,
         PrimaryReceiver,
         PrimarySender,
@@ -48,11 +49,15 @@ use colored::Colorize;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
+use std::{collections::BTreeMap, future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
 };
+
+type PriorityFee<N> = U64<N>;
+type Timestamp = i64;
+type TransactionKey<N> = (PriorityFee<N>, Timestamp);
 
 #[derive(Clone)]
 pub struct Consensus<N: Network> {
@@ -65,7 +70,7 @@ pub struct Consensus<N: Network> {
     /// The unconfirmed solutions queue.
     solutions_queue: Arc<Mutex<IndexMap<PuzzleCommitment<N>, ProverSolution<N>>>>,
     /// The unconfirmed transactions queue.
-    transactions_queue: Arc<Mutex<IndexMap<N::TransactionID, Transaction<N>>>>,
+    transactions_queue: Arc<Mutex<BTreeMap<TransactionKey<N>, Transaction<N>>>>,
     /// The recently-seen unconfirmed solutions.
     seen_solutions: Arc<Mutex<LruCache<PuzzleCommitment<N>, ()>>>,
     /// The recently-seen unconfirmed transactions.
@@ -234,10 +239,6 @@ impl<N: Network> Consensus<N> {
         {
             let transaction_id = transaction.id();
 
-            // Check that the transaction is not a fee transaction.
-            if transaction.is_fee() {
-                bail!("Transaction '{}' is a fee transaction {}", fmt_id(transaction_id), "(skipping)".dimmed());
-            }
             // Check if the transaction was recently seen.
             if self.seen_transactions.lock().put(transaction_id, ()).is_some() {
                 // If the transaction was recently seen, return early.
@@ -247,9 +248,20 @@ impl<N: Network> Consensus<N> {
             if self.ledger.contains_transmission(&TransmissionID::from(&transaction_id))? {
                 bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
-            // Add the transaction to the memory pool.
+            // Get the priority_fee amount from the Deploy or Execute Transaction. Fee Transactions are not expected here.
+            let priority_fee = match &transaction {
+                Transaction::Deploy(_, _, _, fee) => fee.priority_amount()?,
+                Transaction::Execute(_, _, Some(fee)) => fee.priority_amount()?,
+                Transaction::Execute(_, _, None) => U64::new(0),
+                Transaction::Fee(..) => {
+                    bail!("Transaction '{}' is a fee transaction {}", fmt_id(transaction_id), "(skipping)".dimmed());
+                }
+            };
+            // Get the current timestamp
+            let timestamp = now();
+            // Add the transaction to the memory pool, ordered by priority_fee and oldest timestamp.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
-            if self.transactions_queue.lock().insert(transaction_id, transaction).is_some() {
+            if self.transactions_queue.lock().insert((priority_fee, -timestamp), transaction).is_some() {
                 bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
             }
         }
@@ -267,8 +279,8 @@ impl<N: Network> Consensus<N> {
             let mut queue = self.transactions_queue.lock();
             // Determine the number of transactions to send.
             let num_transactions = queue.len().min(capacity);
-            // Drain the solutions from the queue.
-            queue.drain(..num_transactions).collect::<Vec<_>>()
+            // Pop the transactions from the queue.
+            (0..num_transactions).map(|_| queue.pop_last().unwrap()).collect::<Vec<_>>()
         };
         // Iterate over the transactions.
         for (_, transaction) in transactions.into_iter() {
@@ -402,5 +414,42 @@ impl<N: Network> Consensus<N> {
         self.bft.shut_down().await;
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use snarkvm::console::{network::Testnet3, types::U64};
+    use std::collections::BTreeMap;
+
+    use crate::{now, PriorityFee, Timestamp};
+
+    #[test]
+    fn test_transactions_queue_ordering() {
+        let mut queue = BTreeMap::new();
+
+        // Get some timestamps
+        let timestamp_1: Timestamp = now();
+        let timestamp_2: Timestamp = now() + 100;
+
+        // Get some fees
+        let fee_1: PriorityFee<Testnet3> = U64::new(100_000);
+        let fee_2: PriorityFee<Testnet3> = U64::new(200_000);
+        let fee_3: PriorityFee<Testnet3> = U64::new(300_000);
+
+        // Insert some supposed transactions into the queue.
+        queue.insert((fee_1, -timestamp_2), "first");
+        queue.insert((fee_2, -timestamp_1), "second");
+        queue.insert((fee_3, -timestamp_1), "third");
+        queue.insert((fee_3, -timestamp_2), "fourth");
+
+        // Check that all entries are in the map.
+        assert!(queue.len() == 4);
+        // When the fee is the same, the oldest timestamp is popped first.
+        assert_eq!(queue.pop_last(), Some(((fee_3, -timestamp_1), "third")));
+        // When the fee is different, the highest fee is popped first.
+        assert_eq!(queue.pop_last(), Some(((fee_3, -timestamp_2), "fourth")));
+        assert_eq!(queue.pop_last(), Some(((fee_2, -timestamp_1), "second")));
+        assert_eq!(queue.pop_last(), Some(((fee_1, -timestamp_2), "first")));
     }
 }
