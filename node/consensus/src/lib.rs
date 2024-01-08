@@ -57,7 +57,8 @@ use tokio::{
 
 type PriorityFee<N> = U64<N>;
 type Timestamp = i64;
-type TransactionKey<N> = (PriorityFee<N>, Timestamp);
+// Transactions are sorted by PriorityFee first, oldest Timestamp second, and TransactionID last.
+type TransactionKey<N> = (PriorityFee<N>, Timestamp, <N as Network>::TransactionID);
 
 #[derive(Clone)]
 pub struct Consensus<N: Network> {
@@ -257,11 +258,9 @@ impl<N: Network> Consensus<N> {
                     bail!("Transaction '{}' is a fee transaction {}", fmt_id(transaction_id), "(skipping)".dimmed());
                 }
             };
-            // Get the current timestamp
-            let timestamp = now();
             // Add the transaction to the memory pool, ordered by priority_fee and oldest timestamp.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
-            if self.transactions_queue.lock().insert((priority_fee, -timestamp), transaction).is_some() {
+            if self.add_transaction_to_queue(priority_fee, transaction_id, transaction).is_some() {
                 bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
             }
         }
@@ -275,16 +274,11 @@ impl<N: Network> Consensus<N> {
         let transactions = {
             // Determine the available capacity.
             let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
-            // Acquire the lock on the queue.
-            let mut queue = self.transactions_queue.lock();
-            // Determine the number of transactions to send.
-            let num_transactions = queue.len().min(capacity);
             // Pop the transactions from the queue.
-            (0..num_transactions).map(|_| queue.pop_last().unwrap()).collect::<Vec<_>>()
+            self.pop_transactions_from_queue(capacity)
         };
         // Iterate over the transactions.
-        for (_, transaction) in transactions.into_iter() {
-            let transaction_id = transaction.id();
+        for ((_, _, transaction_id), transaction) in transactions.into_iter() {
             trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
             // Send the unconfirmed transaction to the primary.
             if let Err(e) =
@@ -294,6 +288,29 @@ impl<N: Network> Consensus<N> {
             }
         }
         Ok(())
+    }
+
+    /// Adds the given unconfirmed transaction to the transaction_queue
+    fn add_transaction_to_queue(
+        &self,
+        priority_fee: PriorityFee<N>,
+        id: N::TransactionID,
+        transaction: Transaction<N>,
+    ) -> Option<Transaction<N>> {
+        // Get the current timestamp.
+        let timestamp = now();
+        // Add the Transaction to the queue.
+        self.transactions_queue.lock().insert((priority_fee, -timestamp, id), transaction)
+    }
+
+    /// Pops an unconfirmed transaction from the transaction_queue
+    fn pop_transactions_from_queue(&self, capacity: usize) -> Vec<(TransactionKey<N>, Transaction<N>)> {
+        // Acquire the lock on the queue.
+        let mut queue = self.transactions_queue.lock();
+        // Determine the number of transactions to send.
+        let num_transactions = queue.len().min(capacity);
+        // Pop the transactions from the queue.
+        (0..num_transactions).map(|_| queue.pop_last().unwrap()).collect::<Vec<_>>()
     }
 }
 
@@ -419,37 +436,89 @@ impl<N: Network> Consensus<N> {
 
 #[cfg(test)]
 mod tests {
-    use snarkvm::console::{network::Testnet3, types::U64};
-    use std::collections::BTreeMap;
+    use indexmap::IndexMap;
+    use snarkos_account::Account;
+    use snarkos_node_bft_ledger_service::MockLedgerService;
+    use snarkvm::{
+        console::{
+            network::Testnet3,
+            types::{Address, U64},
+        },
+        ledger::{committee::Committee, ledger_test_helpers::sample_deployment_transaction},
+        prelude::{Itertools, Uniform},
+        utilities::TestRng,
+    };
+    use std::sync::Arc;
 
-    use crate::{now, PriorityFee, Timestamp};
+    use crate::Consensus;
+
+    type CurrentNetwork = Testnet3;
 
     #[test]
     fn test_transactions_queue_ordering() {
-        let mut queue = BTreeMap::new();
+        let rng = &mut TestRng::default();
 
-        // Get some timestamps
-        let timestamp_1: Timestamp = now();
-        let timestamp_2: Timestamp = now() + 100;
+        // Sample a committee and mock ledger service.
+        let num_validators = 3;
+        let minimum_stake = 1000000000000;
+        let accepts_delegators = true;
+        let members = (0..num_validators)
+            .map(|_| (Address::<CurrentNetwork>::rand(rng), (minimum_stake, accepts_delegators)))
+            .collect::<IndexMap<_, _>>();
+        let committee = Committee::<CurrentNetwork>::new(0, members).unwrap();
+        let ledger = Arc::new(MockLedgerService::new(committee));
 
-        // Get some fees
-        let fee_1: PriorityFee<Testnet3> = U64::new(100_000);
-        let fee_2: PriorityFee<Testnet3> = U64::new(200_000);
-        let fee_3: PriorityFee<Testnet3> = U64::new(300_000);
+        // Create Consensus.
+        let consensus =
+            Consensus::<CurrentNetwork>::new(Account::new(rng).unwrap(), ledger, Default::default(), &[], None)
+                .unwrap();
 
-        // Insert some supposed transactions into the queue.
-        queue.insert((fee_1, -timestamp_2), "first");
-        queue.insert((fee_2, -timestamp_1), "second");
-        queue.insert((fee_3, -timestamp_1), "third");
-        queue.insert((fee_3, -timestamp_2), "fourth");
+        // Sample priority_fees.
+        let fee_amounts = [100_000, 200_000, 300_000, 300_000];
+        let priority_fees = fee_amounts.into_iter().map(U64::new).collect_vec();
 
-        // Check that all entries are in the map.
-        assert!(queue.len() == 4);
+        // Sample Genesis Block.
+        // let block = sample_genesis_block(rng);
+        // Retrieve transactions.
+        // let transactions = block.transactions().iter().take(4).collect_vec();
+        let transactions = (0..4).map(|_| sample_deployment_transaction(false, rng)).collect_vec();
+
+        // Save Transaction ids.
+        let transaction_ids = transactions.iter().map(|t| t.id()).collect_vec();
+
+        // Insert Transactions into the queue with sleeps.
+        println!("transactions.len() = {}", transactions.len());
+        println!("priority_fees.len() = {}", priority_fees.len());
+        for (tx, priority_fee) in transactions.iter().zip_eq(priority_fees.iter()) {
+            assert!(consensus.add_transaction_to_queue(*priority_fee, tx.id(), tx.clone()).is_none());
+            // Sleep for 1 second.
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+
         // When the fee is the same, the oldest timestamp is popped first.
-        assert_eq!(queue.pop_last(), Some(((fee_3, -timestamp_1), "third")));
         // When the fee is different, the highest fee is popped first.
-        assert_eq!(queue.pop_last(), Some(((fee_3, -timestamp_2), "fourth")));
-        assert_eq!(queue.pop_last(), Some(((fee_2, -timestamp_1), "second")));
-        assert_eq!(queue.pop_last(), Some(((fee_1, -timestamp_2), "first")));
+        // So we expect the above transactions to be popped in order 2, 3, 1, 0.
+        let expected_ids = [2, 3, 1, 0];
+        for expected_id in expected_ids {
+            let mut transactions = consensus.pop_transactions_from_queue(1);
+            assert_eq!(transactions.len(), 1);
+            let (priority_fee, _, id) = transactions.pop().unwrap().0;
+            assert_eq!(priority_fee, priority_fees[expected_id]);
+            assert_eq!(id, transaction_ids[expected_id]);
+        }
+
+        // If the queue is empty, no transactions are popped.
+        assert!(consensus.transactions_queue.lock().is_empty());
+        let queue_is_empty = consensus.pop_transactions_from_queue(1).is_empty();
+        assert!(queue_is_empty);
+
+        // Insert Transactions into the queue without sleeps.
+        for (tx, priority_fee) in transactions.iter().zip_eq(priority_fees.iter()) {
+            assert!(consensus.add_transaction_to_queue(*priority_fee, tx.id(), tx.clone()).is_none());
+        }
+        // We expect all transactions to be in the queue, with unknown order because of similar timestamps.
+        let transactions = consensus.pop_transactions_from_queue(4);
+        assert_eq!(transactions.len(), 4);
+        assert!(consensus.transactions_queue.lock().is_empty());
     }
 }
