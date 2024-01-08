@@ -240,6 +240,10 @@ impl<N: Network> Consensus<N> {
         {
             let transaction_id = transaction.id();
 
+            // Check that the transaction is not a fee transaction.
+            if transaction.is_fee() {
+                bail!("Transaction '{}' is a fee transaction {}", fmt_id(transaction_id), "(skipping)".dimmed());
+            }
             // Check if the transaction was recently seen.
             if self.seen_transactions.lock().put(transaction_id, ()).is_some() {
                 // If the transaction was recently seen, return early.
