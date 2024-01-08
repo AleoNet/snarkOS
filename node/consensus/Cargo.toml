@@ -57,7 +57,7 @@ version = "=2.2.7"
 path = "../bft/ledger-service"
 version = "=2.2.7"
 default-features = false
-features = [ "ledger", "ledger-write", "test" ]
+features = [ "ledger", "ledger-write" ]
 
 [dependencies.snarkos-node-bft-storage-service]
 path = "../bft/storage-service"
@@ -90,3 +90,9 @@ version = "0.2"
 [dev-dependencies.snarkvm]
 workspace = true
 features = [ "test-helpers" ]
+
+[dev-dependencies.snarkos-node-bft-ledger-service]
+path = "../bft/ledger-service"
+version = "=2.2.7"
+default-features = false
+features = [ "test" ]
