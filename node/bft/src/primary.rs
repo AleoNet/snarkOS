@@ -717,24 +717,13 @@ impl<N: Network> Primary<N> {
         // Retrieve the batch certificate author.
         let author = certificate.author();
 
-        // Ensure the batch certificate is from the validator.
-        match self.gateway.resolver().get_address(peer_ip) {
-            // If the peer is a validator, then ensure the batch certificate is from the validator.
-            Some(address) => {
-                if address != author {
-                    // Proceed to disconnect the validator.
-                    self.gateway.disconnect(peer_ip);
-                    bail!("Malicious peer - batch certificate from a different validator ({author})");
-                }
-            }
-            None => bail!("Batch certificate from a disconnected validator"),
-        }
-        // Ensure the batch certificate is authored by a current committee member.
-        if !self.gateway.is_authorized_validator_address(author) {
+        // Ensure the batch certificate is from an authorized validator. 
+        if !self.gateway.is_authorized_validator_ip(peer_ip) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
-            bail!("Malicious peer - Received a batch certificate from a non-committee member ({author})");
+            bail!("Malicious peer - Received a batch certificate from a non-authorized validator ({author})");
         }
+
         // Ensure the batch certificate is not from the current primary.
         if self.gateway.account().address() == author {
             bail!("Received a batch certificate for myself ({author})");
@@ -789,11 +778,11 @@ impl<N: Network> Primary<N> {
         // Retrieve the batch certificate author.
         let author = certificate.author();
 
-        // Ensure the batch certificate is authored by a current committee member.
-        if !self.gateway.is_authorized_validator_address(author) {
+        // Ensure the batch certificate is from an authorized validator. 
+        if !self.gateway.is_authorized_validator_ip(peer_ip) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
-            bail!("Malicious peer - Received a batch certificate from a non-committee member ({author})");
+            bail!("Malicious peer - Received a batch certificate from a non-authorized validator ip ({author})");
         }
 
         // Store the certificate, after ensuring it is valid.
