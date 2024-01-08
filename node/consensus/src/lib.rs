@@ -488,8 +488,6 @@ mod tests {
         let transaction_ids = transactions.iter().map(|t| t.id()).collect_vec();
 
         // Insert Transactions into the queue with sleeps.
-        println!("transactions.len() = {}", transactions.len());
-        println!("priority_fees.len() = {}", priority_fees.len());
         for (tx, priority_fee) in transactions.iter().zip_eq(priority_fees.iter()) {
             assert!(consensus.add_transaction_to_queue(*priority_fee, tx.id(), tx.clone()).is_none());
             // Sleep for 1 second.
