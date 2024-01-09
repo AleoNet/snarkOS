@@ -12,8 +12,8 @@ total_clients=${total_clients:-2}
 read -p "Do you want to run 'cargo install --path .' to build the binary? (y/n, default: y): " build_binary
 build_binary=${build_binary:-y}
 
-# Ask the user whether to clear the existing .ledger directories
-read -p "Do you want to clear the existing .ledger directories? (y/n, default: n): " clear_ledger
+# Ask the user whether to clear the existing ledger history
+read -p "Do you want to clear the existing ledger history? (y/n, default: n): " clear_ledger
 clear_ledger=${clear_ledger:-n}
 
 if [[ $build_binary == "y" ]]; then
