@@ -52,7 +52,6 @@ validator_indices=($(seq 0 $((total_validators - 1))))
 
 # Loop through the list of validator indices and create a new window for each
 for validator_index in "${validator_indices[@]}"; do
-
   # Generate a unique and incrementing log file name based on the validator index
   log_file="$log_dir/validator-$validator_index.log"
 
