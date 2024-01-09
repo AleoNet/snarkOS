@@ -81,7 +81,7 @@ impl Developer {
     }
 
     /// Parse the package from the directory.
-    fn parse_package(program_id: ProgramID<CurrentNetwork>, path: Option<String>) -> Result<Package<CurrentNetwork>> {
+    fn parse_package(program_id: ProgramID<CurrentNetwork>, path: &Option<String>) -> Result<Package<CurrentNetwork>> {
         // Instantiate a path to the directory containing the manifest file.
         let directory = match path {
             Some(path) => PathBuf::from_str(&path)?,
@@ -167,9 +167,9 @@ impl Developer {
 
     /// Determine if the transaction should be broadcast or displayed to user.
     fn handle_transaction(
-        broadcast: Option<String>,
+        broadcast: &Option<String>,
         dry_run: bool,
-        store: Option<String>,
+        store: &Option<String>,
         transaction: Transaction<CurrentNetwork>,
         operation: String,
     ) -> Result<String> {

@@ -31,6 +31,7 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
+use zeroize::Zeroize;
 
 /// Deploys an Aleo program.
 #[derive(Debug, Parser)]
@@ -63,6 +64,13 @@ pub struct Deploy {
     store: Option<String>,
 }
 
+impl Drop for Deploy {
+    /// Zeroize the private key when the `Deploy` struct goes out of scope.
+    fn drop(&mut self) {
+        self.private_key.zeroize();
+    }
+}
+
 impl Deploy {
     /// Deploys an Aleo program.
     pub fn parse(self) -> Result<String> {
@@ -78,7 +86,7 @@ impl Deploy {
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
         // Fetch the package from the directory.
-        let package = Developer::parse_package(self.program_id, self.path)?;
+        let package = Developer::parse_package(self.program_id, &self.path)?;
 
         println!("📦 Creating deployment transaction for '{}'...\n", &self.program_id.to_string().bold());
 
@@ -133,9 +141,9 @@ impl Deploy {
 
         // Determine if the transaction should be broadcast, stored, or displayed to the user.
         Developer::handle_transaction(
-            self.broadcast,
+            &self.broadcast,
             self.dry_run,
-            self.store,
+            &self.store,
             transaction,
             self.program_id.to_string(),
         )
