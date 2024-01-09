@@ -47,6 +47,13 @@ mkdir -p "$log_dir"
 # Create a new tmux session named "devnet"
 tmux new-session -d -s "devnet" -n "window0"
 
+# Get the tmux's base-index for windows
+# we have to create all windows with index offseted by this much
+index_offset="$(tmux show-option -gv base-index)"
+if [ -z "$index_offset" ]; then
+  index_offset=0
+fi
+
 # Generate validator indices from 0 to (total_validators - 1)
 validator_indices=($(seq 0 $((total_validators - 1))))
 
@@ -55,13 +62,13 @@ for validator_index in "${validator_indices[@]}"; do
   # Generate a unique and incrementing log file name based on the validator index
   log_file="$log_dir/validator-$validator_index.log"
 
-  # Create a new window with a unique name
-  tmux new-window -t "devnet:$validator_index" -n "window$validator_index"
-
   # Send the command to start the validator to the new window and capture output to the log file
   if [ "$validator_index" -eq 0 ]; then
     tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file --metrics" C-m
   else
+    # Create a new window with a unique name
+    window_index=$((validator_index + index_offset))
+    tmux new-window -t "devnet:$window_index" -n "window$validator_index"
     tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
   fi
 done
@@ -74,7 +81,7 @@ for client_index in "${client_indices[@]}"; do
   # Generate a unique and incrementing log file name based on the client index
   log_file="$log_dir/client-$client_index.log"
 
-  window_index=$(($client_index + $total_validators))
+  window_index=$((client_index + total_validators + index_offset))
 
   # Create a new window with a unique name
   tmux new-window -t "devnet:$window_index" -n "window-$window_index"
