@@ -59,6 +59,9 @@ version = "1.0.77"
 version = "4.4"
 features = [ "derive" ]
 
+[dependencies.crossterm]
+version = "0.27.0"
+
 [dependencies.once_cell]
 version = "1"
 

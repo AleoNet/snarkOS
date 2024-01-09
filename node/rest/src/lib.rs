@@ -156,6 +156,9 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/transaction/confirmed/:id", get(Self::get_confirmed_transaction))
             .route("/testnet3/transaction/broadcast", post(Self::transaction_broadcast))
 
+            // POST ../solution/broadcast
+            .route("/testnet3/solution/broadcast", post(Self::solution_broadcast))
+
             // GET ../find/..
             .route("/testnet3/find/blockHash/:tx_id", get(Self::find_block_hash))
             .route("/testnet3/find/transactionID/deployment/:program_id", get(Self::find_transaction_id_from_program_id))
