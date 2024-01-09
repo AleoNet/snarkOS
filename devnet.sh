@@ -4,21 +4,25 @@
 read -p "Enter the total number of validators (default: 4): " total_validators
 total_validators=${total_validators:-4}
 
+# Read the total number of clients from the user or use a default value of 2
+read -p "Enter the total number of clients (default: 2): " total_clients
+total_clients=${total_clients:-2}
+
 # Ask the user if they want to run 'cargo install --path .' or use a pre-installed binary
 read -p "Do you want to run 'cargo install --path .' to build the binary? (y/n, default: y): " build_binary
 build_binary=${build_binary:-y}
 
-# Ask the user whether to clear the existing ledger logs
-read -p "Do you want to clear the existing ledger logs? (y/n, default: n): " clear_logs
-clear_logs=${clear_logs:-n}
+# Ask the user whether to clear the existing ledger history
+read -p "Do you want to clear the existing ledger history? (y/n, default: n): " clear_ledger
+clear_ledger=${clear_ledger:-n}
 
 if [[ $build_binary == "y" ]]; then
   # Build the binary using 'cargo install --path .'
   cargo install --path . || exit 1
 fi
 
-# Clear the ledger logs for each validator if the user chooses to clear logs
-if [[ $clear_logs == "y" ]]; then
+# Clear the ledger logs for each validator if the user chooses to clear ledger
+if [[ $clear_ledger == "y" ]]; then
   # Create an array to store background processes
   clean_processes=()
 
@@ -60,6 +64,23 @@ for validator_index in "${validator_indices[@]}"; do
   else
     tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
   fi
+done
+
+# Generate client indices from 0 to (total_clients - 1)
+client_indices=($(seq 0 $((total_clients - 1))))
+
+# Loop through the list of client indices and create a new window for each
+for client_index in "${client_indices[@]}"; do
+  # Generate a unique and incrementing log file name based on the client index
+  log_file="$log_dir/client-$client_index.log"
+
+  window_index=$(($client_index + $total_validators))
+
+  # Create a new window with a unique name
+  tmux new-window -t "devnet:$window_index" -n "window-$window_index"
+
+  # Send the command to start the validator to the new window and capture output to the log file
+  tmux send-keys -t "devnet:window-$window_index" "snarkos start --nodisplay --dev $window_index --client --logfile $log_file" C-m
 done
 
 # Attach to the tmux session to view and interact with the windows
