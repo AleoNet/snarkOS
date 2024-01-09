@@ -53,7 +53,7 @@ jemalloc = [ "tikv-jemallocator" ]
 metrics = [ "snarkos-node-metrics", "snarkos-node/metrics" ]
 
 [dependencies.anyhow]
-version = "1.0.77"
+version = "1.0.79"
 
 [dependencies.clap]
 version = "4.4"

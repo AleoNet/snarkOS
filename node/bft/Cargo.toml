@@ -21,7 +21,7 @@ default = [ ]
 metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics" ]
 
 [dependencies.anyhow]
-version = "1.0.77"
+version = "1.0.79"
 
 [dependencies.async-recursion]
 version = "1.0"

@@ -21,7 +21,7 @@ default = [ "parallel" ]
 parallel = [ "rayon" ]
 
 [dependencies.anyhow]
-version = "1.0.77"
+version = "1.0.79"
 
 [dependencies.backoff]
 version = "0.4"
