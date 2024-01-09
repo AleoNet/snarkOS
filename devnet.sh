@@ -81,7 +81,7 @@ for client_index in "${client_indices[@]}"; do
   # Generate a unique and incrementing log file name based on the client index
   log_file="$log_dir/client-$client_index.log"
 
-  window_index=$(($client_index + $total_validators))
+  window_index=$((client_index + total_validators + index_offset))
 
   # Create a new window with a unique name
   tmux new-window -t "devnet:$window_index" -n "window-$window_index"
