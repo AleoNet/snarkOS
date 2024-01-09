@@ -41,7 +41,7 @@ pub enum Account {
         /// Try until an address with the vanity string is found
         #[clap(short = 'v', long)]
         vanity: Option<String>,
-        /// Print sensitive information(such as private key) discreetly to an alternate screen
+        /// Print sensitive information (such as the private key) discreetly in an alternate screen
         #[clap(long)]
         discreet: bool,
     },
