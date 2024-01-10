@@ -747,6 +747,14 @@ impl<N: Network> Primary<N> {
         // Check if the certificates have reached the quorum threshold.
         let is_quorum = previous_committee.is_quorum_threshold_reached(&authors);
 
+        //If quorum is reached, clear the proposed batch before advancing to the next round. 
+        if is_quorum { 
+            // Reset the proposed batch.
+            let proposal = self.proposed_batch.write().take();
+            if let Some(proposal) = proposal {
+                self.reinsert_transmissions_into_workers(proposal)?;
+            }
+        }
         // Determine if we are currently proposing a round.
         // Note: This is important, because while our peers have advanced,
         // they may not be proposing yet, and thus still able to sign our proposed batch.
