@@ -1322,7 +1322,7 @@ impl<N: Network> Primary<N> {
         // If our primary is far behind the peer, update our committee to the batch round.
         if is_behind_schedule || is_peer_far_in_future {
             // If the batch round is greater than the current committee round, update the committee.
-            self.try_increment_to_the_next_round(batch_round).await?;
+            self.try_increment_to_the_next_round(batch_round + 1).await?;
         }
 
         // Ensure the primary has all of the previous certificates.
