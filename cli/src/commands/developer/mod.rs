@@ -208,14 +208,14 @@ impl Developer {
                     match transaction {
                         Transaction::Deploy(..) => {
                             println!(
-                                "✅ Successfully broadcast deployment {transaction_id} ('{}') to {}.",
+                                "⌛ Deployment {transaction_id} ('{}') has been broadcast to {}.",
                                 operation.bold(),
                                 endpoint
                             )
                         }
                         Transaction::Execute(..) => {
                             println!(
-                                "✅ Successfully broadcast execution {transaction_id} ('{}') to {}.",
+                                "⌛ Execution {transaction_id} ('{}') has been broadcast to {}.",
                                 operation.bold(),
                                 endpoint
                             )
