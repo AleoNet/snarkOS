@@ -12,18 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{io, net::SocketAddr};
-
-use async_trait::async_trait;
-use bytes::BytesMut;
-use futures_util::StreamExt;
-use tokio::{
-    io::AsyncRead,
-    sync::{mpsc, oneshot},
-};
-use tokio_util::codec::{Decoder, FramedRead};
-use tracing::*;
-
 #[cfg(doc)]
 use crate::{protocols::Handshake, Config};
 use crate::{
@@ -32,6 +20,17 @@ use crate::{
     Tcp,
     P2P,
 };
+
+use async_trait::async_trait;
+use bytes::BytesMut;
+use futures_util::StreamExt;
+use std::{io, net::SocketAddr};
+use tokio::{
+    io::AsyncRead,
+    sync::{mpsc, oneshot},
+};
+use tokio_util::codec::{Decoder, FramedRead};
+use tracing::*;
 
 /// Can be used to specify and enable reading, i.e. receiving inbound messages. If the [`Handshake`]
 /// protocol is enabled too, it goes into force only after the handshake has been concluded.
@@ -138,14 +137,16 @@ impl<R: Reading> ReadingInternal for R {
         let self_clone = self.clone();
         let inbound_processing_task = tokio::spawn(async move {
             let node = self_clone.tcp();
-            trace!(parent: node.span(), "spawned a task for processing messages from {}", addr);
+            trace!(parent: node.span(), "spawned a task for processing messages from {addr}");
             tx_processing.send(()).unwrap(); // safe; the channel was just opened
 
             while let Some(msg) = inbound_message_receiver.recv().await {
                 if let Err(e) = self_clone.process_message(addr, msg).await {
-                    error!(parent: node.span(), "can't process a message from {}: {}", addr, e);
+                    error!(parent: node.span(), "can't process a message from {addr}: {e}");
                     node.known_peers().register_failure(addr);
                 }
+                #[cfg(feature = "metrics")]
+                metrics::decrement_gauge(metrics::tcp::TCP_TASKS, 1f64);
             }
         });
         let _ = rx_processing.await;
@@ -157,7 +158,7 @@ impl<R: Reading> ReadingInternal for R {
         // the task for reading messages from a stream
         let node = self.tcp().clone();
         let reader_task = tokio::spawn(async move {
-            trace!(parent: node.span(), "spawned a task for reading messages from {}", addr);
+            trace!(parent: node.span(), "spawned a task for reading messages from {addr}");
             tx_reader.send(()).unwrap(); // safe; the channel was just opened
 
             // postpone reads until the connection is fully established; if the process fails,
@@ -169,12 +170,14 @@ impl<R: Reading> ReadingInternal for R {
                     Ok(msg) => {
                         // send the message for further processing
                         if let Err(e) = inbound_message_sender.try_send(msg) {
-                            error!(parent: node.span(), "can't process a message from {}: {}", addr, e);
+                            error!(parent: node.span(), "can't process a message from {addr}: {e}");
                             node.stats().register_failure();
                         }
+                        #[cfg(feature = "metrics")]
+                        metrics::increment_gauge(metrics::tcp::TCP_TASKS, 1f64);
                     }
                     Err(e) => {
-                        error!(parent: node.span(), "can't read from {}: {}", addr, e);
+                        error!(parent: node.span(), "can't read from {addr}: {e}");
                         node.known_peers().register_failure(addr);
                         if node.config().fatal_io_errors.contains(&e.kind()) {
                             break;

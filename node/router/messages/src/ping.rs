@@ -65,29 +65,33 @@ impl<N: Network> FromBytes for Ping<N> {
         let version = u32::read_le(&mut reader)?;
         let node_type = NodeType::read_le(&mut reader)?;
 
-        if u8::read_le(&mut reader)? == 0 {
-            return Ok(Self { version, node_type, block_locators: None });
+        let selector = u8::read_le(&mut reader)?;
+
+        if selector == 0 {
+            Ok(Self { version, node_type, block_locators: None })
+        } else if selector == 1 {
+            let mut recents = IndexMap::new();
+            let num_recents = u32::read_le(&mut reader)?;
+            for _ in 0..num_recents {
+                let height = u32::read_le(&mut reader)?;
+                let hash = N::BlockHash::read_le(&mut reader)?;
+                recents.insert(height, hash);
+            }
+
+            let mut checkpoints = IndexMap::new();
+            let num_checkpoints = u32::read_le(&mut reader)?;
+            for _ in 0..num_checkpoints {
+                let height = u32::read_le(&mut reader)?;
+                let hash = N::BlockHash::read_le(&mut reader)?;
+                checkpoints.insert(height, hash);
+            }
+
+            let block_locators = Some(BlockLocators { recents, checkpoints });
+
+            Ok(Self { version, node_type, block_locators })
+        } else {
+            Err(error("Invalid selector of optional block locators in ping message"))
         }
-
-        let mut recents = IndexMap::new();
-        let num_recents = u32::read_le(&mut reader)?;
-        for _ in 0..num_recents {
-            let height = u32::read_le(&mut reader)?;
-            let hash = N::BlockHash::read_le(&mut reader)?;
-            recents.insert(height, hash);
-        }
-
-        let mut checkpoints = IndexMap::new();
-        let num_checkpoints = u32::read_le(&mut reader)?;
-        for _ in 0..num_checkpoints {
-            let height = u32::read_le(&mut reader)?;
-            let hash = N::BlockHash::read_le(&mut reader)?;
-            checkpoints.insert(height, hash);
-        }
-
-        let block_locators = Some(BlockLocators { recents, checkpoints });
-
-        Ok(Self { version, node_type, block_locators })
     }
 }
 

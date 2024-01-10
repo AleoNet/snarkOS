@@ -13,7 +13,11 @@
 // limitations under the License.
 
 use super::*;
-use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
+use snarkos_node_router::messages::UnconfirmedSolution;
+use snarkvm::{
+    ledger::coinbase::ProverSolution,
+    prelude::{block::Transaction, Identifier, Plaintext},
+};
 
 use indexmap::IndexMap;
 use rayon::prelude::*;
@@ -326,5 +330,29 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         rest.routing.propagate(message, &[]);
 
         Ok(ErasedJson::pretty(tx_id))
+    }
+
+    // POST /testnet3/solution/broadcast
+    pub(crate) async fn solution_broadcast(
+        State(rest): State<Self>,
+        Json(prover_solution): Json<ProverSolution<N>>,
+    ) -> Result<ErasedJson, RestError> {
+        // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
+        if let Some(consensus) = rest.consensus {
+            // Add the unconfirmed transaction to the memory pool.
+            consensus.add_unconfirmed_solution(prover_solution).await?;
+        }
+
+        let commitment = prover_solution.commitment();
+        // Prepare the unconfirmed transaction message.
+        let message = Message::UnconfirmedSolution(UnconfirmedSolution {
+            solution_id: commitment,
+            solution: Data::Object(prover_solution),
+        });
+
+        // Broadcast the transaction.
+        rest.routing.propagate(message, &[]);
+
+        Ok(ErasedJson::pretty(commitment))
     }
 }

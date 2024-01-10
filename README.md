@@ -6,6 +6,7 @@
     <a href="https://circleci.com/gh/AleoHQ/snarkOS"><img src="https://circleci.com/gh/AleoHQ/snarkOS.svg?style=svg&circle-token=6e9ad6d39d95350544f352d34e0e5c62ef54db26"></a>
     <a href="https://codecov.io/gh/AleoHQ/snarkOS"><img src="https://codecov.io/gh/AleoHQ/snarkOS/branch/master/graph/badge.svg?token=cck8tS9HpO"/></a>
     <a href="https://www.aleo.org/discord"><img src="https://img.shields.io/discord/700454073459015690?logo=discord"/></a>
+    <a href="https://twitter.com/AleoHQ"><img src="https://img.shields.io/twitter/follow/AleoHQ?style=social"/></a>
     <a href="https://GitHub.com/AleoHQ/snarkOS"><img src="https://img.shields.io/badge/contributors-59-ee8449"/></a>
 </p>
 
@@ -65,13 +66,13 @@ The following are **minimum** requirements to run an Aleo node:
     - Provers: CUDA-enabled GPU (optional)
     - Validators: Not required at this time
 
-Please note to run an Aleo Prover that is **competitive**, the machine will require more than these requirements.
+Please note that in order to run an Aleo Prover that is **competitive**, the machine will need more than these requirements.
 
 ### 2.2 Installation
 
 Before beginning, please ensure your machine has `Rust v1.66+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
-Start by cloning this Github repository:
+Start by cloning this GitHub repository:
 ```
 git clone https://github.com/AleoHQ/snarkOS.git --depth 1
 ```
@@ -149,7 +150,7 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ### 3. I can't generate a new address ### 
 
 - Before running the command above (`snarkos account new`) try `source ~/.bashrc`
-- Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
+- Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, and the command is `snarkos`
 
 ### 4. How do I use the CLI to sign and verify a message?
 
@@ -162,7 +163,7 @@ Note, using the `--raw` flag with the command will sign plaintext messages as by
 
 ## 5. Command Line Interface
 
-To run a node with custom settings, refer to the full list of options and flags available in the `snarkOS` CLI.
+To run a node with custom settings, refer to the options and flags available in the `snarkOS` CLI.
 
 The full list of CLI flags and options can be viewed with `snarkos --help`:
 ```
@@ -233,7 +234,7 @@ In the fourth terminal, start the fourth validator by running:
 cargo run --release -- start --nodisplay --dev 3 --validator
 ```
 
-From here, this procedure can be used to further start up provers and clients.
+From here, this procedure can be used to further start-up provers and clients.
 
 ### 6.2 Operations
 
@@ -442,7 +443,7 @@ Thank you for helping make snarkOS better!
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind are welcome!
 
 ## 8. License
 

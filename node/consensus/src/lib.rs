@@ -328,12 +328,29 @@ impl<N: Network> Consensus<N> {
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<()> {
+        #[cfg(feature = "metrics")]
+        let start = subdag.leader_certificate().batch_header().timestamp();
+        #[cfg(feature = "metrics")]
+        let num_committed_certificates = subdag.values().map(|c| c.len()).sum::<usize>();
+
         // Create the candidate next block.
         let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
         // Check that the block is well-formed.
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
+
+        #[cfg(feature = "metrics")]
+        {
+            let elapsed = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - start) as u64);
+
+            metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
+            metrics::counter(metrics::blocks::TRANSACTIONS, next_block.transactions().len() as u64);
+            metrics::gauge(metrics::consensus::LAST_COMMITTED_ROUND, next_block.round() as f64);
+            metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
+            metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
+        }
+
         Ok(())
     }
 

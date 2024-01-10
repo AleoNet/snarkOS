@@ -26,10 +26,14 @@ use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
+use crossterm::ExecutableCommand;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use rayon::prelude::*;
-use std::path::PathBuf;
+use std::{
+    io::{Read, Write},
+    path::PathBuf,
+};
 
 type Network = snarkvm::prelude::Testnet3;
 type A = snarkvm::circuit::AleoV0;
@@ -45,6 +49,9 @@ pub enum Account {
         /// Try until an address with the vanity string is found
         #[clap(short = 'v', long)]
         vanity: Option<String>,
+        /// Print sensitive information (such as the private key) discreetly in an alternate screen
+        #[clap(long)]
+        discreet: bool,
     },
     Sign {
         /// Specify the account private key of the node
@@ -90,7 +97,7 @@ fn aleo_literal_to_fields(input: &str) -> Result<Vec<Field<Network>>> {
 impl Account {
     pub fn parse(self) -> Result<String> {
         match self {
-            Self::New { seed, vanity } => {
+            Self::New { seed, vanity, discreet } => {
                 // Ensure only the seed or the vanity string is specified.
                 if seed.is_some() && vanity.is_some() {
                     bail!("Cannot specify both the '--seed' and '--vanity' flags");
@@ -98,11 +105,11 @@ impl Account {
 
                 // Generate a vanity account.
                 if let Some(vanity) = vanity {
-                    Self::new_vanity(&vanity)
+                    Self::new_vanity(&vanity, discreet)
                 }
                 // Default to generating a normal account, with an optional seed.
                 else {
-                    Self::new_seeded(seed)
+                    Self::new_seeded(seed, discreet)
                 }
             }
             Self::Sign { message, seed, raw, private_key, private_key_file } => {
@@ -121,7 +128,7 @@ impl Account {
     }
 
     /// Generates a new Aleo account with the given vanity string.
-    fn new_vanity(vanity: &str) -> Result<String> {
+    fn new_vanity(vanity: &str, discreet: bool) -> Result<String> {
         // A closure to generate a new Aleo account.
         let sample_account = || snarkos_account::Account::<Network>::new(&mut rand::thread_rng());
 
@@ -169,7 +176,22 @@ impl Account {
             // Return the result if a candidate was found.
             if let Some(account) = account {
                 println!(); // Add a newline for formatting.
-                return Ok(account.to_string());
+                if !discreet {
+                    return Ok(account.to_string());
+                }
+                display_string_discreetly(
+                    &format!("{:>12}  {}", "Private Key".cyan().bold(), account.private_key()),
+                    "### Do not share or lose this private key! Press any key to complete. ###",
+                )
+                .unwrap();
+                let account_info = format!(
+                    " {:>12}  {}\n {:>12}  {}",
+                    "View Key".cyan().bold(),
+                    account.view_key(),
+                    "Address".cyan().bold(),
+                    account.address()
+                );
+                return Ok(account_info);
             } else {
                 let rate = ITERATIONS / timer.elapsed().as_millis();
                 let rate = format!("[{rate} a/ms]");
@@ -179,7 +201,7 @@ impl Account {
     }
 
     /// Generates a new Aleo account with an optional seed.
-    fn new_seeded(seed: Option<String>) -> Result<String> {
+    fn new_seeded(seed: Option<String>, discreet: bool) -> Result<String> {
         // Recover the seed.
         let seed = match seed {
             // Recover the field element deterministically.
@@ -195,7 +217,22 @@ impl Account {
         // Construct the account.
         let account = snarkos_account::Account::<Network>::try_from(private_key)?;
         // Print the new Aleo account.
-        Ok(account.to_string())
+        if !discreet {
+            return Ok(account.to_string());
+        }
+        display_string_discreetly(
+            &format!("{:>12}  {}", "Private Key".cyan().bold(), account.private_key()),
+            "### Do not share or lose this private key! Press any key to complete. ###",
+        )
+        .unwrap();
+        let account_info = format!(
+            " {:>12}  {}\n {:>12}  {}",
+            "View Key".cyan().bold(),
+            account.view_key(),
+            "Address".cyan().bold(),
+            account.address()
+        );
+        Ok(account_info)
     }
 
     // Sign a message with an Aleo private key
@@ -253,6 +290,27 @@ impl Account {
     }
 }
 
+// Print the string to an alternate screen, so that the string won't been printed to the terminal.
+fn display_string_discreetly(discreet_string: &str, continue_message: &str) -> Result<()> {
+    use crossterm::{
+        style::Print,
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+    };
+    let mut stdout = std::io::stdout();
+    stdout.execute(EnterAlternateScreen)?;
+    // print msg on the alternate screen
+    stdout.execute(Print(format!("{discreet_string}\n{continue_message}")))?;
+    stdout.flush()?;
+    wait_for_keypress();
+    stdout.execute(LeaveAlternateScreen)?;
+    Ok(())
+}
+
+fn wait_for_keypress() {
+    let mut single_key = [0u8];
+    std::io::stdin().read_exact(&mut single_key).unwrap();
+}
+
 #[cfg(test)]
 mod tests {
     use crate::commands::Account;
@@ -262,7 +320,7 @@ mod tests {
     #[test]
     fn test_new() {
         for _ in 0..3 {
-            let account = Account::New { seed: None, vanity: None };
+            let account = Account::New { seed: None, vanity: None, discreet: false };
             assert!(account.parse().is_ok());
         }
     }
@@ -288,7 +346,7 @@ mod tests {
         );
 
         let vanity = None;
-        let account = Account::New { seed, vanity };
+        let account = Account::New { seed, vanity, discreet: false };
         let actual = account.parse().unwrap();
         assert_eq!(expected, actual);
     }
@@ -314,7 +372,7 @@ mod tests {
         );
 
         let vanity = None;
-        let account = Account::New { seed, vanity };
+        let account = Account::New { seed, vanity, discreet: false };
         let actual = account.parse().unwrap();
         assert_eq!(expected, actual);
     }
