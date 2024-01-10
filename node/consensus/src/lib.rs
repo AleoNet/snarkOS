@@ -22,7 +22,7 @@ use snarkos_node_bft::{
     helpers::{
         fmt_id,
         init_consensus_channels,
-        now,
+        now_nanos,
         ConsensusReceiver,
         PrimaryReceiver,
         PrimarySender,
@@ -56,9 +56,9 @@ use tokio::{
 };
 
 type PriorityFee<N> = U64<N>;
-type Timestamp = i64;
+type Timestamp = i128;
 // Transactions are sorted by PriorityFee first, oldest Timestamp second, and TransactionID last.
-type TransactionKey<N> = (PriorityFee<N>, Timestamp, <N as Network>::TransactionID);
+type TransactionKey<N> = (PriorityFee<N>, Timestamp, Field<N>);
 
 #[derive(Clone)]
 pub struct Consensus<N: Network> {
@@ -282,7 +282,8 @@ impl<N: Network> Consensus<N> {
             self.pop_transactions_from_queue(capacity)
         };
         // Iterate over the transactions.
-        for ((_, _, transaction_id), transaction) in transactions.into_iter() {
+        for (_, transaction) in transactions.into_iter() {
+            let transaction_id = transaction.id();
             trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
             // Send the unconfirmed transaction to the primary.
             if let Err(e) =
@@ -302,9 +303,9 @@ impl<N: Network> Consensus<N> {
         transaction: Transaction<N>,
     ) -> Option<Transaction<N>> {
         // Get the current timestamp.
-        let timestamp = now();
+        let timestamp = now_nanos();
         // Add the Transaction to the queue.
-        self.transactions_queue.lock().insert((priority_fee, -timestamp, id), transaction)
+        self.transactions_queue.lock().insert((priority_fee, -timestamp, *id.deref()), transaction)
     }
 
     /// Pops an unconfirmed transaction from the transaction_queue
@@ -452,7 +453,7 @@ mod tests {
         prelude::{Itertools, Uniform},
         utilities::TestRng,
     };
-    use std::sync::Arc;
+    use std::{ops::Deref, sync::Arc};
 
     use crate::Consensus;
 
@@ -503,7 +504,7 @@ mod tests {
             assert_eq!(transactions.len(), 1);
             let (priority_fee, _, id) = transactions.pop().unwrap().0;
             assert_eq!(priority_fee, priority_fees[expected_id]);
-            assert_eq!(id, transaction_ids[expected_id]);
+            assert_eq!(id, *transaction_ids[expected_id].deref());
         }
 
         // If the queue is empty, no transactions are popped.

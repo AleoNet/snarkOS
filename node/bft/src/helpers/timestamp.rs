@@ -22,6 +22,11 @@ pub fn now() -> i64 {
     OffsetDateTime::now_utc().unix_timestamp()
 }
 
+/// Returns the current UTC epoch timestamp in nanoseconds.
+pub fn now_nanos() -> i128 {
+    OffsetDateTime::now_utc().unix_timestamp_nanos()
+}
+
 /// Sanity checks the timestamp for liveness.
 pub fn check_timestamp_for_liveness(timestamp: i64) -> Result<()> {
     // Ensure the timestamp is within range.
