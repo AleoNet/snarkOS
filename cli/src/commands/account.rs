@@ -29,6 +29,7 @@ use core::str::FromStr;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use rayon::prelude::*;
+use std::path::PathBuf;
 
 type Network = snarkvm::prelude::Testnet3;
 type A = snarkvm::circuit::AleoV0;
@@ -46,9 +47,12 @@ pub enum Account {
         vanity: Option<String>,
     },
     Sign {
-        /// Private key to use for the signature
-        #[clap(short = 'k', long)]
-        key: String,
+        /// Specify the account private key of the node
+        #[clap(long = "private-key")]
+        private_key: Option<String>,
+        /// Specify the path to a file containing the account private key of the node
+        #[clap(long = "private-key-file")]
+        private_key_file: Option<PathBuf>,
         /// Message (Aleo value) to sign
         #[clap(short = 'm', long)]
         message: String,
@@ -101,7 +105,17 @@ impl Account {
                     Self::new_seeded(seed)
                 }
             }
-            Self::Sign { key, message, seed, raw } => Self::sign(key, message, seed, raw),
+            Self::Sign { message, seed, raw, private_key, private_key_file } => {
+                let key = match (private_key, private_key_file) {
+                    (Some(private_key), None) => private_key,
+                    (None, Some(private_key_file)) => std::fs::read_to_string(private_key_file)?.trim().to_string(),
+                    (None, None) => bail!("Missing the '--private-key' or '--private-key-file' argument"),
+                    (Some(_), Some(_)) => {
+                        bail!("Cannot specify both the '--private-key' and '--private-key-file' flags")
+                    }
+                };
+                Self::sign(key, message, seed, raw)
+            }
             Self::Verify { address, signature, message, raw } => Self::verify(address, signature, message, raw),
         }
     }
@@ -309,7 +323,7 @@ mod tests {
     fn test_signature_raw() {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "Hello, world!".to_string();
-        let account = Account::Sign { key, message, seed: None, raw: true };
+        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed: None, raw: true };
         assert!(account.parse().is_ok());
     }
 
@@ -317,7 +331,7 @@ mod tests {
     fn test_signature() {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "5field".to_string();
-        let account = Account::Sign { key, message, seed: None, raw: false };
+        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed: None, raw: false };
         assert!(account.parse().is_ok());
     }
 
@@ -325,7 +339,7 @@ mod tests {
     fn test_signature_fail() {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "not a literal value".to_string();
-        let account = Account::Sign { key, message, seed: None, raw: false };
+        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed: None, raw: false };
         assert!(account.parse().is_err());
     }
 
@@ -335,7 +349,7 @@ mod tests {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "Hello, world!".to_string();
         let expected = "sign1t2hsaqfhcgvsfg2q3q2stxsffyrvdx98pl0ddkdqngqqtn3vsuprhkv9tkeyzs878ccqp62mfptvvp7m5hjcfnf06cc9pu4khxtkkp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkksrwh0";
-        let account = Account::Sign { key, message, seed, raw: true };
+        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed, raw: true };
         let actual = account.parse().unwrap();
         assert_eq!(expected, actual);
     }
@@ -346,7 +360,7 @@ mod tests {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "5field".to_string();
         let expected = "sign16f464jk7zrq0az5jne2zvamhlfkksfj23508tqvmj836jpplkuqefcshgk8k8rx9xxu284fuwaua7fcz3jajvnqynwtymfm0p692vq8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk3re27j";
-        let account = Account::Sign { key, message, seed, raw: false };
+        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed, raw: false };
         let actual = account.parse().unwrap();
         assert_eq!(expected, actual);
     }
