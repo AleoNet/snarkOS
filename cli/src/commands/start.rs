@@ -123,6 +123,16 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
+
+    #[clap(long)]
+    pub coinbase_private_key: Option<String>,
+    #[clap(long)]
+    pub coinbase_stake_amount: Option<u64>,
+
+    #[clap(long)]
+    pub customer_private_keys: Option<String>,
+    #[clap(long)]
+    pub customer_initial_balance: Option<u64>,
 }
 
 impl Start {
@@ -291,7 +301,37 @@ impl Start {
     /// Returns an alternative genesis block if the node is in development mode.
     /// Otherwise, returns the actual genesis block.
     fn parse_genesis<N: Network>(&self) -> Result<Block<N>> {
-        if self.dev.is_some() {
+        if self.dev.is_some() && self.coinbase_private_key.is_some() {
+            let coinbase_private_key = match &self.coinbase_private_key {
+                Some(private_key) => PrivateKey::<N>::from_str(&private_key)?,
+                None => bail!("Please specify a coinbase private key"),
+            };
+
+            let customer_transfers = match &self.customer_private_keys {
+                Some(customer_private_keys) => {
+                    let customer_initial_balance = match &self.customer_initial_balance {
+                        Some(balance) => balance,
+                        None => bail!("Please specify an initial balance for the customer accounts."),
+                    };
+
+                    let mut customer_transfers: indexmap::IndexMap<_, _> = Default::default();
+                    for key in customer_private_keys.split(",") {
+                        let customer_private_key = PrivateKey::<N>::from_str(key)?;
+                        customer_transfers.insert(customer_private_key, *customer_initial_balance);
+                    }
+
+                    customer_transfers
+                }
+                None => bail!("Please specify customer private keys"),
+            };
+
+            let coinbase_bond_amount = match &self.coinbase_stake_amount {
+                Some(amount) => amount,
+                None => bail!("Please specify a coinbase bond amount"),
+            };
+
+            self.create_custom_genesis(coinbase_private_key, customer_transfers, *coinbase_bond_amount)
+        } else if self.dev.is_some() {
             // Determine the number of genesis committee members.
             let num_committee_members = match self.dev_num_validators {
                 Some(num_committee_members) => num_committee_members,
@@ -485,6 +525,101 @@ impl Start {
             .max_blocking_threads(max_tokio_blocking_threads)
             .build()
             .expect("Failed to initialize a runtime for the router")
+    }
+}
+
+impl Start {
+    /// Create a custom genesis block that sends the `coinbase_recipient_address` with all the balances of `customer_transfers`.
+    /// 1. Public balances are created for these customers. This is the initial balance provided in `customer_transfers` and the fee amount for the `transfer_public` call.
+    /// 2. The `transfer_public` transactions from the customers are added to the genesis block.
+    ///     - These customer balances are sent to the `coinbase_recipient_address`.
+    pub fn create_custom_genesis<N: Network>(
+        &self,
+        coinbase_private_key: PrivateKey<N>, // Coinbase's private key.
+        customer_transfers: indexmap::IndexMap<PrivateKey<N>, u64>, // Initial transfers from Coinbase customers.
+        coinbase_bond_amount: u64,           // Amount Coinbase will bond to validator 0.
+    ) -> Result<Block<N>> {
+        // Determine the number of genesis committee members.
+        let num_committee_members = match self.dev_num_validators {
+            Some(num_committee_members) => num_committee_members,
+            None => DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
+        };
+        ensure!(
+            num_committee_members >= DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
+            "Number of genesis committee members is too low"
+        );
+
+        // Initialize the (fixed) RNG.
+        let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
+        // Initialize the development private keys.
+        let development_private_keys =
+            (0..num_committee_members).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
+
+        // Construct the committee.
+        let committee = {
+            // Calculate the committee stake per member.
+            let stake_per_member = N::STARTING_SUPPLY.saturating_div(2).saturating_div(num_committee_members as u64);
+            ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
+
+            // Construct the committee members and distribute stakes evenly among committee members.
+            let members = development_private_keys
+                .iter()
+                .map(|private_key| Ok((Address::try_from(private_key)?, (stake_per_member, true))))
+                .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+
+            // Output the committee.
+            Committee::<N>::new(0u64, members)?
+        };
+
+        // Calculate the public balance per validator.
+        let remaining_balance = N::STARTING_SUPPLY.saturating_sub(committee.total_stake());
+        let public_balance_per_validator = remaining_balance.saturating_div(num_committee_members as u64 + 1);
+
+        // Construct the public balances with fairly equal distribution.
+        let mut public_balances = development_private_keys
+            .iter()
+            .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
+            .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+
+        // TODO: Consider the fee amount. This is just the base fee amount on testnet3.
+        let transfer_public_fee_amount = 263388u64;
+        let mut coinbase_transfer_balances = 0;
+        for (private_key, amount) in customer_transfers.iter() {
+            public_balances.insert(Address::try_from(private_key)?, amount + transfer_public_fee_amount);
+            coinbase_transfer_balances += amount + transfer_public_fee_amount;
+        }
+
+        // If there is some leftover balance, add it to the 0-th validator.
+        let leftover = remaining_balance
+            .saturating_sub(public_balance_per_validator * num_committee_members as u64)
+            .saturating_sub(coinbase_transfer_balances);
+        if leftover > 0 {
+            let (_, balance) = public_balances.get_index_mut(0).unwrap();
+            *balance += leftover;
+        }
+
+        // Check if the sum of committee stakes and public balances equals the total starting supply.
+        let public_balances_sum: u64 = public_balances.values().copied().sum();
+        if committee.total_stake() + public_balances_sum != N::STARTING_SUPPLY {
+            bail!(
+                "Sum of committee stakes and public balances does not equal total starting supply. {} != {}",
+                committee.total_stake() + public_balances_sum,
+                N::STARTING_SUPPLY
+            );
+        }
+
+        // Initialize a new VM.
+        let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
+        // Initialize the custom genesis block.
+        vm.custom_genesis_quorum(
+            &development_private_keys[0],
+            committee,
+            public_balances,
+            coinbase_private_key,
+            customer_transfers,
+            coinbase_bond_amount,
+            &mut rng,
+        )
     }
 }
 

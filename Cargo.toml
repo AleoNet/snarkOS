@@ -41,7 +41,9 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-version = "=0.16.15"
+#version = "=0.16.15"
+git = "https://github.com/AleoHQ/snarkVM.git"
+branch = "feat/custom-genesis"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
