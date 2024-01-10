@@ -440,8 +440,6 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        *lock_guard = round;
-
         /* Proceeding to sign & propose the batch. */
         info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len());
 
@@ -473,6 +471,9 @@ impl<N: Network> Primary<N> {
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
         *self.proposed_batch.write() = Some(proposal);
+        // Update the lock guard. 
+        *lock_guard = round;
+
         Ok(())
     }
 
