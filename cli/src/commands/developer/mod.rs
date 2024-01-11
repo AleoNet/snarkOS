@@ -84,7 +84,7 @@ impl Developer {
     fn parse_package(program_id: ProgramID<CurrentNetwork>, path: &Option<String>) -> Result<Package<CurrentNetwork>> {
         // Instantiate a path to the directory containing the manifest file.
         let directory = match path {
-            Some(path) => PathBuf::from_str(&path)?,
+            Some(path) => PathBuf::from_str(path)?,
             None => std::env::current_dir()?,
         };
 
@@ -181,7 +181,7 @@ impl Developer {
 
         // Determine if the transaction should be stored.
         if let Some(path) = store {
-            match PathBuf::from_str(&path) {
+            match PathBuf::from_str(path) {
                 Ok(file_path) => {
                     let transaction_bytes = transaction.to_bytes_le()?;
                     std::fs::write(&file_path, transaction_bytes)?;
@@ -196,7 +196,7 @@ impl Developer {
         // Determine if the transaction should be broadcast to the network.
         if let Some(endpoint) = broadcast {
             // Send the deployment request to the local development node.
-            match ureq::post(&endpoint).send_json(&transaction) {
+            match ureq::post(endpoint).send_json(&transaction) {
                 Ok(id) => {
                     // Remove the quotes from the response.
                     let response_string = id.into_string()?.trim_matches('\"').to_string();
