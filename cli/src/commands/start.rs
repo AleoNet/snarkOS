@@ -127,12 +127,9 @@ pub struct Start {
     #[clap(long)]
     pub coinbase_private_key: Option<String>,
     #[clap(long)]
-    pub coinbase_stake_amount: Option<u64>,
-
-    #[clap(long)]
     pub customer_private_keys: Option<String>,
     #[clap(long)]
-    pub customer_initial_balance: Option<u64>,
+    pub customer_bond_amount: Option<u64>,
 }
 
 impl Start {
@@ -307,30 +304,25 @@ impl Start {
                 None => bail!("Please specify a coinbase private key"),
             };
 
-            let customer_transfers = match &self.customer_private_keys {
+            let customer_bonds = match &self.customer_private_keys {
                 Some(customer_private_keys) => {
-                    let customer_initial_balance = match &self.customer_initial_balance {
+                    let customer_bond_amount = match &self.customer_bond_amount {
                         Some(balance) => balance,
-                        None => bail!("Please specify an initial balance for the customer accounts."),
+                        None => bail!("Please specify an initial balance for the customer bond amount."),
                     };
 
-                    let mut customer_transfers: indexmap::IndexMap<_, _> = Default::default();
+                    let mut customer_bonds: indexmap::IndexMap<_, _> = Default::default();
                     for key in customer_private_keys.split(",") {
                         let customer_private_key = PrivateKey::<N>::from_str(key)?;
-                        customer_transfers.insert(customer_private_key, *customer_initial_balance);
+                        customer_bonds.insert(customer_private_key, *customer_bond_amount);
                     }
 
-                    customer_transfers
+                    customer_bonds
                 }
                 None => bail!("Please specify customer private keys"),
             };
 
-            let coinbase_bond_amount = match &self.coinbase_stake_amount {
-                Some(amount) => amount,
-                None => bail!("Please specify a coinbase bond amount"),
-            };
-
-            self.create_custom_genesis(coinbase_private_key, customer_transfers, *coinbase_bond_amount)
+            self.create_custom_genesis(coinbase_private_key, customer_bonds)
         } else if self.dev.is_some() {
             // Determine the number of genesis committee members.
             let num_committee_members = match self.dev_num_validators {
@@ -529,15 +521,14 @@ impl Start {
 }
 
 impl Start {
-    /// Create a custom genesis block that sends the `coinbase_recipient_address` with all the balances of `customer_transfers`.
-    /// 1. Public balances are created for these customers. This is the initial balance provided in `customer_transfers` and the fee amount for the `transfer_public` call.
+    /// Create a custom genesis block that sends the `coinbase_recipient_address` with all the balances of `customer_bonds`.
+    /// 1. Public balances are created for these customers. This is the initial balance provided in `customer_bonds` and the fee amount for the `transfer_public` call.
     /// 2. The `transfer_public` transactions from the customers are added to the genesis block.
     ///     - These customer balances are sent to the `coinbase_recipient_address`.
     pub fn create_custom_genesis<N: Network>(
         &self,
         coinbase_private_key: PrivateKey<N>, // Coinbase's private key.
-        customer_transfers: indexmap::IndexMap<PrivateKey<N>, u64>, // Initial transfers from Coinbase customers.
-        coinbase_bond_amount: u64,           // Amount Coinbase will bond to validator 0.
+        customer_bonds: indexmap::IndexMap<PrivateKey<N>, u64>, // Initial transfers from Coinbase customers.
     ) -> Result<Block<N>> {
         // Determine the number of genesis committee members.
         let num_committee_members = match self.dev_num_validators {
@@ -583,11 +574,13 @@ impl Start {
 
         // TODO: Consider the fee amount. This is just the base fee amount on testnet3.
         let transfer_public_fee_amount = 263388u64;
+        let bond_public_fee_amount = 843880u64;
+
         let mut coinbase_transfer_balances = 0;
-        for (private_key, amount) in customer_transfers.iter() {
-            public_balances.insert(Address::try_from(private_key)?, amount + transfer_public_fee_amount);
-            coinbase_transfer_balances += amount + transfer_public_fee_amount;
+        for (_, amount) in customer_bonds.iter() {
+            coinbase_transfer_balances += amount + transfer_public_fee_amount + bond_public_fee_amount;
         }
+        public_balances.insert(Address::try_from(&coinbase_private_key)?, coinbase_transfer_balances);
 
         // If there is some leftover balance, add it to the 0-th validator.
         let leftover = remaining_balance
@@ -616,8 +609,7 @@ impl Start {
             committee,
             public_balances,
             coinbase_private_key,
-            customer_transfers,
-            coinbase_bond_amount,
+            customer_bonds,
             &mut rng,
         )
     }
