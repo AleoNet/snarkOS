@@ -31,6 +31,7 @@ use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
+use zeroize::Zeroize;
 
 /// Executes an Aleo program function.
 #[derive(Debug, Parser)]
@@ -62,6 +63,13 @@ pub struct Execute {
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
+}
+
+impl Drop for Execute {
+    /// Zeroize the private key when the `Execute` struct goes out of scope.
+    fn drop(&mut self) {
+        self.private_key.zeroize();
+    }
 }
 
 impl Execute {
@@ -143,7 +151,7 @@ impl Execute {
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to the user.
-        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
+        Developer::handle_transaction(&self.broadcast, self.dry_run, &self.store, transaction, locator.to_string())
     }
 }
 

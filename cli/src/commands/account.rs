@@ -27,11 +27,12 @@ use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use rayon::prelude::*;
 use std::io::{Read, Write};
+use zeroize::Zeroize;
 
 type Network = snarkvm::prelude::Testnet3;
 
 /// Commands to manage Aleo accounts.
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Zeroize)]
 pub enum Account {
     /// Generates a new Aleo account
     New {
