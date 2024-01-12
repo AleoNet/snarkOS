@@ -220,7 +220,10 @@ impl Start {
                 // Parse the private key directly.
                 (Some(private_key), None) => Account::from_str(private_key.trim()),
                 // Parse the private key from a file.
-                (None, Some(path)) => Account::from_str(std::fs::read_to_string(path)?.trim()),
+                (None, Some(path)) => {
+                    check_permissions(path)?;
+                    Account::from_str(std::fs::read_to_string(path)?.trim())
+                }
                 // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
                 (None, None) => match self.client {
                     true => Account::new(&mut rand::thread_rng()),
@@ -486,6 +489,26 @@ impl Start {
             .build()
             .expect("Failed to initialize a runtime for the router")
     }
+}
+
+fn check_permissions(path: &PathBuf) -> Result<(), snarkvm::prelude::Error> {
+    #[cfg(target_family = "unix")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        ensure!(path.exists(), "The file '{:?}' does not exist", path);
+        let parent = path.parent();
+        if let Some(parent) = parent {
+            let parent_permissions = parent.metadata()?.permissions().mode();
+            ensure!(
+                parent_permissions & 0o777 == 0o700,
+                "The folder {:?} must be readable only by the owner (0700)",
+                parent
+            );
+        }
+        let permissions = path.metadata()?.permissions().mode();
+        ensure!(permissions & 0o777 == 0o600, "The file {:?} must be readable only by the owner (0600)", path);
+    }
+    Ok(())
 }
 
 /// Loads or computes the genesis block.
