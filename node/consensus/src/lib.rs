@@ -55,6 +55,8 @@ use tokio::{
     task::JoinHandle,
 };
 
+const MAX_TX_QUEUE_SIZE: usize = 1 << 30; // in bytes
+
 type PriorityFee<N> = U64<N>;
 type Timestamp = i128;
 // Transactions are sorted by PriorityFee first, oldest Timestamp second, and TransactionID last.
@@ -260,6 +262,11 @@ impl<N: Network> Consensus<N> {
             // Check if the transaction already exists in the ledger.
             if self.ledger.contains_transmission(&TransmissionID::from(&transaction_id))? {
                 bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
+            }
+            // Check if the queue is full.
+            if std::mem::size_of_val(&self.transactions_queue.lock()) >= MAX_TX_QUEUE_SIZE {
+                // If the queue is full, return early.
+                return Ok(());
             }
             // Get the priority_fee amount from the Deploy or Execute Transaction. Fee Transactions are not expected here.
             let priority_fee = match &transaction {
