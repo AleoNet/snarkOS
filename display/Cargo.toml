@@ -22,6 +22,9 @@ version = "1.0.79"
 [dependencies.crossterm]
 version = "0.27"
 
+[dependencies.ratatui]
+version = "0.25"
+
 [dependencies.snarkos-node]
 path = "../node"
 version = "=2.2.7"
@@ -32,6 +35,3 @@ workspace = true
 [dependencies.tokio]
 version = "1.28"
 features = [ "rt" ]
-
-[dependencies.tui]
-version = "0.19"
