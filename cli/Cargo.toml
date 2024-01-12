@@ -118,5 +118,9 @@ features = [ "env-filter" ]
 [dependencies.ureq]
 version = "2.9"
 
+[dependencies.zeroize]
+version = "1"
+features = [ "derive" ]
+
 [target."cfg(target_family = \"unix\")".dependencies.nix]
 version = "0.26"

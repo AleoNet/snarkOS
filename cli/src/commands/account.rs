@@ -34,12 +34,13 @@ use std::{
     io::{Read, Write},
     path::PathBuf,
 };
+use zeroize::Zeroize;
 
 type Network = snarkvm::prelude::Testnet3;
 type A = snarkvm::circuit::AleoV0;
 
 /// Commands to manage Aleo accounts.
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Zeroize)]
 pub enum Account {
     /// Generates a new Aleo account
     New {
@@ -59,7 +60,7 @@ pub enum Account {
         private_key: Option<String>,
         /// Specify the path to a file containing the account private key of the node
         #[clap(long = "private-key-file")]
-        private_key_file: Option<PathBuf>,
+        private_key_file: Option<String>,
         /// Message (Aleo value) to sign
         #[clap(short = 'm', long)]
         message: String,
@@ -115,7 +116,10 @@ impl Account {
             Self::Sign { message, seed, raw, private_key, private_key_file } => {
                 let key = match (private_key, private_key_file) {
                     (Some(private_key), None) => private_key,
-                    (None, Some(private_key_file)) => std::fs::read_to_string(private_key_file)?.trim().to_string(),
+                    (None, Some(private_key_file)) => {
+                        let path = private_key_file.parse::<PathBuf>().map_err(|e| anyhow!("Invalid path - {e}"))?;
+                        std::fs::read_to_string(path)?.trim().to_string()
+                    }
                     (None, None) => bail!("Missing the '--private-key' or '--private-key-file' argument"),
                     (Some(_), Some(_)) => {
                         bail!("Cannot specify both the '--private-key' and '--private-key-file' flags")

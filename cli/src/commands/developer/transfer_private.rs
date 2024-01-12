@@ -27,6 +27,7 @@ use snarkvm::prelude::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use std::str::FromStr;
+use zeroize::Zeroize;
 
 /// Executes the `transfer_private` function in the `credits.aleo` program.
 #[derive(Debug, Parser)]
@@ -61,6 +62,13 @@ pub struct TransferPrivate {
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
+}
+
+impl Drop for TransferPrivate {
+    /// Zeroize the private key when the `TransferPrivate` struct goes out of scope.
+    fn drop(&mut self) {
+        self.private_key.zeroize();
+    }
 }
 
 impl TransferPrivate {
@@ -116,6 +124,6 @@ impl TransferPrivate {
         println!("✅ Created private transfer of {} microcredits to {}\n", &self.amount, self.recipient);
 
         // Determine if the transaction should be broadcast, stored, or displayed to the user.
-        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
+        Developer::handle_transaction(&self.broadcast, self.dry_run, &self.store, transaction, locator.to_string())
     }
 }
