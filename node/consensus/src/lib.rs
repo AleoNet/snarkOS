@@ -437,10 +437,14 @@ impl<N: Network> Consensus<N> {
         match (transmission_id, transmission) {
             (TransmissionID::Ratification, Transmission::Ratification) => return Ok(()),
             (TransmissionID::Solution(commitment), Transmission::Solution(solution)) => {
+                // Remove the solution from seen_solutions if it exists.
+                self.seen_solutions.lock().pop_entry(&commitment);
                 // Send the solution to the primary.
                 self.primary_sender().tx_unconfirmed_solution.send((commitment, solution, callback)).await?;
             }
             (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+                // Remove the transaction from seen_transactions if it exists.
+                self.seen_transactions.lock().pop_entry(&transaction_id);
                 // Send the transaction to the primary.
                 self.primary_sender().tx_unconfirmed_transaction.send((transaction_id, transaction, callback)).await?;
             }
