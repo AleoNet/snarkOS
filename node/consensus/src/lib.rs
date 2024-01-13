@@ -263,14 +263,23 @@ impl<N: Network> Consensus<N> {
             if self.ledger.contains_transmission(&TransmissionID::from(&transaction_id))? {
                 bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
-            // Check if the queue is full.
-            if std::mem::size_of_val(&self.transactions_queue.lock()) >= MAX_TX_QUEUE_SIZE {
-                // If the queue is full, return early.
+            // Check the size of the transctions queue.
+            let transactions_queue_size = std::mem::size_of_val(&self.transactions_queue.lock());
+            // If the transctions queue is full, return early.
+            if transactions_queue_size >= MAX_TX_QUEUE_SIZE {
+                return Ok(());
+            }
+            // For deployments, if the transactions queue is 75% full, return early.
+            // TODO: get rid of this restriction once we are assured we can take speculative fees.
+            if transaction.is_deploy()
+                && transactions_queue_size >= MAX_TX_QUEUE_SIZE.saturating_mul(100).saturating_div(75)
+            {
                 return Ok(());
             }
             // Get the priority_fee amount from the Deploy or Execute Transaction. Fee Transactions are not expected here.
             let priority_fee = match &transaction {
-                Transaction::Deploy(_, _, _, fee) => fee.priority_amount()?,
+                // TODO: use priority_amount for deployments when we are assured we can consume it.
+                Transaction::Deploy(_, _, _, _) => U64::new(0),
                 Transaction::Execute(_, _, Some(fee)) => fee.priority_amount()?,
                 Transaction::Execute(_, _, None) => U64::new(0),
                 Transaction::Fee(..) => {
