@@ -320,9 +320,10 @@ impl<N: Network> BlockSync<N> {
             // Update the latest height.
             current_height = self.canon.latest_block_height();
             // Bump the timestamps of all outstanding requests if we successfully handled a BlockResponse.
+            let now = Instant::now();
             let mut timestamps = self.request_timestamps.write();
-            for (_height, instant) in timestamps.iter_mut() {
-                *instant = Instant::now();
+            for instant in timestamps.values_mut() {
+                *instant = now;
             }
         }
     }
