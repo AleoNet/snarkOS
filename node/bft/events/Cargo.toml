@@ -48,6 +48,7 @@ version = "=2.2.7"
 
 [dependencies.snarkvm]
 workspace = true
+features = [ "ledger" ]
 
 [dependencies.snow]
 version = "0.9"

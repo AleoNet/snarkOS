@@ -329,9 +329,9 @@ impl<N: Network> Consensus<N> {
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<()> {
         #[cfg(feature = "metrics")]
-        let start = subdag.leader_certificate().batch_header().timestamp();
+        let start = subdag.leader_timestamp()?;
         #[cfg(feature = "metrics")]
-        let num_committed_certificates = subdag.values().map(|c| c.len()).sum::<usize>();
+        let num_committed_certificates = subdag.num_certificates();
 
         // Create the candidate next block.
         let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;

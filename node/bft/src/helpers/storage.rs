@@ -18,7 +18,7 @@ use snarkos_node_bft_storage_service::StorageService;
 use snarkvm::{
     ledger::{
         block::Block,
-        narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, BatchHeader, NarwhalCertificate, Transmission, TransmissionID},
     },
     prelude::{anyhow, bail, cfg_iter, ensure, Address, Field, Network, Result},
 };
@@ -597,14 +597,18 @@ impl<N: Network> Storage<N> {
     }
 
     /// Syncs the batch certificate with the block.
-    pub(crate) fn sync_certificate_with_block(&self, block: &Block<N>, certificate: &BatchCertificate<N>) {
+    pub(crate) fn sync_certificate_with_block(
+        &self,
+        block: &Block<N>,
+        certificate: &BatchCertificate<N>,
+    ) -> Result<()> {
         // Skip if the certificate round is below the GC round.
         if certificate.round() <= self.gc_round() {
-            return;
+            return Ok(());
         }
         // If the certificate ID already exists in storage, skip it.
         if self.contains_certificate(certificate.id()) {
-            return;
+            return Ok(());
         }
         // Retrieve the transmissions for the certificate.
         let mut missing_transmissions = HashMap::new();
@@ -669,8 +673,9 @@ impl<N: Network> Storage<N> {
             certificate.transmission_ids().len()
         );
         if let Err(error) = self.insert_certificate(certificate.clone(), missing_transmissions) {
-            error!("Failed to insert certificate '{certificate_id}' from block {} - {error}", block.height());
+            error!("Failed to insert certificate '{certificate_id}' from block {} - {error}", block.height())
         }
+        Ok(())
     }
 }
 

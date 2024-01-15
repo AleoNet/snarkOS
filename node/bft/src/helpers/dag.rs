@@ -14,7 +14,7 @@
 
 use snarkvm::{
     console::types::{Address, Field},
-    ledger::narwhal::BatchCertificate,
+    ledger::narwhal::{BatchCertificate, NarwhalCertificate},
     prelude::Network,
 };
 
@@ -152,7 +152,10 @@ pub(crate) mod test_helpers {
 mod tests {
     use super::*;
     use snarkvm::{
-        prelude::{narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round, Testnet3},
+        prelude::{
+            narwhal::{batch_certificate::test_helpers::sample_batch_certificate_for_round, NarwhalCertificate},
+            Testnet3,
+        },
         utilities::TestRng,
     };
 

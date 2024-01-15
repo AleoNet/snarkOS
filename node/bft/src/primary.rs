@@ -50,7 +50,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, BatchHeader, Data, NarwhalCertificate, Transmission, TransmissionID},
     },
     prelude::committee::Committee,
 };

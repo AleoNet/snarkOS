@@ -24,7 +24,11 @@ use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
-    ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
+    ledger::{
+        authority::Authority,
+        block::Block,
+        narwhal::{BatchCertificate, NarwhalCertificate},
+    },
 };
 
 use anyhow::{bail, Result};
@@ -203,48 +207,40 @@ impl<N: Network> Sync<N> {
         // Iterate over the blocks.
         for block in &blocks {
             // If the block authority is a subdag, then sync the batch certificates with the block.
-            if let Authority::Quorum(subdag) = block.authority() {
+            if block.authority().is_quorum() {
                 // Iterate over the certificates.
-                for certificate in subdag.values().flatten() {
+                for certificate in block.to_full_subdag()?.into_iter_batch_certificates()? {
                     // Sync the batch certificate with the block.
-                    self.storage.sync_certificate_with_block(block, certificate);
+                    self.storage.sync_certificate_with_block(block, &certificate)?;
                 }
             }
         }
 
         /* Sync the BFT DAG */
 
-        // Retrieve the leader certificates.
-        let leader_certificates = blocks
-            .iter()
-            .flat_map(|block| {
-                match block.authority() {
-                    // If the block authority is a beacon, then skip the block.
-                    Authority::Beacon(_) => None,
-                    // If the block authority is a subdag, then retrieve the certificates.
-                    Authority::Quorum(subdag) => {
-                        Some((subdag.leader_certificate().clone(), subdag.election_certificate_ids().clone()))
-                    }
-                }
-            })
-            .collect::<Vec<_>>();
-        if leader_certificates.is_empty() {
+        // Check if the blocks contain a quorum authority, and by extension a leader certificate.
+        let contains_leader_certificate = blocks.iter().any(|block| block.authority().is_quorum());
+        if !contains_leader_certificate {
             return Ok(());
         }
 
         // Construct a list of the certificates.
-        let certificates = blocks
+        let mut leader_certificates = Vec::with_capacity(blocks.len());
+        let num_certificates = blocks
             .iter()
-            .flat_map(|block| {
-                match block.authority() {
-                    // If the block authority is a beacon, then skip the block.
-                    Authority::Beacon(_) => None,
-                    // If the block authority is a subdag, then retrieve the certificates.
-                    Authority::Quorum(subdag) => Some(subdag.values().flatten().cloned().collect::<Vec<_>>()),
-                }
-            })
-            .flatten()
-            .collect::<Vec<_>>();
+            .map(|block| if let Authority::Quorum(subdag) = block.authority() { subdag.num_certificates() } else { 0 })
+            .sum::<usize>();
+        let mut certificates = Vec::with_capacity(num_certificates);
+        for block in blocks {
+            // If the block authority is a quorum subdag, then retrieve the certificates.
+            if block.authority().is_quorum() {
+                let subdag = block.into_full_subdag()?;
+                let leader_certificate = subdag.leader_batch_certificate()?.clone();
+                let election_certificate_ids = subdag.election_certificate_ids().clone();
+                leader_certificates.push((leader_certificate, election_certificate_ids));
+                certificates.extend(subdag.into_iter_batch_certificates()?);
+            }
+        }
 
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
@@ -278,15 +274,16 @@ impl<N: Network> Sync<N> {
         let _lock = self.lock.lock().await;
 
         // If the block authority is a subdag, then sync the batch certificates with the block.
-        if let Authority::Quorum(subdag) = block.authority() {
+        if block.authority().is_quorum() {
             // Iterate over the certificates.
-            for certificate in subdag.values().flatten() {
+            let subdag = block.to_full_subdag()?;
+            for certificate in subdag.into_iter_batch_certificates()? {
                 // Sync the batch certificate with the block.
-                self.storage.sync_certificate_with_block(&block, certificate);
+                self.storage.sync_certificate_with_block(&block, &certificate)?;
                 // If a BFT sender was provided, send the certificate to the BFT.
                 if let Some(bft_sender) = self.bft_sender.get() {
                     // Await the callback to continue.
-                    if let Err(e) = bft_sender.send_sync_bft(certificate.clone()).await {
+                    if let Err(e) = bft_sender.send_sync_bft(certificate).await {
                         bail!("Sync - {e}");
                     };
                 }

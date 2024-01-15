@@ -71,7 +71,7 @@ use snarkvm::{
     ledger::{
         block::Block,
         committee::Committee,
-        narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, BatchHeader, Data, NarwhalCertificate, Transmission, TransmissionID},
     },
     prelude::{Address, Field, Signature},
 };

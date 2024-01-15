@@ -55,7 +55,7 @@ use snarkos_node_tcp::{
 use snarkvm::{
     console::prelude::*,
     ledger::{committee::Committee, narwhal::Data},
-    prelude::Address,
+    prelude::{Address, NarwhalCertificate},
 };
 
 use colored::Colorize;

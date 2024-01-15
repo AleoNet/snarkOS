@@ -35,7 +35,7 @@ use snarkvm::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, NarwhalCertificate, Subdag, Transmission, TransmissionID},
     },
     prelude::{bail, ensure, Field, Network, Result},
 };
@@ -538,13 +538,13 @@ impl<N: Network> BFT<N> {
         // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
         if !IS_SYNCING {
             // Construct the subdag.
-            let subdag = Subdag::from(commit_subdag.clone(), election_certificate_ids.clone())?;
+            let subdag = Subdag::from_full(commit_subdag.clone(), election_certificate_ids.clone())?;
             // Retrieve the anchor round.
             let anchor_round = subdag.anchor_round();
             // Retrieve the number of transmissions.
             let num_transmissions = transmissions.len();
             // Retrieve metadata about the subdag.
-            let subdag_metadata = subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
+            let subdag_metadata = subdag.num_certificates_rounds();
 
             // Ensure the subdag anchor round matches the leader round.
             ensure!(
@@ -819,7 +819,10 @@ mod tests {
     use snarkvm::{
         ledger::{
             committee::Committee,
-            narwhal::batch_certificate::test_helpers::{sample_batch_certificate, sample_batch_certificate_for_round},
+            narwhal::{
+                batch_certificate::test_helpers::{sample_batch_certificate, sample_batch_certificate_for_round},
+                NarwhalCertificate,
+            },
         },
         utilities::TestRng,
     };
