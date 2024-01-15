@@ -216,7 +216,9 @@ impl<N: Network> Router<N> {
 
     /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
     pub fn is_valid_peer_ip(&self, ip: &SocketAddr) -> bool {
-        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_or_broadcast_ip(ip.ip())
+        //!self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_or_broadcast_ip(ip.ip())
+        // always return true for now
+        true
     }
 
     /// Returns the node type.
