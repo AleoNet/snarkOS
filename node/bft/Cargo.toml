@@ -115,10 +115,10 @@ features = [ "codec" ]
 version = "0.1"
 
 [dev-dependencies.axum]
-version = "0.6"
+version = "0.7"
 
 [dev-dependencies.axum-extra]
-version = "0.8.0"
+version = "0.9"
 default-features = false
 features = [ "erased-json" ]
 
@@ -166,7 +166,7 @@ features = [ "test-helpers" ]
 version = "0.3.1"
 
 [dev-dependencies.tower-http]
-version = "0.4"
+version = "0.5"
 features = [ "fs", "trace" ]
 
 [dev-dependencies.tracing-subscriber]
