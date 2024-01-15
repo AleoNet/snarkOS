@@ -41,7 +41,8 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-version = "=0.16.15"
+git = "https://github.com/aleoHQ/snarkVM.git"
+branch = "block_transmission_id_dedup"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
