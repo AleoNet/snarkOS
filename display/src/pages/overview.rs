@@ -15,8 +15,7 @@
 use snarkos_node::Node;
 use snarkvm::prelude::Network;
 
-use tui::{
-    backend::Backend,
+use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::Span,
@@ -27,7 +26,7 @@ use tui::{
 pub(crate) struct Overview;
 
 impl Overview {
-    pub(crate) fn draw<B: Backend, N: Network>(&self, f: &mut Frame<B>, area: Rect, _node: &Node<N>) {
+    pub(crate) fn draw<N: Network>(&self, f: &mut Frame, area: Rect, _node: &Node<N>) {
         // Initialize the layout of the page.
         let chunks = Layout::default()
             .direction(Direction::Vertical)
