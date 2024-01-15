@@ -263,6 +263,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         let peers = self.router().connected_peers();
         // Filter out invalid addresses.
         let peers = peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).take(u8::MAX as usize).collect();
+        // Log the requester and the sent peers.
+        info!("PeerRequest from {}: Sending peers {:?}", peer_ip, peers);
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
         true
