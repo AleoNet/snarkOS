@@ -427,6 +427,12 @@ impl<N: Network> Router<N> {
             })
             .take(max_candidate_peers);
 
+
+        info!("Node's own IP: {:?}", self.local_ip());
+
+        // info-log eligible_peers
+        info!("eligible_peers: {:?}", eligible_peers);
+
         // Proceed to insert the eligible candidate peer IPs.
         self.candidate_peers.write().extend(eligible_peers);
         #[cfg(feature = "metrics")]

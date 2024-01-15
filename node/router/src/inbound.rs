@@ -262,7 +262,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Retrieve the connected peers.
         let peers = self.router().connected_peers();
         // Filter out invalid addresses and the requesting peer's address.
-        let peers = peers.into_iter().filter(|ip| *ip != peer_ip && self.router().is_valid_peer_ip(ip)).take(u8::MAX as usize).collect();
+        let peers = peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).take(u8::MAX as usize).collect();
+        //let peers = peers.into_iter().filter(|ip| *ip != peer_ip && self.router().is_valid_peer_ip(ip)).take(u8::MAX as usize).collect();
         // Log the requester and the sent peers.
         info!("PeerRequest from {}: Sending peers {:?}", peer_ip, peers);
         // Send a `PeerResponse` message to the peer.
@@ -274,6 +275,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
         // Filter out invalid addresses.
         let peers = peers.iter().copied().filter(|ip| self.router().is_valid_peer_ip(ip)).collect::<Vec<_>>();
+        // Log the requester and the sent peers.
+        info!("PeerResponse from {}: Received peers {:?}", _peer_ip, peers);
         // Adds the given peer IPs to the list of candidate peers.
         self.router().insert_candidate_peers(&peers);
         true

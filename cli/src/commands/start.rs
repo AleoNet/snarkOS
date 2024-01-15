@@ -417,6 +417,11 @@ impl Start {
                 self.node.to_string().bold()
             );
 
+            println!(
+                "nochmal: {}",
+                self.node.to_string().bold()
+            );
+
             // If the node is running a REST server, print the REST IP and JWT.
             if node_type.is_validator() {
                 if let Some(rest_ip) = rest_ip {
