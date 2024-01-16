@@ -53,7 +53,7 @@ use clap::{Parser, ValueEnum};
 use indexmap::IndexMap;
 use rand::{Rng, SeedableRng};
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
-use tokio::sync::oneshot;
+use tokio::{net::TcpListener, sync::oneshot};
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
@@ -401,10 +401,9 @@ async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<Current
 
     // Run the server.
     info!("Starting the server at '{addr}'...");
-    axum::Server::bind(&addr.parse().unwrap())
-        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-        .await
-        .unwrap();
+    let rest_addr: SocketAddr = addr.parse().unwrap();
+    let rest_listener = TcpListener::bind(rest_addr).await.unwrap();
+    axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
 }
 
 /**************************************************************************************************/
