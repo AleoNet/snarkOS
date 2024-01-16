@@ -257,8 +257,15 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         serialized: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
     ) -> bool {
+        // Estimate the transaction size
+        let transaction_size = match &serialized.transaction {
+            // Get the serialized size of incoming messages.
+            Data::Buffer(buffer) => buffer.len(),
+            // NOTE: this measurement might be off and is slow, but is not used in a hot path.
+            Data::Object(tx) => std::mem::size_of_val(tx),
+        };
         // Add the unconfirmed transaction to the memory pool.
-        if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction).await {
+        if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction, transaction_size).await {
             trace!("[UnconfirmedTransaction] {error}");
             return true; // Maintain the connection.
         }

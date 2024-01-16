@@ -311,8 +311,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     ) -> Result<ErasedJson, RestError> {
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
+            // Estimate transaction_size
+            // NOTE: this measurement might be off and is slow, but this endpoint is not a hot path.
+            let transaction_size = std::mem::size_of_val(&tx);
             // Add the unconfirmed transaction to the memory pool.
-            consensus.add_unconfirmed_transaction(tx.clone()).await?;
+            consensus.add_unconfirmed_transaction(tx.clone(), transaction_size).await?;
         }
 
         // Prepare the unconfirmed transaction message.
