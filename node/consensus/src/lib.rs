@@ -49,7 +49,16 @@ use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
 use lru::LruCache;
 use parking_lot::Mutex;
-use std::{collections::BTreeMap, future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    future::Future,
+    net::SocketAddr,
+    num::NonZeroUsize,
+    sync::{
+        atomic::{AtomicI64, Ordering::Relaxed},
+        Arc,
+    },
+};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -58,6 +67,7 @@ use tokio::{
 type PriorityFee<N> = U64<N>;
 type Timestamp = i128;
 type TransactionSize = i64;
+type AtomicTransactionSize = AtomicI64;
 // Transactions are sorted by priority_fee, oldest timestamp, smallest size and transaction ID.
 type TransactionKey<N> = (PriorityFee<N>, Timestamp, TransactionSize, Field<N>);
 
@@ -76,7 +86,7 @@ pub struct Consensus<N: Network> {
     /// The unconfirmed transactions queue.
     transactions_queue: Arc<Mutex<BTreeMap<TransactionKey<N>, Transaction<N>>>>,
     /// Size of transactions queue.
-    transactions_queue_size: Arc<Mutex<TransactionSize>>,
+    transactions_queue_size: Arc<AtomicTransactionSize>,
     /// Set of transactions in queue.
     transactions_in_queue: Arc<Mutex<IndexSet<N::TransactionID>>>,
     /// The recently-seen unconfirmed solutions.
@@ -271,15 +281,14 @@ impl<N: Network> Consensus<N> {
                 bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
             // Compute the approximate new (serialized) size of the transactions queue.
-            let new_tx_queue_size = self.transactions_queue_size.lock().saturating_add(size);
+            let tx_queue_size = self.transactions_queue_size.load(Relaxed).saturating_add(size);
             // If the transctions queue is approximately full, return early.
-            if new_tx_queue_size >= MAX_TX_QUEUE_SIZE {
+            if tx_queue_size >= MAX_TX_QUEUE_SIZE {
                 return Ok(());
             }
             // For deployments, if the transactions queue is 75% full, return early.
             // TODO: get rid of this restriction once we are assured we can take speculative fees.
-            if transaction.is_deploy() && new_tx_queue_size >= MAX_TX_QUEUE_SIZE.saturating_mul(75).saturating_div(100)
-            {
+            if transaction.is_deploy() && tx_queue_size >= MAX_TX_QUEUE_SIZE.saturating_div(100).saturating_mul(75) {
                 return Ok(());
             }
             // Get the priority_fee amount from the Deploy or Execute Transaction. Fee Transactions are not expected here.
@@ -294,7 +303,7 @@ impl<N: Network> Consensus<N> {
             };
             // Add the transaction to the memory pool, ordered by priority_fee and oldest timestamp.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
-            if self.add_transaction_to_queue(priority_fee, transaction_id, transaction, new_tx_queue_size).is_err() {
+            if self.add_transaction_to_queue(priority_fee, transaction_id, transaction, tx_queue_size).is_err() {
                 bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
             }
         }
@@ -309,7 +318,7 @@ impl<N: Network> Consensus<N> {
             // Determine the available capacity.
             let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
             // Pop the transactions from the queue.
-            self.pop_transactions_from_queue(capacity)
+            self.pop_transactions_from_queue(capacity)?
         };
         // Iterate over the transactions.
         for (_, transaction) in transactions.into_iter() {
@@ -339,8 +348,7 @@ impl<N: Network> Consensus<N> {
         let inserted = self.transactions_in_queue.lock().insert(id);
         ensure!(inserted, "Transaction '{}' exists in the queue", fmt_id(id));
         // Add the size to the tracking transactions_queue_size.
-        let mut queue_size = self.transactions_queue_size.lock();
-        *queue_size = queue_size.saturating_add(size);
+        self.transactions_queue_size.fetch_update(Relaxed, Relaxed, |x| Some(x.saturating_add(size))).map_err(error)?;
         // Add the Transaction to the queue.
         let found = self.transactions_queue.lock().insert((priority_fee, -timestamp, -size, *id.deref()), transaction);
         ensure!(found.is_none(), "Transaction '{}' exists in the memory pool", fmt_id(id));
@@ -348,7 +356,7 @@ impl<N: Network> Consensus<N> {
     }
 
     /// Pops an unconfirmed transaction from the transaction_queue
-    fn pop_transactions_from_queue(&self, capacity: usize) -> Vec<(TransactionKey<N>, Transaction<N>)> {
+    fn pop_transactions_from_queue(&self, capacity: usize) -> Result<Vec<(TransactionKey<N>, Transaction<N>)>> {
         // Acquire the lock on the queue.
         let mut queue = self.transactions_queue.lock();
         // Determine the number of transactions to send.
@@ -358,11 +366,12 @@ impl<N: Network> Consensus<N> {
         // Remove the transactions from the queue index, size tracker and mark them again freshly as seen.
         for ((_, _, negative_size, _), tx) in transactions.iter() {
             self.transactions_in_queue.lock().remove(&tx.id());
-            let mut queue_size = self.transactions_queue_size.lock();
-            *queue_size = queue_size.saturating_add(*negative_size);
+            self.transactions_queue_size
+                .fetch_update(Relaxed, Relaxed, |x| Some(x.saturating_add(*negative_size)))
+                .map_err(error)?;
             self.seen_transactions.lock().put(tx.id(), ());
         }
-        transactions
+        Ok(transactions)
     }
 }
 
@@ -504,7 +513,10 @@ mod tests {
         prelude::{Itertools, Uniform},
         utilities::TestRng,
     };
-    use std::{ops::Deref, sync::Arc};
+    use std::{
+        ops::Deref,
+        sync::{atomic::Ordering::Relaxed, Arc},
+    };
 
     use crate::Consensus;
 
@@ -550,14 +562,14 @@ mod tests {
         }
         assert_eq!(consensus.transactions_queue.lock().len(), 4);
         assert_eq!(consensus.transactions_in_queue.lock().len(), 4);
-        assert_eq!(*consensus.transactions_queue_size.lock(), 4 * size);
+        assert_eq!(consensus.transactions_queue_size.load(Relaxed), 4 * size);
 
         // When the fee is the same, the oldest timestamp is popped first.
         // When the fee is different, the highest fee is popped first.
         // So we expect the above transactions to be popped in order 2, 3, 1, 0.
         let expected_ids = [2, 3, 1, 0];
         for expected_id in expected_ids {
-            let mut transactions = consensus.pop_transactions_from_queue(1);
+            let mut transactions = consensus.pop_transactions_from_queue(1).unwrap();
             assert_eq!(transactions.len(), 1);
             let (priority_fee, _, _, id) = transactions.pop().unwrap().0;
             assert_eq!(priority_fee, priority_fees[expected_id]);
@@ -567,8 +579,8 @@ mod tests {
         // If the queue is empty, no transactions are popped.
         assert!(consensus.transactions_queue.lock().is_empty());
         assert!(consensus.transactions_in_queue.lock().is_empty());
-        assert_eq!(*consensus.transactions_queue_size.lock(), 0);
-        let queue_is_empty = consensus.pop_transactions_from_queue(1).is_empty();
+        assert_eq!(consensus.transactions_queue_size.load(Relaxed), 0);
+        let queue_is_empty = consensus.pop_transactions_from_queue(1).unwrap().is_empty();
         assert!(queue_is_empty);
 
         // Insert Transactions into the queue without sleeps.
@@ -577,12 +589,12 @@ mod tests {
         }
         assert_eq!(consensus.transactions_queue.lock().len(), 4);
         assert_eq!(consensus.transactions_in_queue.lock().len(), 4);
-        assert_eq!(*consensus.transactions_queue_size.lock(), 4 * size);
+        assert_eq!(consensus.transactions_queue_size.load(Relaxed), 4 * size);
         // We expect all transactions to be in the queue, with unknown order because of similar timestamps.
-        let transactions = consensus.pop_transactions_from_queue(4);
+        let transactions = consensus.pop_transactions_from_queue(4).unwrap();
         assert_eq!(transactions.len(), 4);
         assert!(consensus.transactions_queue.lock().is_empty());
         assert!(consensus.transactions_in_queue.lock().is_empty());
-        assert_eq!(*consensus.transactions_queue_size.lock(), 0);
+        assert_eq!(consensus.transactions_queue_size.load(Relaxed), 0);
     }
 }
