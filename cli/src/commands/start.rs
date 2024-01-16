@@ -125,11 +125,14 @@ pub struct Start {
     pub dev_num_validators: Option<u16>,
 
     #[clap(long)]
-    pub coinbase_private_key: Option<String>,
+    pub customer_bond_private_keys: Option<String>,
     #[clap(long)]
-    pub customer_private_keys: Option<String>,
+    pub customer_bond_amounts: Option<String>,
+
     #[clap(long)]
-    pub customer_bond_amount: Option<u64>,
+    pub customer_addresses: Option<String>,
+    #[clap(long)]
+    pub customer_public_balance_amounts: Option<String>,
 }
 
 impl Start {
@@ -298,23 +301,23 @@ impl Start {
     /// Returns an alternative genesis block if the node is in development mode.
     /// Otherwise, returns the actual genesis block.
     fn parse_genesis<N: Network>(&self) -> Result<Block<N>> {
-        if self.dev.is_some() && self.coinbase_private_key.is_some() {
-            let coinbase_private_key = match &self.coinbase_private_key {
-                Some(private_key) => PrivateKey::<N>::from_str(&private_key)?,
-                None => bail!("Please specify a coinbase private key"),
-            };
-
-            let customer_bonds = match &self.customer_private_keys {
+        if self.dev.is_some() && self.customer_bond_private_keys.is_some() {
+            let customer_bonds = match &self.customer_bond_private_keys {
                 Some(customer_private_keys) => {
-                    let customer_bond_amount = match &self.customer_bond_amount {
-                        Some(balance) => balance,
+                    let customer_bond_amounts = match &self.customer_bond_amounts {
+                        Some(balances) => balances,
                         None => bail!("Please specify an initial balance for the customer bond amount."),
                     };
 
+                    let mut bond_amounts = vec![];
+                    for key in customer_bond_amounts.split(",") {
+                        bond_amounts.push(key.parse::<u64>()?);
+                    }
+
                     let mut customer_bonds: indexmap::IndexMap<_, _> = Default::default();
-                    for key in customer_private_keys.split(",") {
+                    for (i, key) in customer_private_keys.split(",").enumerate() {
                         let customer_private_key = PrivateKey::<N>::from_str(key)?;
-                        customer_bonds.insert(customer_private_key, *customer_bond_amount);
+                        customer_bonds.insert(customer_private_key, bond_amounts[i]);
                     }
 
                     customer_bonds
@@ -322,7 +325,30 @@ impl Start {
                 None => bail!("Please specify customer private keys"),
             };
 
-            self.create_custom_genesis(coinbase_private_key, customer_bonds)
+            let customer_public_balances = match &self.customer_addresses {
+                Some(customer_addresses) => {
+                    let customer_balances = match &self.customer_public_balance_amounts {
+                        Some(balances) => balances,
+                        None => bail!("Please specify an initial balance for the customer bond amount."),
+                    };
+
+                    let mut balances = vec![];
+                    for key in customer_balances.split(",") {
+                        balances.push(key.parse::<u64>()?);
+                    }
+
+                    let mut customer_public_balances: indexmap::IndexMap<_, _> = Default::default();
+                    for (i, key) in customer_addresses.split(",").enumerate() {
+                        let customer_address = Address::<N>::from_str(key)?;
+                        customer_public_balances.insert(customer_address, balances[i]);
+                    }
+
+                    customer_public_balances
+                }
+                None => bail!("Please specify customer private keys"),
+            };
+
+            self.create_custom_genesis(customer_bonds, customer_public_balances)
         } else if self.dev.is_some() {
             // Determine the number of genesis committee members.
             let num_committee_members = match self.dev_num_validators {
@@ -527,8 +553,8 @@ impl Start {
     ///     - These customer balances are sent to the `coinbase_recipient_address`.
     pub fn create_custom_genesis<N: Network>(
         &self,
-        coinbase_private_key: PrivateKey<N>, // Coinbase's private key.
         customer_bonds: indexmap::IndexMap<PrivateKey<N>, u64>, // Initial transfers from Coinbase customers.
+        additional_public_balances: indexmap::IndexMap<Address<N>, u64>, // Additional public balances.
     ) -> Result<Block<N>> {
         // Determine the number of genesis committee members.
         let num_committee_members = match self.dev_num_validators {
@@ -573,19 +599,29 @@ impl Start {
             .collect::<Result<indexmap::IndexMap<_, _>>>()?;
 
         // TODO: Consider the fee amount. This is just the base fee amount on testnet3.
-        let transfer_public_fee_amount = 263388u64;
         let bond_public_fee_amount = 843880u64;
 
-        let mut coinbase_transfer_balances = 0;
-        for (_, amount) in customer_bonds.iter() {
-            coinbase_transfer_balances += amount + transfer_public_fee_amount + bond_public_fee_amount;
+        let mut bond_amounts = 0;
+        for (private_key, amount) in customer_bonds.iter() {
+            let amt = amount + bond_public_fee_amount;
+
+            public_balances.insert(Address::try_from(private_key)?, amt);
+
+            bond_amounts += amt;
         }
-        public_balances.insert(Address::try_from(&coinbase_private_key)?, coinbase_transfer_balances);
+
+        let mut additional_balances = 0;
+        for (address, amount) in additional_public_balances.iter() {
+            public_balances.insert(*address, *amount);
+
+            additional_balances += amount;
+        }
 
         // If there is some leftover balance, add it to the 0-th validator.
         let leftover = remaining_balance
             .saturating_sub(public_balance_per_validator * num_committee_members as u64)
-            .saturating_sub(coinbase_transfer_balances);
+            .saturating_sub(additional_balances)
+            .saturating_sub(bond_amounts);
         if leftover > 0 {
             let (_, balance) = public_balances.get_index_mut(0).unwrap();
             *balance += leftover;
@@ -604,14 +640,7 @@ impl Start {
         // Initialize a new VM.
         let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
         // Initialize the custom genesis block.
-        vm.custom_genesis_quorum(
-            &development_private_keys[0],
-            committee,
-            public_balances,
-            coinbase_private_key,
-            customer_bonds,
-            &mut rng,
-        )
+        vm.custom_genesis_quorum(&development_private_keys[0], committee, public_balances, customer_bonds, &mut rng)
     }
 }
 
