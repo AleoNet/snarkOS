@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
+use snarkvm::prelude::{block::Transaction, Identifier, Plaintext, ToBytes};
 
 use indexmap::IndexMap;
 use rayon::prelude::*;
@@ -311,9 +311,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     ) -> Result<ErasedJson, RestError> {
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
-            // Estimate transaction_size
-            // NOTE: this measurement might be off and is slow, but this endpoint is not a hot path.
-            let transaction_size = std::mem::size_of_val(&tx);
+            // Get serialized transaction size.
+            let transaction_size = tx.to_bytes_le()?.len();
             // Add the unconfirmed transaction to the memory pool.
             consensus.add_unconfirmed_transaction(tx.clone(), transaction_size).await?;
         }

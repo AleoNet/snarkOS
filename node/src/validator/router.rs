@@ -27,7 +27,7 @@ use snarkos_node_router::messages::{
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Transaction, coinbase::EpochChallenge, error, Network},
+    prelude::{block::Transaction, coinbase::EpochChallenge, error, Network, ToBytes},
 };
 
 use std::{io, net::SocketAddr, time::Duration};
@@ -257,12 +257,17 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         serialized: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
     ) -> bool {
-        // Estimate the transaction size
+        // Get the serialized size of transactions.
         let transaction_size = match &serialized.transaction {
-            // Get the serialized size of incoming messages.
+            // Transaction was received from another node.
             Data::Buffer(buffer) => buffer.len(),
-            // NOTE: this measurement might be off and is slow, but is not used in a hot path.
-            Data::Object(tx) => std::mem::size_of_val(tx),
+            // Transaction was received from own node.
+            Data::Object(tx) => {
+                let Ok(bytes) = tx.to_bytes_le() else {
+                    return false;
+                };
+                bytes.len()
+            }
         };
         // Add the unconfirmed transaction to the memory pool.
         if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction, transaction_size).await {

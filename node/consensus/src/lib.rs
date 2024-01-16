@@ -254,11 +254,11 @@ impl<N: Network> Consensus<N> {
     }
 
     /// Adds the given unconfirmed transaction to the memory pool.
-    pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>, size: usize) -> Result<()> {
+    pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>, serialized_size: usize) -> Result<()> {
         // Process the unconfirmed transaction.
         {
             // Convert the size of the transaction.
-            let size = TransactionSize::try_from(size)?;
+            let size = TransactionSize::try_from(serialized_size)?;
             // Get the transaction ID.
             let transaction_id = transaction.id();
 
