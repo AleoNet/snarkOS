@@ -4884,9 +4884,9 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tower_governor"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4551a0307fd2f95f113688b8c05ec77834af7390293663261621fccd85e97724"
+checksum = "85a54c8af9e56c11e47b70dc8504e81d362783e2fd8e7373938d632954841126"
 dependencies = [
  "axum",
  "forwarded-header-value",
