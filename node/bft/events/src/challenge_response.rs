@@ -17,6 +17,7 @@ use super::*;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChallengeResponse<N: Network> {
     pub signature: Data<Signature<N>>,
+    pub nonce: u64,
 }
 
 impl<N: Network> EventTrait for ChallengeResponse<N> {
@@ -30,6 +31,7 @@ impl<N: Network> EventTrait for ChallengeResponse<N> {
 impl<N: Network> ToBytes for ChallengeResponse<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.signature.write_le(&mut writer)?;
+        self.nonce.write_le(&mut writer)?;
         Ok(())
     }
 }
@@ -37,8 +39,9 @@ impl<N: Network> ToBytes for ChallengeResponse<N> {
 impl<N: Network> FromBytes for ChallengeResponse<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let signature = Data::read_le(&mut reader)?;
+        let nonce = u64::read_le(&mut reader)?;
 
-        Ok(Self { signature })
+        Ok(Self { signature, nonce })
     }
 }
 
@@ -53,7 +56,7 @@ pub mod prop_tests {
     };
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{BoxedStrategy, Strategy};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -70,7 +73,9 @@ pub mod prop_tests {
     }
 
     pub fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
-        any_signature().prop_map(|sig| ChallengeResponse { signature: Data::Object(sig) }).boxed()
+        (any_signature(), any::<u64>())
+            .prop_map(|(sig, nonce)| ChallengeResponse { signature: Data::Object(sig), nonce })
+            .boxed()
     }
 
     #[proptest]
