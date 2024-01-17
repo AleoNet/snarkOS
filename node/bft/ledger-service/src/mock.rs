@@ -23,7 +23,7 @@ use snarkvm::{
     prelude::{bail, ensure, Field, Network, Result},
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{collections::BTreeMap, ops::Range};
 use tracing::*;
@@ -184,6 +184,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         &self,
         _subdag: Subdag<N>,
         _transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        _prior_transmissions: IndexSet<TransmissionID<N>>,
     ) -> Result<Block<N>> {
         unreachable!("MockLedgerService does not support prepare_advance_to_next_quorum_block")
     }

@@ -23,7 +23,7 @@ use snarkvm::{
     prelude::{bail, Field, Network, Result},
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use std::ops::Range;
 
 /// A ledger service for a prover.
@@ -162,6 +162,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         &self,
         _subdag: Subdag<N>,
         _transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        _prior_transmissions: IndexSet<TransmissionID<N>>,
     ) -> Result<Block<N>> {
         bail!("Cannot prepare advance to next quorum block in prover")
     }

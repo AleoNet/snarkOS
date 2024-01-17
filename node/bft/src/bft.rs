@@ -506,6 +506,8 @@ impl<N: Network> BFT<N> {
         };
         // Initialize a map for the deduped transmissions.
         let mut transmissions = IndexMap::new();
+        // Initialize a map for the deduped prior transmission ids.
+        let mut prior_included_transmissions = IndexSet::new();
         // Start from the oldest leader certificate.
         for certificate in commit_subdag.values().flatten() {
             // Update the DAG.
@@ -518,11 +520,6 @@ impl<N: Network> BFT<N> {
                 if transmissions.contains_key(transmission_id) {
                     continue;
                 }
-                // If the transmission already exists in the ledger, skip it.
-                // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
-                if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
-                    continue;
-                }
                 // Retrieve the transmission.
                 let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
                     bail!(
@@ -531,8 +528,14 @@ impl<N: Network> BFT<N> {
                         certificate.round()
                     );
                 };
-                // Add the transmission to the set.
-                transmissions.insert(*transmission_id, transmission);
+                // TODO: this also means that they won't necessarily be prior_included_transactions, and it might fail other checks... What do? Repeated this check until we succeed, or make the verify block check way more expensive.
+                // Add the transmission to the set of prior or new transmissions.
+                // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
+                if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
+                    prior_included_transmissions.insert(*transmission_id);
+                } else {
+                    transmissions.insert(*transmission_id, transmission);
+                }
             }
         }
         // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
@@ -557,7 +560,10 @@ impl<N: Network> BFT<N> {
                 // Initialize a callback sender and receiver.
                 let (callback_sender, callback_receiver) = oneshot::channel();
                 // Send the subdag and transmissions to consensus.
-                consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
+                consensus_sender
+                    .tx_consensus_subdag
+                    .send((subdag, transmissions, prior_included_transmissions, callback_sender))
+                    .await?;
                 // Await the callback to continue.
                 match callback_receiver.await {
                     Ok(Ok(())) => (), // continue
@@ -573,7 +579,7 @@ impl<N: Network> BFT<N> {
             }
 
             info!(
-                "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
+                "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} new transmissions: {subdag_metadata:?}\n"
             );
             // Update the DAG, as the subdag was successfully included into a block.
             let mut dag_write = self.dag.write();

@@ -22,7 +22,7 @@ use snarkvm::{
     prelude::{Field, Network, Result},
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use std::{fmt::Debug, ops::Range};
 
 #[async_trait]
@@ -108,6 +108,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
         &self,
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        prior_transmissions: IndexSet<TransmissionID<N>>,
     ) -> Result<Block<N>>;
 
     /// Adds the given block as the next block in the ledger.

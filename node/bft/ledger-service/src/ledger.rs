@@ -25,7 +25,7 @@ use snarkvm::{
     prelude::{bail, Field, Network, Result},
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use std::{
     fmt,
     ops::Range,
@@ -284,8 +284,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         &self,
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        prior_transmissions: IndexSet<TransmissionID<N>>,
     ) -> Result<Block<N>> {
-        self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)
+        self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions, prior_transmissions)
     }
 
     /// Adds the given block as the next block in the ledger.

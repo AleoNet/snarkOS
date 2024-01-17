@@ -45,7 +45,7 @@ use snarkvm::{
 
 use anyhow::Result;
 use colored::Colorize;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use lru::LruCache;
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
@@ -293,8 +293,10 @@ impl<N: Network> Consensus<N> {
         // Process the committed subdag and transmissions from the BFT.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((committed_subdag, transmissions, callback)) = rx_consensus_subdag.recv().await {
-                self_.process_bft_subdag(committed_subdag, transmissions, callback).await;
+            while let Some((committed_subdag, transmissions, prior_transmissions, callback)) =
+                rx_consensus_subdag.recv().await
+            {
+                self_.process_bft_subdag(committed_subdag, transmissions, prior_transmissions, callback).await;
             }
         });
     }
@@ -304,12 +306,13 @@ impl<N: Network> Consensus<N> {
         &self,
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        prior_transmissions: IndexSet<TransmissionID<N>>,
         callback: oneshot::Sender<Result<()>>,
     ) {
         // Try to advance to the next block.
         let self_ = self.clone();
         let transmissions_ = transmissions.clone();
-        let result = spawn_blocking! { self_.try_advance_to_next_block(subdag, transmissions_) };
+        let result = spawn_blocking! { self_.try_advance_to_next_block(subdag, transmissions_, prior_transmissions) };
 
         // If the block failed to advance, reinsert the transmissions into the memory pool.
         if let Err(e) = &result {
@@ -327,6 +330,7 @@ impl<N: Network> Consensus<N> {
         &self,
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        prior_transmissions: IndexSet<TransmissionID<N>>,
     ) -> Result<()> {
         #[cfg(feature = "metrics")]
         let start = subdag.leader_timestamp()?;
@@ -334,7 +338,8 @@ impl<N: Network> Consensus<N> {
         let num_committed_certificates = subdag.num_certificates();
 
         // Create the candidate next block.
-        let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
+        let next_block =
+            self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions, prior_transmissions)?;
         // Check that the block is well-formed.
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.

@@ -14,7 +14,7 @@
 
 use crate::{CoreLedgerService, LedgerService};
 use async_trait::async_trait;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
@@ -170,8 +170,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         &self,
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        prior_transmissions: IndexSet<TransmissionID<N>>,
     ) -> Result<Block<N>> {
-        self.inner.prepare_advance_to_next_quorum_block(subdag, transmissions)
+        self.inner.prepare_advance_to_next_quorum_block(subdag, transmissions, prior_transmissions)
     }
 
     /// Adds the given block as the next block in the ledger.
