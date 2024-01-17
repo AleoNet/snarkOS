@@ -164,12 +164,15 @@ impl<N: Network> Router<N> {
         }
         /* Step 3: Send the challenge response. */
 
+        let response_nonce: u64 = rng.gen();
+        let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
         // Sign the counterparty nonce.
-        let Ok(our_signature) = self.account.sign_bytes(&peer_request.nonce.to_le_bytes(), rng) else {
+        let Ok(our_signature) = self.account.sign_bytes(&data, rng) else {
             return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
         };
         // Send the challenge response.
-        let our_response = ChallengeResponse { genesis_header, signature: Data::Object(our_signature) };
+        let our_response =
+            ChallengeResponse { genesis_header, signature: Data::Object(our_signature), nonce: response_nonce };
         send(&mut framed, peer_addr, Message::ChallengeResponse(our_response)).await?;
 
         // Add the peer to the router.
@@ -213,11 +216,14 @@ impl<N: Network> Router<N> {
         let rng = &mut OsRng;
 
         // Sign the counterparty nonce.
-        let Ok(our_signature) = self.account.sign_bytes(&peer_request.nonce.to_le_bytes(), rng) else {
+        let response_nonce: u64 = rng.gen();
+        let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+        let Ok(our_signature) = self.account.sign_bytes(&data, rng) else {
             return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
         };
         // Send the challenge response.
-        let our_response = ChallengeResponse { genesis_header, signature: Data::Object(our_signature) };
+        let our_response =
+            ChallengeResponse { genesis_header, signature: Data::Object(our_signature), nonce: response_nonce };
         send(&mut framed, peer_addr, Message::ChallengeResponse(our_response)).await?;
 
         // Sample a random nonce.
@@ -303,7 +309,7 @@ impl<N: Network> Router<N> {
         expected_nonce: u64,
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge response.
-        let ChallengeResponse { genesis_header, signature } = response;
+        let ChallengeResponse { genesis_header, signature, nonce } = response;
 
         // Verify the challenge response, by checking that the block header matches.
         if genesis_header != expected_genesis_header {
@@ -316,7 +322,7 @@ impl<N: Network> Router<N> {
             return Some(DisconnectReason::InvalidChallengeResponse);
         };
         // Verify the signature.
-        if !signature.verify_bytes(&peer_address, &expected_nonce.to_le_bytes()) {
+        if !signature.verify_bytes(&peer_address, &[expected_nonce.to_le_bytes(), nonce.to_le_bytes()].concat()) {
             warn!("Handshake with '{peer_addr}' failed (invalid signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         }
