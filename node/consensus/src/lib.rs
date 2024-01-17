@@ -50,6 +50,7 @@ use indexmap::{IndexMap, IndexSet};
 use lru::LruCache;
 use parking_lot::Mutex;
 use std::{
+    cmp::Reverse,
     collections::BTreeMap,
     future::Future,
     net::SocketAddr,
@@ -69,7 +70,7 @@ type Timestamp = i128;
 type TransactionSize = i64;
 type AtomicTransactionSize = AtomicI64;
 // Transactions are sorted by priority_fee, oldest timestamp, smallest size and transaction ID.
-type TransactionKey<N> = (PriorityFee<N>, Timestamp, TransactionSize, Field<N>);
+type TransactionKey<N> = (PriorityFee<N>, Reverse<Timestamp>, Reverse<TransactionSize>, Field<N>);
 
 const MAX_TX_QUEUE_SIZE: TransactionSize = 1 << 30; // in bytes
 
@@ -350,7 +351,10 @@ impl<N: Network> Consensus<N> {
         // Add the size to the tracking transactions_queue_size.
         self.transactions_queue_size.fetch_update(Relaxed, Relaxed, |x| Some(x.saturating_add(size))).map_err(error)?;
         // Add the Transaction to the queue.
-        let found = self.transactions_queue.lock().insert((priority_fee, -timestamp, -size, *id.deref()), transaction);
+        let found = self
+            .transactions_queue
+            .lock()
+            .insert((priority_fee, Reverse(timestamp), Reverse(size), *id.deref()), transaction);
         ensure!(found.is_none(), "Transaction '{}' exists in the memory pool", fmt_id(id));
         Ok(())
     }
@@ -364,10 +368,10 @@ impl<N: Network> Consensus<N> {
         // Pop the transactions from the queue.
         let transactions = (0..num_transactions).map(|_| queue.pop_last().unwrap()).collect::<Vec<_>>();
         // Remove the transactions from the queue index, size tracker and mark them again freshly as seen.
-        for ((_, _, negative_size, _), tx) in transactions.iter() {
+        for ((_, _, Reverse(size), _), tx) in transactions.iter() {
             self.transactions_in_queue.lock().remove(&tx.id());
             self.transactions_queue_size
-                .fetch_update(Relaxed, Relaxed, |x| Some(x.saturating_add(*negative_size)))
+                .fetch_update(Relaxed, Relaxed, |x| Some(x.saturating_sub(*size)))
                 .map_err(error)?;
             self.seen_transactions.lock().put(tx.id(), ());
         }
