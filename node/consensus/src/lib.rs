@@ -303,7 +303,7 @@ impl<N: Network> Consensus<N> {
             };
             // Add the transaction to the memory pool, ordered by priority_fee and oldest timestamp.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
-            if self.add_transaction_to_queue(priority_fee, transaction_id, transaction, tx_queue_size).is_err() {
+            if self.add_transaction_to_queue(priority_fee, transaction_id, transaction, size).is_err() {
                 bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
             }
         }
