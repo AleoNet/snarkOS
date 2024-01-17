@@ -1,4 +1,41 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.2.3"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -24,7 +61,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -42,7 +79,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -122,7 +159,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_router_connected_total",
@@ -137,7 +174,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -217,7 +254,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_router_candidate_total",
@@ -232,7 +269,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -312,7 +349,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_router_restricted_total",
@@ -327,7 +364,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -369,12 +406,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_blocks_height_total",
@@ -389,7 +426,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -465,7 +502,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
           "expr": "sum(rate(snarkos_blocks_transactions_total[5m]))",
@@ -480,7 +517,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -560,7 +597,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -580,7 +617,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -660,7 +697,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -693,7 +730,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -735,12 +772,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -759,7 +796,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -801,12 +838,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_consensus_last_committed_round",
@@ -821,7 +858,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -863,12 +900,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
           "expr": "snarkos_consensus_committed_certificates_total",
@@ -883,7 +920,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -925,12 +962,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_bft_leaders_elected_total",
@@ -958,7 +995,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1040,7 +1077,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1082,7 +1119,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1163,7 +1200,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1197,7 +1234,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1277,7 +1314,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1297,7 +1334,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1378,7 +1415,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1398,7 +1435,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1479,7 +1516,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1502,7 +1539,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1583,7 +1620,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1603,7 +1640,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1684,7 +1721,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1704,7 +1741,7 @@
   ],
   "refresh": "5s",
   "revision": 1,
-  "schemaVersion": 38,
+  "schemaVersion": 39,
   "tags": [
     "snarkos",
     "aleo"
@@ -1733,6 +1770,6 @@
   "timezone": "",
   "title": "snarkOS",
   "uid": "ahTJm4-4k",
-  "version": 14,
+  "version": 1,
   "weekStart": ""
 }
