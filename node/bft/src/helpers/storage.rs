@@ -1125,6 +1125,12 @@ pub mod prop_tests {
             &mut rng,
         )
         .unwrap();
+
+        // Remove the author from the validator set passed to create the batch
+        // certificate, the author should not sign their own batch.
+        let mut validators = validators.clone();
+        validators.remove(signer);
+
         let certificate = BatchCertificate::from(
             batch_header.clone(),
             sign_batch_header(&ValidatorSet(validators), &batch_header, &mut rng),

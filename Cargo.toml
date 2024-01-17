@@ -41,7 +41,7 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-version = "=0.16.15"
+version = "=0.16.16"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
