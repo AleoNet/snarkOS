@@ -1116,18 +1116,7 @@ impl<N: Network> Primary<N> {
 
     /// Increments to the next round.
     async fn try_increment_to_the_next_round(&self, next_round: u64) -> Result<()> {
-        // If the next round is within GC range, then iterate to the penultimate round.
-        if self.current_round() + self.storage.max_gc_rounds() >= next_round {
-            let mut fast_forward_round = self.current_round();
-            // Iterate until the penultimate round is reached.
-            while fast_forward_round < next_round.saturating_sub(1) {
-                // Update to the next round in storage.
-                fast_forward_round = self.storage.increment_to_next_round(fast_forward_round)?;
-                // Clear the proposed batch.
-                *self.proposed_batch.write() = None;
-            }
-        }
-
+        
         // Retrieve the current round.
         let current_round = self.current_round();
         // Attempt to advance to the next round.
@@ -1144,10 +1133,9 @@ impl<N: Network> Primary<N> {
             }
             // Otherwise, handle the Narwhal case.
             else {
-                // Update to the next round in storage.
-                self.storage.increment_to_next_round(current_round)?;
-                // Set 'is_ready' to 'true'.
-                true
+                warn!("Failed to update the BFT to the next round - a BFT sender was not provided.");
+                // Set 'is_ready' to 'false'.
+                false
             };
 
             // Log whether the next round is ready.
