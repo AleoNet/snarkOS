@@ -28,6 +28,7 @@ use crate::{
     },
     Primary,
     MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
+    MAX_EVEN_ROUND_DELAY_IN_SECS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -50,7 +51,7 @@ use std::{
     future::Future,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicI64, Ordering},
+        atomic::{AtomicI64, Ordering, AtomicBool},
         Arc,
     },
 };
@@ -67,8 +68,12 @@ pub struct BFT<N: Network> {
     dag: Arc<RwLock<DAG<N>>>,
     /// The batch certificate of the leader from the current even round, if one was present.
     leader_certificate: Arc<RwLock<Option<BatchCertificate<N>>>>,
+    /// The flag to indicate if the previous leader election certificates have been broadcasted.   
+    has_broadcasted_election_certificates: Arc<AtomicBool>,
     /// The timer for the leader certificate to be received.
     leader_certificate_timer: Arc<AtomicI64>,
+    /// The timer to advance from even round. 
+    advance_from_even_round_timer: Arc<AtomicI64>,
     /// The last election certificate IDs.
     last_election_certificate_ids: Arc<RwLock<IndexSet<Field<N>>>>,
     /// The consensus sender.
@@ -93,7 +98,9 @@ impl<N: Network> BFT<N> {
             primary: Primary::new(account, storage, ledger, ip, trusted_validators, dev)?,
             dag: Default::default(),
             leader_certificate: Default::default(),
+            has_broadcasted_election_certificates: Arc::new(AtomicBool::new(false)),
             leader_certificate_timer: Default::default(),
+            advance_from_even_round_timer: Default::default(),
             last_election_certificate_ids: Default::default(),
             consensus_sender: Default::default(),
             handles: Default::default(),
@@ -259,6 +266,8 @@ impl<N: Network> BFT<N> {
             }
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
+            // Update the timer for even round advancement. 
+            self.advance_from_even_round_timer.store(now(), Ordering::SeqCst);
         }
 
         is_ready
@@ -452,6 +461,11 @@ impl<N: Network> BFT<N> {
     /// Returns `true` if the timer for the leader certificate has expired.
     fn is_timer_expired(&self) -> bool {
         self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY_IN_SECS <= now()
+    }
+
+    /// Returns `true` if the timer for advancing from even rounds has expired.  
+    fn is_advance_from_even_round_timer_expired(&self) -> bool {
+        self.advance_from_even_round_timer.load(Ordering::SeqCst) + MAX_EVEN_ROUND_DELAY_IN_SECS <= now()
     }
 
     /// Returns 'true' if any of the following conditions hold:
