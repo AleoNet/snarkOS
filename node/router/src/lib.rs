@@ -430,6 +430,15 @@ impl<N: Network> Router<N> {
 
         info!("Node's own IP: {:?}", self.local_ip());
 
+        // iterate over eligible_peers
+        info!("iterating over eligible_peers");
+        for peer_ip in eligible_peers.clone() {
+            info!("peer_ip: {:?}", peer_ip);
+            // log if peer_ip is local_ip
+            info!("is_local_ip: {:?}", self.is_local_ip(&peer_ip));
+        }
+        info!("end iterating over eligible_peers");
+
         // info-log eligible_peers
         info!("eligible_peers: {:?}", eligible_peers);
 
