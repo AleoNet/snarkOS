@@ -25,6 +25,7 @@ mod helpers;
 pub use helpers::*;
 
 mod handshake;
+#[allow(unused_imports)]
 pub use handshake::*;
 
 mod heartbeat;
@@ -367,6 +368,11 @@ impl<N: Network> Router<N> {
     /// Returns the list of trusted peers.
     pub fn trusted_peers(&self) -> &IndexSet<SocketAddr> {
         &self.trusted_peers
+    }
+
+    /// Returns the TCP
+    pub fn tcp(&self) -> &Tcp {
+        &self.tcp
     }
 
     /// Returns the list of bootstrap peers.
