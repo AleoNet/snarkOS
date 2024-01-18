@@ -191,6 +191,11 @@ impl<N: Network> Primary<N> {
         &self.gateway
     }
 
+    /// Returns the sync object. 
+    pub const fn sync(&self) -> &Sync<N> {
+        &self.sync
+    }
+
     /// Returns the storage.
     pub const fn storage(&self) -> &Storage<N> {
         &self.storage
