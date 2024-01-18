@@ -3222,6 +3222,7 @@ dependencies = [
  "colored",
  "crossterm",
  "indexmap 2.1.0",
+ "log",
  "nix",
  "num_cpus",
  "parking_lot",

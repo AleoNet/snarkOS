@@ -19,6 +19,9 @@ edition = "2021"
 [features]
 default = [ "snarkos-node/metrics" ]
 
+[dependencies]
+log = "0.4"
+
 [dependencies.aleo-std]
 version = "0.1.18"
 default-features = false

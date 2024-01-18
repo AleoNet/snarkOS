@@ -17,6 +17,7 @@
 
 #[macro_use]
 extern crate thiserror;
+extern crate log;
 
 pub mod commands;
 pub mod helpers;

@@ -39,6 +39,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
+use log::info;
 
 /// The recommended minimum number of 'open files' limit for a validator.
 /// Validators should be able to handle at least 1000 concurrent connections, each requiring 2 sockets.
@@ -417,8 +418,8 @@ impl Start {
                 self.node.to_string().bold()
             );
 
-            println!(
-                "nochmal: {}",
+            info!(
+                "again: {}",
                 self.node.to_string().bold()
             );
 
