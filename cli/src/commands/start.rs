@@ -328,6 +328,7 @@ impl Start {
                 .iter()
                 .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+            let bonded_balances = indexmap::IndexMap::new();
 
             // If there is some leftover balance, add it to the 0-th validator.
             let leftover =
@@ -344,7 +345,7 @@ impl Start {
             }
 
             // Construct the genesis block.
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
+            load_or_compute_genesis(development_private_keys[0], committee, public_balances, bonded_balances, &mut rng)
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
@@ -479,6 +480,7 @@ fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
+    bonded_balances: indexmap::IndexMap<Address<N>, u64>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
@@ -488,6 +490,7 @@ fn load_or_compute_genesis<N: Network>(
     preimage.extend(genesis_private_key.to_bytes_le()?);
     preimage.extend(committee.to_bytes_le()?);
     preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
+    preimage.extend(&to_bytes_le![bonded_balances.iter().collect::<Vec<(_, _)>>()]?);
 
     // Input the parameters' metadata.
     preimage.extend(snarkvm::parameters::testnet3::BondPublicVerifier::METADATA.as_bytes());
@@ -531,7 +534,7 @@ fn load_or_compute_genesis<N: Network>(
     // Initialize a new VM.
     let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
     // Initialize the genesis block.
-    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng)?;
+    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng)?;
     // Write the genesis block to the file.
     std::fs::write(&file_path, block.to_bytes_le()?)?;
     // Return the genesis block.

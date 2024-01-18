@@ -146,11 +146,12 @@ impl TestNetwork {
         for account in accounts.iter() {
             balances.insert(account.address(), public_balance_per_validator);
         }
+        let bonds = IndexMap::<Address<CurrentNetwork>, u64>::new();
 
         let mut validators = HashMap::with_capacity(config.num_nodes as usize);
         for (id, account) in accounts.into_iter().enumerate() {
             let mut rng = TestRng::fixed(id as u64);
-            let gen_ledger = genesis_ledger(gen_key, committee.clone(), balances.clone(), &mut rng);
+            let gen_ledger = genesis_ledger(gen_key, committee.clone(), balances.clone(), bonds.clone(), &mut rng);
             let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger));
             let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
 
@@ -351,6 +352,7 @@ fn genesis_block(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    bonded_balances: IndexMap<Address<CurrentNetwork>, u64>,
     rng: &mut (impl Rng + CryptoRng),
 ) -> Block<CurrentNetwork> {
     // Initialize the store.
@@ -358,17 +360,23 @@ fn genesis_block(
     // Initialize a new VM.
     let vm = VM::from(store).unwrap();
     // Initialize the genesis block.
-    vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng).unwrap()
+    vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng).unwrap()
 }
 
 fn genesis_ledger(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    bonded_balances: IndexMap<Address<CurrentNetwork>, u64>,
     rng: &mut (impl Rng + CryptoRng),
 ) -> CurrentLedger {
-    let cache_key =
-        to_bytes_le![genesis_private_key, committee, public_balances.iter().collect::<Vec<(_, _)>>()].unwrap();
+    let cache_key = to_bytes_le![
+        genesis_private_key,
+        committee,
+        public_balances.iter().collect::<Vec<(_, _)>>(),
+        bonded_balances.iter().collect::<Vec<(_, _)>>()
+    ]
+    .unwrap();
     // Initialize the genesis block on the first call; other callers
     // will wait for it on the mutex.
     let block = genesis_cache()
@@ -383,7 +391,7 @@ fn genesis_ledger(
                 return Block::from_bytes_le(&buffer).unwrap();
             }
 
-            let block = genesis_block(genesis_private_key, committee, public_balances, rng);
+            let block = genesis_block(genesis_private_key, committee, public_balances, bonded_balances, rng);
             std::fs::write(&file_path, block.to_bytes_le().unwrap()).unwrap();
             block
         })
