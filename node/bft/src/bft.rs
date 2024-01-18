@@ -491,6 +491,15 @@ impl<N: Network> BFT<N> {
             }
         };
 
+        // Retrieve the authors of the current certificates.  
+        let current_authors = current_certificates.clone().into_iter().map(|c| c.author()).collect();
+        // Determine if the quorum threshold is reached. 
+        let is_quorum = previous_committee.is_quorum_threshold_reached(&current_authors); 
+        if !is_quorum{
+            info!("BFT failed to increment from odd round {odd_round} - Quorum threshold has not been reached."); 
+            return false; 
+        }
+
         // Compute the stake for the leader certificate.
         let (stake_with_leader, stake_without_leader) =
             self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &previous_committee);
