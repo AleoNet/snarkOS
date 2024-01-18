@@ -13,10 +13,10 @@
 // limitations under the License.
 
 use snarkvm::{
-    circuit::{environment::ToFields, Eject},
     console::{
         account::{Address, PrivateKey, Signature},
         prelude::{Environment, Uniform},
+        program::{ToFields, Value},
         types::Field,
     },
     utilities::ToBytes,
@@ -37,7 +37,6 @@ use std::{
 use zeroize::Zeroize;
 
 type Network = snarkvm::prelude::Testnet3;
-type A = snarkvm::circuit::AleoV0;
 
 /// Commands to manage Aleo accounts.
 #[derive(Debug, Parser, Zeroize)]
@@ -67,7 +66,7 @@ pub enum Account {
         /// Seed the RNG with a numeric value
         #[clap(short = 's', long)]
         seed: Option<String>,
-        /// When enabled, parses the message as bytes instead of aleo literals
+        /// When enabled, parses the message as bytes instead of Aleo literals
         #[clap(short = 'r', long)]
         raw: bool,
     },
@@ -81,18 +80,15 @@ pub enum Account {
         /// Message (Aleo value) to verify the signature against
         #[clap(short = 'm', long)]
         message: String,
-        /// When enabled, parses the message as bytes instead of aleo literals
+        /// When enabled, parses the message as bytes instead of Aleo literals
         #[clap(short = 'r', long)]
         raw: bool,
     },
 }
 
-/// Parse a raw leo input into fields
+/// Parse a raw Aleo input into fields
 fn aleo_literal_to_fields(input: &str) -> Result<Vec<Field<Network>>> {
-    let literal = snarkvm::circuit::Literal::<A>::from_str(input)?;
-    let plaintext = snarkvm::circuit::Plaintext::<A>::from(literal);
-    let value = snarkvm::circuit::Value::<A>::Plaintext(plaintext);
-    Ok(value.to_fields().into_iter().map(|f| f.eject_value()).collect())
+    Value::<Network>::from_str(input)?.to_fields()
 }
 
 impl Account {
@@ -264,7 +260,7 @@ impl Account {
             private_key.sign_bytes(message.as_bytes(), &mut rng)
         } else {
             let fields =
-                aleo_literal_to_fields(&message).map_err(|_| anyhow!("Failed to parse a valid aleo literal"))?;
+                aleo_literal_to_fields(&message).map_err(|_| anyhow!("Failed to parse a valid Aleo literal"))?;
             private_key.sign(&fields, &mut rng)
         }
         .map_err(|_| anyhow!("Failed to sign the message"))?
@@ -285,12 +281,15 @@ impl Account {
             signature.verify_bytes(&address, message.as_bytes())
         } else {
             let fields =
-                aleo_literal_to_fields(&message).map_err(|_| anyhow!("Failed to parse a valid aleo literal"))?;
+                aleo_literal_to_fields(&message).map_err(|_| anyhow!("Failed to parse a valid Aleo literal"))?;
             signature.verify(&address, &fields)
         };
 
         // Return the verification result
-        Ok(if verified { "verified" } else { "invalid" }.to_string())
+        match verified {
+            true => Ok("✅ The signature is valid".to_string()),
+            false => bail!("❌ The signature is invalid"),
+        }
     }
 }
 
@@ -434,30 +433,30 @@ mod tests {
         let signature = "sign1nnvrjlksrkxdpwsrw8kztjukzhmuhe5zf3srk38h7g32u4kqtqpxn3j5a6k8zrqcfx580a96956nsjvluzt64cqf54pdka9mgksfqp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkwsnaqq".to_string();
         let message = "Hello, world!".to_string();
         let account = Account::Verify { address: address.to_string(), signature, message, raw: true };
-        let actual = account.parse().unwrap();
-        assert_eq!("verified", actual);
+        let actual = account.parse();
+        assert!(actual.is_ok());
 
         // test signature of "Hello, world!" against the message "Different Message"
         let signature = "sign1nnvrjlksrkxdpwsrw8kztjukzhmuhe5zf3srk38h7g32u4kqtqpxn3j5a6k8zrqcfx580a96956nsjvluzt64cqf54pdka9mgksfqp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkwsnaqq".to_string();
         let message = "Different Message".to_string();
         let account = Account::Verify { address: address.to_string(), signature, message, raw: true };
-        let actual = account.parse().unwrap();
-        assert_eq!("invalid", actual);
+        let actual = account.parse();
+        assert!(actual.is_err());
 
         // test signature of "Hello, world!" against the wrong address
         let signature = "sign1nnvrjlksrkxdpwsrw8kztjukzhmuhe5zf3srk38h7g32u4kqtqpxn3j5a6k8zrqcfx580a96956nsjvluzt64cqf54pdka9mgksfqp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkwsnaqq".to_string();
         let message = "Hello, world!".to_string();
         let wrong_address = "aleo1uxl69laseuv3876ksh8k0nd7tvpgjt6ccrgccedpjk9qwyfensxst9ftg5".to_string();
         let account = Account::Verify { address: wrong_address, signature, message, raw: true };
-        let actual = account.parse().unwrap();
-        assert_eq!("invalid", actual);
+        let actual = account.parse();
+        assert!(actual.is_err());
 
         // test a valid signature of "Different Message"
         let signature = "sign1424ztyt9hcm77nq450gvdszrvtg9kvhc4qadg4nzy9y0ah7wdqq7t36cxal42p9jj8e8pjpmc06lfev9nvffcpqv0cxwyr0a2j2tjqlesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk3yrr50".to_string();
         let message = "Different Message".to_string();
         let account = Account::Verify { address: address.to_string(), signature, message, raw: true };
-        let actual = account.parse().unwrap();
-        assert_eq!("verified", actual);
+        let actual = account.parse();
+        assert!(actual.is_ok());
     }
 
     #[test]
@@ -467,29 +466,29 @@ mod tests {
         let signature = "sign1j7swjfnyujt2vme3ulu88wdyh2ddj85arh64qh6c6khvrx8wvsp8z9wtzde0sahqj2qwz8rgzt803c0ceega53l4hks2mf5sfsv36qhesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkdetews".to_string();
         let message = "5field".to_string();
         let account = Account::Verify { address: address.to_string(), signature, message, raw: false };
-        let actual = account.parse().unwrap();
-        assert_eq!("verified", actual);
+        let actual = account.parse();
+        assert!(actual.is_ok());
 
         // test signature of 5u8 against the message 10u8
         let signature = "sign1j7swjfnyujt2vme3ulu88wdyh2ddj85arh64qh6c6khvrx8wvsp8z9wtzde0sahqj2qwz8rgzt803c0ceega53l4hks2mf5sfsv36qhesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkdetews".to_string();
         let message = "10field".to_string();
         let account = Account::Verify { address: address.to_string(), signature, message, raw: false };
-        let actual = account.parse().unwrap();
-        assert_eq!("invalid", actual);
+        let actual = account.parse();
+        assert!(actual.is_err());
 
         // test signature of 5u8 against the wrong address
         let signature = "sign1j7swjfnyujt2vme3ulu88wdyh2ddj85arh64qh6c6khvrx8wvsp8z9wtzde0sahqj2qwz8rgzt803c0ceega53l4hks2mf5sfsv36qhesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkdetews".to_string();
         let message = "5field".to_string();
         let wrong_address = "aleo1uxl69laseuv3876ksh8k0nd7tvpgjt6ccrgccedpjk9qwyfensxst9ftg5".to_string();
         let account = Account::Verify { address: wrong_address, signature, message, raw: false };
-        let actual = account.parse().unwrap();
-        assert_eq!("invalid", actual);
+        let actual = account.parse();
+        assert!(actual.is_err());
 
         // test a valid signature of 10u8
         let signature = "sign1t9v2t5tljk8pr5t6vkcqgkus0a3v69vryxmfrtwrwg0xtj7yv5qj2nz59e5zcyl50w23lhntxvt6vzeqfyu6dt56698zvfj2l6lz6q0esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk8rh9kt".to_string();
         let message = "10field".to_string();
         let account = Account::Verify { address: address.to_string(), signature, message, raw: false };
-        let actual = account.parse().unwrap();
-        assert_eq!("verified", actual);
+        let actual = account.parse();
+        assert!(actual.is_ok());
     }
 }
