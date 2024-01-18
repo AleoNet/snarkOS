@@ -326,9 +326,9 @@ impl<N: Network> BFT<N> {
     }
 
     /// Returns 'true' under one of the following conditions:
-    ///  - If the leader certificate is set for the current even round,
-    ///  - The timer for the leader certificate has expired, and we can
-    ///    achieve quorum threshold (2f + 1) without the leader.
+    /// - If there is a quorum of non-votes for the previous leader and the current round leader is found, or the leader timer expires AND the BFT has reached quorum threshold for the current round. 
+    /// - If the previous round leader has been committed and the current round leader is found, or the leader timer expires AND the BFT has reached quorum threshold for the current round. 
+    /// - If the even-round timer expires AND the BFT has reached quorum threshold for the current round. 
     fn is_even_round_ready_for_next_round(
         &self,
         current_certificates: IndexSet<BatchCertificate<N>>,
@@ -339,8 +339,21 @@ impl<N: Network> BFT<N> {
         let previous_round = current_round.saturating_sub(1); 
         // Compute the penultimate round. 
         let penultimate_round = previous_round.saturating_sub(1); 
+        // Determine if the leader certificate for the current round was found. 
+        let found_current_leader = self.leader_certificate.read().as_ref().map_or(false, |leader_certificate| leader_certificate.round() == current_round);  
         // Retrieve the authors of the current certificates.  
         let current_authors = current_certificates.clone().into_iter().map(|c| c.author()).collect();
+        // Determine if quorum threshold with the current round certificates is reached. 
+        let is_quorum = previous_committee.is_quorum_threshold_reached(&current_authors); 
+        // If quorum threshold has not been reached, return 'false'. 
+        if !is_quorum{
+            warn!("BFT is not ready to increment from even round {current_round} - Quorum threshold has not been reached. ");
+            return false; 
+        }
+        // If the election certificates for the previous leader have already been broadcasted, advance if the current round leader is found or the leader timer has expired. 
+        if self.has_broadcasted_election_certificates.load(Ordering::SeqCst){
+            return found_current_leader || self.is_leader_timer_expired(); 
+        }
         // Retrieve the previous committee for the previous round, or the penultimate committee. 
         let penultimate_committee = match self.ledger().get_previous_committee_for_round(previous_round) {
             Ok(committee) => committee,
@@ -361,42 +374,31 @@ impl<N: Network> BFT<N> {
         };
         // Retrieve the previous leader certificate. 
         let previous_leader_certificate = self.storage().get_certificate_for_round_with_author(penultimate_round, previous_leader);
-        // Initialize an empty set to be populated with authors who included the previous leader certificate in the previous certificate round. 
-        let mut previous_authors_with_leader = HashSet::new();
+        // Initialize a flag for skipping the previous leader certificate. This flag is set to 'true' if either there is a quorum of non-votes for the previous leader certificate or if the leader certificate was not received.  
+        let mut can_skip_previous_leader = false; 
         match previous_leader_certificate {
             Some(certificate) => {
                 // Retrieve the previous leader certificate ID. 
                 let previous_leader_certificate_id = certificate.id();
-                // Construct a set over the authors who included the leader's certificate in the previous certificate round.
-                previous_authors_with_leader = previous_certificates
-                    .iter()
-                    .filter_map(|certificate| {
-                        if certificate.previous_certificate_ids().contains(&previous_leader_certificate_id) {
-                            Some(certificate.author())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+                // Compute the stake with and without the previous leader certificate. 
+                let (_stake_with_previous_leader, stake_without_previous_leader) = self.compute_stake_for_leader_certificate(previous_leader_certificate_id, previous_certificates.clone(), &penultimate_committee);
+                // If there is a quorum of non-votes for the previous leader certificate, skip waiting for its election certificates as it would not have been committed by any validator. 
+                if stake_without_previous_leader >= penultimate_committee.quorum_threshold() { 
+                    can_skip_previous_leader = true; 
+                    info!("BFT found a quorum of non-votes in the odd round {previous_round} - Skip looking for election certificates. ");
+                }
             }
             None => {
-                error!("BFT failed to find leader certificate for the even round {penultimate_round}");
+                // If the previous leader certificate was not found, skip waiting for its election certificates. 
+                can_skip_previous_leader = true; 
+                warn!("BFT failed to find leader certificate for the even round {penultimate_round}. ");
             }
-        };
-        
-        // Determine if we have found the leader certificate for the current round. 
-        let found_current_leader = self.leader_certificate.read().as_ref().map_or(false, |leader_certificate| leader_certificate.round() == current_round);
-        // Determine if we have reached quorum threshold with the current round certificates. 
-        let is_quorum = previous_committee.is_quorum_threshold_reached(&current_authors);
-        // Determine if at least one author included the previous leader's certificate in the previous certificate round.  
-        let has_stake = previous_authors_with_leader.iter().any(|author| penultimate_committee.get_stake(*author) > 0);
-        // If there is a quorum of non-votes for the previous leader in the previous certificate round, no validator could have committed this leader certificate. 
-        // In this scenario, skip looking for the election certificates and advance when the current round leader is found and quorum threshold is reached, or the timer expires. 
-        if !has_stake{
-            info!("BFT found a quorum of non-votes in the odd round {previous_round} - Skip looking for election certificates. ");
-            return found_current_leader && is_quorum || self.is_timer_expired(); 
+        };       
+        // If the primary can skip the previous leader, advance to the next round if the current leader was found or if the leader timer has expired. 
+        if can_skip_previous_leader{
+            return found_current_leader || self.is_leader_timer_expired(); 
         }
-        // Initialize a variable to track if we have already committed the previous leader certificate. 
+        // Initialize a flag to track if we have committed the previous leader certificate. 
         let mut previously_committed = false; 
         // If the primary committed the previous leader certificate, it will broadcast the election certificates to all validators. 
         for certificate in current_certificates{
@@ -408,27 +410,33 @@ impl<N: Network> BFT<N> {
                 .filter_map(|id| self.storage().get_certificate(*id))
                 .collect();
             // Retrieve the authors of the last election certificates. 
-            let last_election_authors = last_election_certificates.into_iter().map(|c| c.author()).collect();
+            let last_election_authors = last_election_certificates.clone().into_iter().map(|c| c.author()).collect();
             // Determine if the last election authors have reached availability threshold to commit the previous leader certificate. 
             let is_availability = penultimate_committee.is_availability_threshold_reached(&last_election_authors); 
-            // Check if the last election authors have achieved availability threshold. 
-            if is_availability {
+            // If the availability threshold is reached and the primary is synced, broadcast the election certificates. 
+            if is_availability && self.primary.sync().is_synced() {
                 info!("BFT found election certificates from round {previous_round} to commit the previous leader certificate from round {penultimate_round}.");
                 info!("Broadcasting election certificates from round {previous_round} to all validators... ");
                 // Broadcast election certificates to all validators. 
-                self.primary.gateway().broadcast(Event::BatchCertified(certificate.clone().into()));
+                for last_election_certificate in last_election_certificates{
+                    self.primary.gateway().broadcast(Event::BatchCertified(last_election_certificate.clone().into()));
+                }
             }
-            // Update the tracker if the primary committed the previous leader certificate. 
+            // Update the flag for the previously committed leader certificate. 
             previously_committed = previously_committed || is_availability; 
         }
-        // If the primary committed the previous leader certificate, advance whenever the current leader certificate is found and quorum threshold is reached, or the timer expires. 
+
+        // If the primary committed the previous leader certificate, advance if the current leader certificate was found or the leader timer has expired. 
         if previously_committed{
-            return found_current_leader && is_quorum || self.is_timer_expired(); 
+            // Set the flag to 'true'. 
+            self.has_broadcasted_election_certificates.store(true, Ordering::SeqCst);
+            return found_current_leader || self.is_leader_timer_expired(); 
         }
-        
-        // If the primary did not commit the previous leader certificate, it will try to commit the previous leader again once the full length of the timer has expired. 
-        if self.is_timer_expired(){
-            info!("BFT (timer expired) - Checking if it can commit the previous leader certificate from round {penultimate_round} ..."); 
+
+        if self.is_advance_from_even_round_timer_expired(){
+            info!("BFT (even-round timer expired) - Checking if the leader certificate from round {penultimate_round} was committed ..."); 
+            // Reset the flag to 'false' before advancing to the next round.
+            self.has_broadcasted_election_certificates.store(false, Ordering::SeqCst);
             // Retrieve the updated certificates for the current round. 
             let updated_certificates = self.storage().get_certificates_for_round(current_round);
             for certificate in updated_certificates{
@@ -441,25 +449,25 @@ impl<N: Network> BFT<N> {
                     .collect();
                 // Retrieve the authors of the last election certificates. 
                 let last_election_authors = last_election_certificates.into_iter().map(|c| c.author()).collect();
-                // Determine if the last election authors have achieved availability threshold to commit the previous leader certificate. 
+                // Determine if the last election authors have reached availability threshold to commit the previous leader certificate. 
                 let is_availability = penultimate_committee.is_availability_threshold_reached(&last_election_authors); 
                 // Check if the last election authors have achieved availability threshold. 
-                if is_availability {
-                    info!("BFT found election certificates from round {previous_round} after the timer expired to commit the previous leader certificate from round {penultimate_round}.");
-                    // Broadcast the election certificates for completeness. 
-                    self.primary.gateway().broadcast(Event::BatchCertified(certificate.clone().into()));
+                if is_availability{ 
+                    info!("BFT found election certificates from round {previous_round} after the even-round timer expired to commit the leader certificate from round {penultimate_round}.");
+                    // Advance to the next round as the even-round timer has expired.
                     return true; 
-                }
+                } 
             }
-            // Advance as the timer expired. 
+            warn!("BFT did not find an availability threshold of election certificates from round {previous_round} after the even-round timer expired.");
+            // Advance to the next round as the even-round timer has expired.
             return true; 
         }
-        // Otherwise, return 'false'.
+
         return false;
     }
 
     /// Returns `true` if the timer for the leader certificate has expired.
-    fn is_timer_expired(&self) -> bool {
+    fn is_leader_timer_expired(&self) -> bool {
         self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY_IN_SECS <= now()
     }
 
@@ -520,7 +528,7 @@ impl<N: Network> BFT<N> {
         // Return 'true' if any of the following conditions hold:
         stake_with_leader >= previous_committee.availability_threshold()
             || stake_without_leader >= previous_committee.quorum_threshold()
-            || self.is_timer_expired()
+            || self.is_leader_timer_expired()
     }
 
     /// Computes the amount of stake that has & has not signed for the leader certificate.
@@ -994,7 +1002,7 @@ mod tests {
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
-        assert!(bft.is_timer_expired()); // 0 + 5 < now()
+        assert!(bft.is_leader_timer_expired()); // 0 + 5 < now()
 
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
@@ -1010,7 +1018,7 @@ mod tests {
 
         // Set the timer to now().
         bft.leader_certificate_timer.store(now(), Ordering::SeqCst);
-        assert!(!bft.is_timer_expired());
+        assert!(!bft.is_leader_timer_expired());
 
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
@@ -1032,7 +1040,7 @@ mod tests {
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
-        assert!(bft.is_timer_expired()); // 0 + 5 < now()
+        assert!(bft.is_leader_timer_expired()); // 0 + 5 < now()
 
         // Store is at round 1, and we are checking for round 2.
         // Ensure this call fails on an even round.
@@ -1054,7 +1062,7 @@ mod tests {
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, &[], None)?;
-        assert!(bft.is_timer_expired()); // 0 + 5 < now()
+        assert!(bft.is_leader_timer_expired()); // 0 + 5 < now()
 
         // Ensure this call fails on an even round.
         let result = bft.is_leader_quorum_or_nonleaders_available(2);
