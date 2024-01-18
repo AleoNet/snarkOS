@@ -264,6 +264,8 @@ impl<N: Network> BFT<N> {
             if let Err(e) = self.storage().increment_to_next_round(current_round) {
                 warn!("BFT failed to increment to the next round from round {current_round} - {e}");
             }
+            // Reset the flag to 'false' before advancing to the next round.
+            self.has_broadcasted_election_certificates.store(false, Ordering::SeqCst);
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
             // Update the timer for even round advancement. 
@@ -435,8 +437,6 @@ impl<N: Network> BFT<N> {
 
         if self.is_advance_from_even_round_timer_expired(){
             info!("BFT (even-round timer expired) - Checking if the leader certificate from round {penultimate_round} was committed ..."); 
-            // Reset the flag to 'false' before advancing to the next round.
-            self.has_broadcasted_election_certificates.store(false, Ordering::SeqCst);
             // Retrieve the updated certificates for the current round. 
             let updated_certificates = self.storage().get_certificates_for_round(current_round);
             for certificate in updated_certificates{
