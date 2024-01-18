@@ -272,6 +272,10 @@ impl<N: Network> Gateway<N> {
         !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_or_broadcast_ip(ip.ip())
     }
 
+    pub fn trusted_validators(&self) -> &IndexSet<SocketAddr> {  
+        &self.trusted_validators
+    }
+
     /// Returns the resolver.
     pub fn resolver(&self) -> &Resolver<N> {
         &self.resolver

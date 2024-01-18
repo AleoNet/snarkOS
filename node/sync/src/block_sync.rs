@@ -339,6 +339,15 @@ impl<N: Network> BlockSync<N> {
         }
     }
 
+    /// Checks if the provided peer ip is a sync peer.   
+    pub fn is_peer_ip_sync_peer(&self, peer_ip: SocketAddr) -> bool {
+        if let Some((sync_peers, _)) = self.find_sync_peers() {
+            sync_peers.contains_key(&peer_ip)
+        } else {
+            false
+        }
+    }
+    
     /// Updates the block locators and common ancestors for the given peer IP.
     /// This function checks that the given block locators are well-formed, however it does **not** check
     /// that the block locators are consistent the peer's previous block locators or other peers' block locators.

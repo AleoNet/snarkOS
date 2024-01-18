@@ -186,6 +186,11 @@ impl<N: Network> Primary<N> {
         self.storage.current_round()
     }
 
+    /// Returns the sync object. 
+    pub const fn sync(&self) -> &Sync<N> {
+        &self.sync
+    }
+
     /// Returns the gateway.
     pub const fn gateway(&self) -> &Gateway<N> {
         &self.gateway
@@ -1299,18 +1304,22 @@ impl<N: Network> Primary<N> {
             let previous_committee = self.ledger.get_previous_committee_for_round(batch_round)?;
             previous_committee.is_quorum_threshold_reached(&authors)
         };
+        let is_peer_far_in_future = 
+            !(batch_round > self.current_round() + self.storage.max_gc_rounds()) 
+            || (self.gateway.trusted_validators().contains(&peer_ip) 
+            || self.sync.block_sync().is_peer_ip_sync_peer(peer_ip) 
+            || is_quorum_threshold_reached);
 
-        // Check if our primary should move to the next round.
-        // Note: Checking that quorum threshold is reached is important for mitigating a race condition,
-        // whereby Narwhal requires 2f+1, however the BFT only requires f+1. Without this check, the primary
-        // will advance to the next round assuming f+1, not 2f+1, which can lead to a network stall.
+        if !is_peer_far_in_future{ 
+            bail!("Batch certificate from round {batch_round} sent by peer {peer_ip} is too far into the future. "); 
+        }
         let is_behind_schedule = is_quorum_threshold_reached && batch_round > self.current_round();
-        // Check if our primary is far behind the peer.
-        let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();
-        // If our primary is far behind the peer, update our committee to the batch round.
-        if is_behind_schedule || is_peer_far_in_future {
-            // If the batch round is greater than the current committee round, update the committee.
-            self.try_increment_to_the_next_round(batch_round + 1).await?;
+        if is_behind_schedule {
+            let next_round = self.current_round() + 1; 
+            let end_round = batch_round + 1; 
+            for round in next_round..end_round{
+                self.try_increment_to_the_next_round(round).await?;
+            }
         }
 
         // Ensure the primary has all of the previous certificates.
