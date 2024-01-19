@@ -4868,21 +4868,17 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tower_governor"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85a54c8af9e56c11e47b70dc8504e81d362783e2fd8e7373938d632954841126"
+checksum = "0d31d2cd0776b0e10664d3db2e362b9a8b38a18cb09ba97d3f2f775c54f2c51b"
 dependencies = [
  "axum",
  "forwarded-header-value",
- "futures",
- "futures-core",
  "governor",
  "http 1.0.0",
  "pin-project",
  "thiserror",
- "tokio",
  "tower",
- "tower-layer",
  "tracing",
 ]
 
