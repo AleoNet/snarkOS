@@ -1,4 +1,41 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.2.3"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -24,7 +61,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -42,7 +79,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -122,7 +159,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_router_connected_total",
@@ -137,7 +174,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -217,7 +254,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_router_candidate_total",
@@ -232,7 +269,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -312,7 +349,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_router_restricted_total",
@@ -327,7 +364,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -369,12 +406,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_blocks_height_total",
@@ -389,7 +426,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -465,7 +502,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
           "expr": "sum(rate(snarkos_blocks_transactions_total[5m]))",
@@ -480,7 +517,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -560,7 +597,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -580,7 +617,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -660,7 +697,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -693,7 +730,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -735,12 +772,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -759,7 +796,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -801,12 +838,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_consensus_last_committed_round",
@@ -821,7 +858,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -863,12 +900,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
           "expr": "snarkos_consensus_committed_certificates_total",
@@ -883,7 +920,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -925,12 +962,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.2",
+      "pluginVersion": "10.2.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "snarkos_bft_leaders_elected_total",
@@ -958,7 +995,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1040,7 +1077,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1082,7 +1119,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1163,7 +1200,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1182,12 +1219,112 @@
       "type": "timeseries"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "displayName": "Average Block Latency",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 6,
+        "y": 51
+      },
+      "id": 38,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "avg(snarkos_consensus_block_latency_secs)",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Block Latency",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 59
       },
       "id": 4,
       "panels": [],
@@ -1197,7 +1334,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1258,7 +1395,7 @@
         "h": 8,
         "w": 12,
         "x": 6,
-        "y": 52
+        "y": 60
       },
       "id": 37,
       "options": {
@@ -1277,7 +1414,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1297,7 +1434,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1359,7 +1496,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 68
       },
       "id": 32,
       "options": {
@@ -1378,7 +1515,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1398,7 +1535,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1460,7 +1597,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 60
+        "y": 68
       },
       "id": 33,
       "options": {
@@ -1479,7 +1616,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1502,7 +1639,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1564,7 +1701,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 68
+        "y": 76
       },
       "id": 34,
       "options": {
@@ -1583,7 +1720,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1603,7 +1740,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1665,7 +1802,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 68
+        "y": 76
       },
       "id": 35,
       "options": {
@@ -1684,7 +1821,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "d7ad3b42-ab69-4a13-b542-dcee4597bb6b"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1704,7 +1841,7 @@
   ],
   "refresh": "5s",
   "revision": 1,
-  "schemaVersion": 38,
+  "schemaVersion": 39,
   "tags": [
     "snarkos",
     "aleo"
@@ -1733,6 +1870,6 @@
   "timezone": "",
   "title": "snarkOS",
   "uid": "ahTJm4-4k",
-  "version": 14,
+  "version": 2,
   "weekStart": ""
 }

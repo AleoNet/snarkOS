@@ -156,7 +156,7 @@ commands:
 jobs:
   integration:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: 2xlarge
     steps:
       - run_serial_long:
@@ -165,7 +165,7 @@ jobs:
 
   snarkos:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -174,7 +174,7 @@ jobs:
 
   account:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -183,7 +183,7 @@ jobs:
 
   cli:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -192,7 +192,7 @@ jobs:
 
   display:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -201,7 +201,7 @@ jobs:
 
   node:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -210,7 +210,7 @@ jobs:
 
   node-bft:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -219,7 +219,7 @@ jobs:
 
   node-bft-events:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -228,7 +228,7 @@ jobs:
 
   node-bft-ledger-service:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -237,7 +237,7 @@ jobs:
 
   node-bft-storage-service:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -246,7 +246,7 @@ jobs:
 
   node-cdn:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -255,7 +255,7 @@ jobs:
 
   node-consensus:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -264,7 +264,7 @@ jobs:
 
   node-rest:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -273,7 +273,7 @@ jobs:
 
   node-router:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -282,7 +282,7 @@ jobs:
 
   node-router-messages:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -291,7 +291,7 @@ jobs:
 
   node-sync:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -300,7 +300,7 @@ jobs:
 
   node-sync-communication-service:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -309,7 +309,7 @@ jobs:
 
   node-sync-locators:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -318,7 +318,7 @@ jobs:
 
   node-tcp:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -327,7 +327,7 @@ jobs:
 
   check-fmt:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: xlarge
     steps:
       - checkout
@@ -343,7 +343,7 @@ jobs:
 
   check-clippy:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.72.1
     resource_class: 2xlarge
     steps:
       - checkout
