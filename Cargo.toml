@@ -41,8 +41,8 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-git = "https://github.com/joske/snarkVM.git"
-branch = "fix/metrics-api-changes"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "9656a7e"
 # version = "=0.16.16"
 features = [ "circuit", "console", "rocks" ]
 
