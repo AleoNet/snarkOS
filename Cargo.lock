@@ -3358,7 +3358,6 @@ dependencies = [
 name = "snarkos-node-metrics"
 version = "2.2.7"
 dependencies = [
- "metrics",
  "metrics-exporter-prometheus",
  "snarkvm",
  "tokio",

@@ -19,12 +19,10 @@ pub use names::*;
 // Re-export the snarkVM metrics.
 pub use snarkvm::metrics::*;
 
-/// Initialises the metrics and returns a handle to the task running the metrics exporter.
+/// Initializes the metrics and returns a handle to the task running the metrics exporter.
 pub fn initialize_metrics() {
-    use metrics_exporter_prometheus::PrometheusBuilder;
-
-    // Build the recorder and set as global.
-    PrometheusBuilder::new().install().expect("can't build the prometheus exporter");
+    // Build the Prometheus exporter.
+    metrics_exporter_prometheus::PrometheusBuilder::new().install().expect("can't build the prometheus exporter");
 
     // Register the snarkVM metrics.
     snarkvm::metrics::register_metrics();
