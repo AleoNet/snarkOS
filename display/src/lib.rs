@@ -29,21 +29,21 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Tabs as TabsTui},
+    Frame,
+    Terminal,
+};
 use std::{
     io,
     thread,
     time::{Duration, Instant},
 };
 use tokio::sync::mpsc::Receiver;
-use tui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    text::{Span, Spans},
-    widgets::{Block, Borders, Tabs as TabsTui},
-    Frame,
-    Terminal,
-};
 
 pub struct Display<N: Network> {
     /// An instance of the node.
@@ -127,7 +127,7 @@ impl<N: Network> Display<N> {
     }
 
     /// Draws the display.
-    fn draw<B: Backend>(&mut self, f: &mut Frame<B>) {
+    fn draw(&mut self, f: &mut Frame) {
         /* Layout */
 
         // Initialize the layout of the page.
@@ -148,7 +148,7 @@ impl<N: Network> Display<N> {
             .iter()
             .map(|t| {
                 let (first, rest) = t.split_at(1);
-                Spans::from(vec![
+                Line::from(vec![
                     Span::styled(first, Style::default().fg(Color::Yellow)),
                     Span::styled(rest, Style::default().fg(Color::Green)),
                 ])

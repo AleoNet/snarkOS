@@ -33,7 +33,7 @@ impl KnownPeers {
         self.0.read().get(&addr).map(Arc::clone)
     }
 
-    /// Removes an address to the list of known peers.
+    /// Removes an address from the list of known peers.
     pub fn remove(&self, addr: SocketAddr) -> Option<Arc<Stats>> {
         self.0.write().remove(&addr)
     }

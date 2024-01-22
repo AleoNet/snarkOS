@@ -175,6 +175,9 @@ impl<N: Network> Storage<N> {
         // Update the storage to the next round.
         self.update_current_round(next_round);
 
+        #[cfg(feature = "metrics")]
+        metrics::gauge(metrics::bft::LAST_STORED_ROUND, next_round as f64);
+
         // Retrieve the storage round.
         let storage_round = self.current_round();
         // Retrieve the GC round.
@@ -1118,9 +1121,16 @@ pub mod prop_tests {
             now(),
             transmission_map.keys().cloned().collect(),
             Default::default(),
+            Default::default(),
             &mut rng,
         )
         .unwrap();
+
+        // Remove the author from the validator set passed to create the batch
+        // certificate, the author should not sign their own batch.
+        let mut validators = validators.clone();
+        validators.remove(signer);
+
         let certificate = BatchCertificate::from(
             batch_header.clone(),
             sign_batch_header(&ValidatorSet(validators), &batch_header, &mut rng),

@@ -90,6 +90,9 @@ pub struct Start {
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
     pub rest: SocketAddr,
+    /// Specify the requests per second (RPS) rate limit per IP for the REST server
+    #[clap(default_value = "10", long = "rest-rps")]
+    pub rest_rps: u32,
     /// If the flag is set, the node will not initialize the REST server
     #[clap(long)]
     pub norest: bool,
@@ -103,11 +106,14 @@ pub struct Start {
     /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
+    /// Enables the metrics exporter
+    #[clap(default_value = "false", long = "metrics")]
+    pub metrics: bool,
 
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
-    /// If the flag is set, the node will not prefresh from a CDN
+    /// If the flag is set, the node will not prefetch from a CDN
     #[clap(long)]
     pub nocdn: bool,
 
@@ -214,7 +220,10 @@ impl Start {
                 // Parse the private key directly.
                 (Some(private_key), None) => Account::from_str(private_key.trim()),
                 // Parse the private key from a file.
-                (None, Some(path)) => Account::from_str(std::fs::read_to_string(path)?.trim()),
+                (None, Some(path)) => {
+                    check_permissions(path)?;
+                    Account::from_str(std::fs::read_to_string(path)?.trim())
+                }
                 // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
                 (None, None) => match self.client {
                     true => Account::new(&mut rand::thread_rng()),
@@ -429,12 +438,17 @@ impl Start {
         // Check if the machine meets the minimum requirements for a validator.
         crate::helpers::check_validator_machine(node_type);
 
+        // Initialize the metrics.
+        if self.metrics {
+            metrics::initialize_metrics();
+        }
+
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, bft_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
-            NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, self.dev).await,
         }
     }
 
@@ -445,7 +459,10 @@ impl Start {
         // Determine the number of main cores.
         let main_cores = match num_cores {
             // Insufficient
-            0..=3 => unreachable!("The number of cores is insufficient"),
+            0..=3 => {
+                eprintln!("The number of cores is insufficient, at least 4 are needed.");
+                std::process::exit(1);
+            }
             // Efficiency mode
             4..=8 => 2,
             // Standard mode
@@ -473,6 +490,26 @@ impl Start {
             .build()
             .expect("Failed to initialize a runtime for the router")
     }
+}
+
+fn check_permissions(path: &PathBuf) -> Result<(), snarkvm::prelude::Error> {
+    #[cfg(target_family = "unix")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        ensure!(path.exists(), "The file '{:?}' does not exist", path);
+        let parent = path.parent();
+        if let Some(parent) = parent {
+            let parent_permissions = parent.metadata()?.permissions().mode();
+            ensure!(
+                parent_permissions & 0o777 == 0o700,
+                "The folder {:?} must be readable only by the owner (0700)",
+                parent
+            );
+        }
+        let permissions = path.metadata()?.permissions().mode();
+        ensure!(permissions & 0o777 == 0o600, "The file {:?} must be readable only by the owner (0600)", path);
+    }
+    Ok(())
 }
 
 /// Loads or computes the genesis block.

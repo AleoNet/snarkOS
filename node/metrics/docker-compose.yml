@@ -1,0 +1,14 @@
+services:
+  prometheus:
+    image: ubuntu/prometheus:2.33-22.04_beta
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - 9090:9090
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  grafana:
+    image: grafana/grafana
+    depends_on: [prometheus]
+    ports:
+      - 3000:3000
