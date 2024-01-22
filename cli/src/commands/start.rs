@@ -123,6 +123,38 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
+
+    /// If development mode is enabled, specify the genesis private key.
+    #[clap(long)]
+    pub dev_genesis_private_key: Option<String>,
+
+    /// If development mode is enabled, specify the validator addresses.
+    #[clap(long)]
+    pub dev_validator_addresses: Option<String>,
+    /// If development mode is enabled, specify the total amount bonded to the validator.
+    #[clap(long)]
+    pub dev_validator_amounts: Option<String>,
+    /// If development mode is enabled, specify whether or not the validator is open.
+    #[clap(long)]
+    pub dev_validator_open: Option<String>,
+
+    /// If development mode is enabled, specify the addresses with public balances.
+    #[clap(long)]
+    pub dev_public_addresses: Option<String>,
+    /// If development mode is enabled, specify the public balance.
+    #[clap(long)]
+    pub dev_public_amounts: Option<String>,
+
+    /// If development mode is enabled, specify the addresses with bonded balances.
+    /// Note that this should also include the validator addresses.
+    #[clap(long)]
+    pub dev_bonded_addresses: Option<String>,
+    /// If development mode is enabled, specify the validator to bond to.
+    #[clap(long)]
+    pub dev_bonded_validators: Option<String>,
+    /// If development mode is enabled, specify the bonded balance.
+    #[clap(long)]
+    pub dev_bonded_amounts: Option<String>,
 }
 
 impl Start {
@@ -295,67 +327,203 @@ impl Start {
     /// Otherwise, returns the actual genesis block.
     fn parse_genesis<N: Network>(&self) -> Result<Block<N>> {
         if self.dev.is_some() {
-            // Determine the number of genesis committee members.
-            let num_committee_members = match self.dev_num_validators {
-                Some(num_committee_members) => num_committee_members,
-                None => DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
-            };
-            ensure!(
-                num_committee_members >= DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
-                "Number of genesis committee members is too low"
-            );
+            // Check whether or not a custom genesis block should be constructed.
+            match (
+                &self.dev_validator_addresses,
+                &self.dev_validator_amounts,
+                &self.dev_validator_open,
+                &self.dev_public_addresses,
+                &self.dev_public_amounts,
+                &self.dev_bonded_addresses,
+                &self.dev_bonded_validators,
+                &self.dev_bonded_amounts,
+            ) {
+                (
+                    Some(dev_validator_addresses),
+                    Some(dev_validator_amounts),
+                    Some(dev_validator_open),
+                    Some(dev_public_addresses),
+                    Some(dev_public_amounts),
+                    Some(dev_bonded_addresses),
+                    Some(dev_bonded_validators),
+                    Some(dev_bonded_amounts),
+                ) => {
+                    // Parse the genesis private key.
+                    let genesis_private_key = match &self.dev_genesis_private_key {
+                        Some(genesis_private_key) => PrivateKey::<N>::from_str(genesis_private_key)?,
+                        None => bail!("Must specify the genesis private key with '--dev-genesis-private-key'"),
+                    };
 
-            // Initialize the (fixed) RNG.
-            let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
-            // Initialize the development private keys.
-            let development_private_keys =
-                (0..num_committee_members).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
+                    // Parse the validator addresses.
+                    let dev_validator_addresses = dev_validator_addresses
+                        .split(',')
+                        .map(|address| Address::<N>::from_str(address.trim()))
+                        .collect::<Result<Vec<_>>>()?;
 
-            // Construct the committee.
-            let committee = {
-                // Calculate the committee stake per member.
-                let stake_per_member =
-                    N::STARTING_SUPPLY.saturating_div(2).saturating_div(num_committee_members as u64);
-                ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
+                    // Parse the validator amounts.
+                    let dev_validator_amounts = dev_validator_amounts
+                        .split(',')
+                        .map(|amount| amount.trim().parse::<u64>().map_err(|_| anyhow::anyhow!("Invalid amount")))
+                        .collect::<Result<Vec<_>>>()?;
 
-                // Construct the committee members and distribute stakes evenly among committee members.
-                let members = development_private_keys
-                    .iter()
-                    .map(|private_key| Ok((Address::try_from(private_key)?, (stake_per_member, true))))
-                    .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+                    // Parse the validator open flags.
+                    let dev_validator_open = dev_validator_open
+                        .split(',')
+                        .map(|open| open.trim().parse::<bool>().map_err(|_| anyhow::anyhow!("Invalid flag")))
+                        .collect::<Result<Vec<_>>>()?;
 
-                // Output the committee.
-                Committee::<N>::new(0u64, members)?
-            };
+                    // Check that the number of validator addresses, amounts, and `is_open` flags match.
+                    ensure!(
+                        dev_validator_addresses.len() == dev_validator_amounts.len()
+                            && dev_validator_addresses.len() == dev_validator_open.len(),
+                        "Number of validator addresses, amounts, and `is_open` flags do not match"
+                    );
 
-            // Calculate the public balance per validator.
-            let remaining_balance = N::STARTING_SUPPLY.saturating_sub(committee.total_stake());
-            let public_balance_per_validator = remaining_balance.saturating_div(num_committee_members as u64);
+                    // Parse the public addresses.
+                    let dev_public_addresses = dev_public_addresses
+                        .split(',')
+                        .map(|address| Address::<N>::from_str(address.trim()))
+                        .collect::<Result<Vec<_>>>()?;
 
-            // Construct the public balances with fairly equal distribution.
-            let mut public_balances = development_private_keys
-                .iter()
-                .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
-                .collect::<Result<indexmap::IndexMap<_, _>>>()?;
-            let bonded_balances =
-                committee.members().iter().map(|(address, (stake, _))| (*address, (*address, *stake))).collect();
+                    // Parse the public amounts.
+                    let dev_public_amounts = dev_public_amounts
+                        .split(',')
+                        .map(|amount| amount.trim().parse::<u64>().map_err(|_| anyhow::anyhow!("Invalid amount")))
+                        .collect::<Result<Vec<_>>>()?;
 
-            // If there is some leftover balance, add it to the 0-th validator.
-            let leftover =
-                remaining_balance.saturating_sub(public_balance_per_validator * num_committee_members as u64);
-            if leftover > 0 {
-                let (_, balance) = public_balances.get_index_mut(0).unwrap();
-                *balance += leftover;
+                    // Check that the number of public addresses and amounts match.
+                    ensure!(
+                        dev_public_addresses.len() == dev_public_amounts.len(),
+                        "Number of public addresses and amounts do not match"
+                    );
+
+                    // Parse the bonded addresses.
+                    let dev_bonded_addresses = dev_bonded_addresses
+                        .split(',')
+                        .map(|address| Address::<N>::from_str(address.trim()))
+                        .collect::<Result<Vec<_>>>()?;
+
+                    // Parse the bonded validators.
+                    let dev_bonded_validators = dev_bonded_validators
+                        .split(',')
+                        .map(|address| Address::<N>::from_str(address.trim()))
+                        .collect::<Result<Vec<_>>>()?;
+
+                    // Parse the bonded amounts.
+                    let dev_bonded_amounts = dev_bonded_amounts
+                        .split(',')
+                        .map(|amount| amount.trim().parse::<u64>().map_err(|_| anyhow::anyhow!("Invalid amount")))
+                        .collect::<Result<Vec<_>>>()?;
+
+                    // Check that the number of bonded addresses, validators, and amounts match.
+                    ensure!(
+                        dev_bonded_addresses.len() == dev_bonded_validators.len()
+                            && dev_bonded_addresses.len() == dev_bonded_amounts.len(),
+                        "Number of bonded addresses, validators, and amounts do not match"
+                    );
+
+                    load_or_compute_genesis(
+                        genesis_private_key,
+                        Committee::<N>::new(
+                            0u64,
+                            dev_validator_addresses
+                                .into_iter()
+                                .zip(dev_validator_amounts.into_iter().zip(dev_validator_open.into_iter()))
+                                .map(|(address, (amount, open))| Ok((address, (amount, open))))
+                                .collect::<Result<indexmap::IndexMap<_, _>>>()?,
+                        )?,
+                        dev_public_addresses
+                            .into_iter()
+                            .zip(dev_public_amounts.into_iter())
+                            .map(|(address, amount)| Ok((address, amount)))
+                            .collect::<Result<indexmap::IndexMap<_, _>>>()?,
+                        dev_bonded_addresses
+                            .into_iter()
+                            .zip(dev_bonded_validators.into_iter().zip(dev_bonded_amounts.into_iter()))
+                            .map(|(address, (validator, amount))| Ok((address, (validator, amount))))
+                            .collect::<Result<indexmap::IndexMap<_, _>>>()?,
+                        &mut ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED),
+                    )
+                }
+                (None, None, None, None, None, None, None, None) => {
+                    // Determine the number of genesis committee members.
+                    let num_committee_members = match self.dev_num_validators {
+                        Some(num_committee_members) => num_committee_members,
+                        None => DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
+                    };
+                    ensure!(
+                        num_committee_members >= DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
+                        "Number of genesis committee members is too low"
+                    );
+
+                    // Initialize the (fixed) RNG.
+                    let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
+                    // Initialize the development private keys.
+                    let development_private_keys = (0..num_committee_members)
+                        .map(|_| PrivateKey::<N>::new(&mut rng))
+                        .collect::<Result<Vec<_>>>()?;
+
+                    // Construct the committee.
+                    let committee = {
+                        // Calculate the committee stake per member.
+                        let stake_per_member =
+                            N::STARTING_SUPPLY.saturating_div(2).saturating_div(num_committee_members as u64);
+                        ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
+
+                        // Construct the committee members and distribute stakes evenly among committee members.
+                        let members = development_private_keys
+                            .iter()
+                            .map(|private_key| Ok((Address::try_from(private_key)?, (stake_per_member, true))))
+                            .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+
+                        // Output the committee.
+                        Committee::<N>::new(0u64, members)?
+                    };
+
+                    // Calculate the public balance per validator.
+                    let remaining_balance = N::STARTING_SUPPLY.saturating_sub(committee.total_stake());
+                    let public_balance_per_validator = remaining_balance.saturating_div(num_committee_members as u64);
+
+                    // Construct the public balances with fairly equal distribution.
+                    let mut public_balances = development_private_keys
+                        .iter()
+                        .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
+                        .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+                    let bonded_balances = committee
+                        .members()
+                        .iter()
+                        .map(|(address, (stake, _))| (*address, (*address, *stake)))
+                        .collect();
+
+                    // If there is some leftover balance, add it to the 0-th validator.
+                    let leftover =
+                        remaining_balance.saturating_sub(public_balance_per_validator * num_committee_members as u64);
+                    if leftover > 0 {
+                        let (_, balance) = public_balances.get_index_mut(0).unwrap();
+                        *balance += leftover;
+                    }
+
+                    // Check if the sum of committee stakes and public balances equals the total starting supply.
+                    let public_balances_sum: u64 = public_balances.values().copied().sum();
+                    if committee.total_stake() + public_balances_sum != N::STARTING_SUPPLY {
+                        bail!("Sum of committee stakes and public balances does not equal total starting supply.");
+                    }
+
+                    // Use the genesis private key if provided.
+                    let genesis_private_key = match &self.dev_genesis_private_key {
+                        Some(genesis_private_key) => PrivateKey::<N>::from_str(genesis_private_key)?,
+                        None => development_private_keys[0],
+                    };
+
+                    // Construct the genesis block.
+                    load_or_compute_genesis(genesis_private_key, committee, public_balances, bonded_balances, &mut rng)
+                }
+                _ => {
+                    bail!(
+                        "Must either specify all or none of the following flags: '--dev-validator-addresses', '--dev-validator-amounts', '--dev-public-addresses', '--dev-public-amounts', '--dev-bonded-addresses', '--dev-bonded-amounts'"
+                    )
+                }
             }
-
-            // Check if the sum of committee stakes and public balances equals the total starting supply.
-            let public_balances_sum: u64 = public_balances.values().copied().sum();
-            if committee.total_stake() + public_balances_sum != N::STARTING_SUPPLY {
-                bail!("Sum of committee stakes and public balances does not equal total starting supply.");
-            }
-
-            // Construct the genesis block.
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, bonded_balances, &mut rng)
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
