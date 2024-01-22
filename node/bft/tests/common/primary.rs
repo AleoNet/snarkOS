@@ -146,7 +146,11 @@ impl TestNetwork {
         for account in accounts.iter() {
             balances.insert(account.address(), public_balance_per_validator);
         }
-        let bonds = IndexMap::<Address<CurrentNetwork>, (Address<CurrentNetwork>, u64)>::new();
+        let bonds = committee
+            .members()
+            .iter()
+            .map(|(address, (stake, _))| (*address, (*address, *stake)))
+            .collect::<IndexMap<_, _>>();
 
         let mut validators = HashMap::with_capacity(config.num_nodes as usize);
         for (id, account) in accounts.into_iter().enumerate() {

@@ -42,7 +42,7 @@ members = [
 
 [workspace.dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "9656a7e"
+branch = "bond_balances_in_genesis"
 # version = "=0.16.16"
 features = [ "circuit", "console", "rocks" ]
 

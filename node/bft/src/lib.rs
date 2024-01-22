@@ -85,6 +85,6 @@ mod tests {
 
     #[test]
     fn test_max_gc_rounds() {
-        assert_eq!(MAX_GC_ROUNDS as usize, snarkvm::ledger::narwhal::Subdag::<CurrentNetwork>::MAX_ROUNDS);
+        assert_eq!(MAX_GC_ROUNDS, snarkvm::ledger::narwhal::Subdag::<CurrentNetwork>::MAX_ROUNDS);
     }
 }

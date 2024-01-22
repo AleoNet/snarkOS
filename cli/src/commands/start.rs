@@ -337,7 +337,8 @@ impl Start {
                 .iter()
                 .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
-            let bonded_balances = indexmap::IndexMap::new();
+            let bonded_balances =
+                committee.members().iter().map(|(address, (stake, _))| (*address, (*address, *stake))).collect();
 
             // If there is some leftover balance, add it to the 0-th validator.
             let leftover =
@@ -517,7 +518,7 @@ fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
-    bonded_balances: indexmap::IndexMap<Address<N>, u64>,
+    bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, u64)>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.

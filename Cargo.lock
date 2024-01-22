@@ -75,9 +75,9 @@ dependencies = [
 
 [[package]]
 name = "aleo-std"
-version = "0.1.18"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3aa6ad1a3bb96698e7e8d8e42a6f2fda3b8611a43aab4d5effb921f18798833"
+checksum = "a3ec648bb4d936c62d63cb85983059c7fecd92175912c145470da3b03010c7c6"
 dependencies = [
  "aleo-std-cpu",
  "aleo-std-profiler",
@@ -101,9 +101,9 @@ checksum = "2bf055ddb2f54fa86394d19d87e7956df2f3cafff489fc14c0f48f2f80664c3d"
 
 [[package]]
 name = "aleo-std-storage"
-version = "0.1.3"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "503e2538d5158b869bc9c30c9754f9a23f4210987008014a9f118db99f22c217"
+checksum = "453100af40d56582265853ecb2ef660d1bc1ba6920bff020a77ceba1122c8eb5"
 dependencies = [
  "dirs",
 ]
@@ -171,9 +171,9 @@ dependencies = [
 
 [[package]]
 name = "anstream"
-version = "0.6.8"
+version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "628a8f9bd1e24b4e0db2b4bc2d000b001e7dd032d54afa60a68836aeec5aa54a"
+checksum = "6e2e1ebcb11de5c03c67de28a7df593d32191b44939c482e97702baaaa6ab6a5"
 dependencies = [
  "anstyle",
  "anstyle-parse",
@@ -2153,9 +2153,9 @@ dependencies = [
 
 [[package]]
 name = "openssl"
-version = "0.10.62"
+version = "0.10.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cde4d2d9200ad5909f8dac647e29482e07c3a35de8a13fce7c9c7747ad9f671"
+checksum = "15c9d69dd87a29568d4d017cfe8ec518706046a05184e5aea92d0af890b803c8"
 dependencies = [
  "bitflags 2.4.2",
  "cfg-if",
@@ -2185,9 +2185,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.98"
+version = "0.9.99"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1665caf8ab2dc9aef43d1c0023bd904633a6a05cb30b0ad59bec2ae986e57a7"
+checksum = "22e1bf214306098e4832460f797824c05d25aacdf896f64a985fb0fd992454ae"
 dependencies = [
  "cc",
  "libc",
@@ -2403,9 +2403,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.76"
+version = "1.0.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95fc56cda0b5c3325f5fbbd7ff9fda9e02bb00bb3dac51252d2f1bfa1cb8cc8c"
+checksum = "e2422ad645d89c99f8f3e6b88a9fdeca7fabeac836b1002371c4367c8f984aae"
 dependencies = [
  "unicode-ident",
 ]
@@ -2619,13 +2619,13 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.2"
+version = "1.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
+checksum = "b62dbe01f0b06f9d8dc7d49e05a0785f153b00b2c227856282f671e0318c9b15"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata 0.4.3",
+ "regex-automata 0.4.4",
  "regex-syntax 0.8.2",
 ]
 
@@ -2640,9 +2640,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f804c7828047e88b2d32e2d7fe5a105da8ee3264f01902f796c8e067dc2483f"
+checksum = "3b7fa1134405e2ec9353fd416b17f8dacd46c473d7d3fd1cf202706a14eb792a"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -3077,9 +3077,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.12.0"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2593d31f82ead8df961d8bd23a64c2ccf2eb5dd34b0a34bfb4dd54011c72009e"
+checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
 
 [[package]]
 name = "smol_str"
@@ -3500,8 +3500,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "anstyle",
  "anyhow",
@@ -3531,8 +3531,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-algorithms"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3561,8 +3561,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-account",
  "snarkvm-circuit-algorithms",
@@ -3575,8 +3575,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-account"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-algorithms",
  "snarkvm-circuit-network",
@@ -3586,8 +3586,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-algorithms"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-types",
  "snarkvm-console-algorithms",
@@ -3596,8 +3596,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-collections"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-algorithms",
  "snarkvm-circuit-types",
@@ -3606,8 +3606,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-environment"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "indexmap 2.1.0",
  "itertools 0.11.0",
@@ -3624,13 +3624,13 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-environment-witness"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 
 [[package]]
 name = "snarkvm-circuit-network"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-algorithms",
  "snarkvm-circuit-collections",
@@ -3640,8 +3640,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-program"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "paste",
  "snarkvm-circuit-account",
@@ -3655,8 +3655,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-types"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-address",
@@ -3670,8 +3670,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-types-address"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3683,8 +3683,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-types-boolean"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-console-types-boolean",
@@ -3692,8 +3692,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-types-field"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3702,8 +3702,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-types-group"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3714,8 +3714,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-types-integers"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3726,8 +3726,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-types-scalar"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3737,8 +3737,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-circuit-types-string"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3749,8 +3749,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console-account",
  "snarkvm-console-algorithms",
@@ -3762,8 +3762,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-account"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "bs58",
  "snarkvm-console-network",
@@ -3773,8 +3773,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-algorithms"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "blake2s_simd",
  "smallvec",
@@ -3786,8 +3786,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-collections"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "aleo-std",
  "rayon",
@@ -3797,8 +3797,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-network"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "anyhow",
  "indexmap 2.1.0",
@@ -3820,8 +3820,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-network-environment"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "anyhow",
  "bech32",
@@ -3838,8 +3838,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-program"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "enum_index",
  "enum_index_derive",
@@ -3859,8 +3859,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-types"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-address",
@@ -3874,8 +3874,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-types-address"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3885,16 +3885,16 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-types-boolean"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console-network-environment",
 ]
 
 [[package]]
 name = "snarkvm-console-types-field"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3903,8 +3903,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-types-group"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3914,8 +3914,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-types-integers"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3925,8 +3925,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-types-scalar"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3936,8 +3936,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-console-types-string"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3947,8 +3947,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-curves"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "rand",
  "rayon",
@@ -3961,8 +3961,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-fields"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3978,8 +3978,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -4003,8 +4003,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-authority"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "anyhow",
  "rand",
@@ -4015,8 +4015,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-block"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "indexmap 2.1.0",
  "rayon",
@@ -4034,8 +4034,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-coinbase"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -4054,8 +4054,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-committee"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "anyhow",
  "indexmap 2.1.0",
@@ -4065,14 +4065,15 @@ dependencies = [
  "rand_distr",
  "serde_json",
  "snarkvm-console",
+ "snarkvm-ledger-narwhal-batch-header",
  "snarkvm-metrics",
  "test-strategy",
 ]
 
 [[package]]
 name = "snarkvm-ledger-narwhal"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-ledger-narwhal-batch-certificate",
  "snarkvm-ledger-narwhal-batch-header",
@@ -4084,8 +4085,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-narwhal-batch-certificate"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "indexmap 2.1.0",
  "rayon",
@@ -4097,8 +4098,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-narwhal-batch-header"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "indexmap 2.1.0",
  "serde_json",
@@ -4109,8 +4110,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-narwhal-data"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "bytes",
  "serde_json",
@@ -4120,13 +4121,14 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-narwhal-subdag"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "indexmap 2.1.0",
  "rayon",
  "serde_json",
  "snarkvm-console",
+ "snarkvm-ledger-committee",
  "snarkvm-ledger-narwhal-batch-certificate",
  "snarkvm-ledger-narwhal-batch-header",
  "snarkvm-ledger-narwhal-transmission-id",
@@ -4134,8 +4136,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-narwhal-transmission"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "bytes",
  "serde_json",
@@ -4147,8 +4149,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-narwhal-transmission-id"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "snarkvm-console",
  "snarkvm-ledger-coinbase",
@@ -4156,8 +4158,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-query"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "async-trait",
  "reqwest",
@@ -4169,10 +4171,10 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-store"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
- "aleo-std",
+ "aleo-std-storage",
  "anyhow",
  "bincode",
  "indexmap 2.1.0",
@@ -4194,8 +4196,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-ledger-test-helpers"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "once_cell",
  "snarkvm-circuit",
@@ -4209,8 +4211,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-metrics"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
@@ -4218,8 +4220,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-parameters"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -4243,8 +4245,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-synthesizer"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -4256,7 +4258,6 @@ dependencies = [
  "snarkvm-circuit",
  "snarkvm-console",
  "snarkvm-ledger-block",
- "snarkvm-ledger-coinbase",
  "snarkvm-ledger-committee",
  "snarkvm-ledger-query",
  "snarkvm-ledger-store",
@@ -4268,8 +4269,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-synthesizer-process"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "aleo-std",
  "colored",
@@ -4291,8 +4292,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-synthesizer-program"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "indexmap 2.1.0",
  "paste",
@@ -4305,8 +4306,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-synthesizer-snark"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "bincode",
  "once_cell",
@@ -4318,8 +4319,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-utilities"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -4339,8 +4340,8 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-utilities-derives"
-version = "0.16.16"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=9656a7e#9656a7e0550c17cf63cd86da6029c3a0b063f731"
+version = "0.16.17"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=bond_balances_in_genesis#133c822c56a67cae418002c7681c4c22fb85f2e5"
 dependencies = [
  "proc-macro2",
  "quote 1.0.35",
