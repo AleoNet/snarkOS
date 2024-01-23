@@ -45,6 +45,8 @@ pub use node::*;
 mod traits;
 pub use traits::*;
 
+use aleo_std::StorageMode;
+
 /// A helper to log instructions to recover.
 pub fn log_clean_error(dev: Option<u16>) {
     match dev {
@@ -70,7 +72,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
     /// Removes the specified ledger from storage.
     pub(crate) fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
         // Construct the path to the ledger in storage.
-        let mut path = aleo_std::aleo_ledger_dir(network, dev);
+        let mut path = aleo_std::aleo_ledger_dir(network, StorageMode::from(dev));
 
         // Delete the parent folder.
         path.pop();
