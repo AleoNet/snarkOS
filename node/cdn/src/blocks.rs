@@ -170,6 +170,13 @@ pub async fn load_blocks<N: Network>(
     // A loop for inserting the pending blocks into the ledger.
     let mut current_height = start_height.saturating_sub(1);
     while current_height < end_height - 1 {
+        // If we are instructed to shut down, abort.
+        if shutdown.load(Ordering::Relaxed) {
+            info!("Stopping block sync at {} - shutting down", current_height);
+            // We can shut down cleanly from here, as the node hasn't been started yet.
+            std::process::exit(0);
+        }
+
         let mut candidate_blocks = pending_blocks.lock();
 
         // Obtain the height of the nearest pending block.
@@ -183,12 +190,7 @@ pub async fn load_blocks<N: Network>(
         // Wait if the nearest pending block is not the next one that can be inserted.
         if next_height > current_height + 1 {
             // There is a gap in pending blocks, we need to wait.
-            debug!(
-                "First candidate's height {} > {}; {} pending",
-                next_height,
-                current_height + 1,
-                candidate_blocks.len()
-            );
+            debug!("Waiting for the first applicable blocks; {} pending", candidate_blocks.len());
             drop(candidate_blocks);
             tokio::time::sleep(Duration::from_secs(1)).await;
             continue;
@@ -203,25 +205,16 @@ pub async fn load_blocks<N: Network>(
         let mut process_clone = process.clone();
         let shutdown_clone = shutdown.clone();
         current_height = tokio::task::spawn_blocking(move || {
-            for block in next_blocks {
-                // If the Ctrl-C handler registered the signal, stop the sync.
+            for block in next_blocks.into_iter().filter(|b| (start_height..end_height).contains(&b.height())) {
+                // If we are instructed to shut down, abort.
                 if shutdown_clone.load(Ordering::Relaxed) {
-                    info!("Stopping block sync (at {}) - the node is shutting down", current_height);
-                    // Note: Calling 'exit' from here is not ideal, but the CDN sync happens before
-                    // the node is even initialized, so it doesn't result in any other
-                    // functionalities being shut down abruptly.
+                    info!("Stopping block sync at {} - the node is shutting down", current_height);
+                    // We can shut down cleanly from here, as the node hasn't been started yet.
                     std::process::exit(0);
-                }
-
-                // Due to the CDN serving bundles of specific size, we may receive some redundant blocks.
-                if block.height() < start_height || current_height >= end_height - 1 {
-                    debug!("Skipping block {}", block.height());
-                    continue;
                 }
 
                 // Insert the block into the ledger.
                 process_clone(block)?;
-
                 current_height += 1;
 
                 // Log the progress.
@@ -251,6 +244,11 @@ async fn download_block_bundles<N: Network>(
 
     let mut start = cdn_start;
     while start < cdn_end - 1 {
+        // If we are instructed to shut down, stop downloading.
+        if shutdown.load(Ordering::Relaxed) {
+            break;
+        }
+
         // Avoid collecting too many blocks in order to restrict memory use.
         let num_pending_blocks = pending_blocks.lock().len();
         if num_pending_blocks >= MAXIMUM_PENDING_BLOCKS as usize {
@@ -259,15 +257,9 @@ async fn download_block_bundles<N: Network>(
             continue;
         }
 
-        // Stop looping once we have enough pending blocks and ongoing requests.
-        let active_request_count = active_requests.load(Ordering::Relaxed);
-        if start + num_pending_blocks as u32 + active_request_count * BLOCKS_PER_FILE >= cdn_end - 1 {
-            debug!("Reached the end of the syncing range; stopping CDN requests");
-            break;
-        }
-
         // The number of concurrent requests is maintained at CONCURRENT_REQUESTS, unless the maximum
         // number of pending blocks may be breached.
+        let active_request_count = active_requests.load(Ordering::Relaxed);
         let num_requests =
             cmp::min(CONCURRENT_REQUESTS, (MAXIMUM_PENDING_BLOCKS - num_pending_blocks as u32) / BLOCKS_PER_FILE)
                 .saturating_sub(active_request_count);
@@ -314,11 +306,7 @@ async fn download_block_bundles<N: Network>(
                                     Err(idx) => pending_blocks.insert(idx, block),
                                 }
                             }
-                            debug!(
-                                "Received {ctx} in {:.2?} ({} queued for insertion)",
-                                request_time.elapsed(),
-                                pending_blocks.len()
-                            );
+                            debug!("Received {ctx} in {:.2?}", request_time.elapsed());
                             break;
                         }
                         Err(error) => {
@@ -326,12 +314,9 @@ async fn download_block_bundles<N: Network>(
                             // case the maximum number of attempts has been breached.
                             attempts += 1;
                             if attempts > MAXIMUM_REQUEST_ATTEMPTS {
-                                warn!(
-                                    "Maximum number ({}) of requests to {} reached; shutting down.",
-                                    attempts, blocks_url
-                                );
+                                warn!("Maximum number of requests to {blocks_url} reached; shutting down.");
                                 shutdown_clone.store(true, Ordering::Relaxed);
-                                return;
+                                break;
                             }
                             tokio::time::sleep(Duration::from_secs(attempts as u64)).await;
                             warn!("Failed to request {ctx} - {error}; retrying ({attempts} attempt(s) so far)");
@@ -350,6 +335,8 @@ async fn download_block_bundles<N: Network>(
         // A short sleep in order to allow some block processing to happen in the meantime.
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+
+    debug!("Reached the end of the syncing range; stopping CDN requests");
 }
 
 /// Retrieves the CDN height with the given base URL.
