@@ -45,6 +45,8 @@ const BLOCKS_PER_FILE: u32 = 50;
 const CONCURRENT_REQUESTS: u32 = 16;
 /// Maximum number of pending sync blocks.
 const MAXIMUM_PENDING_BLOCKS: u32 = BLOCKS_PER_FILE * CONCURRENT_REQUESTS * 2;
+/// Maximum number of attempts for a request to the CDN.
+const MAXIMUM_REQUEST_ATTEMPTS: u8 = 10;
 /// The supported network.
 const NETWORK_ID: u16 = 3;
 
@@ -160,8 +162,9 @@ pub async fn load_blocks<N: Network>(
     // Spawn a background task responsible for concurrent downloads.
     let pending_blocks_clone = pending_blocks.clone();
     let base_url = base_url.to_owned();
+    let shutdown_clone = shutdown.clone();
     tokio::spawn(async move {
-        download_block_bundles(client, base_url, cdn_start, cdn_end, pending_blocks_clone).await;
+        download_block_bundles(client, base_url, cdn_start, cdn_end, pending_blocks_clone, shutdown_clone).await;
     });
 
     // A loop for inserting the pending blocks into the ledger.
@@ -241,6 +244,7 @@ async fn download_block_bundles<N: Network>(
     cdn_start: u32,
     cdn_end: u32,
     pending_blocks: Arc<Mutex<Vec<Block<N>>>>,
+    shutdown: Arc<AtomicBool>,
 ) {
     // Keep track of the number of concurrent requests.
     let active_requests: Arc<AtomicU32> = Default::default();
@@ -283,6 +287,7 @@ async fn download_block_bundles<N: Network>(
             let base_url_clone = base_url.clone();
             let pending_blocks_clone = pending_blocks.clone();
             let active_requests_clone = active_requests.clone();
+            let shutdown_clone = shutdown.clone();
             tokio::spawn(async move {
                 // Increment the number of active requests.
                 active_requests_clone.fetch_add(1, Ordering::Relaxed);
@@ -317,9 +322,18 @@ async fn download_block_bundles<N: Network>(
                             break;
                         }
                         Err(error) => {
-                            // Increment the attempt counter, and wait with a linear backoff.
+                            // Increment the attempt counter, and wait with a linear backoff, or abort in
+                            // case the maximum number of attempts has been breached.
                             attempts += 1;
-                            tokio::time::sleep(Duration::from_secs(attempts)).await;
+                            if attempts > MAXIMUM_REQUEST_ATTEMPTS {
+                                warn!(
+                                    "Maximum number ({}) of requests to {} reached; shutting down.",
+                                    attempts, blocks_url
+                                );
+                                shutdown_clone.store(true, Ordering::Relaxed);
+                                return;
+                            }
+                            tokio::time::sleep(Duration::from_secs(attempts as u64)).await;
                             warn!("Failed to request {ctx} - {error}; retrying ({attempts} attempt(s) so far)");
                         }
                     }
