@@ -28,7 +28,6 @@ use snarkvm::prelude::{
 
 use anyhow::{anyhow, bail, Result};
 use colored::Colorize;
-use core::ops::Range;
 use parking_lot::Mutex;
 use reqwest::Client;
 use std::{
@@ -131,7 +130,7 @@ pub async fn load_blocks<N: Network>(
     if end_height < start_height {
         return Err((
             start_height,
-            anyhow!("The given end height ({end_height}) must be less than the start height ({start_height})"),
+            anyhow!("The given end height ({end_height}) must not be less than the start height ({start_height})"),
         ));
     }
 
@@ -139,10 +138,8 @@ pub async fn load_blocks<N: Network>(
     let cdn_start = start_height - (start_height % BLOCKS_PER_FILE);
     // Set the CDN end height to the given end height.
     let cdn_end = end_height;
-    // Construct the CDN range.
-    let cdn_range = cdn_start..cdn_end;
     // If the CDN range is empty, return.
-    if cdn_range.is_empty() {
+    if cdn_start >= cdn_end {
         return Ok(cdn_end);
     }
 
@@ -160,104 +157,11 @@ pub async fn load_blocks<N: Network>(
         }
     };
 
-    // Spawn a task responsible for concurrent downloads.
+    // Spawn a background task responsible for concurrent downloads.
     let pending_blocks_clone = pending_blocks.clone();
     let base_url = base_url.to_owned();
     tokio::spawn(async move {
-        // Keep track of the number of concurrent requests.
-        let active_requests: Arc<AtomicU32> = Default::default();
-
-        let mut start = cdn_start;
-        while start < cdn_end - 1 {
-            // Avoid collecting too many blocks in order to restrict memory use.
-            let num_pending_blocks = pending_blocks_clone.lock().len();
-            if num_pending_blocks >= MAXIMUM_PENDING_BLOCKS as usize {
-                debug!("Maximum number of pending blocks reached ({num_pending_blocks}), waiting...");
-                tokio::time::sleep(Duration::from_secs(5)).await;
-                continue;
-            }
-
-            // Stop looping once we have enough pending blocks and ongoing requests.
-            let active_request_count = active_requests.load(Ordering::Relaxed);
-            if start + num_pending_blocks as u32 + active_request_count * BLOCKS_PER_FILE >= cdn_end - 1 {
-                debug!("Reached the end of the syncing range; stopping CDN requests");
-                break;
-            }
-
-            // The number of concurrent requests is maintained at CONCURRENT_REQUESTS, unless the maximum
-            // number of pending blocks may be breached.
-            let num_requests =
-                cmp::min(CONCURRENT_REQUESTS, (MAXIMUM_PENDING_BLOCKS - num_pending_blocks as u32) / BLOCKS_PER_FILE)
-                    .saturating_sub(active_request_count);
-
-            // Spawn concurrent requests for bundles of blocks.
-            for i in 0..num_requests {
-                let start = start + i * BLOCKS_PER_FILE;
-                let end = start + BLOCKS_PER_FILE;
-
-                // If this request would breach the upper limit, stop downloading.
-                if end > cdn_end + BLOCKS_PER_FILE {
-                    debug!("Reached the end of the syncing range; stopping CDN requests");
-                    break;
-                }
-
-                let client_clone = client.clone();
-                let base_url_clone = base_url.clone();
-                let pending_blocks_clone = pending_blocks_clone.clone();
-                let active_requests_clone = active_requests.clone();
-                tokio::spawn(async move {
-                    // Increment the number of active requests.
-                    active_requests_clone.fetch_add(1, Ordering::Relaxed);
-
-                    let ctx = format!("blocks {start} to {end}");
-                    debug!("Requesting {ctx} (of {cdn_end})");
-
-                    // Prepare the URL.
-                    let blocks_url = format!("{base_url_clone}/{start}.{end}.blocks");
-                    let ctx = format!("blocks {start} to {end}");
-                    // Download blocks, retrying on failure.
-                    let mut attempts = 0;
-                    let request_time = Instant::now();
-
-                    loop {
-                        // Fetch the blocks.
-                        match cdn_get(client_clone.clone(), &blocks_url, &ctx).await {
-                            Ok::<Vec<Block<N>>, _>(blocks) => {
-                                // Keep the collection of pending blocks sorted by the height.
-                                let mut pending_blocks = pending_blocks_clone.lock();
-                                for block in blocks {
-                                    match pending_blocks.binary_search_by_key(&block.height(), |b| b.height()) {
-                                        Ok(_idx) => warn!("Duplicate pending block at height {}", block.height()),
-                                        Err(idx) => pending_blocks.insert(idx, block),
-                                    }
-                                }
-                                debug!(
-                                    "Received {ctx} in {:.2?} ({} queued for insertion)",
-                                    request_time.elapsed(),
-                                    pending_blocks.len()
-                                );
-                                break;
-                            }
-                            Err(error) => {
-                                // Increment the attempt counter, and wait with a linear backoff.
-                                attempts += 1;
-                                tokio::time::sleep(Duration::from_secs(attempts)).await;
-                                warn!("Failed to request {ctx} - {error}; retrying ({attempts} attempt(s) so far)");
-                            }
-                        }
-                    }
-
-                    // Decrement the number of active requests.
-                    active_requests_clone.fetch_sub(1, Ordering::Relaxed);
-                });
-            }
-
-            // Increase the starting block height for the subsequent requests.
-            start += BLOCKS_PER_FILE * num_requests;
-
-            // A short sleep in order to allow some block processing to happen in the meantime.
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
+        download_block_bundles(client, base_url, cdn_start, cdn_end, pending_blocks_clone).await;
     });
 
     // A loop for inserting the pending blocks into the ledger.
@@ -293,45 +197,145 @@ pub async fn load_blocks<N: Network>(
         drop(candidate_blocks);
 
         // Attempt to advance the ledger using the CDN block bundle.
-        for block in next_blocks {
-            // If the Ctrl-C handler registered the signal, stop the sync.
-            if shutdown.load(Ordering::Relaxed) {
-                info!("Stopping block sync (at {}) - the node is shutting down", block.height());
-                // Note: Calling 'exit' from here is not ideal, but the CDN sync happens before
-                // the node is even initialized, so it doesn't result in any other
-                // functionalities being shut down abruptly.
-                std::process::exit(0);
-            }
-
-            // Due to the CDN serving bundles of specific size, we may receive some redundant blocks.
-            if block.height() < start_height || current_height >= end_height - 1 {
-                debug!("Skipping block {}", block.height());
-                continue;
-            }
-
-            // Insert the block into the ledger.
-            let mut process_clone = process.clone();
-            let result = tokio::task::spawn_blocking(move || process_clone(block)).await;
-
-            // Abort syncing on failure.
-            match result {
-                Ok(Ok(_)) => {}
-                Ok(Err(err)) => {
-                    return Err((current_height, err));
+        let mut process_clone = process.clone();
+        let shutdown_clone = shutdown.clone();
+        current_height = tokio::task::spawn_blocking(move || {
+            for block in next_blocks {
+                // If the Ctrl-C handler registered the signal, stop the sync.
+                if shutdown_clone.load(Ordering::Relaxed) {
+                    info!("Stopping block sync (at {}) - the node is shutting down", current_height);
+                    // Note: Calling 'exit' from here is not ideal, but the CDN sync happens before
+                    // the node is even initialized, so it doesn't result in any other
+                    // functionalities being shut down abruptly.
+                    std::process::exit(0);
                 }
-                Err(err) => {
-                    return Err((current_height, err.into()));
+
+                // Due to the CDN serving bundles of specific size, we may receive some redundant blocks.
+                if block.height() < start_height || current_height >= end_height - 1 {
+                    debug!("Skipping block {}", block.height());
+                    continue;
                 }
+
+                // Insert the block into the ledger.
+                process_clone(block)?;
+
+                current_height += 1;
+
+                // Log the progress.
+                log_progress::<BLOCKS_PER_FILE>(timer, current_height, cdn_start, cdn_end, "block");
             }
 
-            current_height += 1;
-
-            // Log the progress.
-            log_progress::<BLOCKS_PER_FILE>(timer, current_height, &cdn_range, "block");
-        }
+            Ok(current_height)
+        })
+        .await
+        .map_err(|e| (current_height, e.into()))?
+        .map_err(|e| (current_height, e))?;
     }
 
     Ok(current_height)
+}
+
+async fn download_block_bundles<N: Network>(
+    client: Client,
+    base_url: String,
+    cdn_start: u32,
+    cdn_end: u32,
+    pending_blocks: Arc<Mutex<Vec<Block<N>>>>,
+) {
+    // Keep track of the number of concurrent requests.
+    let active_requests: Arc<AtomicU32> = Default::default();
+
+    let mut start = cdn_start;
+    while start < cdn_end - 1 {
+        // Avoid collecting too many blocks in order to restrict memory use.
+        let num_pending_blocks = pending_blocks.lock().len();
+        if num_pending_blocks >= MAXIMUM_PENDING_BLOCKS as usize {
+            debug!("Maximum number of pending blocks reached ({num_pending_blocks}), waiting...");
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            continue;
+        }
+
+        // Stop looping once we have enough pending blocks and ongoing requests.
+        let active_request_count = active_requests.load(Ordering::Relaxed);
+        if start + num_pending_blocks as u32 + active_request_count * BLOCKS_PER_FILE >= cdn_end - 1 {
+            debug!("Reached the end of the syncing range; stopping CDN requests");
+            break;
+        }
+
+        // The number of concurrent requests is maintained at CONCURRENT_REQUESTS, unless the maximum
+        // number of pending blocks may be breached.
+        let num_requests =
+            cmp::min(CONCURRENT_REQUESTS, (MAXIMUM_PENDING_BLOCKS - num_pending_blocks as u32) / BLOCKS_PER_FILE)
+                .saturating_sub(active_request_count);
+
+        // Spawn concurrent requests for bundles of blocks.
+        for i in 0..num_requests {
+            let start = start + i * BLOCKS_PER_FILE;
+            let end = start + BLOCKS_PER_FILE;
+
+            // If this request would breach the upper limit, stop downloading.
+            if end > cdn_end + BLOCKS_PER_FILE {
+                debug!("Reached the end of the syncing range; stopping CDN requests");
+                break;
+            }
+
+            let client_clone = client.clone();
+            let base_url_clone = base_url.clone();
+            let pending_blocks_clone = pending_blocks.clone();
+            let active_requests_clone = active_requests.clone();
+            tokio::spawn(async move {
+                // Increment the number of active requests.
+                active_requests_clone.fetch_add(1, Ordering::Relaxed);
+
+                let ctx = format!("blocks {start} to {end}");
+                debug!("Requesting {ctx} (of {cdn_end})");
+
+                // Prepare the URL.
+                let blocks_url = format!("{base_url_clone}/{start}.{end}.blocks");
+                let ctx = format!("blocks {start} to {end}");
+                // Download blocks, retrying on failure.
+                let mut attempts = 0;
+                let request_time = Instant::now();
+
+                loop {
+                    // Fetch the blocks.
+                    match cdn_get(client_clone.clone(), &blocks_url, &ctx).await {
+                        Ok::<Vec<Block<N>>, _>(blocks) => {
+                            // Keep the collection of pending blocks sorted by the height.
+                            let mut pending_blocks = pending_blocks_clone.lock();
+                            for block in blocks {
+                                match pending_blocks.binary_search_by_key(&block.height(), |b| b.height()) {
+                                    Ok(_idx) => warn!("Duplicate pending block at height {}", block.height()),
+                                    Err(idx) => pending_blocks.insert(idx, block),
+                                }
+                            }
+                            debug!(
+                                "Received {ctx} in {:.2?} ({} queued for insertion)",
+                                request_time.elapsed(),
+                                pending_blocks.len()
+                            );
+                            break;
+                        }
+                        Err(error) => {
+                            // Increment the attempt counter, and wait with a linear backoff.
+                            attempts += 1;
+                            tokio::time::sleep(Duration::from_secs(attempts)).await;
+                            warn!("Failed to request {ctx} - {error}; retrying ({attempts} attempt(s) so far)");
+                        }
+                    }
+                }
+
+                // Decrement the number of active requests.
+                active_requests_clone.fetch_sub(1, Ordering::Relaxed);
+            });
+        }
+
+        // Increase the starting block height for the subsequent requests.
+        start += BLOCKS_PER_FILE * num_requests;
+
+        // A short sleep in order to allow some block processing to happen in the meantime.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
 /// Retrieves the CDN height with the given base URL.
@@ -403,13 +407,12 @@ async fn cdn_get<T: 'static + DeserializeOwned + Send>(client: Client, url: &str
 fn log_progress<const OBJECTS_PER_FILE: u32>(
     timer: Instant,
     current_index: u32,
-    cdn_range: &Range<u32>,
+    cdn_start: u32,
+    mut cdn_end: u32,
     object_name: &str,
 ) {
-    // Prepare the CDN start and end heights.
-    let cdn_start = cdn_range.start;
     // Subtract 1, as the end of the range is exclusive.
-    let cdn_end = cdn_range.end - 1;
+    cdn_end -= 1;
     // Compute the percentage completed.
     let percentage = current_index * 100 / cdn_end;
     // Compute the number of files processed so far.
@@ -517,18 +520,19 @@ mod tests {
     fn test_log_progress() {
         // This test sanity checks that basic arithmetic is correct (i.e. no divide by zero, etc.).
         let timer = Instant::now();
-        let cdn_range = &(0..100);
+        let cdn_start = 0;
+        let cdn_end = 100;
         let object_name = "blocks";
-        log_progress::<10>(timer, 0, cdn_range, object_name);
-        log_progress::<10>(timer, 10, cdn_range, object_name);
-        log_progress::<10>(timer, 20, cdn_range, object_name);
-        log_progress::<10>(timer, 30, cdn_range, object_name);
-        log_progress::<10>(timer, 40, cdn_range, object_name);
-        log_progress::<10>(timer, 50, cdn_range, object_name);
-        log_progress::<10>(timer, 60, cdn_range, object_name);
-        log_progress::<10>(timer, 70, cdn_range, object_name);
-        log_progress::<10>(timer, 80, cdn_range, object_name);
-        log_progress::<10>(timer, 90, cdn_range, object_name);
-        log_progress::<10>(timer, 100, cdn_range, object_name);
+        log_progress::<10>(timer, 0, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 10, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 20, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 30, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 40, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 50, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 60, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 70, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 80, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 90, cdn_start, cdn_end, object_name);
+        log_progress::<10>(timer, 100, cdn_start, cdn_end, object_name);
     }
 }
