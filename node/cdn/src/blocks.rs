@@ -112,8 +112,16 @@ pub async fn load_blocks<N: Network>(
         return Err((start_height, anyhow!("The network ({}) is not supported", N::ID)));
     }
 
+    // Create a Client to maintain a connection pool throughout the sync.
+    let client = match Client::builder().build() {
+        Ok(client) => client,
+        Err(error) => {
+            return Err((start_height.saturating_sub(1), anyhow!("Failed to create a CDN request client: {error}")));
+        }
+    };
+
     // Fetch the CDN height.
-    let cdn_height = match cdn_height::<BLOCKS_PER_FILE>(base_url).await {
+    let cdn_height = match cdn_height::<BLOCKS_PER_FILE>(&client, base_url).await {
         Ok(cdn_height) => cdn_height,
         Err(error) => return Err((start_height, error)),
     };
@@ -150,14 +158,6 @@ pub async fn load_blocks<N: Network>(
 
     // Start a timer.
     let timer = Instant::now();
-
-    // Create a Client to maintain a connection pool throughout the sync.
-    let client = match Client::builder().build() {
-        Ok(client) => client,
-        Err(error) => {
-            return Err((start_height.saturating_sub(1), anyhow!("Failed to create a CDN request client: {error}")));
-        }
-    };
 
     // Spawn a background task responsible for concurrent downloads.
     let pending_blocks_clone = pending_blocks.clone();
@@ -356,7 +356,7 @@ async fn download_block_bundles<N: Network>(
 ///
 /// Note: This function decrements the tip by a few blocks, to ensure the
 /// tip is not on a block that is not yet available on the CDN.
-async fn cdn_height<const BLOCKS_PER_FILE: u32>(base_url: &str) -> Result<u32> {
+async fn cdn_height<const BLOCKS_PER_FILE: u32>(client: &Client, base_url: &str) -> Result<u32> {
     // A representation of the 'latest.json' file object.
     #[derive(Deserialize, Serialize, Debug)]
     struct LatestState {
@@ -364,11 +364,6 @@ async fn cdn_height<const BLOCKS_PER_FILE: u32>(base_url: &str) -> Result<u32> {
         inclusive_height: u32,
         hash: String,
     }
-    // Create a request client.
-    let client = match reqwest::Client::builder().build() {
-        Ok(client) => client,
-        Err(error) => bail!("Failed to create a CDN request client: {error}"),
-    };
     // Prepare the URL.
     let latest_json_url = format!("{base_url}/latest.json");
     // Send the request.
@@ -513,8 +508,9 @@ mod tests {
     #[test]
     fn test_cdn_height() {
         let rt = tokio::runtime::Runtime::new().unwrap();
+        let client = reqwest::Client::builder().build().unwrap();
         rt.block_on(async {
-            let height = cdn_height::<BLOCKS_PER_FILE>(TEST_BASE_URL).await.unwrap();
+            let height = cdn_height::<BLOCKS_PER_FILE>(&client, TEST_BASE_URL).await.unwrap();
             assert!(height > 0);
         });
     }
