@@ -234,6 +234,7 @@ pub async fn load_blocks<N: Network>(
             let cdn_range_clone = cdn_range.clone();
             let completed_height_clone = completed_height.clone();
             let failed_clone = failed.clone();
+            let shutdown_clone = shutdown.clone();
             let result = tokio::task::spawn_blocking(move || {
                 // Fetch the last height in the blocks.
                 let curr_height = blocks.last().map(|block| block.height()).unwrap_or(start_height);
@@ -242,6 +243,15 @@ pub async fn load_blocks<N: Network>(
                 for block in blocks {
                     // Retrieve the block height.
                     let block_height = block.height();
+
+                    // If the Ctrl-C handler registered the signal, then stop the sync.
+                    if shutdown_clone.load(Ordering::Relaxed) {
+                        info!("Skipping block process (at {block_height}) - The node is shutting down");
+                        // Note: Calling 'exit' from here is not ideal, but the CDN sync happens before
+                        // the node is even initialized, so it doesn't result in any other
+                        // functionalities being shut down abruptly.
+                        std::process::exit(0);
+                    }
 
                     // If the sync failed, set the failed flag, and return.
                     if let Err(error) = process_clone(block) {
