@@ -71,7 +71,7 @@ pub trait NodeInterface<N: Network>: Routing<N> {
                     }
 
                     // A best-effort attempt to let any ongoing activity conclude.
-                    tokio::time::sleep(Duration::from_secs(3)).await;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
 
                     // Terminate the process.
                     std::process::exit(0);
