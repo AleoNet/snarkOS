@@ -134,9 +134,6 @@ pub struct Start {
     /// If development mode is enabled, specify the total amount bonded to the validator.
     #[clap(long)]
     pub dev_validator_amounts: Option<String>,
-    /// If development mode is enabled, specify whether or not the validator is open.
-    #[clap(long)]
-    pub dev_validator_open: Option<String>,
 
     /// If development mode is enabled, specify the addresses with public balances.
     #[clap(long)]
@@ -331,7 +328,6 @@ impl Start {
             match (
                 &self.dev_validator_addresses,
                 &self.dev_validator_amounts,
-                &self.dev_validator_open,
                 &self.dev_public_addresses,
                 &self.dev_public_amounts,
                 &self.dev_bonded_addresses,
@@ -341,7 +337,6 @@ impl Start {
                 (
                     Some(dev_validator_addresses),
                     Some(dev_validator_amounts),
-                    Some(dev_validator_open),
                     Some(dev_public_addresses),
                     Some(dev_public_amounts),
                     Some(dev_bonded_addresses),
@@ -366,17 +361,10 @@ impl Start {
                         .map(|amount| amount.trim().parse::<u64>().map_err(|_| anyhow::anyhow!("Invalid amount")))
                         .collect::<Result<Vec<_>>>()?;
 
-                    // Parse the validator open flags.
-                    let dev_validator_open = dev_validator_open
-                        .split(',')
-                        .map(|open| open.trim().parse::<bool>().map_err(|_| anyhow::anyhow!("Invalid flag")))
-                        .collect::<Result<Vec<_>>>()?;
-
                     // Check that the number of validator addresses, amounts, and `is_open` flags match.
                     ensure!(
-                        dev_validator_addresses.len() == dev_validator_amounts.len()
-                            && dev_validator_addresses.len() == dev_validator_open.len(),
-                        "Number of validator addresses, amounts, and `is_open` flags do not match"
+                        dev_validator_addresses.len() == dev_validator_amounts.len(),
+                        "Number of validator addresses and amounts do not match"
                     );
 
                     // Parse the public addresses.
@@ -428,8 +416,8 @@ impl Start {
                             0u64,
                             dev_validator_addresses
                                 .into_iter()
-                                .zip(dev_validator_amounts.into_iter().zip(dev_validator_open.into_iter()))
-                                .map(|(address, (amount, open))| Ok((address, (amount, open))))
+                                .zip(dev_validator_amounts.into_iter())
+                                .map(|(address, amount)| Ok((address, (amount, true))))
                                 .collect::<Result<indexmap::IndexMap<_, _>>>()?,
                         )?,
                         dev_public_addresses
@@ -445,7 +433,7 @@ impl Start {
                         &mut ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED),
                     )
                 }
-                (None, None, None, None, None, None, None, None) => {
+                (None, None, None, None, None, None, None) => {
                     // Determine the number of genesis committee members.
                     let num_committee_members = match self.dev_num_validators {
                         Some(num_committee_members) => num_committee_members,
