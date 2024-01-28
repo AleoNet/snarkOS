@@ -42,9 +42,9 @@ which verifies transactions and stores the encrypted state applications in a pub
 
 The following are **minimum** requirements to run an Aleo node:
  - **OS**: 64-bit architectures only, latest up-to-date for security
-    - Clients: Ubuntu 22.04 (LTS), macOS Ventura or later, Windows 11 or later
-    - Provers: Ubuntu 22.04 (LTS), macOS Ventura or later
-    - Validators: Ubuntu 22.04 (LTS)
+    - Clients: Ubuntu 22.04 (LTS), macOS Ventura or later, Windows 11 or later, (*Beta*: Debian 12)
+    - Provers: Ubuntu 22.04 (LTS), macOS Ventura or later, (*Beta*: Debian 12)
+    - Validators: Ubuntu 22.04 (LTS), (*Beta*: Debian 12)
  - **CPU**: 64-bit architectures only
     - Clients: 16-cores
     - Provers: 32-cores (64-cores preferred)
@@ -93,6 +93,19 @@ cargo install --path .
 ```
 
 Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
+
+**[*Beta* - For Debian users]** A helper script to install dependencies is available. From the `snarkOS` directory, run:
+```
+./build_debian.sh
+```
+
+Lastly, install `snarkOS`:
+```
+cargo install --path .
+```
+
+Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
+
 
 ## 3. Run an Aleo Node
 
