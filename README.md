@@ -44,7 +44,7 @@ The following are **minimum** requirements to run an Aleo node:
  - **OS**: 64-bit architectures only, latest up-to-date for security
     - Clients: Ubuntu 22.04 (LTS), macOS Ventura or later, Windows 11 or later
     - Provers: Ubuntu 22.04 (LTS), macOS Ventura or later
-    - Validators: Ubuntu 22.04 (LTS)
+    - Validators: Ubuntu 22.04 (LTS), macOS Ventura or later
  - **CPU**: 64-bit architectures only
     - Clients: 16-cores
     - Provers: 32-cores (64-cores preferred)
