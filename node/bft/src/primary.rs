@@ -721,7 +721,7 @@ impl<N: Network> Primary<N> {
         if !self.gateway.is_authorized_validator_ip(peer_ip) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
-            bail!("Malicious peer - Received a batch certificate from a non-authorized validator ip ({peer_ip})");
+            bail!("Malicious peer - Received a batch certificate from an unauthorized validator IP ({peer_ip})");
         }
         // Ensure the batch certificate is not from the current primary.
         if self.gateway.account().address() == author {
