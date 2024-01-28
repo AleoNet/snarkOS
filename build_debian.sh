@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # This script will install the llvm toolchain on the different
+
 # Debian and Ubuntu versions
 
 set -eux
