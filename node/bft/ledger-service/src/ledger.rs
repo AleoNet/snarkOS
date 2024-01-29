@@ -34,6 +34,8 @@ use std::{
         Arc,
     },
 };
+use tracing::info;
+
 
 /// A core ledger service.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
@@ -270,7 +272,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
         // Check the transaction is well-formed.
         let ledger = self.ledger.clone();
-        spawn_blocking!(ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()))
+        // kp here
+        info!("start checking transaction verification for {}", transaction_id);
+        let check_result = spawn_blocking!(ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()));
+        info!("end checking transaction verification for {}", transaction_id);
+        check_result
     }
 
     /// Checks the given block is valid next block.
