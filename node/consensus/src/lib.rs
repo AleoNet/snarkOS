@@ -17,6 +17,7 @@
 #[macro_use]
 extern crate tracing;
 
+use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_node_bft::{
     helpers::{
@@ -81,10 +82,15 @@ impl<N: Network> Consensus<N> {
         ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
+        // Recover the dev id if present.
+        let dev = match storage_mode {
+            StorageMode::Development(id) => Some(id),
+            _ => None,
+        };
         // Initialize the Narwhal transmissions.
-        let transmissions = Arc::new(BFTPersistentStorage::open(dev)?);
+        let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode)?);
         // Initialize the Narwhal storage.
         let storage = NarwhalStorage::new(ledger.clone(), transmissions, MAX_GC_ROUNDS);
         // Initialize the BFT.

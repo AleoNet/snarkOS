@@ -16,6 +16,9 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[dev-dependencies.aleo-std]
+version = "0.1.24"
+
 [dev-dependencies.snarkos-node-cdn]
 path = "../node/cdn"
 

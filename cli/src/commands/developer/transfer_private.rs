@@ -14,6 +14,7 @@
 
 use super::{CurrentNetwork, Developer};
 
+use aleo_std::StorageMode;
 use snarkvm::prelude::{
     query::Query,
     store::{helpers::memory::ConsensusMemory, ConsensusStore},
@@ -26,7 +27,7 @@ use snarkvm::prelude::{
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 use zeroize::Zeroize;
 
 /// Executes the `transfer_private` function in the `credits.aleo` program.
@@ -62,6 +63,9 @@ pub struct TransferPrivate {
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage_path")]
+    pub storage_path: Option<PathBuf>,
 }
 
 impl Drop for TransferPrivate {
@@ -74,7 +78,7 @@ impl Drop for TransferPrivate {
 impl TransferPrivate {
     /// Creates an Aleo transfer with the provided inputs.
     #[allow(clippy::format_in_format_args)]
-    pub fn parse(self) -> Result<String> {
+    pub fn parse(mut self) -> Result<String> {
         // Ensure that the user has specified an action.
         if !self.dry_run && self.broadcast.is_none() && self.store.is_none() {
             bail!("❌ Please specify one of the following actions: --broadcast, --dry-run, --store");
@@ -94,7 +98,12 @@ impl TransferPrivate {
             let rng = &mut rand::thread_rng();
 
             // Initialize the VM.
-            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
+            let storage_mode = if let Some(path) = self.storage_path.take() {
+                StorageMode::Custom(path)
+            } else {
+                StorageMode::Production
+            };
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(storage_mode)?;
             let vm = VM::from(store)?;
 
             // Prepare the fee.

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::{traits::NodeInterface, Client, Prover, Validator};
+use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_node_router::messages::NodeType;
 use snarkvm::prelude::{
@@ -48,7 +49,7 @@ impl<N: Network> Node<N> {
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
             Validator::new(
@@ -61,7 +62,7 @@ impl<N: Network> Node<N> {
                 trusted_validators,
                 genesis,
                 cdn,
-                dev,
+                storage_mode,
             )
             .await?,
         )))
@@ -73,9 +74,9 @@ impl<N: Network> Node<N> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
-        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, dev).await?)))
+        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, storage_mode).await?)))
     }
 
     /// Initializes a new client node.
@@ -87,10 +88,10 @@ impl<N: Network> Node<N> {
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
         Ok(Self::Client(Arc::new(
-            Client::new(node_ip, rest_ip, rest_rps, account, trusted_peers, genesis, cdn, dev).await?,
+            Client::new(node_ip, rest_ip, rest_rps, account, trusted_peers, genesis, cdn, storage_mode).await?,
         )))
     }
 

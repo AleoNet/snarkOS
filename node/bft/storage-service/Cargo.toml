@@ -22,6 +22,9 @@ memory = [ "parking_lot", "tracing" ]
 persistent = [ ]
 test = [ "memory" ]
 
+[dependencies.aleo-std]
+version = "0.1.24"
+
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]

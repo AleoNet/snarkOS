@@ -17,6 +17,7 @@ use crate::common::{
     CurrentNetwork,
     TranslucentLedgerService,
 };
+use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_node_bft::{
     helpers::{init_primary_channels, PrimarySender, Storage},
@@ -389,5 +390,5 @@ fn genesis_ledger(
         })
         .clone();
     // Initialize the ledger with the genesis block.
-    CurrentLedger::load(block, None).unwrap()
+    CurrentLedger::load(block, StorageMode::Production).unwrap()
 }

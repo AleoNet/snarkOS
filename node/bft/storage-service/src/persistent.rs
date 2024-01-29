@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::StorageService;
+use aleo_std::StorageMode;
 use snarkvm::{
     ledger::{
         narwhal::{BatchHeader, Transmission, TransmissionID},
@@ -42,8 +43,8 @@ pub struct BFTPersistentStorage<N: Network> {
 
 impl<N: Network> BFTPersistentStorage<N> {
     /// Initializes a new BFT persistent storage service.
-    pub fn open(dev: Option<u16>) -> Result<Self> {
-        Ok(Self { transmissions: internal::RocksDB::open_map(N::ID, dev, MapID::BFT(BFTMap::Transmissions))? })
+    pub fn open(storage_mode: StorageMode) -> Result<Self> {
+        Ok(Self { transmissions: internal::RocksDB::open_map(N::ID, storage_mode, MapID::BFT(BFTMap::Transmissions))? })
     }
 
     /// Initializes a new BFT persistent storage service.

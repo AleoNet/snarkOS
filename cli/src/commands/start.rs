@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_display::Display;
 use snarkos_node::{bft::MEMORY_POOL_PORT, router::messages::NodeType, Node};
@@ -123,6 +124,9 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage_path")]
+    pub storage_path: Option<PathBuf>,
 }
 
 impl Start {
@@ -353,7 +357,12 @@ impl Start {
             }
 
             // Construct the genesis block.
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
+            let mode = if let Some(path) = &self.storage_path {
+                StorageMode::Custom(path.clone())
+            } else {
+                StorageMode::Production
+            };
+            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng, mode)
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
@@ -442,12 +451,19 @@ impl Start {
             metrics::initialize_metrics();
         }
 
+        // Obtain the storage mode.
+        let storage_mode = if let Some(path) = self.storage_path.take() {
+            StorageMode::Custom(path)
+        } else {
+            StorageMode::from(self.dev)
+        };
         // Initialize the node.
+
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
-            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
-            NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode).await,
+            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
+            NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }
     }
 
@@ -517,6 +533,7 @@ fn load_or_compute_genesis<N: Network>(
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
     rng: &mut ChaChaRng,
+    storage_mode: StorageMode,
 ) -> Result<Block<N>> {
     // Construct the preimage.
     let mut preimage = Vec::new();
@@ -566,7 +583,7 @@ fn load_or_compute_genesis<N: Network>(
     /* Otherwise, compute the genesis block and store it. */
 
     // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(storage_mode)?)?;
     // Initialize the genesis block.
     let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng)?;
     // Write the genesis block to the file.
