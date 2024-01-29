@@ -46,6 +46,10 @@ members = [
 version = "=0.16.18"
 features = [ "circuit", "console", "rocks" ]
 
+[workspace.dependencies.aleo-std]
+version = "=0.1.24"
+default-features = false
+
 [[bin]]
 name = "snarkos"
 path = "snarkos/main.rs"

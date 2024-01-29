@@ -23,7 +23,7 @@ persistent = [ ]
 test = [ "memory" ]
 
 [dependencies.aleo-std]
-version = "0.1.24"
+workspace = true
 
 [dependencies.indexmap]
 version = "2.1"
