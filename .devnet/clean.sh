@@ -26,6 +26,9 @@ terminate_tmux_session() {
     tmux kill-session -t snarkos-session
     snarkos clean --dev $NODE_ID
 
+    REMOTE_LOG_FILE="/tmp/snarkos.log"
+    rm -f \$REMOTE_LOG_FILE
+
     exit  # Exit root user
 EOF
 
