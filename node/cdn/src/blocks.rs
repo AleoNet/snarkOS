@@ -116,7 +116,7 @@ pub async fn load_blocks<N: Network>(
     let client = match Client::builder().build() {
         Ok(client) => client,
         Err(error) => {
-            return Err((start_height.saturating_sub(1), anyhow!("Failed to create a CDN request client: {error}")));
+            return Err((start_height.saturating_sub(1), anyhow!("Failed to create a CDN request client - {error}")));
         }
     };
 
@@ -190,7 +190,7 @@ pub async fn load_blocks<N: Network>(
         // Wait if the nearest pending block is not the next one that can be inserted.
         if next_height > current_height + 1 {
             // There is a gap in pending blocks, we need to wait.
-            debug!("Waiting for the first applicable blocks; {} pending", candidate_blocks.len());
+            debug!("Waiting for the first relevant blocks ({} pending)", candidate_blocks.len());
             drop(candidate_blocks);
             tokio::time::sleep(Duration::from_secs(1)).await;
             continue;
@@ -271,7 +271,7 @@ async fn download_block_bundles<N: Network>(
 
             // If this request would breach the upper limit, stop downloading.
             if end > cdn_end + BLOCKS_PER_FILE {
-                debug!("Reached the end of the syncing range; stopping CDN requests");
+                debug!("Finishing network requests to the CDN...");
                 break;
             }
 
@@ -302,11 +302,11 @@ async fn download_block_bundles<N: Network>(
                             let mut pending_blocks = pending_blocks_clone.lock();
                             for block in blocks {
                                 match pending_blocks.binary_search_by_key(&block.height(), |b| b.height()) {
-                                    Ok(_idx) => warn!("Duplicate pending block at height {}", block.height()),
+                                    Ok(_idx) => warn!("Found a duplicate pending block at height {}", block.height()),
                                     Err(idx) => pending_blocks.insert(idx, block),
                                 }
                             }
-                            debug!("Received {ctx} in {:.2?}", request_time.elapsed());
+                            debug!("Received {ctx} {}", format!("(in {:.2?})", request_time.elapsed()).dimmed());
                             break;
                         }
                         Err(error) => {
@@ -314,12 +314,12 @@ async fn download_block_bundles<N: Network>(
                             // case the maximum number of attempts has been breached.
                             attempts += 1;
                             if attempts > MAXIMUM_REQUEST_ATTEMPTS {
-                                warn!("Maximum number of requests to {blocks_url} reached; shutting down.");
+                                warn!("Maximum number of requests to {blocks_url} reached - shutting down...");
                                 shutdown_clone.store(true, Ordering::Relaxed);
                                 break;
                             }
                             tokio::time::sleep(Duration::from_secs(attempts as u64)).await;
-                            warn!("Failed to request {ctx} - {error}; retrying ({attempts} attempt(s) so far)");
+                            warn!("{error} - retrying ({attempts} attempt(s) so far)");
                         }
                     }
                 }
@@ -336,7 +336,7 @@ async fn download_block_bundles<N: Network>(
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 
-    debug!("Reached the end of the syncing range; stopping CDN requests");
+    debug!("Finished network requests to the CDN");
 }
 
 /// Retrieves the CDN height with the given base URL.
@@ -356,22 +356,22 @@ async fn cdn_height<const BLOCKS_PER_FILE: u32>(client: &Client, base_url: &str)
     // Send the request.
     let response = match client.get(latest_json_url).send().await {
         Ok(response) => response,
-        Err(error) => bail!("Failed to fetch the CDN height: {error}"),
+        Err(error) => bail!("Failed to fetch the CDN height - {error}"),
     };
     // Parse the response.
     let bytes = match response.bytes().await {
         Ok(bytes) => bytes,
-        Err(error) => bail!("Failed to parse the CDN height response: {error}"),
+        Err(error) => bail!("Failed to parse the CDN height response - {error}"),
     };
     // Parse the bytes for the string.
     let latest_state_string = match bincode::deserialize::<String>(&bytes) {
         Ok(string) => string,
-        Err(error) => bail!("Failed to deserialize the CDN height response: {error}"),
+        Err(error) => bail!("Failed to deserialize the CDN height response - {error}"),
     };
     // Parse the string for the tip.
     let tip = match serde_json::from_str::<LatestState>(&latest_state_string) {
         Ok(latest) => latest.exclusive_height,
-        Err(error) => bail!("Failed to extract the CDN height response: {error}"),
+        Err(error) => bail!("Failed to extract the CDN height response - {error}"),
     };
     // Decrement the tip by a few blocks to ensure the CDN is caught up.
     let tip = tip.saturating_sub(10);
@@ -384,18 +384,18 @@ async fn cdn_get<T: 'static + DeserializeOwned + Send>(client: Client, url: &str
     // Fetch the bytes from the given URL.
     let response = match client.get(url).send().await {
         Ok(response) => response,
-        Err(error) => bail!("Failed to fetch {ctx}: {error}"),
+        Err(error) => bail!("Failed to fetch {ctx} - {error}"),
     };
     // Parse the response.
     let bytes = match response.bytes().await {
         Ok(bytes) => bytes,
-        Err(error) => bail!("Failed to parse {ctx}: {error}"),
+        Err(error) => bail!("Failed to parse {ctx} - {error}"),
     };
     // Parse the objects.
     match tokio::task::spawn_blocking(move || bincode::deserialize::<T>(&bytes)).await {
         Ok(Ok(objects)) => Ok(objects),
-        Ok(Err(error)) => bail!("Failed to deserialize {ctx}: {error}"),
-        Err(error) => bail!("Failed to join task for {ctx}: {error}"),
+        Ok(Err(error)) => bail!("Failed to deserialize {ctx} - {error}"),
+        Err(error) => bail!("Failed to join task for {ctx} - {error}"),
     }
 }
 
