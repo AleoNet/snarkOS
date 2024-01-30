@@ -214,10 +214,10 @@ impl<N: Network> Router<N> {
         let is_unspecified_or_loopback = ip.ip().is_unspecified() || ip.ip().is_loopback();
         let is_same_port = ip.port() == self.local_ip().port();
 
-        info!("Checking if IP is local: {:?}", ip);
-        info!("Same as local IP: {}", is_same_ip);
-        info!("Is unspecified or loopback: {}", is_unspecified_or_loopback);
-        info!("Same port as local IP: {}", is_same_port);
+        info!("Checking if IP is local-3: {:?}", ip);
+        info!("Same as local IP-3: {}", is_same_ip);
+        info!("Is unspecified or loopback-3: {}", is_unspecified_or_loopback);
+        info!("Same port as local IP-3: {}", is_same_port);
 
         is_same_ip || (is_unspecified_or_loopback && is_same_port)
     }
@@ -445,18 +445,18 @@ impl<N: Network> Router<N> {
         // iterate over eligible_peers
         info!("iterating over eligible_peers");
         for peer_ip in eligible_peers.clone() {
-            info!("peer_ip: {:?}", peer_ip);
+            info!("peer_ip-1: {:?}", peer_ip);
             // log if peer_ip is local_ip
-            info!("is_local_ip: {:?}", self.is_local_ip(&peer_ip));
+            info!("is_local_ip-1: {:?}", self.is_local_ip(&peer_ip));
         }
         info!("end iterating over eligible_peers");
 
         info!("iterating over peers");
         for peer_ip in peers.iter() {
-            info!("Checking peer_ip: {:?}", peer_ip);
-            info!("is_local_ip: {:?}", self.is_local_ip(peer_ip));
-            info!("is_connected: {:?}", self.is_connected(peer_ip));
-            info!("is_restricted: {:?}", self.is_restricted(peer_ip));
+            info!("Checking peer_ip-2: {:?}", peer_ip);
+            info!("is_local_ip-2: {:?}", self.is_local_ip(peer_ip));
+            info!("is_connected-2: {:?}", self.is_connected(peer_ip));
+            info!("is_restricted-2: {:?}", self.is_restricted(peer_ip));
         }
         info!("end iterating over peers");
         
