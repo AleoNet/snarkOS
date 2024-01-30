@@ -41,7 +41,7 @@ start_snarkos_in_tmux() {
     if [ "$NODE_TYPE" = "validator" ]; then
       tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --bft 0.0.0.0:5000 --rest 0.0.0.0:3033 --peers $NODE_IP:4133 --validators $NODE_IP:5000 --verbosity $VERBOSITY --dev $NODE_ID --dev-num-validators $NUM_VALIDATORS --validator --metrics" C-m
     else
-      tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --peers $NODE_IP:4133 --client --dev-num-validators $NUM_VALIDATORS" C-m
+      tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --peers $NODE_IP:4130 --client --dev-num-validators $NUM_VALIDATORS --dev $NODE_ID" C-m
     fi
 
     exit
