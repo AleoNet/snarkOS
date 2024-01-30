@@ -210,9 +210,18 @@ impl<N: Network> Router<N> {
 
     /// Returns `true` if the given IP is this node.
     pub fn is_local_ip(&self, ip: &SocketAddr) -> bool {
-        *ip == self.local_ip()
-            || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
+        let is_same_ip = *ip == self.local_ip();
+        let is_unspecified_or_loopback = ip.ip().is_unspecified() || ip.ip().is_loopback();
+        let is_same_port = ip.port() == self.local_ip().port();
+
+        info!("Checking if IP is local: {:?}", ip);
+        info!("Same as local IP: {}", is_same_ip);
+        info!("Is unspecified or loopback: {}", is_unspecified_or_loopback);
+        info!("Same port as local IP: {}", is_same_port);
+
+        is_same_ip || (is_unspecified_or_loopback && is_same_port)
     }
+
 
     /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
     pub fn is_valid_peer_ip(&self, ip: &SocketAddr) -> bool {
@@ -430,6 +439,9 @@ impl<N: Network> Router<N> {
 
         info!("Node's own IP: {:?}", self.local_ip());
 
+        // info-log eligible_peers
+        info!("eligible_peers: {:?}", eligible_peers);
+
         // iterate over eligible_peers
         info!("iterating over eligible_peers");
         for peer_ip in eligible_peers.clone() {
@@ -439,8 +451,15 @@ impl<N: Network> Router<N> {
         }
         info!("end iterating over eligible_peers");
 
-        // info-log eligible_peers
-        info!("eligible_peers: {:?}", eligible_peers);
+        info!("iterating over peers");
+        for peer_ip in peers.iter() {
+            info!("Checking peer_ip: {:?}", peer_ip);
+            info!("is_local_ip: {:?}", self.is_local_ip(peer_ip));
+            info!("is_connected: {:?}", self.is_connected(peer_ip));
+            info!("is_restricted: {:?}", self.is_restricted(peer_ip));
+        }
+        info!("end iterating over peers");
+        
 
         // Proceed to insert the eligible candidate peer IPs.
         self.candidate_peers.write().extend(eligible_peers);
