@@ -70,7 +70,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
     /// Removes the specified ledger from storage.
     pub(crate) fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
         // Construct the path to the ledger in storage.
-        let mut path = aleo_std::aleo_ledger_dir(network, dev);
+        let mut path = aleo_std::aleo_ledger_dir(network, aleo_std::StorageMode::from(dev));
 
         // Delete the parent folder.
         path.pop();

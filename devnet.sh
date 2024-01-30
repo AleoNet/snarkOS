@@ -48,7 +48,7 @@ mkdir -p "$log_dir"
 tmux new-session -d -s "devnet" -n "window0"
 
 # Get the tmux's base-index for windows
-# we have to create all windows with index offseted by this much
+# we have to create all windows with index offset by this much
 index_offset="$(tmux show-option -gv base-index)"
 if [ -z "$index_offset" ]; then
   index_offset=0

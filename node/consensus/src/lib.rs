@@ -332,6 +332,8 @@ impl<N: Network> Consensus<N> {
         let start = subdag.leader_certificate().batch_header().timestamp();
         #[cfg(feature = "metrics")]
         let num_committed_certificates = subdag.values().map(|c| c.len()).sum::<usize>();
+        #[cfg(feature = "metrics")]
+        let current_block_timestamp = self.ledger.latest_block().header().metadata().timestamp();
 
         // Create the candidate next block.
         let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
@@ -343,14 +345,16 @@ impl<N: Network> Consensus<N> {
         #[cfg(feature = "metrics")]
         {
             let elapsed = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - start) as u64);
+            let next_block_timestamp = next_block.header().metadata().timestamp();
+            let block_latency = next_block_timestamp - current_block_timestamp;
 
             metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
             metrics::counter(metrics::blocks::TRANSACTIONS, next_block.transactions().len() as u64);
             metrics::gauge(metrics::consensus::LAST_COMMITTED_ROUND, next_block.round() as f64);
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
+            metrics::histogram(metrics::consensus::BLOCK_LATENCY, block_latency as f64);
         }
-
         Ok(())
     }
 
