@@ -935,17 +935,14 @@ mod tests {
 #[cfg(test)]
 pub mod prop_tests {
     use super::*;
-    use crate::{
-        helpers::{now, storage::tests::assert_storage},
-        MAX_GC_ROUNDS,
-    };
+    use crate::helpers::{now, storage::tests::assert_storage};
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         ledger::{
             coinbase::PuzzleCommitment,
             committee::prop_tests::{CommitteeContext, ValidatorSet},
-            narwhal::Data,
+            narwhal::{BatchHeader, Data},
         },
         prelude::{Signature, Uniform},
     };
@@ -970,7 +967,7 @@ pub mod prop_tests {
         type Strategy = BoxedStrategy<Storage<CurrentNetwork>>;
 
         fn arbitrary() -> Self::Strategy {
-            (any::<CommitteeContext>(), 0..MAX_GC_ROUNDS)
+            (any::<CommitteeContext>(), 0..BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
                     let ledger = Arc::new(MockLedgerService::new(committee));
                     Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), gc_rounds)
@@ -979,7 +976,7 @@ pub mod prop_tests {
         }
 
         fn arbitrary_with(context: Self::Parameters) -> Self::Strategy {
-            (Just(context), 0..MAX_GC_ROUNDS)
+            (Just(context), 0..BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
                     let ledger = Arc::new(MockLedgerService::new(committee));
                     Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), gc_rounds)

@@ -18,17 +18,15 @@ use crate::{
     ProposedBatch,
     Transport,
     MAX_BATCH_DELAY_IN_MS,
-    MAX_TRANSMISSIONS_PER_BATCH,
-    MAX_TRANSMISSIONS_PER_WORKER_PING,
     MAX_WORKERS,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Data, Transmission, TransmissionID},
-    prelude::{
+    ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{BatchHeader, Data, Transmission, TransmissionID},
     },
 };
 
@@ -36,8 +34,6 @@ use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
-
-const MAX_TRANSMISSIONS_PER_WORKER: usize = MAX_TRANSMISSIONS_PER_BATCH / MAX_WORKERS as usize;
 
 #[derive(Clone)]
 pub struct Worker<N: Network> {
@@ -97,6 +93,14 @@ impl<N: Network> Worker<N> {
 }
 
 impl<N: Network> Worker<N> {
+    /// The maximum number of transmissions allowed in a worker.
+    pub const MAX_TRANSMISSIONS_PER_WORKER: usize =
+        BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / MAX_WORKERS as usize;
+    /// The maximum number of transmissions allowed in a worker ping.
+    pub const MAX_TRANSMISSIONS_PER_WORKER_PING: usize = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / 10;
+
+    // transmissions
+
     /// Returns the number of transmissions in the ready queue.
     pub fn num_transmissions(&self) -> usize {
         self.ready.num_transmissions()
@@ -209,8 +213,12 @@ impl<N: Network> Worker<N> {
     /// Broadcasts a worker ping event.
     pub(crate) fn broadcast_ping(&self) {
         // Retrieve the transmission IDs.
-        let transmission_ids =
-            self.ready.transmission_ids().into_iter().take(MAX_TRANSMISSIONS_PER_WORKER_PING).collect::<IndexSet<_>>();
+        let transmission_ids = self
+            .ready
+            .transmission_ids()
+            .into_iter()
+            .take(Self::MAX_TRANSMISSIONS_PER_WORKER_PING)
+            .collect::<IndexSet<_>>();
 
         // Broadcast the ping event.
         if !transmission_ids.is_empty() {
@@ -228,7 +236,7 @@ impl<N: Network> Worker<N> {
         }
         // If the ready queue is full, then skip this transmission.
         // Note: We must prioritize the unconfirmed solutions and unconfirmed transactions, not transmissions.
-        if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_WORKER {
+        if self.ready.num_transmissions() > Self::MAX_TRANSMISSIONS_PER_WORKER {
             return;
         }
         // Attempt to fetch the transmission from the peer.
