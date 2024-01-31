@@ -270,28 +270,6 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         if transaction.is_fee() {
             bail!("Invalid transaction - 'Transaction::fee' type is not valid at this stage ({})", transaction.id());
         }
-
-        // info-log transaction fee
-        match transaction {
-            Transaction::Deploy(_, _, _, fee) => {
-                // Handle Deploy transaction, log the fee
-                info!("transaction fee: {}", fee);
-            },
-            Transaction::Execute(_, _, Some(fee)) => {
-                // Handle Execute transaction, log the fee if it exists
-                info!("transaction fee: {}", fee);
-            },
-            Transaction::Fee(_, fee) => {
-                // Handle Fee transaction, log the fee
-                info!("transaction fee: {}", fee);
-            },
-            _ => {
-                // Handle other cases or ignore
-                info!("transaction fee inspection other case");
-            },
-        }
-        
-
         // Check the transaction is well-formed.
         let ledger = self.ledger.clone();
         // kp here
