@@ -23,7 +23,7 @@ use snarkvm::{
     prelude::{anyhow, bail, cfg_iter, ensure, Address, Field, Network, Result},
 };
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use std::{
@@ -552,15 +552,16 @@ impl<N: Network> Storage<N> {
         let author = certificate.author();
 
         // Update the round.
-        {
-            // Acquire the write lock.
-            let mut rounds = self.rounds.write();
-            // Remove the round to certificate ID entry.
-            rounds.entry(round).or_default().swap_remove(&(certificate_id, batch_id, author));
-            // If the round is empty, remove it.
-            if rounds.get(&round).map_or(false, |entries| entries.is_empty()) {
-                rounds.swap_remove(&round);
+        match self.rounds.write().entry(round) {
+            Entry::Occupied(mut entry) => {
+                // Remove the round to certificate ID entry.
+                entry.get_mut().swap_remove(&(certificate_id, batch_id, author));
+                // If the round is empty, remove it.
+                if entry.get().is_empty() {
+                    entry.shift_remove();
+                }
             }
+            Entry::Vacant(_) => {}
         }
         // Remove the certificate.
         self.certificates.write().swap_remove(&certificate_id);

@@ -135,7 +135,7 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
                     // If there are no more certificate IDs for the transmission ID, remove the transmission.
                     if certificate_ids.is_empty() {
                         // Remove the entry for the transmission ID.
-                        occupied_entry.swap_remove();
+                        occupied_entry.shift_remove();
                     }
                 }
                 Entry::Vacant(_) => {}

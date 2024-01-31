@@ -227,7 +227,7 @@ impl<N: Network> Cache<N> {
         let value = entry.saturating_sub(1);
         // If the entry is 0, remove the entry.
         if *entry == 0 {
-            map_write.swap_remove(&key);
+            map_write.shift_remove(&key);
         } else {
             *entry = value;
         }
