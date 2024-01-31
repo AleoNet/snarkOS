@@ -272,20 +272,20 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
 
         // info-log transaction fee
-        match &transaction {
-            Transaction::Deploy(_, _, _, fee) => {
-                info!("transaction fee: {}", fee.clone());
-            },
-            Transaction::Execute(_, _, Some(fee)) => {
-                info!("transaction fee: {}", fee.clone());
-            },
-            Transaction::Fee(_, fee) => {
-                info!("transaction fee: {}", fee.clone());
-            },
-            _ => {
-                info!("transaction fee inspection other case");
-            },
-        }
+        //match &transaction {
+        //    Transaction::Deploy(_, _, _, fee) => {
+        //        info!("transaction fee: {}", fee.clone());
+        //    },
+        //    Transaction::Execute(_, _, Some(fee)) => {
+        //        info!("transaction fee: {}", fee.clone());
+        //    },
+        //    Transaction::Fee(_, fee) => {
+        //        info!("transaction fee: {}", fee.clone());
+        //    },
+        //    _ => {
+        //        info!("transaction fee inspection other case");
+        //    },
+        //}
         
 
         // Check the transaction is well-formed.
