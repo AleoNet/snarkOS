@@ -556,16 +556,16 @@ impl<N: Network> Storage<N> {
             // Acquire the write lock.
             let mut rounds = self.rounds.write();
             // Remove the round to certificate ID entry.
-            rounds.entry(round).or_default().remove(&(certificate_id, batch_id, author));
+            rounds.entry(round).or_default().swap_remove(&(certificate_id, batch_id, author));
             // If the round is empty, remove it.
             if rounds.get(&round).map_or(false, |entries| entries.is_empty()) {
-                rounds.remove(&round);
+                rounds.swap_remove(&round);
             }
         }
         // Remove the certificate.
-        self.certificates.write().remove(&certificate_id);
+        self.certificates.write().swap_remove(&certificate_id);
         // Remove the batch ID.
-        self.batch_ids.write().remove(&batch_id);
+        self.batch_ids.write().swap_remove(&batch_id);
         // Remove the transmission entries in the certificate from storage.
         self.transmissions.remove_transmissions(&certificate_id, certificate.transmission_ids());
         // Return successfully.
@@ -645,7 +645,7 @@ impl<N: Network> Storage<N> {
                 }
                 TransmissionID::Transaction(transaction_id) => {
                     // Retrieve the transaction.
-                    match unconfirmed_transactions.remove(transaction_id) {
+                    match unconfirmed_transactions.swap_remove(transaction_id) {
                         // Insert the transaction.
                         Some(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
                         // Otherwise, try to load the unconfirmed transaction from the ledger.

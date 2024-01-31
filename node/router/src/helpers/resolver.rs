@@ -55,8 +55,8 @@ impl Resolver {
 
     /// Removes the bidirectional mapping of the listener address and the (ambiguous) peer address.
     pub fn remove_peer(&self, listener_ip: &SocketAddr) {
-        if let Some(peer_addr) = self.from_listener.write().remove(listener_ip) {
-            self.to_listener.write().remove(&peer_addr);
+        if let Some(peer_addr) = self.from_listener.write().swap_remove(listener_ip) {
+            self.to_listener.write().swap_remove(&peer_addr);
         }
     }
 }
