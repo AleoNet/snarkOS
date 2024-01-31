@@ -595,10 +595,10 @@ mod tests {
 
         let config = Start::try_parse_from(["snarkos", "--peers", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
         assert!(config.parse_trusted_peers().is_ok());
-        assert_eq!(config.parse_trusted_peers().unwrap(), vec![
-            SocketAddr::from_str("1.2.3.4:5").unwrap(),
-            SocketAddr::from_str("6.7.8.9:0").unwrap()
-        ]);
+        assert_eq!(
+            config.parse_trusted_peers().unwrap(),
+            vec![SocketAddr::from_str("1.2.3.4:5").unwrap(), SocketAddr::from_str("6.7.8.9:0").unwrap()]
+        );
     }
 
     #[test]
@@ -613,10 +613,10 @@ mod tests {
 
         let config = Start::try_parse_from(["snarkos", "--validators", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
         assert!(config.parse_trusted_validators().is_ok());
-        assert_eq!(config.parse_trusted_validators().unwrap(), vec![
-            SocketAddr::from_str("1.2.3.4:5").unwrap(),
-            SocketAddr::from_str("6.7.8.9:0").unwrap()
-        ]);
+        assert_eq!(
+            config.parse_trusted_validators().unwrap(),
+            vec![SocketAddr::from_str("1.2.3.4:5").unwrap(), SocketAddr::from_str("6.7.8.9:0").unwrap()]
+        );
     }
 
     #[test]

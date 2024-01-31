@@ -14,10 +14,7 @@
 
 use crate::{
     helpers::{BFTSender, Pending, Storage, SyncReceiver},
-    Gateway,
-    Transport,
-    MAX_BATCH_DELAY_IN_MS,
-    PRIMARY_PING_IN_MS,
+    Gateway, Transport, MAX_BATCH_DELAY_IN_MS, PRIMARY_PING_IN_MS,
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -29,7 +26,7 @@ use snarkvm::{
 
 use anyhow::{bail, Result};
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use std::{future::Future, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::{
     sync::{oneshot, Mutex as TMutex, OnceCell},
     task::JoinHandle,
@@ -353,6 +350,36 @@ impl<N: Network> Sync<N> {
     fn send_certificate_response(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
         // Attempt to retrieve the certificate.
         if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
+            // If you are the malicious node, skip requests from the victim node.
+            let validator_address = self.gateway.account().address();
+            if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS && certificate.round() >= 3 {
+                // Exclude this peer from the broadcast.
+                if let Some(victim_peer_ip) = self.gateway.resolver().get_peer_ip_for_address(
+                    snarkvm::console::account::Address::from_str(crate::VICTIM_NODE_ADDRESS).unwrap(),
+                ) {
+                    if victim_peer_ip == peer_ip {
+                        info!(
+                            "\n----------- MALICIOUS NODE: IGNORING CERTIFICATE REQUEST {} FROM VICTIM {}\n",
+                            crate::helpers::fmt_id(request.certificate_id),
+                            peer_ip
+                        );
+                        return;
+                    }
+                }
+
+                // Ignore the request if you were deemed leader in the last 30 seconds.
+                let elapsed = crate::helpers::now() - *self.gateway.malicious_node_is_leader.lock();
+                let wait_time = 30; // 30 seconds.
+                if elapsed <= wait_time {
+                    info!(
+                        "\n----------- MALICIOUS NODE: IGNORING CERTIFICATE REQUEST {} FROM {}\n",
+                        crate::helpers::fmt_id(request.certificate_id),
+                        peer_ip
+                    );
+                    return;
+                }
+            }
+
             // Send the certificate response to the peer.
             let self_ = self.clone();
             tokio::spawn(async move {

@@ -14,18 +14,9 @@
 
 use crate::{
     helpers::{
-        fmt_id,
-        init_bft_channels,
-        now,
-        BFTReceiver,
-        ConsensusSender,
-        PrimaryReceiver,
-        PrimarySender,
-        Storage,
-        DAG,
+        fmt_id, init_bft_channels, now, BFTReceiver, ConsensusSender, PrimaryReceiver, PrimarySender, Storage, DAG,
     },
-    Primary,
-    MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
+    Primary, MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -235,7 +226,16 @@ impl<N: Network> BFT<N> {
                 let leader_round = leader_certificate.round();
                 match leader_round == current_round {
                     true => {
-                        info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author());
+                        info!(
+                            "\n\nRound {current_round} elected a leader - {} {}\n",
+                            leader_certificate.author(),
+                            fmt_id(leader_certificate.id())
+                        );
+
+                        if &leader_certificate.author().to_string() == crate::MALICIOUS_NODE_ADDRESS {
+                            info!("\n\n ------------- MALICIOUS NODE IS LEADER FOR ROUND {current_round}\n\n")
+                        }
+
                         #[cfg(feature = "metrics")]
                         metrics::increment_counter(metrics::bft::LEADERS_ELECTED);
                     }
@@ -432,8 +432,15 @@ impl<N: Network> BFT<N> {
         // Acquire the BFT lock.
         let _lock = self.lock.lock().await;
 
+        let validator_address = self.primary.gateway().account().address();
+
+        if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS {
+            debug!("UPDATE DAG");
+        }
+
         // Retrieve the certificate round.
         let certificate_round = certificate.round();
+        let certificate_id = certificate.id();
         // Insert the certificate into the DAG.
         self.dag.write().insert(certificate);
 
@@ -443,30 +450,55 @@ impl<N: Network> BFT<N> {
         if commit_round % 2 != 0 || commit_round < 2 {
             return Ok(());
         }
+
+        if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS {
+            debug!("UPDATE DAG 1.5");
+        }
         // If the commit round is at or below the last committed round, return early.
         if commit_round <= self.dag.read().last_committed_round() {
             return Ok(());
+        }
+
+        if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS {
+            debug!("UPDATE DAG 2");
         }
 
         // Retrieve the previous committee for the commit round.
         let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee for commit round {commit_round}");
         };
+
+        if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS {
+            debug!("UPDATE DAG 3");
+        }
         // Compute the leader for the commit round.
         let Ok(leader) = previous_committee.get_leader(commit_round) else {
             bail!("BFT failed to compute the leader for commit round {commit_round}");
         };
+
+        if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS {
+            debug!("UPDATE DAG 4");
+        }
         // Retrieve the leader certificate for the commit round.
         let Some(leader_certificate) = self.dag.read().get_certificate_for_round_with_author(commit_round, leader)
         else {
             trace!("BFT did not find the leader certificate for commit round {commit_round} yet");
             return Ok(());
         };
+
+        if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS {
+            debug!("UPDATE DAG 5");
+        }
         // Retrieve all of the certificates for the **certificate** round.
         let Some(certificates) = self.dag.read().get_certificates_for_round(certificate_round) else {
             // TODO (howardwu): Investigate how many certificates we should have at this point.
             bail!("BFT failed to retrieve the certificates for certificate round {certificate_round}");
         };
+
+        if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS {
+            debug!("UPDATE DAG 6");
+        }
+
         // Construct a set over the authors who included the leader's certificate in the certificate round.
         let authors = certificates
             .values()
@@ -478,8 +510,16 @@ impl<N: Network> BFT<N> {
         // Check if the leader is ready to be committed.
         if !previous_committee.is_availability_threshold_reached(&authors) {
             // If the leader is not ready to be committed, return early.
-            trace!("BFT is not ready to commit {commit_round}");
+            debug!("BFT is not ready to commit {commit_round}, authors: {:?}", authors);
             return Ok(());
+        }
+        // For the particular node, skip the leader committing here.
+        if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS && validator_address == leader {
+            info!("\n----------- MALICIOUS NODE IS THE LEADER FOR round {} AND IS COMMITTING THE LEADER CERTIFICATE w/ certificate {} at round {certificate_round}\n", leader_certificate.round(), fmt_id(certificate_id));
+
+            info!("\n AUTHORS for availability threshold: {:?}\n", authors);
+
+            *self.primary.gateway().malicious_node_is_leader.lock() = now();
         }
 
         /* Proceeding to commit the leader. */

@@ -15,42 +15,21 @@
 use crate::{
     events::{EventCodec, PrimaryPing},
     helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
-    spawn_blocking,
-    CONTEXT,
-    MAX_BATCH_DELAY_IN_MS,
-    MAX_GC_ROUNDS,
-    MAX_TRANSMISSIONS_PER_BATCH,
-    MAX_TRANSMISSIONS_PER_WORKER_PING,
-    MEMORY_POOL_PORT,
+    spawn_blocking, CONTEXT, MAX_BATCH_DELAY_IN_MS, MAX_GC_ROUNDS, MAX_TRANSMISSIONS_PER_BATCH,
+    MAX_TRANSMISSIONS_PER_WORKER_PING, MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_events::{
-    BlockRequest,
-    BlockResponse,
-    CertificateRequest,
-    CertificateResponse,
-    ChallengeRequest,
-    ChallengeResponse,
-    DataBlocks,
-    DisconnectReason,
-    Event,
-    EventTrait,
-    TransmissionRequest,
-    TransmissionResponse,
-    ValidatorsRequest,
+    BlockRequest, BlockResponse, CertificateRequest, CertificateResponse, ChallengeRequest, ChallengeResponse,
+    DataBlocks, DisconnectReason, Event, EventTrait, TransmissionRequest, TransmissionResponse, ValidatorsRequest,
     ValidatorsResponse,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
-    is_bogon_ip,
-    is_unspecified_or_broadcast_ip,
+    is_bogon_ip, is_unspecified_or_broadcast_ip,
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
-    Config,
-    Connection,
-    ConnectionSide,
-    Tcp,
-    P2P,
+    Config, Connection, ConnectionSide, Tcp, P2P,
 };
 use snarkvm::{
     console::prelude::*,
@@ -108,7 +87,7 @@ pub struct Gateway<N: Network> {
     /// The resolver.
     resolver: Arc<Resolver<N>>,
     /// The set of trusted validators.
-    trusted_validators: IndexSet<SocketAddr>,
+    pub trusted_validators: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
     connected_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
@@ -124,6 +103,8 @@ pub struct Gateway<N: Network> {
     sync_sender: Arc<OnceCell<SyncSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+
+    pub malicious_node_is_leader: Arc<Mutex<i64>>,
 }
 
 impl<N: Network> Gateway<N> {
@@ -157,6 +138,7 @@ impl<N: Network> Gateway<N> {
             worker_senders: Default::default(),
             sync_sender: Default::default(),
             handles: Default::default(),
+            malicious_node_is_leader: Default::default(),
         })
     }
 
@@ -193,6 +175,14 @@ impl<N: Network> Gateway<N> {
         self.initialize_heartbeat();
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
+
+        if &self.account.address().to_string() == crate::MALICIOUS_NODE_ADDRESS {
+            info!("\nSTARTING MALICIOUS NODE. SKIP SENDING CERTIFICATES TO {}\n", crate::VICTIM_NODE_ADDRESS);
+        }
+
+        if &self.account.address().to_string() == crate::VICTIM_NODE_ADDRESS {
+            info!("\nSTARTING VICTIM NODE. WILL NOT RECEIVE CERTIFICATES FROM {}\n", crate::MALICIOUS_NODE_ADDRESS);
+        }
     }
 }
 
@@ -962,7 +952,40 @@ impl<N: Network> Transport<N> for Gateway<N> {
         // Ensure there are connected peers.
         if self.number_of_connected_peers() > 0 {
             let self_ = self.clone();
-            let connected_peers = self.connected_peers.read().clone();
+            let mut connected_peers = self.connected_peers.read().clone();
+
+            // Testing code for malicious node.
+            let certificate = match &event {
+                Event::CertificateResponse(certificate) => Some(certificate.certificate.clone()),
+                Event::BatchCertified(certificate) => certificate.certificate.clone().deserialize_blocking().ok(),
+                Event::PrimaryPing(primary_ping) => {
+                    primary_ping.primary_certificate.clone().deserialize_blocking().ok()
+                }
+                _ => None,
+            };
+            if let Some(certificate) = &certificate {
+                // For the particular node, skip the leader committing here.
+                let validator_address = self.account().address();
+                if &validator_address.to_string() == crate::MALICIOUS_NODE_ADDRESS
+                    && validator_address == certificate.author()
+                {
+                    // Exclude this peer from the broadcast.
+                    if let Some(victim_peer_ip) =
+                        self.resolver.get_peer_ip_for_address(Address::from_str(crate::VICTIM_NODE_ADDRESS).unwrap())
+                    {
+                        connected_peers.remove(&victim_peer_ip);
+
+                        info!(
+                            "\n----------- MALICIOUS NODE BROADCAST: EXCLUDING event {} with CERTIFICATE {} at round {} to {}\n",
+                            event.name(),
+                            crate::helpers::fmt_id(certificate.id()),
+                            certificate.round(),
+                            victim_peer_ip
+                        );
+                    }
+                }
+            };
+
             tokio::spawn(async move {
                 // Iterate through all connected peers.
                 for peer_ip in connected_peers {
@@ -1310,10 +1333,7 @@ mod prop_tests {
     use crate::{
         gateway::prop_tests::GatewayAddress::{Dev, Prod},
         helpers::{init_primary_channels, init_worker_channels, Storage},
-        Gateway,
-        Worker,
-        MAX_WORKERS,
-        MEMORY_POOL_PORT,
+        Gateway, Worker, MAX_WORKERS, MEMORY_POOL_PORT,
     };
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;

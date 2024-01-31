@@ -15,28 +15,11 @@
 use crate::{
     events::{BatchPropose, BatchSignature, Event},
     helpers::{
-        assign_to_worker,
-        assign_to_workers,
-        fmt_id,
-        init_sync_channels,
-        init_worker_channels,
-        now,
-        BFTSender,
-        PrimaryReceiver,
-        PrimarySender,
-        Proposal,
-        Storage,
+        assign_to_worker, assign_to_workers, fmt_id, init_sync_channels, init_worker_channels, now, BFTSender,
+        PrimaryReceiver, PrimarySender, Proposal, Storage,
     },
-    spawn_blocking,
-    Gateway,
-    Sync,
-    Transport,
-    Worker,
-    MAX_BATCH_DELAY_IN_MS,
-    MAX_TRANSMISSIONS_PER_BATCH,
-    MAX_WORKERS,
-    PRIMARY_PING_IN_MS,
-    WORKER_PING_IN_MS,
+    spawn_blocking, Gateway, Sync, Transport, Worker, MAX_BATCH_DELAY_IN_MS, MAX_TRANSMISSIONS_PER_BATCH, MAX_WORKERS,
+    PRIMARY_PING_IN_MS, WORKER_PING_IN_MS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
@@ -73,6 +56,9 @@ use tokio::{
 
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
+
+pub const MALICIOUS_NODE_ADDRESS: &str = "aleo12ux3gdauck0v60westgcpqj7v8rrcr3v346e4jtq04q7kkt22czsh808v2";
+pub const VICTIM_NODE_ADDRESS: &str = "aleo1s3ws5tra87fjycnjrwsjcrnw2qxr8jfqqdugnf0xzqqw29q9m5pqem2u4t";
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
@@ -277,6 +263,15 @@ impl<N: Network> Primary<N> {
         if let Err(e) = self.check_proposed_batch_for_expiration().await {
             warn!("Failed to check the proposed batch for expiration - {e}");
             return Ok(());
+        }
+
+        // Node 0 will wait until it gets the malicious node's certificate for 2, before proposing a batch.
+        if self.current_round() == 3
+            && self.gateway().account().address().to_string()
+                == "aleo1rhgdu77hgyqd3xjj8ucu3jj9r2krwz6mnzyd80gncr5fxcwlh5rsvzp9px"
+            && self.storage.get_certificates_for_round(2).len() < 3
+        {
+            debug!("\n------ NODE 0 DO NOT PROPOSE BATCH FOR ROUND 3 until it gets the malicious node's certificate for 2 ------\n");
         }
 
         // If there is a batch being proposed already,
@@ -684,7 +679,11 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to certify the batch. */
 
-        info!("Quorum threshold reached - Preparing to certify our batch for round {}...", proposal.round());
+        info!(
+            "Quorum threshold reached - Preparing to certify our batch for round {}... {}",
+            proposal.round(),
+            fmt_id(proposal.batch_id())
+        );
 
         // Retrieve the previous committee for the round.
         let previous_committee = self.ledger.get_previous_committee_for_round(proposal.round())?;
@@ -887,6 +886,20 @@ impl<N: Network> Primary<N> {
                         primary_certificate,
                         batch_certificates,
                     ));
+
+                    // If we just committed our own anchor, then wait for a bit before broadcasting the certificate.
+                    let validator_address = self_.gateway.account().address();
+                    if validator_address.to_string() == MALICIOUS_NODE_ADDRESS {
+                        if let snarkvm::ledger::authority::Authority::Quorum(subdag) = self_.ledger().latest_block().authority() {
+                            if subdag.leader_address() == validator_address {
+                                // Wait for a bit.
+                                let duration = rand::thread_rng().gen_range(25..=30);
+                                info!("\n------ Malicious node: waiting {duration} seconds before broadcasting the PrimaryPing.\n");
+                                tokio::time::sleep(Duration::from_secs(duration)).await;
+                            }
+                        }
+                    }
+
                     // Broadcast the event.
                     self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
                 }
@@ -1200,17 +1213,56 @@ impl<N: Network> Primary<N> {
         let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
         // Store the certified batch.
         self.storage.insert_certificate(certificate.clone(), transmissions)?;
-        debug!("Stored a batch certificate for round {}", certificate.round());
+        debug!("Stored a batch certificate for round {}, - {}", certificate.round(), fmt_id(certificate.id()));
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
+            if &self.gateway.account().address().to_string() == crate::MALICIOUS_NODE_ADDRESS {
+                println!("\n ATTEMPT TO SEND PRIMARY CERTIFICATE TO BFT \n");
+            }
             // Await the callback to continue.
             if let Err(e) = bft_sender.send_primary_certificate_to_bft(certificate.clone()).await {
                 warn!("Failed to update the BFT DAG from primary - {e}");
                 return Err(e);
             };
         }
-        // Broadcast the certified batch to all validators.
-        self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
+
+        // If the node is malicious, wait on broadcasting the certificate and skip the victim's ip.
+        let validator_address = self.gateway().account().address();
+        if validator_address.to_string() == MALICIOUS_NODE_ADDRESS {
+            // If we just committed our own anchor, then wait for a bit before broadcasting the certificate.
+            if let snarkvm::ledger::authority::Authority::Quorum(subdag) = self.ledger().latest_block().authority() {
+                if subdag.leader_address() == validator_address {
+                    // Wait for a bit.
+                    let duration = rand::thread_rng().gen_range(25..=30);
+                    info!("\n------ Malicious node: waiting {duration} seconds before broadcasting the certificate {} for round {}\n", fmt_id(certificate.id()), certificate.round());
+                    tokio::time::sleep(Duration::from_secs(duration)).await;
+                }
+            }
+        }
+
+        // If the node is malicious, only send the batch certified to a single node.
+        let validator_address = self.gateway().account().address();
+        if &validator_address.to_string() == MALICIOUS_NODE_ADDRESS {
+            let peer_ip = self.gateway.trusted_validators.get_index(0).unwrap().clone();
+            let (gateway, event, round) =
+                (self.gateway.clone(), Event::BatchCertified(certificate.clone().into()), proposal.round());
+            tokio::spawn(async move {
+                info!(
+                    "\n------Malicious node: Sending batch certificate for round {round} to a single peer '{peer_ip}'\n"
+                );
+                if gateway.send(peer_ip, event).await.is_none() {
+                    warn!(
+                        "-----Malicious node: Failed to send batch certificate  for round {round} to peer '{peer_ip}'"
+                    );
+                }
+            });
+        } else {
+            // Broadcast the certified batch to all validators.
+            self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
+        }
+
+        // // Broadcast the certified batch to all validators.
+        // self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
         // Log the certified batch.
         let num_transmissions = certificate.transmission_ids().len();
         let round = certificate.round();
@@ -1277,9 +1329,41 @@ impl<N: Network> Primary<N> {
 
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.id()) {
+            let committee = self.ledger.current_committee().expect("Ledger is missing a committee.");
+            let leader = committee.get_leader(certificate.round()).unwrap();
+
+            // If you are node 0. Then wait until Round 2 has hit quorum without the leader.
+            if self.gateway().account().address().to_string()
+                == "aleo1rhgdu77hgyqd3xjj8ucu3jj9r2krwz6mnzyd80gncr5fxcwlh5rsvzp9px"
+                && certificate.round() % 2 == 0
+                && self.current_round() <= certificate.round()
+                && &leader.to_string() == crate::MALICIOUS_NODE_ADDRESS
+                && &certificate.author().to_string() == crate::MALICIOUS_NODE_ADDRESS
+            {
+                info!("\n -----ARTIFICIALLY WAIT FOR ROUND {} before processing the certificate from the malicious node.\n", certificate.round());
+                while self.current_round() <= certificate.round() {
+                    tokio::time::sleep(std::time::Duration::from_millis(3)).await;
+                }
+            }
+
+            // If you are the malicious node, do not store certificates for subsequent rounds.
+            if self.gateway().account().address().to_string() == crate::MALICIOUS_NODE_ADDRESS
+                && self.gateway().account().address() == leader
+                && certificate.round() <= 4
+                && certificate.round() > 3
+            {
+                info!("\n ----- MALICIOUS NODE ARTIFICIALLY WAIT FOR ROUND {} before processing the certificate from the node.\n", certificate.round());
+                while self.current_round() <= certificate.round() {
+                    tokio::time::sleep(std::time::Duration::from_millis(3)).await;
+                }
+            }
+
             // Store the batch certificate.
             self.storage.insert_certificate(certificate.clone(), missing_transmissions)?;
-            debug!("Stored a batch certificate for round {batch_round} from '{peer_ip}'");
+            debug!(
+                "Stored a batch certificate authored by {} for round {batch_round} from '{peer_ip}'",
+                certificate.author()
+            );
             // If a BFT sender was provided, send the round and certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
                 // Send the certificate to the BFT.
@@ -1855,9 +1939,10 @@ mod tests {
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
 
         // Try to process the batch proposal from the peer, should succeed.
-        assert!(
-            primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.is_ok()
-        );
+        assert!(primary
+            .process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into())
+            .await
+            .is_ok());
     }
 
     #[tokio::test]
@@ -1922,15 +2007,13 @@ mod tests {
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
 
         // Try to process the batch proposal from the peer, should error.
-        assert!(
-            primary
-                .process_batch_propose_from_peer(peer_ip, BatchPropose {
-                    round: round + 1,
-                    batch_header: Data::Object(proposal.batch_header().clone())
-                })
-                .await
-                .is_err()
-        );
+        assert!(primary
+            .process_batch_propose_from_peer(
+                peer_ip,
+                BatchPropose { round: round + 1, batch_header: Data::Object(proposal.batch_header().clone()) }
+            )
+            .await
+            .is_err());
     }
 
     #[tokio::test]
@@ -1964,15 +2047,13 @@ mod tests {
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
 
         // Try to process the batch proposal from the peer, should error.
-        assert!(
-            primary
-                .process_batch_propose_from_peer(peer_ip, BatchPropose {
-                    round: round + 1,
-                    batch_header: Data::Object(proposal.batch_header().clone())
-                })
-                .await
-                .is_err()
-        );
+        assert!(primary
+            .process_batch_propose_from_peer(
+                peer_ip,
+                BatchPropose { round: round + 1, batch_header: Data::Object(proposal.batch_header().clone()) }
+            )
+            .await
+            .is_err());
     }
 
     #[tokio::test]
