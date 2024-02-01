@@ -742,15 +742,9 @@ impl<N: Network> Primary<N> {
         let authors = certificates.iter().map(BatchCertificate::author).collect();
         // Check if the certificates have reached the quorum threshold.
         let is_quorum = previous_committee.is_quorum_threshold_reached(&authors);
-
-        // Determine if we are currently proposing a round.
-        // Note: This is important, because while our peers have advanced,
-        // they may not be proposing yet, and thus still able to sign our proposed batch.
-        let is_proposing = self.proposed_batch.read().is_some();
-
-        // Determine whether to advance to the next round.
-        if is_quorum && !is_proposing {
-            // If we have reached the quorum threshold, then proceed to the next round.
+        // Determine whether to try advancing to the next round.
+        if is_quorum {
+            // If we have reached the quorum threshold, then try to advance to the next round.
             self.try_increment_to_the_next_round(current_round + 1).await?;
         }
         Ok(())
