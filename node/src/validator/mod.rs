@@ -359,7 +359,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             }
             None => {
                 // Retrieve the genesis committee.
-                let Ok(Some(committee)) = self.ledger.get_committee_for_round(0) else {
+                let Ok(Some(committee)) = self.ledger.get_committee_for_round_with_lag(0) else {
                     // If the genesis committee is not available, do not start the loop.
                     return Ok(());
                 };

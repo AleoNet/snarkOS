@@ -71,7 +71,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // Deprecated: Use `get_committee_latest` instead.
     // GET /testnet3/latest/committee
     pub(crate) async fn latest_committee(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
+        Ok(ErasedJson::pretty(rest.ledger.latest_committee_with_lag()?))
     }
 
     // ---------------------------------------------------------
@@ -253,7 +253,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
     // GET /testnet3/committee/latest
     pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
+        Ok(ErasedJson::pretty(rest.ledger.latest_committee_with_lag()?))
     }
 
     // GET /testnet3/peers/count
