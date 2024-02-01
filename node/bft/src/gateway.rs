@@ -258,6 +258,11 @@ impl<N: Network> Gateway<N> {
         self.tcp.listening_addr().expect("The TCP listener is not enabled")
     }
 
+    // Returns the set of trusted validators. 
+    pub fn trusted_validators(&self) -> &IndexSet<SocketAddr> {  
+        &self.trusted_validators
+    }
+
     /// Returns `true` if the given IP is this node.
     pub fn is_local_ip(&self, ip: SocketAddr) -> bool {
         ip == self.local_ip()

@@ -1101,18 +1101,7 @@ impl<N: Network> Primary<N> {
 
     /// Increments to the next round.
     async fn try_increment_to_the_next_round(&self, next_round: u64) -> Result<()> {
-        // If the next round is within GC range, then iterate to the penultimate round.
-        if self.current_round() + self.storage.max_gc_rounds() >= next_round {
-            let mut fast_forward_round = self.current_round();
-            // Iterate until the penultimate round is reached.
-            while fast_forward_round < next_round.saturating_sub(1) {
-                // Update to the next round in storage.
-                fast_forward_round = self.storage.increment_to_next_round(fast_forward_round)?;
-                // Clear the proposed batch.
-                *self.proposed_batch.write() = None;
-            }
-        }
-
+    
         // Retrieve the current round.
         let current_round = self.current_round();
         // Attempt to advance to the next round.
@@ -1129,10 +1118,8 @@ impl<N: Network> Primary<N> {
             }
             // Otherwise, handle the Narwhal case.
             else {
-                // Update to the next round in storage.
-                self.storage.increment_to_next_round(current_round)?;
-                // Set 'is_ready' to 'true'.
-                true
+                warn!("Failed to update the BFT to the next round - a BFT sender was not provided.");
+                false 
             };
 
             // Log whether the next round is ready.
@@ -1296,18 +1283,26 @@ impl<N: Network> Primary<N> {
             let previous_committee = self.ledger.get_previous_committee_for_round(batch_round)?;
             previous_committee.is_quorum_threshold_reached(&authors)
         };
-
-        // Check if our primary should move to the next round.
-        // Note: Checking that quorum threshold is reached is important for mitigating a race condition,
-        // whereby Narwhal requires 2f+1, however the BFT only requires f+1. Without this check, the primary
-        // will advance to the next round assuming f+1, not 2f+1, which can lead to a network stall.
+        // Determine if the batch round is far into the future. 
+        let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds(); 
+        // If the batch round is far into the future, only sync if the peer is a trusted validator, a sync peer, or if quorum threshold has been reached on the batch round. 
+        let sync_with_far_in_future_batch = !is_peer_far_in_future 
+            || ((self.gateway.trusted_validators().contains(&peer_ip) 
+            || self.sync.block_sync().is_peer_ip_sync_peer(peer_ip) 
+            || is_quorum_threshold_reached));
+        // Check if the primary should sync with the batch. 
+        if !sync_with_far_in_future_batch{ 
+            bail!("Batch certificate from round {batch_round} sent by peer {peer_ip} is too far into the future. "); 
+        }
+        // Determine if the primary is behind schedule. 
         let is_behind_schedule = is_quorum_threshold_reached && batch_round > self.current_round();
-        // Check if our primary is far behind the peer.
-        let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();
-        // If our primary is far behind the peer, update our committee to the batch round.
-        if is_behind_schedule || is_peer_far_in_future {
-            // If the batch round is greater than the current committee round, update the committee.
-            self.try_increment_to_the_next_round(batch_round).await?;
+        // If the primary is behind schedule, it will sequentially try to increment to the batch round following BFT logic. 
+        if is_behind_schedule {
+            let next_round = self.current_round() + 1; 
+            let end_round = batch_round + 1; 
+            for round in next_round..end_round{
+                self.try_increment_to_the_next_round(round).await?;
+            }
         }
 
         // Ensure the primary has all of the previous certificates.
