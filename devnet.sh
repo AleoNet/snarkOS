@@ -8,8 +8,8 @@ total_validators=${total_validators:-4}
 read -p "Enter the total number of clients (default: 2): " total_clients
 total_clients=${total_clients:-2}
 
-# Ask the user if they want to run 'cargo install --path .' or use a pre-installed binary
-read -p "Do you want to run 'cargo install --path .' to build the binary? (y/n, default: y): " build_binary
+# Ask the user if they want to run 'cargo install --locked --path .' or use a pre-installed binary
+read -p "Do you want to run 'cargo install --locked --path .' to build the binary? (y/n, default: y): " build_binary
 build_binary=${build_binary:-y}
 
 # Ask the user whether to clear the existing ledger history
@@ -18,7 +18,7 @@ clear_ledger=${clear_ledger:-n}
 
 if [[ $build_binary == "y" ]]; then
   # Build the binary using 'cargo install --path .'
-  cargo install --path . || exit 1
+  cargo install --locked --path . || exit 1
 fi
 
 # Clear the ledger logs for each validator if the user chooses to clear ledger

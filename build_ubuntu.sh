@@ -33,7 +33,7 @@ source $HOME/.cargo/env
 
 # Install snarkOS
 # cargo clean
-cargo install --path .
+cargo install --locked --path .
 
 echo "=================================================="
 echo " Attention - Please ensure ports 4133 and 3033"
