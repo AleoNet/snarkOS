@@ -41,14 +41,24 @@ type TransmissionMap<N> = IndexMap<TransmissionID<N>, Transmission<N>>;
 
 #[derive(Debug)]
 pub struct ConsensusSender<N: Network> {
-    pub tx_consensus_subdag:
-        mpsc::Sender<(Subdag<N>, TransmissionMap<N>, IndexSet<TransmissionID<N>>, oneshot::Sender<Result<()>>)>,
+    pub tx_consensus_subdag: mpsc::Sender<(
+        Subdag<N>,
+        TransmissionMap<N>,
+        IndexSet<TransmissionID<N>>,
+        IndexSet<TransmissionID<N>>,
+        oneshot::Sender<Result<()>>,
+    )>,
 }
 
 #[derive(Debug)]
 pub struct ConsensusReceiver<N: Network> {
-    pub rx_consensus_subdag:
-        mpsc::Receiver<(Subdag<N>, TransmissionMap<N>, IndexSet<TransmissionID<N>>, oneshot::Sender<Result<()>>)>,
+    pub rx_consensus_subdag: mpsc::Receiver<(
+        Subdag<N>,
+        TransmissionMap<N>,
+        IndexSet<TransmissionID<N>>,
+        IndexSet<TransmissionID<N>>,
+        oneshot::Sender<Result<()>>,
+    )>,
 }
 
 /// Initializes the consensus channels.

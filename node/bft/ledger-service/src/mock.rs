@@ -185,6 +185,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         _subdag: Subdag<N>,
         _transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
         _prior_transmissions: IndexSet<TransmissionID<N>>,
+        _aborted_transmissions: IndexSet<TransmissionID<N>>,
     ) -> Result<Block<N>> {
         unreachable!("MockLedgerService does not support prepare_advance_to_next_quorum_block")
     }

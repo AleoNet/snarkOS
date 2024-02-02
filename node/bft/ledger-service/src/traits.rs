@@ -109,6 +109,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
         prior_transmissions: IndexSet<TransmissionID<N>>,
+        aborted_transmissions: IndexSet<TransmissionID<N>>,
     ) -> Result<Block<N>>;
 
     /// Adds the given block as the next block in the ledger.

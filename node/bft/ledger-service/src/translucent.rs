@@ -171,8 +171,14 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
         prior_transmissions: IndexSet<TransmissionID<N>>,
+        aborted_transmissions: IndexSet<TransmissionID<N>>,
     ) -> Result<Block<N>> {
-        self.inner.prepare_advance_to_next_quorum_block(subdag, transmissions, prior_transmissions)
+        self.inner.prepare_advance_to_next_quorum_block(
+            subdag,
+            transmissions,
+            prior_transmissions,
+            aborted_transmissions,
+        )
     }
 
     /// Adds the given block as the next block in the ledger.

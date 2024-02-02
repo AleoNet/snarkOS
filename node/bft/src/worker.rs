@@ -508,6 +508,7 @@ mod tests {
                 subdag: Subdag<N>,
                 transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
                 prior_transmissions: IndexSet<TransmissionID<N>>,
+                aborted_transmissions: IndexSet<TransmissionID<N>>,
             ) -> Result<Block<N>>;
             fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
         }

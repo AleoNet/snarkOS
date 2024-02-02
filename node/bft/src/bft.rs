@@ -508,6 +508,8 @@ impl<N: Network> BFT<N> {
         let mut transmissions = IndexMap::new();
         // Initialize a map for the deduped prior transmission ids.
         let mut prior_included_transmissions = IndexSet::new();
+        // Initialize a map for transmission ids which could not be read from the ledger.
+        let mut aborted_transmissions = IndexSet::new();
         // Start from the oldest leader certificate.
         for certificate in commit_subdag.values().flatten() {
             // Update the DAG.
@@ -520,21 +522,32 @@ impl<N: Network> BFT<N> {
                 if transmissions.contains_key(transmission_id) {
                     continue;
                 }
-                // Retrieve the transmission.
-                let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
-                    bail!(
-                        "BFT failed to retrieve transmission '{}' from round {}",
-                        fmt_id(transmission_id),
-                        certificate.round()
-                    );
-                };
-                // TODO: this also means that they won't necessarily be prior_included_transactions, and it might fail other checks... What do? Repeated this check until we succeed, or make the verify block check way more expensive.
-                // Add the transmission to the set of prior or new transmissions.
-                // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
-                if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
-                    prior_included_transmissions.insert(*transmission_id);
-                } else {
-                    transmissions.insert(*transmission_id, transmission);
+                // Check if the ledger contains the transmission already.
+                match self.ledger().contains_transmission(transmission_id) {
+                    // On failure to read from the ledger, we skip including this transmission, out of safety.
+                    Err(err) => {
+                        warn!("{}", err.to_string());
+                        aborted_transmissions.insert(*transmission_id);
+                        continue;
+                    }
+                    // If the transmission already exists in the ledger, save just the transmission ID.
+                    Ok(true) => {
+                        prior_included_transmissions.insert(*transmission_id);
+                        continue;
+                    }
+                    // If the transmission does not exist in the ledger, retrieve it from the storage.
+                    Ok(false) => {
+                        // Retrieve the transmission.
+                        let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
+                            bail!(
+                                "BFT failed to retrieve transmission '{}' from round {}",
+                                fmt_id(transmission_id),
+                                certificate.round()
+                            );
+                        };
+                        // Add the transmission to the set.
+                        transmissions.insert(*transmission_id, transmission);
+                    }
                 }
             }
         }
@@ -562,7 +575,7 @@ impl<N: Network> BFT<N> {
                 // Send the subdag and transmissions to consensus.
                 consensus_sender
                     .tx_consensus_subdag
-                    .send((subdag, transmissions, prior_included_transmissions, callback_sender))
+                    .send((subdag, transmissions, prior_included_transmissions, aborted_transmissions, callback_sender))
                     .await?;
                 // Await the callback to continue.
                 match callback_receiver.await {
