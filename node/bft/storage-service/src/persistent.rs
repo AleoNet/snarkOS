@@ -30,7 +30,10 @@ use snarkvm::{
 
 use indexmap::{indexset, IndexSet};
 use snarkvm::ledger::store::cow_to_cloned;
-use std::{borrow::Cow, collections::HashMap};
+use std::{
+    borrow::Cow,
+    collections::{BTreeSet, HashMap},
+};
 use tracing::error;
 
 /// A BFT persistent storage service.
@@ -110,7 +113,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     fn insert_transmissions(
         &self,
         certificate_id: Field<N>,
-        transmission_ids: IndexSet<TransmissionID<N>>,
+        transmission_ids: BTreeSet<TransmissionID<N>>,
         mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
         // Inserts the following:
@@ -154,7 +157,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     /// Removes the certificate ID for the transmissions from storage.
     ///
     /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
-    fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>) {
+    fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &BTreeSet<TransmissionID<N>>) {
         // If this is the last certificate ID for the transmission ID, remove the transmission.
         'outer: for transmission_id in transmission_ids {
             // Retrieve the transmission entry.

@@ -18,7 +18,10 @@ use snarkvm::{
 };
 
 use indexmap::IndexSet;
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::{BTreeSet, HashMap},
+    fmt::Debug,
+};
 
 pub trait StorageService<N: Network>: Debug + Send + Sync {
     /// Returns `true` if the storage contains the specified `transmission ID`.
@@ -39,14 +42,14 @@ pub trait StorageService<N: Network>: Debug + Send + Sync {
     fn insert_transmissions(
         &self,
         certificate_id: Field<N>,
-        transmission_ids: IndexSet<TransmissionID<N>>,
+        transmission_ids: BTreeSet<TransmissionID<N>>,
         missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     );
 
     /// Removes the certificate ID for the transmissions from storage.
     ///
     /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
-    fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>);
+    fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &BTreeSet<TransmissionID<N>>);
 
     /// Returns a HashMap over the `(transmission ID, (transmission, certificate IDs))` entries.
     #[cfg(any(test, feature = "test"))]

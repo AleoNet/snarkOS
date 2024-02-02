@@ -20,7 +20,7 @@ use snarkvm::{
 
 use indexmap::{indexset, map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use tracing::error;
 
 /// A BFT in-memory storage service.
@@ -87,7 +87,7 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
     fn insert_transmissions(
         &self,
         certificate_id: Field<N>,
-        transmission_ids: IndexSet<TransmissionID<N>>,
+        transmission_ids: BTreeSet<TransmissionID<N>>,
         mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
         // Acquire the transmissions write lock.
@@ -121,7 +121,7 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
     /// Removes the certificate ID for the transmissions from storage.
     ///
     /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
-    fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>) {
+    fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &BTreeSet<TransmissionID<N>>) {
         // Acquire the transmissions write lock.
         let mut transmissions = self.transmissions.write();
         // If this is the last certificate ID for the transmission ID, remove the transmission.
