@@ -41,9 +41,10 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-#git = "https://github.com/AleoHQ/snarkVM.git"
+git = "https://github.com/AleoHQ/snarkVM.git"
+branch = "vicsn/stress_test_2"
 #rev = "06bd41f"
-version = "=0.16.18"
+#version = "=0.16.18"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
