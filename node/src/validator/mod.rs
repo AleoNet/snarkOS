@@ -90,7 +90,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let signal_node = Self::handle_signals(shutdown.clone());
 
         // Initialize the ledger.
-        let ledger = Ledger::load(genesis, dev)?;
+        let ledger = Ledger::load(genesis, dev.into())?;
         // TODO: Remove me after Phase 3.
         let ledger = crate::phase_3_reset(ledger, dev)?;
         // Initialize the CDN.
