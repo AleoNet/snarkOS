@@ -204,49 +204,47 @@ impl<N: Network> Sync<N> {
         self.storage.sync_height_with_block(latest_block.height());
         // Sync the round with the block.
         self.storage.sync_round_with_block(latest_block.round());
+        // Compute the number of certificates in quorum blocks.
+        let num_certificates = blocks
+            .iter()
+            .map(|block| if let Authority::Quorum(subdag) = block.authority() { subdag.num_certificates() } else { 0 })
+            .sum::<usize>();
+        // Construct a list of leader certificates.
+        let mut leader_certificates = Vec::with_capacity(blocks.len());
+        // Construct a list of all certificates.
+        let mut certificates = Vec::with_capacity(num_certificates);
         // Iterate over the blocks.
         for block in &blocks {
             // If the block authority is a subdag, then sync the batch certificates with the block.
             if block.authority().is_quorum() {
+                // Construct the full subdag.
+                let subdag = block.to_full_subdag()?;
+                // Retrieve the leader certificate and election certificate IDs.
+                let leader_certificate = subdag.leader_batch_certificate()?.clone();
+                let election_certificate_ids = subdag.election_certificate_ids().clone();
+                leader_certificates.push((leader_certificate, election_certificate_ids));
+                // Construct iter over the certificates.
+                let certificate_iter = subdag.into_iter_batch_certificates()?;
                 // Iterate over the certificates.
-                for certificate in block.to_full_subdag()?.into_iter_batch_certificates()? {
+                for certificate in certificate_iter {
                     // Sync the batch certificate with the block.
                     self.storage.sync_certificate_with_block(block, &certificate)?;
+                    // Store the certificates in the list.
+                    certificates.push(certificate);
                 }
             }
         }
 
         /* Sync the BFT DAG */
 
-        // Check if the blocks contain a quorum authority, and by extension a leader certificate.
-        let contains_leader_certificate = blocks.iter().any(|block| block.authority().is_quorum());
-        if !contains_leader_certificate {
-            return Ok(());
-        }
-
-        // Construct a list of the certificates.
-        let mut leader_certificates = Vec::with_capacity(blocks.len());
-        let num_certificates = blocks
-            .iter()
-            .map(|block| if let Authority::Quorum(subdag) = block.authority() { subdag.num_certificates() } else { 0 })
-            .sum::<usize>();
-        let mut certificates = Vec::with_capacity(num_certificates);
-        for block in blocks {
-            // If the block authority is a quorum subdag, then retrieve the certificates.
-            if block.authority().is_quorum() {
-                let subdag = block.into_full_subdag()?;
-                let leader_certificate = subdag.leader_batch_certificate()?.clone();
-                let election_certificate_ids = subdag.election_certificate_ids().clone();
-                leader_certificates.push((leader_certificate, election_certificate_ids));
-                certificates.extend(subdag.into_iter_batch_certificates()?);
-            }
-        }
-
-        // If a BFT sender was provided, send the certificate to the BFT.
+        // If a BFT sender was provided, send any certificates to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
-            // Await the callback to continue.
-            if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send((leader_certificates, certificates)).await {
-                bail!("Failed to update the BFT DAG from sync: {e}");
+            // We need certificates to send.
+            if !certificates.is_empty() && !leader_certificates.is_empty() {
+                // Await the callback to continue.
+                if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send((leader_certificates, certificates)).await {
+                    bail!("Failed to update the BFT DAG from sync: {e}");
+                }
             }
         }
 
