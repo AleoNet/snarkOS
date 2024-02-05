@@ -21,11 +21,11 @@ use snarkvm::{
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
         Ledger,
+        SubdagTransmissions,
     },
     prelude::{bail, Field, Network, Result},
 };
 
-use indexmap::{IndexMap, IndexSet};
 use std::{
     fmt,
     ops::Range,
@@ -283,16 +283,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn prepare_advance_to_next_quorum_block(
         &self,
         subdag: Subdag<N>,
-        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
-        prior_transmissions: IndexSet<TransmissionID<N>>,
-        aborted_transmissions: IndexSet<TransmissionID<N>>,
+        subdag_transmissions: SubdagTransmissions<N>,
     ) -> Result<Block<N>> {
-        self.ledger.prepare_advance_to_next_quorum_block(
-            subdag,
-            transmissions,
-            prior_transmissions,
-            aborted_transmissions,
-        )
+        self.ledger.prepare_advance_to_next_quorum_block(subdag, subdag_transmissions)
     }
 
     /// Adds the given block as the next block in the ledger.

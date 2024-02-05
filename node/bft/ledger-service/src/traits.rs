@@ -19,10 +19,9 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{Field, Network, Result},
+    prelude::{Field, Network, Result, SubdagTransmissions},
 };
 
-use indexmap::{IndexMap, IndexSet};
 use std::{fmt::Debug, ops::Range};
 
 #[async_trait]
@@ -107,9 +106,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     fn prepare_advance_to_next_quorum_block(
         &self,
         subdag: Subdag<N>,
-        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
-        prior_transmissions: IndexSet<TransmissionID<N>>,
-        aborted_transmissions: IndexSet<TransmissionID<N>>,
+        subdag_transmissions: SubdagTransmissions<N>,
     ) -> Result<Block<N>>;
 
     /// Adds the given block as the next block in the ledger.

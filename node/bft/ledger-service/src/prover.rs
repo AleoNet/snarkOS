@@ -20,10 +20,9 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, Field, Network, Result, SubdagTransmissions},
 };
 
-use indexmap::{IndexMap, IndexSet};
 use std::ops::Range;
 
 /// A ledger service for a prover.
@@ -161,9 +160,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     fn prepare_advance_to_next_quorum_block(
         &self,
         _subdag: Subdag<N>,
-        _transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
-        _prior_transmissions: IndexSet<TransmissionID<N>>,
-        _aborted_transmissions: IndexSet<TransmissionID<N>>,
+        _subdag_transmissions: SubdagTransmissions<N>,
     ) -> Result<Block<N>> {
         bail!("Cannot prepare advance to next quorum block in prover")
     }

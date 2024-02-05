@@ -37,7 +37,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, NarwhalCertificate, Subdag, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, Field, Network, Result},
+    prelude::{bail, ensure, Field, Network, Result, SubdagTransmissions},
 };
 
 use colored::Colorize;
@@ -568,13 +568,13 @@ impl<N: Network> BFT<N> {
 
             // Trigger consensus.
             if let Some(consensus_sender) = self.consensus_sender.get() {
+                // Construct subdag transmissions.
+                let subdag_transmissions =
+                    SubdagTransmissions { transmissions, prior_included_transmissions, aborted_transmissions };
                 // Initialize a callback sender and receiver.
                 let (callback_sender, callback_receiver) = oneshot::channel();
                 // Send the subdag and transmissions to consensus.
-                consensus_sender
-                    .tx_consensus_subdag
-                    .send((subdag, transmissions, prior_included_transmissions, aborted_transmissions, callback_sender))
-                    .await?;
+                consensus_sender.tx_consensus_subdag.send((subdag, subdag_transmissions, callback_sender)).await?;
                 // Await the callback to continue.
                 match callback_receiver.await {
                     Ok(Ok(())) => (), // continue

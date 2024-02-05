@@ -20,10 +20,9 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, Field, Network, Result},
+    prelude::{bail, ensure, Field, Network, Result, SubdagTransmissions},
 };
 
-use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{collections::BTreeMap, ops::Range};
 use tracing::*;
@@ -183,9 +182,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     fn prepare_advance_to_next_quorum_block(
         &self,
         _subdag: Subdag<N>,
-        _transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
-        _prior_transmissions: IndexSet<TransmissionID<N>>,
-        _aborted_transmissions: IndexSet<TransmissionID<N>>,
+        _subdag_transmissions: SubdagTransmissions<N>,
     ) -> Result<Block<N>> {
         unreachable!("MockLedgerService does not support prepare_advance_to_next_quorum_block")
     }

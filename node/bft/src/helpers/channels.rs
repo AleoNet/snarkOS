@@ -26,9 +26,9 @@ use snarkvm::{
     ledger::{
         block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
-        narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, Subdag, TransmissionID},
     },
-    prelude::Result,
+    prelude::{Result, SubdagTransmissions},
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -37,28 +37,14 @@ use tokio::sync::{mpsc, oneshot};
 
 const MAX_CHANNEL_SIZE: usize = 8192;
 
-type TransmissionMap<N> = IndexMap<TransmissionID<N>, Transmission<N>>;
-
 #[derive(Debug)]
 pub struct ConsensusSender<N: Network> {
-    pub tx_consensus_subdag: mpsc::Sender<(
-        Subdag<N>,
-        TransmissionMap<N>,
-        IndexSet<TransmissionID<N>>,
-        IndexSet<TransmissionID<N>>,
-        oneshot::Sender<Result<()>>,
-    )>,
+    pub tx_consensus_subdag: mpsc::Sender<(Subdag<N>, SubdagTransmissions<N>, oneshot::Sender<Result<()>>)>,
 }
 
 #[derive(Debug)]
 pub struct ConsensusReceiver<N: Network> {
-    pub rx_consensus_subdag: mpsc::Receiver<(
-        Subdag<N>,
-        TransmissionMap<N>,
-        IndexSet<TransmissionID<N>>,
-        IndexSet<TransmissionID<N>>,
-        oneshot::Sender<Result<()>>,
-    )>,
+    pub rx_consensus_subdag: mpsc::Receiver<(Subdag<N>, SubdagTransmissions<N>, oneshot::Sender<Result<()>>)>,
 }
 
 /// Initializes the consensus channels.

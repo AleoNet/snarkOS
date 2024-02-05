@@ -14,17 +14,16 @@
 
 use crate::{CoreLedgerService, LedgerService};
 use async_trait::async_trait;
-use indexmap::{IndexMap, IndexSet};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
-        narwhal::{Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
         Ledger,
     },
-    prelude::{narwhal::BatchCertificate, Field, Network, Result},
+    prelude::{Field, Network, Result, SubdagTransmissions},
 };
 use std::{
     fmt,
@@ -169,16 +168,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     fn prepare_advance_to_next_quorum_block(
         &self,
         subdag: Subdag<N>,
-        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
-        prior_transmissions: IndexSet<TransmissionID<N>>,
-        aborted_transmissions: IndexSet<TransmissionID<N>>,
+        subdag_transmissions: SubdagTransmissions<N>,
     ) -> Result<Block<N>> {
-        self.inner.prepare_advance_to_next_quorum_block(
-            subdag,
-            transmissions,
-            prior_transmissions,
-            aborted_transmissions,
-        )
+        self.inner.prepare_advance_to_next_quorum_block(subdag, subdag_transmissions)
     }
 
     /// Adds the given block as the next block in the ledger.

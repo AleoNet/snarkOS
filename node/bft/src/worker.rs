@@ -447,11 +447,11 @@ mod tests {
             block::Block,
             committee::Committee,
             narwhal::{BatchCertificate, Subdag, Transmission, TransmissionID},
+            SubdagTransmissions,
         },
     };
 
     use bytes::Bytes;
-    use indexmap::IndexMap;
     use mockall::mock;
     use std::{io, ops::Range};
 
@@ -506,9 +506,7 @@ mod tests {
             fn prepare_advance_to_next_quorum_block(
                 &self,
                 subdag: Subdag<N>,
-                transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
-                prior_transmissions: IndexSet<TransmissionID<N>>,
-                aborted_transmissions: IndexSet<TransmissionID<N>>,
+                subdag_transmissions: SubdagTransmissions<N>,
             ) -> Result<Block<N>>;
             fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
         }
