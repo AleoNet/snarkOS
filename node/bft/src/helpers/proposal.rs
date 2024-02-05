@@ -55,7 +55,7 @@ impl<N: Network> Proposal<N> {
             batch_header.transmission_ids().len() == transmissions.len(),
             "The transmission IDs do not match in the batch header and transmissions"
         );
-        for (a, b) in batch_header.transmission_ids().iter().zip_eq(transmissions.keys()) {
+        for (a, b) in batch_header.transmission_ids().iter().zip_eq(transmissions.keys().sorted()) {
             ensure!(a == b, "The transmission IDs do not match in the batch header and transmissions");
         }
         // Return the proposal.
