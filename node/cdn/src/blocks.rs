@@ -318,7 +318,7 @@ async fn download_block_bundles<N: Network>(
                                 shutdown_clone.store(true, Ordering::Relaxed);
                                 break;
                             }
-                            tokio::time::sleep(Duration::from_secs(attempts as u64)).await;
+                            tokio::time::sleep(Duration::from_secs(attempts as u64 * 10)).await;
                             warn!("{error} - retrying ({attempts} attempt(s) so far)");
                         }
                     }
