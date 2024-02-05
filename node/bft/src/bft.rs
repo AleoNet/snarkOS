@@ -528,12 +528,10 @@ impl<N: Network> BFT<N> {
                     Err(err) => {
                         warn!("{}", err);
                         aborted_transmissions.insert(*transmission_id);
-                        continue;
                     }
                     // If the transmission already exists in the ledger, save just the transmission ID.
                     Ok(true) => {
                         prior_included_transmissions.insert(*transmission_id);
-                        continue;
                     }
                     // If the transmission does not exist in the ledger, retrieve it from the storage.
                     Ok(false) => {
