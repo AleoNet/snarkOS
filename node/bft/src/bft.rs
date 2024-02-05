@@ -526,7 +526,7 @@ impl<N: Network> BFT<N> {
                 match self.ledger().contains_transmission(transmission_id) {
                     // On failure to read from the ledger, we skip including this transmission, out of safety.
                     Err(err) => {
-                        warn!("{}", err.to_string());
+                        warn!("{}", err);
                         aborted_transmissions.insert(*transmission_id);
                         continue;
                     }
