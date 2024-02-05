@@ -26,9 +26,9 @@ if [[ $clear_ledger == "y" ]]; then
   # Create an array to store background processes
   clean_processes=()
 
-  for ((validator_index = 0; validator_index < total_validators; validator_index++)); do
-    # Run 'snarkos clean' for each validator in the background
-    snarkos clean --dev $validator_index &
+  for ((index = 0; index < $((total_validators + total_clients)); index++)); do
+     # Run 'snarkos clean' for each node in the background
+    snarkos clean --dev $index &
 
     # Store the process ID of the background task
     clean_processes+=($!)
