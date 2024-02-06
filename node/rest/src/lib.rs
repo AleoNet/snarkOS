@@ -112,7 +112,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             GovernorConfigBuilder::default()
                 .per_second(1)
                 .burst_size(rest_rps)
-                .error_handler(|error| Response::new(error.to_string()))
+                .error_handler(|error| Response::new(error.to_string().into()))
                 .finish()
                 .expect("Couldn't set up rate limiting for the REST server!"),
         );

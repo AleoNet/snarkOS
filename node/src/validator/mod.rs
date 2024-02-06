@@ -352,10 +352,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         match dev {
             // If the node is running in development mode, only generate if you are allowed.
             Some(dev) => {
-                // If the node is not the first node, do not start the loop.
-                if dev != 0 {
-                    return Ok(());
-                }
+                return Ok(());
             }
             None => {
                 // Retrieve the genesis committee.
