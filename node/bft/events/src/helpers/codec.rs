@@ -21,6 +21,7 @@ use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     prelude::ParallelSlice,
 };
+use metrics_external::histogram;
 use snow::{HandshakeState, StatelessTransportState};
 use std::{io, sync::Arc};
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
@@ -83,11 +84,14 @@ impl<N: Network> Decoder for EventCodec<N> {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
-
+        let bytes_len = bytes.len() as f64;
         // Convert the bytes to an event, or fail if it is not valid.
         let reader = bytes.reader();
         match Event::read_le(reader) {
-            Ok(event) => Ok(Some(event)),
+            Ok(event) => {
+                histogram!(metrics::tcp::TCP_GATEWAY, "event" => event.name()).record(bytes_len);
+                Ok(Some(event))
+            },
             Err(error) => {
                 error!("Failed to deserialize an event: {}", error);
                 Err(std::io::ErrorKind::InvalidData.into())

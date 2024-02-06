@@ -36,6 +36,10 @@ path = "../../metrics"
 version = "=2.2.7"
 optional = true
 
+[dependencies.metrics_external]
+version = "0.22"
+package = "metrics" 
+
 [dependencies.rayon]
 version = "1"
 
