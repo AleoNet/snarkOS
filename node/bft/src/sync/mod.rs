@@ -14,6 +14,7 @@
 
 use crate::{
     helpers::{BFTSender, Pending, Storage, SyncReceiver},
+    spawn_blocking,
     Gateway,
     Transport,
     MAX_BATCH_DELAY_IN_MS,
@@ -205,9 +206,11 @@ impl<N: Network> Sync<N> {
             // If the block authority is a subdag, then sync the batch certificates with the block.
             if let Authority::Quorum(subdag) = block.authority() {
                 // Iterate over the certificates.
-                for certificate in subdag.values().flatten() {
+                for certificate in subdag.values().flatten().cloned() {
                     // Sync the batch certificate with the block.
-                    self.storage.sync_certificate_with_block(block, certificate);
+                    let storage = self.storage.clone();
+                    let block = block.clone();
+                    let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block, &certificate)));
                 }
             }
         }
@@ -282,7 +285,10 @@ impl<N: Network> Sync<N> {
             // Iterate over the certificates.
             for certificate in subdag.values().flatten() {
                 // Sync the batch certificate with the block.
-                self.storage.sync_certificate_with_block(&block, certificate);
+                let storage = self.storage.clone();
+                let block_clone = block.clone();
+                let certificate_clone = certificate.clone();
+                let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block_clone, &certificate_clone)));
                 // If a BFT sender was provided, send the certificate to the BFT.
                 if let Some(bft_sender) = self.bft_sender.get() {
                     // Await the callback to continue.
