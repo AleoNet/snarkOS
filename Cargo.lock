@@ -3181,6 +3181,7 @@ dependencies = [
  "deadline",
  "futures-util",
  "indexmap 2.1.0",
+ "lru",
  "num_cpus",
  "once_cell",
  "parking_lot",
