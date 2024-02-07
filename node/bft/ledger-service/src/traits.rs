@@ -78,6 +78,13 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// Returns `true` if the ledger contains the given transmission ID.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
 
+    /// Ensures the given transmission ID matches the given transmission.
+    fn ensure_transmission_id_matches(
+        &self,
+        transmission_id: TransmissionID<N>,
+        transmission: &mut Transmission<N>,
+    ) -> Result<()>;
+
     /// Checks the given solution is well-formed.
     async fn check_solution_basic(
         &self,

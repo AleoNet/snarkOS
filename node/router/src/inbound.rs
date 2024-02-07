@@ -67,7 +67,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         trace!("Received '{}' from '{peer_ip}'", message.name());
 
         // This match statement handles the inbound message by deserializing the message,
-        // checking the message is valid, and then calling the appropriate (trait) handler.
+        // checking that the message is valid, and then calling the appropriate (trait) handler.
         match message {
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
@@ -117,10 +117,16 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 true => Ok(()),
                 false => bail!("Peer '{peer_ip}' sent an invalid peer request"),
             },
-            Message::PeerResponse(message) => match self.peer_response(peer_ip, &message.peers) {
-                true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
-            },
+            Message::PeerResponse(message) => {
+                if !self.router().cache.contains_outbound_peer_request(peer_ip) {
+                    bail!("Peer '{peer_ip}' is not following the protocol (unexpected peer response)")
+                }
+
+                match self.peer_response(peer_ip, &message.peers) {
+                    true => Ok(()),
+                    false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
+                }
+            }
             Message::Ping(message) => {
                 // Ensure the message protocol version is not outdated.
                 if message.version < Message::<N>::VERSION {
@@ -256,7 +262,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Retrieve the connected peers.
         let peers = self.router().connected_peers();
         // Filter out invalid addresses.
-        let peers = peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).collect();
+        let peers = peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).take(u8::MAX as usize).collect();
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
         true

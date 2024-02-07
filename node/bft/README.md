@@ -47,4 +47,4 @@ on the entries they receive from other validators' workers.
 ## Open Questions
 
 1. How does one guarantee the number of accepted transactions and solutions does not exceed the block limits?
-   - We need to set limits on number of transmissions for the workers, but also the primary.
+   - We need to set limits on the number of transmissions for the workers, but also the primary.

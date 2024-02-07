@@ -222,7 +222,9 @@ impl<N: Network> Sync<N> {
                     // If the block authority is a beacon, then skip the block.
                     Authority::Beacon(_) => None,
                     // If the block authority is a subdag, then retrieve the certificates.
-                    Authority::Quorum(subdag) => Some(subdag.leader_certificate().clone()),
+                    Authority::Quorum(subdag) => {
+                        Some((subdag.leader_certificate().clone(), subdag.election_certificate_ids().clone()))
+                    }
                 }
             })
             .collect::<Vec<_>>();
@@ -335,7 +337,7 @@ impl<N: Network> Sync<N> {
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
             // Send the certificate request to the peer.
             if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
-                bail!("Unable to fetch batch certificate - failed to send request")
+                bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
             }
         }
         // Wait for the certificate to be fetched.
@@ -343,7 +345,7 @@ impl<N: Network> Sync<N> {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
-            Err(e) => bail!("Unable to fetch batch certificate - (timeout) {e}"),
+            Err(e) => bail!("Unable to fetch batch certificate {certificate_id} - (timeout) {e}"),
         }
     }
 

@@ -48,7 +48,7 @@ use clap::{Parser, ValueEnum};
 use indexmap::IndexMap;
 use rand::{Rng, SeedableRng};
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
-use tokio::sync::oneshot;
+use tokio::{net::TcpListener, sync::oneshot};
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
@@ -111,8 +111,11 @@ pub async fn start_bft(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the storage.
-    let storage =
-        Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS);
+    let storage = Storage::new(
+        ledger.clone(),
+        Arc::new(BFTMemoryService::new()),
+        BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+    );
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -149,8 +152,11 @@ pub async fn start_primary(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the storage.
-    let storage =
-        Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS);
+    let storage = Storage::new(
+        ledger.clone(),
+        Arc::new(BFTMemoryService::new()),
+        BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+    );
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -398,10 +404,9 @@ async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<Current
 
     // Run the server.
     info!("Starting the server at '{addr}'...");
-    axum::Server::bind(&addr.parse().unwrap())
-        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-        .await
-        .unwrap();
+    let rest_addr: SocketAddr = addr.parse().unwrap();
+    let rest_listener = TcpListener::bind(rest_addr).await.unwrap();
+    axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
 }
 
 /**************************************************************************************************/
@@ -439,6 +444,9 @@ struct Args {
     /// Enables the solution and transaction cannons, and optionally the interval in ms to run them on.
     #[arg(long, value_name = "INTERVAL_MS")]
     fire_transmissions: Option<Option<u64>>,
+    /// Enables the metrics exporter.
+    #[clap(long, default_value = "false")]
+    metrics: bool,
 }
 
 /// A helper method to parse the peers provided to the CLI.
@@ -504,6 +512,13 @@ async fn main() -> Result<()> {
         }
         _ => (),
     };
+
+    // Initialize the metrics.
+    #[cfg(feature = "metrics")]
+    if args.metrics {
+        info!("Initializing metrics...");
+        metrics::initialize_metrics();
+    }
 
     // Start the monitoring server.
     start_server(bft_holder, primary, args.id).await;

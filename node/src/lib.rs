@@ -70,7 +70,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
     /// Removes the specified ledger from storage.
     pub(crate) fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
         // Construct the path to the ledger in storage.
-        let mut path = aleo_std::aleo_ledger_dir(network, dev);
+        let mut path = aleo_std::aleo_ledger_dir(network, aleo_std::StorageMode::from(dev));
 
         // Delete the parent folder.
         path.pop();
@@ -139,6 +139,33 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             std::thread::sleep(std::time::Duration::from_secs(5));
             return Ledger::<N, C>::load(genesis.clone(), dev);
         }
+    } else if let Ok(block) = ledger.get_block(726845) {
+        if *block.hash() == *ID::<N>::from_str("ab1tf3v9qef0uh3ygsc0qqem7dzeyy2m8aqz583a80z60l8t5l22u9s84y38z")? {
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            return Ledger::<N, C>::load(genesis.clone(), dev);
+        }
+    } else if let Ok(block) = ledger.get_block(997810) {
+        if *block.hash() == *ID::<N>::from_str("ab1pap9sxh5fcskw7l3msax4fq2mrqd80kxp0epx9dguxua2e8dacys78key5")? {
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            return Ledger::<N, C>::load(genesis.clone(), dev);
+        }
+    } else if let Ok(block) = ledger.get_block(997810) {
+        if *block.hash() == *ID::<N>::from_str("ab1fx4mpz0fdqx75djf3n9grsjkc229xfs8fzmjqsxkajtj8j8sdurqufgvyz")? {
+            let genesis = ledger.get_block(0)?;
+            drop(ledger);
+            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
+            // Sleep for 5 seconds to allow the user to read the message.
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            return Ledger::<N, C>::load(genesis.clone(), dev);
+        }
     }
     Ok(ledger)
 }
@@ -192,7 +219,7 @@ pub fn notification_message() -> String {
     - If participating, BE PREPARED TO RESET YOUR NODE AT ANY TIME.
     - When a reset occurs, RUN THE FOLLOWING TO RESET YOUR NODE:
         - git checkout testnet3 && git pull
-        - cargo install --path .
+        - cargo install --locked --path .
         - snarkos clean
         - snarkos start --nodisplay --client
 

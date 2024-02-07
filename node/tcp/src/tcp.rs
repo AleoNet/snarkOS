@@ -69,7 +69,7 @@ pub struct InnerTcp {
     listening_addr: OnceCell<SocketAddr>,
     /// Contains objects used by the protocols implemented by the node.
     pub(crate) protocols: Protocols,
-    /// A list of connections that have not been finalized yet.
+    /// A set of connections that have not been finalized yet.
     connecting: Mutex<HashSet<SocketAddr>>,
     /// Contains objects related to the node's active connections.
     connections: Connections,

@@ -143,11 +143,11 @@ impl TestNetwork {
         for (id, account) in accounts.into_iter().enumerate() {
             let mut rng = TestRng::fixed(id as u64);
             let gen_ledger = genesis_ledger(gen_key, committee.clone(), balances.clone(), &mut rng);
-            let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger));
+            let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger, Default::default()));
             let storage = Storage::new(
                 ledger.clone(),
                 Arc::new(BFTMemoryService::new()),
-                BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS,
+                BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
             );
 
             let (primary, bft) = if config.bft {

@@ -42,7 +42,7 @@ use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
     is_bogon_ip,
-    is_unspecified_ip,
+    is_unspecified_or_broadcast_ip,
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
     Connection,
@@ -206,17 +206,17 @@ impl<N: Network> Gateway<N> {
             .map_or_else(|_e| Committee::<N>::MAX_COMMITTEE_SIZE as usize, |committee| committee.num_members())
     }
 
-    /// The maxixmum number of events to cache.
+    /// The maximum number of events to cache.
     fn max_cache_events(&self) -> usize {
         self.max_cache_transmissions()
     }
 
     /// The maximum number of certificate requests to cache.
     fn max_cache_certificates(&self) -> usize {
-        2 * BatchHeader::<N>::MAX_GC_ROUNDS as usize * self.max_committee_size()
+        2 * BatchHeader::<N>::MAX_GC_ROUNDS * self.max_committee_size()
     }
 
-    /// Thne maximum number of transmission requests to cache.
+    /// The maximum number of transmission requests to cache.
     fn max_cache_transmissions(&self) -> usize {
         self.max_cache_certificates() * BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH
     }
@@ -267,7 +267,7 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
     pub fn is_valid_peer_ip(&self, ip: SocketAddr) -> bool {
-        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_ip(ip.ip())
+        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_or_broadcast_ip(ip.ip())
     }
 
     /// Returns the resolver.
@@ -427,13 +427,21 @@ impl<N: Network> Gateway<N> {
         Ok(())
     }
 
+    #[cfg(feature = "metrics")]
+    fn update_metrics(&self) {
+        metrics::gauge(metrics::bft::CONNECTED, self.connected_peers.read().len() as f64);
+        metrics::gauge(metrics::bft::CONNECTING, self.connecting_peers.lock().len() as f64);
+    }
+
     /// Inserts the given peer into the connected peers.
     #[cfg(not(test))]
     fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr, address);
-        // Add an transmission for this peer in the connected peers.
+        // Add a transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Inserts the given peer into the connected peers.
@@ -442,7 +450,7 @@ impl<N: Network> Gateway<N> {
     pub fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr, address);
-        // Add an transmission for this peer in the connected peers.
+        // Add a transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
     }
 
@@ -461,6 +469,8 @@ impl<N: Network> Gateway<N> {
         self.resolver.remove_peer(peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().shift_remove(&peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Sends the given event to specified peer.
@@ -523,7 +533,7 @@ impl<N: Network> Gateway<N> {
                 Event::TransmissionResponse(TransmissionResponse { transmission_id, .. }) => *transmission_id,
                 _ => unreachable!(),
             };
-            // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
+            // Skip processing this certificate if the rate limit was exceeded (i.e. someone is spamming a specific certificate).
             let num_events = self.cache.insert_inbound_transmission(transmission_id, CACHE_REQUESTS_INTERVAL);
             if num_events >= self.max_cache_duplicates() {
                 return Ok(());
@@ -979,7 +989,7 @@ impl<N: Network> Reading for Gateway<N> {
 
     /// The maximum queue depth of incoming messages for a single peer.
     const MESSAGE_QUEUE_DEPTH: usize = 2
-        * BatchHeader::<N>::MAX_GC_ROUNDS as usize
+        * BatchHeader::<N>::MAX_GC_ROUNDS
         * Committee::<N>::MAX_COMMITTEE_SIZE as usize
         * BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH;
 
@@ -1014,7 +1024,7 @@ impl<N: Network> Writing for Gateway<N> {
 
     /// The maximum queue depth of outgoing messages for a single peer.
     const MESSAGE_QUEUE_DEPTH: usize = 2
-        * BatchHeader::<N>::MAX_GC_ROUNDS as usize
+        * BatchHeader::<N>::MAX_GC_ROUNDS
         * Committee::<N>::MAX_COMMITTEE_SIZE as usize
         * BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH;
 
