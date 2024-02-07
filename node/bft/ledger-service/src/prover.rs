@@ -108,9 +108,9 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Committee for round {round} does not exist in prover")
     }
 
-    /// Returns the previous committee for the given round.
-    /// If the previous round is in the future, then the current committee is returned.
-    fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
+    /// Returns the previous committee with lag for the given round.
+    /// If the previous round with lag is in the future, then the current committee is returned.
+    fn get_previous_committee_with_lag_for_round(&self, round: u64) -> Result<Committee<N>> {
         bail!("Previous committee for round {round} does not exist in prover")
     }
 
