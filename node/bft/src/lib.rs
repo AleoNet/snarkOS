@@ -72,3 +72,17 @@ macro_rules! spawn_blocking {
         }
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type CurrentNetwork = snarkvm::console::network::Testnet3;
+
+    #[test]
+    fn test_max_gc_rounds() {
+        assert_eq!(MAX_GC_ROUNDS, snarkvm::ledger::narwhal::BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64);
+        assert_eq!(MAX_GC_ROUNDS, snarkvm::ledger::narwhal::Subdag::<CurrentNetwork>::MAX_ROUNDS);
+        assert_eq!(MAX_GC_ROUNDS, <CurrentNetwork as snarkvm::prelude::Network>::COMMITTEE_ROUND_LAG);
+    }
+}
