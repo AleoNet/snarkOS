@@ -20,11 +20,6 @@ sudo apt-get install -y \
 	xz-utils \
 	ufw
 
-# Open ports on system
-
-sudo ufw allow 5000/tcp
-sudo ufw allow 4133/tcp
-sudo ufw allow 3033/tcp
 
 # Install Rust
 
