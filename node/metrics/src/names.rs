@@ -72,5 +72,5 @@ pub mod tcp {
     pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_encryption_size";
     pub const NOISE_CODEC_DECRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_decryption_size";
     pub const TCP_TASKS: &str = "snarkos_tcp_tasks_total";
-    pub const TCP_GATEWAY: &str = "snarkos_tcp_gateway_messages";
+    pub const TCP_GATEWAY: &str = "snarkos_tcp_gateway_messages_received";
 }
