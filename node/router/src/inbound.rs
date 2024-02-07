@@ -261,8 +261,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn peer_request(&self, peer_ip: SocketAddr) -> bool {
         // Retrieve the connected peers.
         let peers = self.router().connected_peers();
-        // Filter out invalid addresses.
-        let peers = peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).take(u8::MAX as usize).collect();
+        // Filter out invalid addresses and the requesting peer's address.
+        let peers = peers
+            .into_iter()
+            .filter(|ip| *ip != peer_ip && self.router().is_valid_peer_ip(ip))
+            .take(u8::MAX as usize)
+            .collect();
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
         true
