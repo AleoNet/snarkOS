@@ -153,7 +153,7 @@ pub async fn load_blocks<N: Network>(
         return Ok(cdn_end);
     }
 
-    // A collection of dowloaded blocks pending insertion into the ledger.
+    // A collection of downloaded blocks pending insertion into the ledger.
     let pending_blocks: Arc<Mutex<Vec<Block<N>>>> = Default::default();
 
     // Start a timer.
