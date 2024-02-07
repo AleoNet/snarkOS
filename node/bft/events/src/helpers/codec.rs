@@ -89,6 +89,7 @@ impl<N: Network> Decoder for EventCodec<N> {
         let reader = bytes.reader();
         match Event::read_le(reader) {
             Ok(event) => {
+                #[cfg(feature = "metrics")]
                 histogram!(metrics::tcp::TCP_GATEWAY, "event" => event.name()).record(bytes_len);
                 Ok(Some(event))
             },
