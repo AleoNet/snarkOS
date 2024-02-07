@@ -86,3 +86,13 @@ version = "1.19"
 
 [dev-dependencies.tracing-test]
 version = "0.2"
+
+[dev-dependencies.snarkvm]
+workspace = true
+features = [ "test-helpers" ]
+
+[dev-dependencies.snarkos-node-bft-ledger-service]
+path = "../bft/ledger-service"
+version = "=2.2.7"
+default-features = false
+features = [ "test" ]
