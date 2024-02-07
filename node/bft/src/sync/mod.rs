@@ -347,7 +347,9 @@ impl<N: Network> Sync<N> {
             }
         }
         // Wait for the certificate to be fetched.
-        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
+        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY_IN_MS * 2), callback_receiver)
+            .await
+        {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
@@ -357,8 +359,12 @@ impl<N: Network> Sync<N> {
 
     /// Handles the incoming certificate request.
     fn send_certificate_response(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
-        // Attempt to retrieve the certificate.
-        if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
+        // Attempt to retrieve the certificate. First check the storage, then the ledger.
+        if let Some(certificate) = self
+            .storage
+            .get_certificate(request.certificate_id)
+            .or_else(|| self.ledger.get_batch_certificate(&request.certificate_id).ok())
+        {
             // Send the certificate response to the peer.
             let self_ = self.clone();
             tokio::spawn(async move {
