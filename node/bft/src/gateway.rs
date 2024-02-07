@@ -329,8 +329,7 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given address is an authorized validator.
     pub fn is_authorized_validator_address(&self, validator_address: Address<N>) -> bool {
-        // TODO (raychu86): How should we address the authorized validators now that we have committee lags.
-        // Determine if the validator address is a member of the previous or current committee.
+        // Determine if the validator address is a member of the previous committee with lag or the current committee.
         // We allow leniency in this validation check in order to accommodate these two scenarios:
         //  1. New validators should be able to connect immediately once bonded as a committee member.
         //  2. Existing validators must remain connected until they are no longer bonded as a committee member.
