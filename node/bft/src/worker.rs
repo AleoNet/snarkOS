@@ -420,6 +420,8 @@ impl<N: Network> Worker<N> {
             tokio::spawn(async move {
                 self_.gateway.send(peer_ip, Event::TransmissionResponse((transmission_id, transmission).into())).await;
             });
+        } else {
+            warn!("Failed to send transmission response to peer '{peer_ip}': Transmission '{transmission_id}' not found");
         }
     }
 
