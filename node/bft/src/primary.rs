@@ -552,6 +552,7 @@ impl<N: Network> Primary<N> {
 
         // If the peer is ahead, use the batch header to sync up to the peer.
         let transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
+        debug!("Synced transmissions for round {batch_round}");
 
         // Ensure the batch is for the current round.
         // This method must be called after fetching previous certificates (above),
@@ -562,8 +563,10 @@ impl<N: Network> Primary<N> {
         let storage = self.storage.clone();
         let header = batch_header.clone();
         let missing_transmissions = spawn_blocking!(storage.check_batch_header(&header, transmissions))?;
+        debug!("Determined missing transmissions for round {batch_round}");
         // Inserts the missing transmissions into the workers.
         self.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
+        debug!("Inserted missing transmissions into workers for round {batch_round}");
 
         /* Proceeding to sign the batch. */
 

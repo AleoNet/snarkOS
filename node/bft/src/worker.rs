@@ -281,7 +281,7 @@ impl<N: Network> Worker<N> {
         };
         // If the transmission ID and transmission type matches, then insert the transmission into the ready queue.
         if is_well_formed && self.ready.insert(transmission_id, transmission) {
-            trace!("Worker {} - Added transmission '{}' from '{peer_ip}'", self.id, fmt_id(transmission_id));
+            debug!("Worker {} - Added transmission '{}' from '{peer_ip}'", self.id, fmt_id(transmission_id));
         }
     }
 
@@ -331,7 +331,7 @@ impl<N: Network> Worker<N> {
         }
         // Adds the transaction to the ready queue.
         if self.ready.insert(&transaction_id, transmission) {
-            trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
+            debug!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
         }
         Ok(())
     }

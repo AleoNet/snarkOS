@@ -486,7 +486,7 @@ impl<N: Network> Gateway<N> {
         // Retrieve the event name.
         let name = event.name();
         // Send the event to the peer.
-        trace!("{CONTEXT} Sending '{name}' to '{peer_ip}'");
+        debug!("{CONTEXT} Sending '{name}' to '{peer_ip}'");
         let result = self.unicast(peer_addr, event);
         // If the event was unable to be sent, disconnect.
         if let Err(e) = &result {
@@ -538,7 +538,7 @@ impl<N: Network> Gateway<N> {
                 return Ok(());
             }
         }
-        trace!("{CONTEXT} Received '{}' from '{peer_ip}'", event.name());
+        debug!("{CONTEXT} Received '{}' from '{peer_ip}'", event.name());
 
         // This match statement handles the inbound event by deserializing the event,
         // checking the event is valid, and then calling the appropriate (trait) handler.
