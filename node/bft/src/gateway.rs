@@ -631,27 +631,27 @@ impl<N: Network> Gateway<N> {
                 bail!("{CONTEXT} {:?}", disconnect.reason)
             }
             Event::PrimaryPing(ping) => {
-                let PrimaryPing { version, block_locators, primary_certificate, batch_certificates } = ping;
+                // let PrimaryPing { version, block_locators, primary_certificate, batch_certificates } = ping;
 
-                // Ensure the event version is not outdated.
-                if version < Event::<N>::VERSION {
-                    bail!("Dropping '{peer_ip}' on event version {version} (outdated)");
-                }
+                // // Ensure the event version is not outdated.
+                // if version < Event::<N>::VERSION {
+                //     bail!("Dropping '{peer_ip}' on event version {version} (outdated)");
+                // }
 
-                // If a sync sender was provided, update the peer locators.
-                if let Some(sync_sender) = self.sync_sender.get() {
-                    // Check the block locators are valid, and update the validators in the sync module.
-                    if let Err(error) = sync_sender.update_peer_locators(peer_ip, block_locators).await {
-                        bail!("Validator '{peer_ip}' sent invalid block locators - {error}");
-                    }
-                }
+                // // If a sync sender was provided, update the peer locators.
+                // if let Some(sync_sender) = self.sync_sender.get() {
+                //     // Check the block locators are valid, and update the validators in the sync module.
+                //     if let Err(error) = sync_sender.update_peer_locators(peer_ip, block_locators).await {
+                //         bail!("Validator '{peer_ip}' sent invalid block locators - {error}");
+                //     }
+                // }
 
-                // Send the batch certificates to the primary.
-                let _ = self
-                    .primary_sender()
-                    .tx_primary_ping
-                    .send((peer_ip, primary_certificate, batch_certificates))
-                    .await;
+                // // Send the batch certificates to the primary.
+                // let _ = self
+                //     .primary_sender()
+                //     .tx_primary_ping
+                //     .send((peer_ip, primary_certificate, batch_certificates))
+                //     .await;
                 Ok(())
             }
             Event::TransmissionRequest(request) => {
