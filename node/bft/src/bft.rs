@@ -516,7 +516,7 @@ impl<N: Network> BFT<N> {
             for round in (self.dag.read().last_committed_round() + 2..=leader_round.saturating_sub(2)).rev().step_by(2)
             {
                 // Retrieve the previous committee for the leader round.
-                let previous_committee = match self.ledger().get_previous_committee_for_round(round) {
+                let previous_committee = match self.ledger().get_previous_committee_with_lag_for_round(round) {
                     Ok(committee) => committee,
                     Err(e) => {
                         bail!("BFT failed to retrieve the previous committee for the even round {round} - {e}");
