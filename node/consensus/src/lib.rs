@@ -101,7 +101,7 @@ impl<N: Network> Consensus<N> {
     }
 
     /// Run the consensus instance.
-    pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
+    pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>, dev: Option<u16>) -> Result<()> {
         info!("Starting the consensus instance...");
         // Set the primary sender.
         self.primary_sender.set(primary_sender.clone()).expect("Primary sender already set");
@@ -111,7 +111,7 @@ impl<N: Network> Consensus<N> {
         // Then, start the consensus handlers.
         self.start_handlers(consensus_receiver);
         // Lastly, the consensus.
-        self.bft.run(Some(consensus_sender), primary_sender, primary_receiver).await?;
+        self.bft.run(Some(consensus_sender), primary_sender, primary_receiver, dev).await?;
         Ok(())
     }
 
