@@ -494,44 +494,44 @@ impl<N: Network> BFT<N> {
     /// Commits the leader certificate, and all previous leader certificates since the last committed round.
     async fn commit_leader_certificate<const ALLOW_LEDGER_ACCESS: bool, const IS_SYNCING: bool>(
         &self,
-        root_leader_certificate: BatchCertificate<N>,
+        leader_certificate: BatchCertificate<N>,
         election_certificate_ids: IndexSet<Field<N>>,
     ) -> Result<()> {
         // Determine the list of all previous leader certificates since the last committed round.
         // The order of the leader certificates is from **newest** to **oldest**.
-        let mut leader_certificates = vec![root_leader_certificate.clone()];
+        let mut leader_certificates = vec![leader_certificate.clone()];
         {
-            // Retrieve the root leader round.
-            let root_leader_round = root_leader_certificate.round();
-            // Initialize the current leader certificate to the root leader certificate. This will be updated as we recurse through the root leader subDAG. 
-            let mut current_leader_certificate = root_leader_certificate; 
-            for round in (self.dag.read().last_committed_round() + 2..=root_leader_round.saturating_sub(2)).rev().step_by(2)
+            // Retrieve the leader round.
+            let leader_round = leader_certificate.round();
+
+            let mut current_leader_certificate = leader_certificate;
+            for round in (self.dag.read().last_committed_round() + 2..=leader_round.saturating_sub(2)).rev().step_by(2)
             {
-                // Retrieve the previous committee for the leader round. 
+                // Retrieve the previous committee for the leader round.
                 let previous_committee = match self.ledger().get_previous_committee_for_round(round) {
                     Ok(committee) => committee,
                     Err(e) => {
                         bail!("BFT failed to retrieve the previous committee for the even round {round} - {e}");
                     }
                 };
-                // Compute the leader address for the leader round. 
-                let previous_leader = match previous_committee.get_leader(round) {
+                // Compute the leader address for the leader round.
+                let leader = match previous_committee.get_leader(round) {
                     Ok(leader) => leader,
                     Err(e) => {
                         bail!("BFT failed to compute the leader for the even round {round} - {e}");
                     }
                 };
                 // Retrieve the previous leader certificate.
-                let Some(previous_leader_certificate) = self.dag.read().get_certificate_for_round_with_author(round, previous_leader)
+                let Some(previous_certificate) = self.dag.read().get_certificate_for_round_with_author(round, leader)
                 else {
                     continue;
                 };
                 // Determine if there is a path between the previous certificate and the current leader certificate.
-                if self.is_linked(previous_leader_certificate.clone(), current_leader_certificate.clone())? {
+                if self.is_linked(previous_certificate.clone(), current_leader_certificate.clone())? {
                     // Add the previous leader certificate to the list of certificates to commit.
-                    leader_certificates.push(previous_leader_certificate.clone());
+                    leader_certificates.push(previous_certificate.clone());
                     // Update the current leader certificate to the previous leader certificate.
-                    current_leader_certificate = previous_leader_certificate;
+                    current_leader_certificate = previous_certificate;
                 }
             }
         }
@@ -732,7 +732,7 @@ impl<N: Network> BFT<N> {
                 bail!("BFT failed to retrieve the certificates for past round {round}");
             };
             // Filter the certificates to only include those that are in the traversal.
-            traversal = certificates 
+            traversal = certificates
                 .into_values()
                 .filter(|p| traversal.iter().any(|c| c.previous_certificate_ids().contains(&p.id())))
                 .collect();
