@@ -154,7 +154,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         };
 
         // Get the previous round with lag.
-        let previous_round_with_lag = previous_round.saturating_sub(N::COMMITTEE_ROUND_LAG);
+        let previous_round_with_lag = previous_round.saturating_sub(Committee::<N>::COMMITTEE_LOOKBACK_RANGE);
 
         // Retrieve the committee for the previous round with lag.
         self.get_committee_for_round(previous_round_with_lag)
