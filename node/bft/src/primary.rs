@@ -95,6 +95,7 @@ pub struct Primary<N: Network> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The lock for propose_batch.
     propose_lock: Arc<TMutex<u64>>,
+    dev: Option<u16>,
 }
 
 impl<N: Network> Primary<N> {
@@ -108,9 +109,9 @@ impl<N: Network> Primary<N> {
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the gateway.
-        let gateway = Gateway::new(account, ledger.clone(), ip, trusted_validators, dev)?;
+        let gateway = Gateway::new(account, ledger.clone(), ip, trusted_validators, dev.clone())?;
         // Initialize the sync module.
-        let sync = Sync::new(gateway.clone(), storage.clone(), ledger.clone());
+        let sync = Sync::new(gateway.clone(), storage.clone(), ledger.clone(), dev.clone());
         // Initialize the primary instance.
         Ok(Self {
             sync,
@@ -123,6 +124,7 @@ impl<N: Network> Primary<N> {
             signed_proposals: Default::default(),
             handles: Default::default(),
             propose_lock: Default::default(),
+            dev, 
         })
     }
 
@@ -132,6 +134,7 @@ impl<N: Network> Primary<N> {
         bft_sender: Option<BFTSender<N>>,
         primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
+        dev: Option<u16>,
     ) -> Result<()> {
         info!("Starting the primary instance of the memory pool...");
 
@@ -175,7 +178,7 @@ impl<N: Network> Primary<N> {
         self.gateway.run(primary_sender, worker_senders, Some(sync_sender)).await;
         // Lastly, start the primary handlers.
         // Note: This ensures the primary does not start communicating before syncing is complete.
-        self.start_handlers(primary_receiver);
+        self.start_handlers(primary_receiver, dev);
 
         Ok(())
     }
@@ -475,7 +478,7 @@ impl<N: Network> Primary<N> {
             transmissions,
         )?;
         // Broadcast the batch to all validators for signing.
-        self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
+        self.gateway.broadcast(Event::BatchPropose(batch_header.clone().into()));
         // Set the proposed batch.
         *self.proposed_batch.write() = Some(proposal);
         Ok(())
@@ -810,7 +813,7 @@ impl<N: Network> Primary<N> {
 
 impl<N: Network> Primary<N> {
     /// Starts the primary handlers.
-    fn start_handlers(&self, primary_receiver: PrimaryReceiver<N>) {
+    fn start_handlers(&self, primary_receiver: PrimaryReceiver<N>, dev: Option<u16>) {
         let PrimaryReceiver {
             mut rx_batch_propose,
             mut rx_batch_signature,

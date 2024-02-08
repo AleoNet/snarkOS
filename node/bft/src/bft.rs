@@ -105,6 +105,7 @@ impl<N: Network> BFT<N> {
         consensus_sender: Option<ConsensusSender<N>>,
         primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
+        dev: Option<u16>,
     ) -> Result<()> {
         info!("Starting the BFT instance...");
         // Initialize the BFT channels.
@@ -112,7 +113,7 @@ impl<N: Network> BFT<N> {
         // First, start the BFT handlers.
         self.start_handlers(bft_receiver);
         // Next, run the primary instance.
-        self.primary.run(Some(bft_sender), primary_sender, primary_receiver).await?;
+        self.primary.run(Some(bft_sender), primary_sender, primary_receiver, dev).await?;
         // Lastly, set the consensus sender.
         // Note: This ensures during initial syncing, that the BFT does not advance the ledger.
         if let Some(consensus_sender) = consensus_sender {

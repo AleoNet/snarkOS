@@ -53,11 +53,12 @@ pub struct Sync<N: Network> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The sync lock.
     lock: Arc<TMutex<()>>,
+    dev: Option<u16>,
 }
 
 impl<N: Network> Sync<N> {
     /// Initializes a new sync instance.
-    pub fn new(gateway: Gateway<N>, storage: Storage<N>, ledger: Arc<dyn LedgerService<N>>) -> Self {
+    pub fn new(gateway: Gateway<N>, storage: Storage<N>, ledger: Arc<dyn LedgerService<N>>, dev: Option<u16>) -> Self {
         // Initialize the block sync module.
         let block_sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
         // Return the sync instance.
@@ -70,6 +71,7 @@ impl<N: Network> Sync<N> {
             bft_sender: Default::default(),
             handles: Default::default(),
             lock: Default::default(),
+            dev,
         }
     }
 
