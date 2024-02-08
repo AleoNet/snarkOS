@@ -22,6 +22,7 @@ use crate::{
     MAX_TRANSMISSIONS_PER_WORKER_PING,
     MAX_WORKERS,
 };
+use lru::LruCache;
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
@@ -33,7 +34,7 @@ use snarkvm::{
 };
 
 use indexmap::{IndexMap, IndexSet};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
@@ -51,6 +52,8 @@ pub struct Worker<N: Network> {
     ledger: Arc<dyn LedgerService<N>>,
     /// The proposed batch.
     proposed_batch: Arc<ProposedBatch<N>>,
+    /// The signed transmissions.
+    signed_transmissions: Arc<RwLock<LruCache<TransmissionID<N>, Transmission<N>>>>,
     /// The ready queue.
     ready: Ready<N>,
     /// The pending transmissions queue.
@@ -67,6 +70,7 @@ impl<N: Network> Worker<N> {
         storage: Storage<N>,
         ledger: Arc<dyn LedgerService<N>>,
         proposed_batch: Arc<ProposedBatch<N>>,
+        signed_transmissions: Arc<RwLock<LruCache<TransmissionID<N>, Transmission<N>>>>,
     ) -> Result<Self> {
         // Ensure the worker ID is valid.
         ensure!(id < MAX_WORKERS, "Invalid worker ID '{id}'");
@@ -77,6 +81,7 @@ impl<N: Network> Worker<N> {
             storage,
             ledger,
             proposed_batch,
+            signed_transmissions,
             ready: Default::default(),
             pending: Default::default(),
             handles: Default::default(),
@@ -166,13 +171,15 @@ impl<N: Network> Worker<N> {
         }
         // Check if the transmission ID exists in the proposed batch.
         if let Some(transmission) =
-            self.proposed_batch.read().as_ref().and_then(|p| {
-                debug!("searching through batch proposal for round {} transmissions {:?}", p.round(), p.transmissions());
-                p.get_transmission(transmission_id)
-            })
+            self.proposed_batch.read().as_ref().and_then(|p| p.get_transmission(transmission_id))
         {
             return Some(transmission.clone());
         }
+        // Check if the transmission ID exists in the signed transmissions.
+        if let Some(transmission) = self.signed_transmissions.write().get(&transmission_id) {
+            return Some(transmission.clone());
+        }
+        debug!("could not find tranmission id {}", transmission_id);
         None
     }
 
@@ -424,7 +431,9 @@ impl<N: Network> Worker<N> {
                 self_.gateway.send(peer_ip, Event::TransmissionResponse((transmission_id, transmission).into())).await;
             });
         } else {
-            warn!("Failed to send transmission response to peer '{peer_ip}': Transmission '{transmission_id}' not found");
+            warn!(
+                "Failed to send transmission response to peer '{peer_ip}': Transmission '{transmission_id}' not found"
+            );
         }
     }
 
@@ -458,7 +467,7 @@ mod tests {
     use bytes::Bytes;
     use indexmap::IndexMap;
     use mockall::mock;
-    use std::{io, ops::Range};
+    use std::{io, num::NonZeroUsize, ops::Range};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -533,7 +542,10 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
-        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let signed_transmissions =
+            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap())));
+        let worker =
+            Worker::new(0, Arc::new(gateway), storage, ledger, Default::default(), signed_transmissions).unwrap();
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
         let transmission_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -569,7 +581,10 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
-        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let signed_transmissions =
+            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap())));
+        let worker =
+            Worker::new(0, Arc::new(gateway), storage, ledger, Default::default(), signed_transmissions).unwrap();
         let transmission_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
         let worker_ = worker.clone();
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -605,7 +620,10 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
-        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let signed_transmissions =
+            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap())));
+        let worker =
+            Worker::new(0, Arc::new(gateway), storage, ledger, Default::default(), signed_transmissions).unwrap();
         let puzzle = PuzzleCommitment::from_g1_affine(rng.gen());
         let transmission_id = TransmissionID::Solution(puzzle);
         let worker_ = worker.clone();
@@ -643,7 +661,10 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
-        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let signed_transmissions =
+            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap())));
+        let worker =
+            Worker::new(0, Arc::new(gateway), storage, ledger, Default::default(), signed_transmissions).unwrap();
         let puzzle = PuzzleCommitment::from_g1_affine(rng.gen());
         let transmission_id = TransmissionID::Solution(puzzle);
         let worker_ = worker.clone();
@@ -681,7 +702,10 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
-        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let signed_transmissions =
+            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap())));
+        let worker =
+            Worker::new(0, Arc::new(gateway), storage, ledger, Default::default(), signed_transmissions).unwrap();
         let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
         let transmission_id = TransmissionID::Transaction(transaction_id);
         let worker_ = worker.clone();
@@ -719,7 +743,10 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
-        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let signed_transmissions =
+            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap())));
+        let worker =
+            Worker::new(0, Arc::new(gateway), storage, ledger, Default::default(), signed_transmissions).unwrap();
         let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
         let transmission_id = TransmissionID::Transaction(transaction_id);
         let worker_ = worker.clone();
@@ -740,6 +767,8 @@ mod tests {
 
 #[cfg(test)]
 mod prop_tests {
+    use std::num::NonZeroUsize;
+
     use super::*;
     use crate::Gateway;
     use snarkos_node_bft_ledger_service::MockLedgerService;
@@ -773,8 +802,11 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let committee = new_test_committee(4);
+        let signed_transmissions =
+            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap())));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(MockLedgerService::new(committee));
-        let worker = Worker::new(id, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let worker =
+            Worker::new(id, Arc::new(gateway), storage, ledger, Default::default(), signed_transmissions).unwrap();
         assert_eq!(worker.id(), id);
     }
 
@@ -786,7 +818,9 @@ mod prop_tests {
     ) {
         let committee = new_test_committee(4);
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(MockLedgerService::new(committee));
-        let worker = Worker::new(id, Arc::new(gateway), storage, ledger, Default::default());
+        let signed_transmissions =
+            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap())));
+        let worker = Worker::new(id, Arc::new(gateway), storage, ledger, Default::default(), signed_transmissions);
         // TODO once Worker implements Debug, simplify this with `unwrap_err`
         if let Err(error) = worker {
             assert_eq!(error.to_string(), format!("Invalid worker ID '{}'", id));

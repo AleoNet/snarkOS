@@ -1312,9 +1312,12 @@ mod prop_tests {
         helpers::{init_primary_channels, init_worker_channels, Storage},
         Gateway,
         Worker,
+        MAX_TRANSMISSIONS_PER_BATCH,
         MAX_WORKERS,
         MEMORY_POOL_PORT,
     };
+    use lru::LruCache;
+    use parking_lot::RwLock;
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_tcp::P2P;
@@ -1334,6 +1337,7 @@ mod prop_tests {
     use std::{
         fmt::{Debug, Formatter},
         net::{IpAddr, Ipv4Addr, SocketAddr},
+        num::NonZeroUsize,
         sync::Arc,
     };
     use test_strategy::proptest;
@@ -1481,9 +1485,17 @@ mod prop_tests {
                 let (tx_worker, rx_worker) = init_worker_channels();
                 // Construct the worker instance.
                 let ledger = Arc::new(MockLedgerService::new(committee.clone()));
-                let worker =
-                    Worker::new(id, Arc::new(gateway.clone()), worker_storage.clone(), ledger, Default::default())
-                        .unwrap();
+                let signed_transmissions =
+                    Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap())));
+                let worker = Worker::new(
+                    id,
+                    Arc::new(gateway.clone()),
+                    worker_storage.clone(),
+                    ledger,
+                    Default::default(),
+                    signed_transmissions,
+                )
+                .unwrap();
                 // Run the worker instance.
                 worker.run(rx_worker);
 

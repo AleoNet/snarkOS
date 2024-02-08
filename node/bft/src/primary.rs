@@ -58,11 +58,13 @@ use snarkvm::{
 use colored::Colorize;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::{IndexMap, IndexSet};
+use lru::LruCache;
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
     net::SocketAddr,
+    num::NonZeroUsize,
     sync::Arc,
     time::Duration,
 };
@@ -92,6 +94,8 @@ pub struct Primary<N: Network> {
     proposed_batch: Arc<ProposedBatch<N>>,
     /// The recently-signed batch proposals (a map from the address to the round, batch ID, and signature).
     signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, Field<N>, Signature<N>)>>>,
+    /// The recently-signed transmissions.
+    signed_transmissions: Arc<RwLock<LruCache<TransmissionID<N>, Transmission<N>>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The lock for propose_batch.
@@ -122,6 +126,9 @@ impl<N: Network> Primary<N> {
             bft_sender: Default::default(),
             proposed_batch: Default::default(),
             signed_proposals: Default::default(),
+            signed_transmissions: Arc::new(RwLock::new(LruCache::new(
+                NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
+            ))),
             handles: Default::default(),
             propose_lock: Default::default(),
         })
@@ -157,6 +164,7 @@ impl<N: Network> Primary<N> {
                 self.storage.clone(),
                 self.ledger.clone(),
                 self.proposed_batch.clone(),
+                self.signed_transmissions.clone(),
             )?;
             // Run the worker instance.
             worker.run(rx_worker);
@@ -682,7 +690,15 @@ impl<N: Network> Primary<N> {
             };
             // Retrieve the batch proposal, clearing the proposed batch.
             match proposed_batch.take() {
-                Some(proposal) => proposal,
+                Some(proposal) => {
+                    // Store the transmissions so they can still be retrieved by other validators.
+                    for transmission in proposal.transmissions() {
+                        self.signed_transmissions.write().put(*transmission.0, transmission.1.clone());
+                    }
+
+                    // Return the proposal.
+                    proposal
+                }
                 None => return Ok(()),
             }
         };
@@ -1103,9 +1119,13 @@ impl<N: Network> Primary<N> {
         // Check if the proposed batch is timed out or stale.
         let is_expired = match self.proposed_batch.read().as_ref() {
             Some(proposal) => {
-                debug!("proposed batch is expired - clearing it. proposal.round() < self.current_round() = {} < {}", proposal.round(), self.current_round());
+                debug!(
+                    "proposed batch is expired - clearing it. proposal.round() < self.current_round() = {} < {}",
+                    proposal.round(),
+                    self.current_round()
+                );
                 proposal.round() < self.current_round()
-            },
+            }
             None => false,
         };
         // If the batch is expired, clear the proposed batch.
@@ -1587,6 +1607,7 @@ mod tests {
             primary.storage.clone(),
             primary.ledger.clone(),
             primary.proposed_batch.clone(),
+            primary.signed_transmissions.clone(),
         )
         .unwrap()]);
         for a in accounts.iter() {

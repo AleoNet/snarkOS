@@ -21,7 +21,7 @@ use snarkvm::{
 use indexmap::{indexset, map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use tracing::error;
+use tracing::{debug, error};
 
 /// A BFT in-memory storage service.
 #[derive(Debug)]
@@ -112,6 +112,7 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
                     // Prepare the set of certificate IDs.
                     let certificate_ids = indexset! { certificate_id };
                     // Insert the transmission and a new set with the certificate ID.
+                    debug!("Inserting tranmission id to storage: {}", transmission_id);
                     vacant_entry.insert((transmission, certificate_ids));
                 }
             }
