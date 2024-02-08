@@ -723,7 +723,7 @@ impl<N: Network> BFT<N> {
             // Filter the certificates to only include those that are in the traversal.
             traversal = certificates
                 .into_values()
-                .filter(|c| traversal.iter().any(|p| p.previous_certificate_ids().contains(&c.id())))
+                .filter(|p| traversal.iter().any(|c| c.previous_certificate_ids().contains(&p.id())))
                 .collect();
         }
         Ok(traversal.contains(&previous_certificate))
