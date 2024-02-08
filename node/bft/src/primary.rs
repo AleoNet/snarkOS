@@ -517,11 +517,32 @@ impl<N: Network> Primary<N> {
         let transmission_ids = transmissions.keys().copied().collect();
         // Prepare the previous batch certificate IDs.
         let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
-        // Prepare the last election certificate IDs.
-        let last_election_certificate_ids = match self.bft_sender.get() {
-            Some(bft_sender) => bft_sender.get_last_election_certificate_ids().await?,
-            None => Default::default(),
-        };
+        
+        // Remove election certificates from Byzantine node and the asynchronous node. 
+        let mut last_election_certificate_ids = IndexSet::new(); 
+        if round >= 4 {
+            let mut BYZANTINE_LEADER_ROUND_4 = 0; 
+            let mut BYZANTINE_LEADER_ADDR_ROUND_4 = addr0; 
+            let committee_round_4 = self.ledger.get_previous_committee_with_lag_for_round(4)?;
+            let leader_result_round_4 = committee_round_4.get_leader(4);
+            match leader_result_round_4 {
+                Ok(leader) => {
+                    BYZANTINE_LEADER_ROUND_4 = *address_to_index_map.get(&leader).unwrap_or(&usize::MAX) as u16;
+                    BYZANTINE_LEADER_ADDR_ROUND_4 = committee.get_leader(4).unwrap_or_else(|_| addr0);
+                },
+                Err(e) => {
+                    info!("Error getting leader for round {}: {}", round, e);
+                },
+            }
+            if let Some(dev) = self.dev {
+                if (dev != BYZANTINE_LEADER_ROUND_4) && dev != (BYZANTINE_LEADER_ROUND_4 + 3) % 4 {
+                    last_election_certificate_ids = match self.bft_sender.get() {
+                        Some(bft_sender) => bft_sender.get_last_election_certificate_ids().await?,
+                        None => Default::default(),
+                    };
+                } 
+            }
+        }
         // Sign the batch header.
         let batch_header = spawn_blocking!(BatchHeader::new(
             &private_key,
