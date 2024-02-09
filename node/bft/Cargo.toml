@@ -20,6 +20,9 @@ edition = "2021"
 default = [ ]
 metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics" ]
 
+[dependencies.aleo-std]
+workspace = true
+
 [dependencies.anyhow]
 version = "1.0.79"
 
