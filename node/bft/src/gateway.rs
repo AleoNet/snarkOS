@@ -64,7 +64,14 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rand::seq::{IteratorRandom, SliceRandom};
-use std::{collections::{HashMap, HashSet}, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    future::Future,
+    io,
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
@@ -159,7 +166,7 @@ impl<N: Network> Gateway<N> {
             worker_senders: Default::default(),
             sync_sender: Default::default(),
             handles: Default::default(),
-            dev, 
+            dev,
         })
     }
 
@@ -962,17 +969,17 @@ impl<N: Network> Transport<N> for Gateway<N> {
     // TODO(ljedrz): the event should be checked for the presence of Data::Object, and
     // serialized in advance if it's there.
     fn broadcast(&self, event: Event<N>) {
-        // Initialize addresses and IPs for nodes in devnet. 
-        let addr0 = Address::from_str("aleo1rhgdu77hgyqd3xjj8ucu3jj9r2krwz6mnzyd80gncr5fxcwlh5rsvzp9px").unwrap(); 
-        let addr1 = Address::from_str("aleo1s3ws5tra87fjycnjrwsjcrnw2qxr8jfqqdugnf0xzqqw29q9m5pqem2u4t").unwrap(); 
-        let addr2 = Address::from_str("aleo1ashyu96tjwe63u0gtnnv8z5lhapdu4l5pjsl2kha7fv7hvz2eqxs5dz0rg").unwrap(); 
-        let addr3 = Address::from_str("aleo12ux3gdauck0v60westgcpqj7v8rrcr3v346e4jtq04q7kkt22czsh808v2").unwrap(); 
+        // Initialize addresses and IPs for nodes in devnet.
+        let addr0 = Address::from_str("aleo1rhgdu77hgyqd3xjj8ucu3jj9r2krwz6mnzyd80gncr5fxcwlh5rsvzp9px").unwrap();
+        let addr1 = Address::from_str("aleo1s3ws5tra87fjycnjrwsjcrnw2qxr8jfqqdugnf0xzqqw29q9m5pqem2u4t").unwrap();
+        let addr2 = Address::from_str("aleo1ashyu96tjwe63u0gtnnv8z5lhapdu4l5pjsl2kha7fv7hvz2eqxs5dz0rg").unwrap();
+        let addr3 = Address::from_str("aleo12ux3gdauck0v60westgcpqj7v8rrcr3v346e4jtq04q7kkt22czsh808v2").unwrap();
         let ip1 = SocketAddr::from_str("127.0.0.1:5001").unwrap();
         let ip0 = SocketAddr::from_str("127.0.0.1:5000").unwrap();
         let ip2 = SocketAddr::from_str("127.0.0.1:5002").unwrap();
         let ip3 = SocketAddr::from_str("127.0.0.1:5003").unwrap();
-        let addresses = [addr0, addr1, addr2, addr3]; 
-        let ips = [ip0, ip1, ip2, ip3]; 
+        let addresses = [addr0, addr1, addr2, addr3];
+        let ips = [ip0, ip1, ip2, ip3];
         let mut address_to_index_map: HashMap<Address<N>, usize> = HashMap::new();
         let mut index_to_ips_map: HashMap<u16, SocketAddr> = HashMap::new();
         for (index, &address) in addresses.iter().enumerate() {
@@ -981,33 +988,37 @@ impl<N: Network> Transport<N> for Gateway<N> {
         for (index, &ip) in ips.iter().enumerate() {
             index_to_ips_map.insert(index as u16, ip);
         }
-        // Byzantine leader selectively decides which nodes to send batch certificates to. 
+        // Byzantine leader selectively decides which nodes to send batch certificates to.
         if let Event::BatchCertified(batch_certified) = &event {
             if let Data::Object(certificate) = &batch_certified.certificate {
                 let round = certificate.batch_header().round();
-                if round == 4 || round == 5{ 
-                    let committee = match self.ledger.get_previous_committee_with_lag_for_round(4) {
+                if round == 4 || round == 5 {
+                    let committee = match self.ledger.get_previous_committee_for_round(4) {
                         Ok(committee) => committee,
                         Err(_) => {
                             error!("Failed to retrieve previous committee.");
-                            return; 
+                            return;
                         }
                     };
                     let BYZANTINE_LEADER_ADDR_ROUND_4 = committee.get_leader(4).unwrap_or_else(|_| addr0);
-                    let BYZANTINE_LEADER_ROUND_4 = *address_to_index_map.get(&BYZANTINE_LEADER_ADDR_ROUND_4).unwrap_or(&usize::MAX) as u16;
+                    let BYZANTINE_LEADER_ROUND_4 =
+                        *address_to_index_map.get(&BYZANTINE_LEADER_ADDR_ROUND_4).unwrap_or(&usize::MAX) as u16;
                     if let Some(dev) = self.dev {
                         if dev == BYZANTINE_LEADER_ROUND_4 {
                             let self_ = self.clone();
                             let connected_peers = self.connected_peers.read().clone();
-                            let index = ((BYZANTINE_LEADER_ROUND_4 + 3) % 4) as u16; 
-                            let peer_ip = *index_to_ips_map.get(&index).unwrap(); 
+                            let index = ((BYZANTINE_LEADER_ROUND_4 + 3) % 4) as u16;
+                            let peer_ip = *index_to_ips_map.get(&index).unwrap();
                             if connected_peers.contains(&peer_ip) {
                                 tokio::spawn(async move {
-                                    info!("Byzantine node {} is selectively sending to peer IP {}", BYZANTINE_LEADER_ROUND_4, peer_ip);
+                                    info!(
+                                        "Byzantine node {} is selectively sending to peer IP {}",
+                                        BYZANTINE_LEADER_ROUND_4, peer_ip
+                                    );
                                     let _ = Transport::send(&self_, peer_ip, event.clone()).await;
                                 });
                             } else {
-                                warn!("Peer ip {} is not in connected peers", peer_ip); 
+                                warn!("Peer ip {} is not in connected peers", peer_ip);
                             }
                         } else {
                             if self.number_of_connected_peers() > 0 {

@@ -124,7 +124,7 @@ impl<N: Network> Primary<N> {
             signed_proposals: Default::default(),
             handles: Default::default(),
             propose_lock: Default::default(),
-            dev, 
+            dev,
         })
     }
 
@@ -334,26 +334,26 @@ impl<N: Network> Primary<N> {
             bail!("Primary is safely skipping {}", format!("(round {round} was already certified)").dimmed());
         }
 
-        // Initialize addresses for nodes in devnet. 
-        let addr0 = Address::from_str("aleo1rhgdu77hgyqd3xjj8ucu3jj9r2krwz6mnzyd80gncr5fxcwlh5rsvzp9px").unwrap(); 
-        let addr1 = Address::from_str("aleo1s3ws5tra87fjycnjrwsjcrnw2qxr8jfqqdugnf0xzqqw29q9m5pqem2u4t").unwrap(); 
-        let addr2 = Address::from_str("aleo1ashyu96tjwe63u0gtnnv8z5lhapdu4l5pjsl2kha7fv7hvz2eqxs5dz0rg").unwrap(); 
-        let addr3 = Address::from_str("aleo12ux3gdauck0v60westgcpqj7v8rrcr3v346e4jtq04q7kkt22czsh808v2").unwrap(); 
-        let addresses = [addr0, addr1, addr2, addr3]; 
+        // Initialize addresses for nodes in devnet.
+        let addr0 = Address::from_str("aleo1rhgdu77hgyqd3xjj8ucu3jj9r2krwz6mnzyd80gncr5fxcwlh5rsvzp9px").unwrap();
+        let addr1 = Address::from_str("aleo1s3ws5tra87fjycnjrwsjcrnw2qxr8jfqqdugnf0xzqqw29q9m5pqem2u4t").unwrap();
+        let addr2 = Address::from_str("aleo1ashyu96tjwe63u0gtnnv8z5lhapdu4l5pjsl2kha7fv7hvz2eqxs5dz0rg").unwrap();
+        let addr3 = Address::from_str("aleo12ux3gdauck0v60westgcpqj7v8rrcr3v346e4jtq04q7kkt22czsh808v2").unwrap();
+        let addresses = [addr0, addr1, addr2, addr3];
         let mut address_to_index_map: HashMap<Address<N>, usize> = HashMap::new();
         for (index, &address) in addresses.iter().enumerate() {
             address_to_index_map.insert(address, index);
         }
-        let committee = self.ledger.get_previous_committee_with_lag_for_round(round)?;
+        let committee = self.ledger.get_previous_committee_for_round(round)?;
         let leader_result = committee.get_leader(round);
         match leader_result {
             Ok(leader) => {
                 let leader_index = *address_to_index_map.get(&leader).unwrap_or(&usize::MAX) as u16;
                 info!("\n\n The leader for round {} is {} \n", round, leader_index);
-            },
+            }
             Err(e) => {
                 info!("Error getting leader for round {}: {}", round, e);
-            },
+            }
         }
 
         // Compute the previous round.
@@ -361,20 +361,20 @@ impl<N: Network> Primary<N> {
         // Retrieve the previous certificates.
         let mut previous_certificates = self.storage.get_certificates_for_round(previous_round);
 
-        // Configure the state of the DAG for rounds 5 and 6. 
-        if round == 6 || round == 5{
-            let mut BYZANTINE_LEADER_ROUND_4 = 0; 
-            let mut BYZANTINE_LEADER_ADDR_ROUND_4 = addr0;  
-            let committee_round_4 = self.ledger.get_previous_committee_with_lag_for_round(4)?;
+        // Configure the state of the DAG for rounds 5 and 6.
+        if round == 6 || round == 5 {
+            let mut BYZANTINE_LEADER_ROUND_4 = 0;
+            let mut BYZANTINE_LEADER_ADDR_ROUND_4 = addr0;
+            let committee_round_4 = self.ledger.get_previous_committee_for_round(4)?;
             let leader_result_round_4 = committee_round_4.get_leader(4);
             match leader_result_round_4 {
                 Ok(leader) => {
                     BYZANTINE_LEADER_ROUND_4 = *address_to_index_map.get(&leader).unwrap_or(&usize::MAX) as u16;
-                    BYZANTINE_LEADER_ADDR_ROUND_4 = leader; 
-                },
+                    BYZANTINE_LEADER_ADDR_ROUND_4 = leader;
+                }
                 Err(e) => {
                     info!("Error getting leader for round {}: {}", round, e);
-                },
+                }
             }
             if round == 6 {
                 if let Some(dev) = self.dev {
@@ -383,7 +383,7 @@ impl<N: Network> Primary<N> {
                     }
                 }
             } else if round == 5 {
-                if let Some(dev) = self.dev{
+                if let Some(dev) = self.dev {
                     if dev == (BYZANTINE_LEADER_ROUND_4 + 1) % 4 {
                         previous_certificates.retain(|c| c.author() != BYZANTINE_LEADER_ADDR_ROUND_4);
                     } else if dev == (BYZANTINE_LEADER_ROUND_4 + 2) % 4 {
@@ -391,13 +391,12 @@ impl<N: Network> Primary<N> {
                     }
                 }
             }
-        } 
-        // Log previous certificates of primary in current round. 
-        for cert in previous_certificates.clone(){
-            let cert_author = cert.author(); 
+        }
+        // Log previous certificates of primary in current round.
+        for cert in previous_certificates.clone() {
+            let cert_author = cert.author();
             let index = *address_to_index_map.get(&cert_author).unwrap_or(&usize::MAX) as u16;
-            info!("Previous certificate author: {} ", index); 
-            
+            info!("Previous certificate author: {} ", index);
         }
 
         // Check if the primary is connected to enough validators to reach quorum threshold.
@@ -514,22 +513,22 @@ impl<N: Network> Primary<N> {
         let transmission_ids = transmissions.keys().copied().collect();
         // Prepare the previous batch certificate IDs.
         let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
-        
-        // Remove election certificates from Byzantine node and the asynchronous node. 
-        let mut last_election_certificate_ids = IndexSet::new(); 
+
+        // Remove election certificates from Byzantine node and the asynchronous node.
+        let mut last_election_certificate_ids = IndexSet::new();
         if round >= 4 {
-            let mut BYZANTINE_LEADER_ROUND_4 = 0; 
-            let mut BYZANTINE_LEADER_ADDR_ROUND_4 = addr0; 
-            let committee_round_4 = self.ledger.get_previous_committee_with_lag_for_round(4)?;
+            let mut BYZANTINE_LEADER_ROUND_4 = 0;
+            let mut BYZANTINE_LEADER_ADDR_ROUND_4 = addr0;
+            let committee_round_4 = self.ledger.get_previous_committee_for_round(4)?;
             let leader_result_round_4 = committee_round_4.get_leader(4);
             match leader_result_round_4 {
                 Ok(leader) => {
                     BYZANTINE_LEADER_ROUND_4 = *address_to_index_map.get(&leader).unwrap_or(&usize::MAX) as u16;
                     BYZANTINE_LEADER_ADDR_ROUND_4 = committee.get_leader(4).unwrap_or_else(|_| addr0);
-                },
+                }
                 Err(e) => {
                     info!("Error getting leader for round {}: {}", round, e);
-                },
+                }
             }
             if let Some(dev) = self.dev {
                 if (dev != BYZANTINE_LEADER_ROUND_4) && dev != (BYZANTINE_LEADER_ROUND_4 + 3) % 4 {
@@ -537,7 +536,7 @@ impl<N: Network> Primary<N> {
                         Some(bft_sender) => bft_sender.get_last_election_certificate_ids().await?,
                         None => Default::default(),
                     };
-                } 
+                }
             }
         }
         // Sign the batch header.
