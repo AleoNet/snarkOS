@@ -50,13 +50,13 @@ use aleo_std::StorageMode;
 /// A helper to log instructions to recover.
 pub fn log_clean_error(storage_mode: &StorageMode) {
     match storage_mode {
-        StorageMode::Custom(path) => {
-            error!("Storage corruption detected! Run `snarkos clean --path {}` to reset storage", path.display())
-        }
+        StorageMode::Production => error!("Storage corruption detected! Run `snarkos clean` to reset storage"),
         StorageMode::Development(id) => {
             error!("Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage")
         }
-        _ => error!("Storage corruption detected! Run `snarkos clean` to reset storage"),
+        StorageMode::Custom(path) => {
+            error!("Storage corruption detected! Run `snarkos clean --path {}` to reset storage", path.display())
+        }
     }
 }
 
