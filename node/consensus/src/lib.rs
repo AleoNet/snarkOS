@@ -93,10 +93,10 @@ impl<N: Network> Consensus<N> {
             bft,
             primary_sender: Default::default(),
             solutions_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
+                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
             ))),
             transactions_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
+                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
             ))),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
