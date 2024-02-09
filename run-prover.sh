@@ -39,7 +39,6 @@ while :
 do
   echo "Checking for updates..."
   git stash
-  rm Cargo.lock
   STATUS=$(git pull)
 
   if [ "$STATUS" != "Already up to date." ]; then
