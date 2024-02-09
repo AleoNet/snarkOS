@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Enable ports 4133 and 3033
-sudo ufw allow 4133
+# Enable ports 4133/tcp and 3033/tcp
 sudo ufw allow 4133/tcp
-sudo ufw allow 3033
 sudo ufw allow 3033/tcp
 
 # Enable ufw and reload
