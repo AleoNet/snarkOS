@@ -14,18 +14,9 @@
 
 use crate::{
     helpers::{
-        fmt_id,
-        init_bft_channels,
-        now,
-        BFTReceiver,
-        ConsensusSender,
-        PrimaryReceiver,
-        PrimarySender,
-        Storage,
-        DAG,
+        fmt_id, init_bft_channels, now, BFTReceiver, ConsensusSender, PrimaryReceiver, PrimarySender, Storage, DAG,
     },
-    Primary,
-    MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
+    Primary, MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -543,6 +534,10 @@ impl<N: Network> BFT<N> {
                     current_leader_certificate = previous_certificate;
                 }
             }
+        }
+
+        if leader_certificates.len() > 1 {
+            info!("\nCommitting {} leader certificates as separate blocks\n", leader_certificates.len());
         }
 
         // Iterate over the leader certificates to commit.
