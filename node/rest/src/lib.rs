@@ -36,22 +36,19 @@ use snarkvm::{
 use anyhow::Result;
 use axum::{
     body::Body,
-    error_handling::HandleErrorLayer,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
     http::{header::CONTENT_TYPE, Method, Request, StatusCode},
     middleware,
     middleware::Next,
     response::Response,
     routing::{get, post},
-    BoxError,
     Json,
 };
 use axum_extra::response::ErasedJson;
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, task::JoinHandle};
-use tower::ServiceBuilder;
-use tower_governor::{errors::display_error, governor::GovernorConfigBuilder, GovernorLayer};
+use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -115,6 +112,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             GovernorConfigBuilder::default()
                 .per_second(1)
                 .burst_size(rest_rps)
+                .error_handler(|error| Response::new(error.to_string()))
                 .finish()
                 .expect("Couldn't set up rate limiting for the REST server!"),
         );
@@ -156,6 +154,9 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/transaction/confirmed/:id", get(Self::get_confirmed_transaction))
             .route("/testnet3/transaction/broadcast", post(Self::transaction_broadcast))
 
+            // POST ../solution/broadcast
+            .route("/testnet3/solution/broadcast", post(Self::solution_broadcast))
+
             // GET ../find/..
             .route("/testnet3/find/blockHash/:tx_id", get(Self::find_block_hash))
             .route("/testnet3/find/transactionID/deployment/:program_id", get(Self::find_transaction_id_from_program_id))
@@ -192,18 +193,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .layer(cors)
             // Cap body size at 10MB.
             .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
-            .layer(
-                ServiceBuilder::new()
-                    // this middleware goes above `GovernorLayer` because it will receive
-                    // errors returned by `GovernorLayer`
-                    .layer(HandleErrorLayer::new(|e: BoxError| async move {
-                        display_error(e)
-                    }))
-                    .layer(GovernorLayer {
-                        // We can leak this because it is created only once and it persists.
-                        config: Box::leak(governor_config),
-                    }),
-            )
+            .layer(GovernorLayer {
+                // We can leak this because it is created only once and it persists.
+                config: Box::leak(governor_config),
+            })
         };
 
         let rest_listener = TcpListener::bind(rest_ip).await.unwrap();

@@ -31,6 +31,7 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
+use aleo_std::StorageMode;
 use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::Colorize;
@@ -123,6 +124,9 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage_path")]
+    pub storage_path: Option<PathBuf>,
 }
 
 impl Start {
@@ -220,7 +224,10 @@ impl Start {
                 // Parse the private key directly.
                 (Some(private_key), None) => Account::from_str(private_key.trim()),
                 // Parse the private key from a file.
-                (None, Some(path)) => Account::from_str(std::fs::read_to_string(path)?.trim()),
+                (None, Some(path)) => {
+                    check_permissions(path)?;
+                    Account::from_str(std::fs::read_to_string(path)?.trim())
+                }
                 // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
                 (None, None) => match self.client {
                     true => Account::new(&mut rand::thread_rng()),
@@ -439,12 +446,18 @@ impl Start {
             metrics::initialize_metrics();
         }
 
+        // Initialize the storage mode.
+        let storage_mode = match &self.storage_path {
+            Some(path) => StorageMode::Custom(path.clone()),
+            None => StorageMode::from(self.dev),
+        };
+
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
-            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
-            NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode).await,
+            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
+            NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }
     }
 
@@ -486,6 +499,26 @@ impl Start {
             .build()
             .expect("Failed to initialize a runtime for the router")
     }
+}
+
+fn check_permissions(path: &PathBuf) -> Result<(), snarkvm::prelude::Error> {
+    #[cfg(target_family = "unix")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        ensure!(path.exists(), "The file '{:?}' does not exist", path);
+        let parent = path.parent();
+        if let Some(parent) = parent {
+            let parent_permissions = parent.metadata()?.permissions().mode();
+            ensure!(
+                parent_permissions & 0o777 == 0o700,
+                "The folder {:?} must be readable only by the owner (0700)",
+                parent
+            );
+        }
+        let permissions = path.metadata()?.permissions().mode();
+        ensure!(permissions & 0o777 == 0o600, "The file {:?} must be readable only by the owner (0600)", path);
+    }
+    Ok(())
 }
 
 /// Loads or computes the genesis block.
@@ -543,7 +576,7 @@ fn load_or_compute_genesis<N: Network>(
     /* Otherwise, compute the genesis block and store it. */
 
     // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(Some(0))?)?;
     // Initialize the genesis block.
     let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng)?;
     // Write the genesis block to the file.

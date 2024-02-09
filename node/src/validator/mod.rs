@@ -40,6 +40,7 @@ use snarkvm::prelude::{
     Network,
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use core::future::Future;
 use parking_lot::Mutex;
@@ -81,7 +82,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
         // Prepare the shutdown flag.
         let shutdown: Arc<AtomicBool> = Default::default();
@@ -90,16 +91,16 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let signal_node = Self::handle_signals(shutdown.clone());
 
         // Initialize the ledger.
-        let ledger = Ledger::load(genesis, dev)?;
+        let ledger = Ledger::load(genesis, storage_mode.clone())?;
         // TODO: Remove me after Phase 3.
-        let ledger = crate::phase_3_reset(ledger, dev)?;
+        let ledger = crate::phase_3_reset(ledger, storage_mode.clone())?;
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
             if let Err((_, error)) =
                 snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone(), shutdown.clone()).await
             {
-                crate::log_clean_error(dev);
+                crate::log_clean_error(&storage_mode);
                 return Err(error);
             }
         }
@@ -110,7 +111,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service.clone());
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger_service, bft_ip, trusted_validators, dev)?;
+        let mut consensus =
+            Consensus::new(account.clone(), ledger_service, bft_ip, trusted_validators, storage_mode.clone())?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
@@ -123,7 +125,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
-            dev.is_some(),
+            matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
 
@@ -138,7 +140,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             shutdown,
         };
         // Initialize the transaction pool.
-        node.initialize_transaction_pool(dev)?;
+        node.initialize_transaction_pool(storage_mode)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
@@ -338,7 +340,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     // }
 
     /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self, dev: Option<u16>) -> Result<()> {
+    fn initialize_transaction_pool(&self, storage_mode: StorageMode) -> Result<()> {
         use snarkvm::console::{
             program::{Identifier, Literal, ProgramID, Value},
             types::U64,
@@ -349,15 +351,15 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let locator = (ProgramID::from_str("credits.aleo")?, Identifier::from_str("transfer_public")?);
 
         // Determine whether to start the loop.
-        match dev {
+        match storage_mode {
             // If the node is running in development mode, only generate if you are allowed.
-            Some(dev) => {
+            StorageMode::Development(id) => {
                 // If the node is not the first node, do not start the loop.
-                if dev != 0 {
+                if id != 0 {
                     return Ok(());
                 }
             }
-            None => {
+            _ => {
                 // Retrieve the genesis committee.
                 let Ok(Some(committee)) = self.ledger.get_committee_for_round(0) else {
                     // If the genesis committee is not available, do not start the loop.
@@ -470,7 +472,7 @@ mod tests {
         // Specify the node attributes.
         let node = SocketAddr::from_str("0.0.0.0:4133").unwrap();
         let rest = SocketAddr::from_str("0.0.0.0:3033").unwrap();
-        let dev = Some(0);
+        let storage_mode = StorageMode::Development(0);
 
         // Initialize an (insecure) fixed RNG.
         let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
@@ -493,7 +495,7 @@ mod tests {
             &[],
             genesis,
             None,
-            dev,
+            storage_mode,
         )
         .await
         .unwrap();

@@ -15,7 +15,6 @@
 #![allow(clippy::type_complexity)]
 
 use super::CurrentNetwork;
-
 use snarkvm::prelude::{block::Block, Ciphertext, Field, FromBytes, Network, Plaintext, PrivateKey, Record, ViewKey};
 
 use anyhow::{bail, ensure, Result};
@@ -26,12 +25,13 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+use zeroize::Zeroize;
 
 const MAX_BLOCK_RANGE: u32 = 50;
 const CDN_ENDPOINT: &str = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3";
 
 /// Scan the snarkOS node for records.
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Zeroize)]
 pub struct Scan {
     /// An optional private key scan for unspent records.
     #[clap(short, long)]

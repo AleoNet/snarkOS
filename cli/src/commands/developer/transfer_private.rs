@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use super::{CurrentNetwork, Developer};
-
 use snarkvm::prelude::{
     query::Query,
     store::{helpers::memory::ConsensusMemory, ConsensusStore},
@@ -24,9 +23,11 @@ use snarkvm::prelude::{
     VM,
 };
 
+use aleo_std::StorageMode;
 use anyhow::{bail, Result};
 use clap::Parser;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
+use zeroize::Zeroize;
 
 /// Executes the `transfer_private` function in the `credits.aleo` program.
 #[derive(Debug, Parser)]
@@ -61,6 +62,16 @@ pub struct TransferPrivate {
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage_path")]
+    pub storage_path: Option<PathBuf>,
+}
+
+impl Drop for TransferPrivate {
+    /// Zeroize the private key when the `TransferPrivate` struct goes out of scope.
+    fn drop(&mut self) {
+        self.private_key.zeroize();
+    }
 }
 
 impl TransferPrivate {
@@ -85,8 +96,14 @@ impl TransferPrivate {
             // Initialize an RNG.
             let rng = &mut rand::thread_rng();
 
+            // Initialize the storage.
+            let storage_mode = match &self.storage_path {
+                Some(path) => StorageMode::Custom(path.clone()),
+                None => StorageMode::Production,
+            };
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(storage_mode)?;
+
             // Initialize the VM.
-            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
 
             // Prepare the fee.
@@ -116,6 +133,6 @@ impl TransferPrivate {
         println!("✅ Created private transfer of {} microcredits to {}\n", &self.amount, self.recipient);
 
         // Determine if the transaction should be broadcast, stored, or displayed to the user.
-        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
+        Developer::handle_transaction(&self.broadcast, self.dry_run, &self.store, transaction, locator.to_string())
     }
 }

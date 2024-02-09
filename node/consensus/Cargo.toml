@@ -20,8 +20,11 @@ edition = "2021"
 default = [ ]
 metrics = [ "dep:metrics" ]
 
+[dependencies.aleo-std]
+workspace = true
+
 [dependencies.anyhow]
-version = "1.0.77"
+version = "1.0.79"
 
 [dependencies.colored]
 version = "2"

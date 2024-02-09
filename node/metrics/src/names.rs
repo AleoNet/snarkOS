@@ -29,9 +29,10 @@ pub(super) const GAUGE_NAMES: [&str; 12] = [
     tcp::TCP_TASKS,
 ];
 
-pub(super) const HISTOGRAM_NAMES: [&str; 6] = [
+pub(super) const HISTOGRAM_NAMES: [&str; 7] = [
     bft::COMMIT_ROUNDS_LATENCY,
     consensus::CERTIFICATE_COMMIT_LATENCY,
+    consensus::BLOCK_LATENCY,
     tcp::NOISE_CODEC_ENCRYPTION_TIME,
     tcp::NOISE_CODEC_DECRYPTION_TIME,
     tcp::NOISE_CODEC_ENCRYPTION_SIZE,
@@ -56,6 +57,7 @@ pub mod consensus {
     pub const CERTIFICATE_COMMIT_LATENCY: &str = "snarkos_consensus_certificate_commit_latency_secs";
     pub const COMMITTED_CERTIFICATES: &str = "snarkos_consensus_committed_certificates_total";
     pub const LAST_COMMITTED_ROUND: &str = "snarkos_consensus_last_committed_round";
+    pub const BLOCK_LATENCY: &str = "snarkos_consensus_block_latency_secs";
 }
 
 pub mod router {
