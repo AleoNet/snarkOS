@@ -34,19 +34,3 @@ trap exit_node SIGINT
 
 echo "Running an Aleo Prover node..."
 $COMMAND &
-
-while :
-do
-  echo "Checking for updates..."
-  git stash
-  rm Cargo.lock
-  STATUS=$(git pull)
-
-  if [ "$STATUS" != "Already up to date." ]; then
-    echo "Updated code found, rebuilding and relaunching prover"
-    cargo clean
-    kill -INT $!; sleep 2; $COMMAND &
-  fi
-
-  sleep 1800;
-done
