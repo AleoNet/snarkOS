@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use aleo_std::StorageMode;
-
 use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
@@ -37,8 +36,10 @@ impl Clean {
     /// Cleans the snarkOS node storage.
     pub fn parse(self) -> Result<String> {
         // Remove the specified ledger from storage.
-        let mode = if let Some(path) = self.path { StorageMode::Custom(path) } else { StorageMode::from(self.dev) };
-        Self::remove_ledger(self.network, mode)
+        Self::remove_ledger(self.network, match self.path {
+            Some(path) => StorageMode::Custom(path),
+            None => StorageMode::from(self.dev),
+        })
     }
 
     /// Removes the specified ledger from storage.
