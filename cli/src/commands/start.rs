@@ -356,14 +356,8 @@ impl Start {
                 bail!("Sum of committee stakes and public balances does not equal total starting supply.");
             }
 
-            // Initialize the storage mode.
-            let storage_mode = match &self.storage_path {
-                Some(path) => StorageMode::Custom(path.clone()),
-                None => StorageMode::Production,
-            };
-
             // Construct the genesis block.
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, storage_mode, &mut rng)
+            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
@@ -532,7 +526,6 @@ fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
-    storage_mode: StorageMode,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
@@ -583,7 +576,7 @@ fn load_or_compute_genesis<N: Network>(
     /* Otherwise, compute the genesis block and store it. */
 
     // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(storage_mode)?)?;
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(Some(0))?)?;
     // Initialize the genesis block.
     let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng)?;
     // Write the genesis block to the file.
