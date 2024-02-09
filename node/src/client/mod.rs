@@ -15,7 +15,6 @@
 mod router;
 
 use crate::traits::NodeInterface;
-use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_node_bft::ledger_service::CoreLedgerService;
 use snarkos_node_rest::Rest;
@@ -42,6 +41,7 @@ use snarkvm::{
     },
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use core::future::Future;
 use parking_lot::Mutex;
@@ -100,7 +100,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             if let Err((_, error)) =
                 snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone(), shutdown.clone()).await
             {
-                crate::log_clean_error(storage_mode);
+                crate::log_clean_error(&storage_mode);
                 return Err(error);
             }
         }

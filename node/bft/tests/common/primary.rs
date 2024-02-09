@@ -17,7 +17,6 @@ use crate::common::{
     CurrentNetwork,
     TranslucentLedgerService,
 };
-use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_node_bft::{
     helpers::{init_primary_channels, PrimarySender, Storage},
@@ -50,16 +49,16 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
+use aleo_std::StorageMode;
+use indexmap::IndexMap;
+use itertools::Itertools;
+use parking_lot::Mutex;
 use std::{
     collections::HashMap,
     ops::RangeBounds,
     sync::{Arc, OnceLock},
     time::Duration,
 };
-
-use indexmap::IndexMap;
-use itertools::Itertools;
-use parking_lot::Mutex;
 use tokio::{task::JoinHandle, time::sleep};
 use tracing::*;
 

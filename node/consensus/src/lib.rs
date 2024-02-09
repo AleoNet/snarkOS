@@ -17,7 +17,6 @@
 #[macro_use]
 extern crate tracing;
 
-use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_node_bft::{
     helpers::{
@@ -44,6 +43,7 @@ use snarkvm::{
     prelude::*,
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use colored::Colorize;
 use indexmap::IndexMap;
@@ -84,10 +84,10 @@ impl<N: Network> Consensus<N> {
         trusted_validators: &[SocketAddr],
         storage_mode: StorageMode,
     ) -> Result<Self> {
-        // Recover the dev id if present.
+        // Recover the development ID, if it is present.
         let dev = match storage_mode {
             StorageMode::Development(id) => Some(id),
-            _ => None,
+            StorageMode::Production | StorageMode::Custom(..) => None,
         };
         // Initialize the Narwhal transmissions.
         let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode)?);

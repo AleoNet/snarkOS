@@ -15,7 +15,6 @@
 mod router;
 
 use crate::traits::NodeInterface;
-use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_node_bft::ledger_service::ProverLedgerService;
 use snarkos_node_router::{
@@ -41,6 +40,7 @@ use snarkvm::{
     },
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};

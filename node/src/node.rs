@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use crate::{traits::NodeInterface, Client, Prover, Validator};
-use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_node_router::messages::NodeType;
 use snarkvm::prelude::{
@@ -25,6 +24,7 @@ use snarkvm::prelude::{
     ViewKey,
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
 

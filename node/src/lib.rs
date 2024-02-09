@@ -48,7 +48,7 @@ pub use traits::*;
 use aleo_std::StorageMode;
 
 /// A helper to log instructions to recover.
-pub fn log_clean_error(storage_mode: StorageMode) {
+pub fn log_clean_error(storage_mode: &StorageMode) {
     match storage_mode {
         StorageMode::Custom(path) => {
             error!("Storage corruption detected! Run `snarkos clean --path {}` to reset storage", path.display())
@@ -75,9 +75,9 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
     use core::str::FromStr;
 
     /// Removes the specified ledger from storage.
-    pub(crate) fn remove_ledger(network: u16, storage_mode: StorageMode) -> Result<String> {
+    pub(crate) fn remove_ledger(network: u16, storage_mode: &StorageMode) -> Result<String> {
         // Construct the path to the ledger in storage.
-        let mut path = aleo_std::aleo_ledger_dir(network, storage_mode);
+        let mut path = aleo_std::aleo_ledger_dir(network, storage_mode.clone());
 
         // Delete the parent folder.
         path.pop();
@@ -107,7 +107,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             drop(ledger);
             println!(
                 "{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n",
-                remove_ledger(N::ID, storage_mode.clone())?
+                remove_ledger(N::ID, &storage_mode)?
             );
             // Sleep for 5 seconds to allow the user to read the message.
             std::thread::sleep(std::time::Duration::from_secs(5));
@@ -119,7 +119,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             drop(ledger);
             println!(
                 "{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n",
-                remove_ledger(N::ID, storage_mode.clone())?
+                remove_ledger(N::ID, &storage_mode)?
             );
             // Sleep for 5 seconds to allow the user to read the message.
             std::thread::sleep(std::time::Duration::from_secs(5));
@@ -131,7 +131,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             drop(ledger);
             println!(
                 "{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n",
-                remove_ledger(N::ID, storage_mode.clone())?
+                remove_ledger(N::ID, &storage_mode)?
             );
             // Sleep for 5 seconds to allow the user to read the message.
             std::thread::sleep(std::time::Duration::from_secs(5));
@@ -143,7 +143,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             drop(ledger);
             println!(
                 "{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n",
-                remove_ledger(N::ID, storage_mode.clone())?
+                remove_ledger(N::ID, &storage_mode)?
             );
             // Sleep for 5 seconds to allow the user to read the message.
             std::thread::sleep(std::time::Duration::from_secs(5));
@@ -155,7 +155,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             drop(ledger);
             println!(
                 "{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n",
-                remove_ledger(N::ID, storage_mode.clone())?
+                remove_ledger(N::ID, &storage_mode)?
             );
             // Sleep for 5 seconds to allow the user to read the message.
             std::thread::sleep(std::time::Duration::from_secs(5));
@@ -167,7 +167,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             drop(ledger);
             println!(
                 "{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n",
-                remove_ledger(N::ID, storage_mode.clone())?
+                remove_ledger(N::ID, &storage_mode)?
             );
             // Sleep for 5 seconds to allow the user to read the message.
             std::thread::sleep(std::time::Duration::from_secs(5));
@@ -179,7 +179,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             drop(ledger);
             println!(
                 "{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n",
-                remove_ledger(N::ID, storage_mode.clone())?
+                remove_ledger(N::ID, &storage_mode)?
             );
             // Sleep for 5 seconds to allow the user to read the message.
             std::thread::sleep(std::time::Duration::from_secs(5));
@@ -191,7 +191,7 @@ pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
             drop(ledger);
             println!(
                 "{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n",
-                remove_ledger(N::ID, storage_mode.clone())?
+                remove_ledger(N::ID, &storage_mode)?
             );
             // Sleep for 5 seconds to allow the user to read the message.
             std::thread::sleep(std::time::Duration::from_secs(5));
