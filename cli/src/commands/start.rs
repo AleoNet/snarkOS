@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use aleo_std::StorageMode;
 use snarkos_account::Account;
 use snarkos_display::Display;
 use snarkos_node::{bft::MEMORY_POOL_PORT, router::messages::NodeType, Node};
@@ -32,6 +31,7 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
+use aleo_std::StorageMode;
 use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::Colorize;
@@ -356,13 +356,14 @@ impl Start {
                 bail!("Sum of committee stakes and public balances does not equal total starting supply.");
             }
 
-            // Construct the genesis block.
-            let mode = if let Some(path) = &self.storage_path {
-                StorageMode::Custom(path.clone())
-            } else {
-                StorageMode::Production
+            // Initialize the storage mode.
+            let storage_mode = match &self.storage_path {
+                Some(path) => StorageMode::Custom(path.clone()),
+                None => StorageMode::Production,
             };
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng, mode)
+
+            // Construct the genesis block.
+            load_or_compute_genesis(development_private_keys[0], committee, public_balances, storage_mode, &mut rng)
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
@@ -451,14 +452,13 @@ impl Start {
             metrics::initialize_metrics();
         }
 
-        // Obtain the storage mode.
-        let storage_mode = if let Some(path) = self.storage_path.take() {
-            StorageMode::Custom(path)
-        } else {
-            StorageMode::from(self.dev)
+        // Initialize the storage mode.
+        let storage_mode = match &self.storage_path {
+            Some(path) => StorageMode::Custom(path.clone()),
+            None => StorageMode::from(self.dev),
         };
-        // Initialize the node.
 
+        // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
             NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode).await,
@@ -532,8 +532,8 @@ fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
-    rng: &mut ChaChaRng,
     storage_mode: StorageMode,
+    rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
     let mut preimage = Vec::new();

@@ -15,7 +15,6 @@
 #![allow(clippy::type_complexity)]
 
 use super::CurrentNetwork;
-
 use snarkvm::prelude::{block::Block, Ciphertext, Field, FromBytes, Network, Plaintext, PrivateKey, Record, ViewKey};
 
 use anyhow::{bail, ensure, Result};

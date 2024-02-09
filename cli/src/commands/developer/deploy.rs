@@ -13,8 +13,6 @@
 // limitations under the License.
 
 use super::{CurrentAleo, CurrentNetwork, Developer};
-
-use aleo_std::StorageMode;
 use snarkvm::{
     console::program::ProgramOwner,
     prelude::{
@@ -28,6 +26,7 @@ use snarkvm::{
     },
 };
 
+use aleo_std::StorageMode;
 use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
@@ -77,7 +76,7 @@ impl Drop for Deploy {
 
 impl Deploy {
     /// Deploys an Aleo program.
-    pub fn parse(mut self) -> Result<String> {
+    pub fn parse(self) -> Result<String> {
         // Ensure that the user has specified an action.
         if !self.dry_run && self.broadcast.is_none() && self.store.is_none() {
             bail!("❌ Please specify one of the following actions: --broadcast, --dry-run, --store");
@@ -103,13 +102,14 @@ impl Deploy {
             // Initialize an RNG.
             let rng = &mut rand::thread_rng();
 
-            // Initialize the VM.
-            let storage_mode = if let Some(path) = self.storage_path.take() {
-                StorageMode::Custom(path)
-            } else {
-                StorageMode::Production
+            // Initialize the storage.
+            let storage_mode = match &self.storage_path {
+                Some(path) => StorageMode::Custom(path.clone()),
+                None => StorageMode::Production,
             };
             let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(storage_mode)?;
+
+            // Initialize the VM.
             let vm = VM::from(store)?;
 
             // Compute the minimum deployment cost.
