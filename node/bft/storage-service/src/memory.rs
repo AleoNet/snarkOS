@@ -131,11 +131,11 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
                 Entry::Occupied(mut occupied_entry) => {
                     let (_, certificate_ids) = occupied_entry.get_mut();
                     // Remove the certificate ID for the transmission ID.
-                    certificate_ids.remove(certificate_id);
+                    certificate_ids.swap_remove(certificate_id);
                     // If there are no more certificate IDs for the transmission ID, remove the transmission.
                     if certificate_ids.is_empty() {
                         // Remove the entry for the transmission ID.
-                        occupied_entry.remove();
+                        occupied_entry.shift_remove();
                     }
                 }
                 Entry::Vacant(_) => {}
