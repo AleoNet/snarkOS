@@ -504,7 +504,7 @@ impl<N: Network> BFT<N> {
             // Retrieve the leader round.
             let leader_round = leader_certificate.round();
 
-            let mut current_leader_certificate = leader_certificate;
+            let mut current_certificate = leader_certificate;
             for round in (self.dag.read().last_committed_round() + 2..=leader_round.saturating_sub(2)).rev().step_by(2)
             {
                 // Retrieve the previous committee for the leader round.
@@ -526,12 +526,12 @@ impl<N: Network> BFT<N> {
                 else {
                     continue;
                 };
-                // Determine if there is a path between the previous certificate and the current leader certificate.
-                if self.is_linked(previous_certificate.clone(), current_leader_certificate.clone())? {
+                // Determine if there is a path between the previous certificate and the current certificate.
+                if self.is_linked(previous_certificate.clone(), current_certificate.clone())? {
                     // Add the previous leader certificate to the list of certificates to commit.
                     leader_certificates.push(previous_certificate.clone());
-                    // Update the current leader certificate to the previous leader certificate.
-                    current_leader_certificate = previous_certificate;
+                    // Update the current certificate to the previous leader certificate.
+                    current_certificate = previous_certificate;
                 }
             }
         }
