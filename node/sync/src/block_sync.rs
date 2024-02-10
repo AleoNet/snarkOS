@@ -220,7 +220,9 @@ impl<N: Network> BlockSync<N> {
 
         // If there are no block requests, but there are pending block responses in the sync pool,
         // then try to advance the ledger using these pending block responses.
-        if block_requests.is_empty() && !self.responses.read().is_empty() {
+        // Note: This condition is guarded by `mode.is_router()` because validators sync blocks
+        // using another code path that updates both `storage` and `ledger` when advancing blocks.
+        if block_requests.is_empty() && !self.responses.read().is_empty() && self.mode.is_router() {
             // Retrieve the latest block height.
             let current_height = self.canon.latest_block_height();
             // Try to advance the ledger with the sync pool.
