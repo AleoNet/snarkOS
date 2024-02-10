@@ -291,13 +291,11 @@ impl<N: Network> BFT<N> {
             return false;
         }
 
-        // Retrieve the previous committee with lag of the current round.
-        let previous_committee_with_lag = match self.ledger().get_previous_committee_with_lag_for_round(current_round) {
+        // Retrieve the committee lookback of the current round.
+        let previous_committee_with_lag = match self.ledger().get_committee_lookback_for_round(current_round) {
             Ok(committee) => committee,
             Err(e) => {
-                error!(
-                    "BFT failed to retrieve the previous committee with lag for the even round {current_round} - {e}"
-                );
+                error!("BFT failed to retrieve the committee lookback for the even round {current_round} - {e}");
                 return false;
             }
         };
@@ -377,13 +375,11 @@ impl<N: Network> BFT<N> {
         let leader_certificate_id = leader_certificate.id();
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
-        // Retrieve the previous committee with lag for the current round.
-        let previous_committee_with_lag = match self.ledger().get_previous_committee_with_lag_for_round(current_round) {
+        // Retrieve the committee lookback for the current round.
+        let previous_committee_with_lag = match self.ledger().get_committee_lookback_for_round(current_round) {
             Ok(committee) => committee,
             Err(e) => {
-                error!(
-                    "BFT failed to retrieve the previous committee with lag for the odd round {current_round} - {e}"
-                );
+                error!("BFT failed to retrieve the committee lookback for the odd round {current_round} - {e}");
                 return false;
             }
         };
@@ -455,9 +451,8 @@ impl<N: Network> BFT<N> {
             return Ok(());
         }
 
-        // Retrieve the previous committee with lag for the commit round.
-        let Ok(previous_committee_with_lag) = self.ledger().get_previous_committee_with_lag_for_round(commit_round)
-        else {
+        // Retrieve the committee lookback for the commit round.
+        let Ok(previous_committee_with_lag) = self.ledger().get_committee_lookback_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee with lag for commit round {commit_round}");
         };
         // Compute the leader for the commit round.
@@ -516,7 +511,7 @@ impl<N: Network> BFT<N> {
             for round in (self.dag.read().last_committed_round() + 2..=leader_round.saturating_sub(2)).rev().step_by(2)
             {
                 // Retrieve the previous committee for the leader round.
-                let previous_committee = match self.ledger().get_previous_committee_with_lag_for_round(round) {
+                let previous_committee = match self.ledger().get_committee_lookback_for_round(round) {
                     Ok(committee) => committee,
                     Err(e) => {
                         bail!("BFT failed to retrieve the previous committee for the even round {round} - {e}");

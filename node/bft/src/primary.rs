@@ -286,9 +286,7 @@ impl<N: Network> Primary<N> {
             // TODO(ljedrz): the BatchHeader should be serialized only once in advance before being sent to non-signers.
             let event = Event::BatchPropose(proposal.batch_header().clone().into());
             // Iterate through the non-signers.
-            for address in
-                proposal.nonsigners(&self.ledger.get_previous_committee_with_lag_for_round(proposal.round())?)
-            {
+            for address in proposal.nonsigners(&self.ledger.get_committee_lookback_for_round(proposal.round())?) {
                 // Resolve the address to the peer IP.
                 match self.gateway.resolver().get_peer_ip_for_address(address) {
                     // Resend the batch proposal to the validator for signing.
@@ -337,7 +335,7 @@ impl<N: Network> Primary<N> {
         // Check if the primary is connected to enough validators to reach quorum threshold.
         {
             // Retrieve the committee to check against.
-            let committee_with_lag = self.ledger.get_previous_committee_with_lag_for_round(round)?;
+            let committee_with_lag = self.ledger.get_committee_lookback_for_round(round)?;
             // Retrieve the connected validator addresses.
             let mut connected_validators = self.gateway.connected_addresses();
             // Append the primary to the set.
@@ -363,10 +361,9 @@ impl<N: Network> Primary<N> {
         let mut is_ready = previous_round == 0;
         // If the previous round is not 0, check if the previous certificates have reached the quorum threshold.
         if previous_round > 0 {
-            // Retrieve the previous committee with lag for the round.
-            let Ok(previous_committee_with_lag) = self.ledger.get_previous_committee_with_lag_for_round(previous_round)
-            else {
-                bail!("Cannot propose a batch for round {round}: the previous committee with lag is not known yet")
+            // Retrieve the committee lookback for the round.
+            let Ok(previous_committee_with_lag) = self.ledger.get_committee_lookback_for_round(previous_round) else {
+                bail!("Cannot propose a batch for round {round}: the committee lookback is not known yet")
             };
             // Construct a set over the authors.
             let authors = previous_certificates.iter().map(BatchCertificate::author).collect();
@@ -470,11 +467,8 @@ impl<N: Network> Primary<N> {
             &mut rand::thread_rng()
         ))?;
         // Construct the proposal.
-        let proposal = Proposal::new(
-            self.ledger.get_previous_committee_with_lag_for_round(round)?,
-            batch_header.clone(),
-            transmissions,
-        )?;
+        let proposal =
+            Proposal::new(self.ledger.get_committee_lookback_for_round(round)?, batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
@@ -663,9 +657,8 @@ impl<N: Network> Primary<N> {
                             ),
                         }
                     }
-                    // Retrieve the previous committee with lag for the round.
-                    let previous_committee_with_lag =
-                        self.ledger.get_previous_committee_with_lag_for_round(proposal.round())?;
+                    // Retrieve the committee lookback for the round.
+                    let previous_committee_with_lag = self.ledger.get_committee_lookback_for_round(proposal.round())?;
                     // Retrieve the address of the validator.
                     let Some(signer) = self.gateway.resolver().get_address(peer_ip) else {
                         bail!("Signature is from a disconnected validator");
@@ -693,8 +686,8 @@ impl<N: Network> Primary<N> {
 
         info!("Quorum threshold reached - Preparing to certify our batch for round {}...", proposal.round());
 
-        // Retrieve the previous committee with lag for the round.
-        let previous_committee_with_lag = self.ledger.get_previous_committee_with_lag_for_round(proposal.round())?;
+        // Retrieve the committee lookback for the round.
+        let previous_committee_with_lag = self.ledger.get_committee_lookback_for_round(proposal.round())?;
         // Store the certified batch and broadcast it to all validators.
         // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
         if let Err(e) = self.store_and_broadcast_certificate(&proposal, &previous_committee_with_lag).await {
@@ -743,8 +736,8 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the current round.
         let current_round = self.current_round();
-        // Retrieve the previous committee with lag.
-        let previous_committee_with_lag = self.ledger.get_previous_committee_with_lag_for_round(current_round)?;
+        // Retrieve the committee lookback.
+        let previous_committee_with_lag = self.ledger.get_committee_lookback_for_round(current_round)?;
         // Retrieve the certificates.
         let certificates = self.storage.get_certificates_for_round(current_round);
         // Construct a set over the authors.
@@ -1302,7 +1295,7 @@ impl<N: Network> Primary<N> {
         let is_quorum_threshold_reached = {
             let certificates = self.storage.get_certificates_for_round(batch_round);
             let authors = certificates.iter().map(BatchCertificate::author).collect();
-            let previous_committee_with_lag = self.ledger.get_previous_committee_with_lag_for_round(batch_round)?;
+            let previous_committee_with_lag = self.ledger.get_committee_lookback_for_round(batch_round)?;
             previous_committee_with_lag.is_quorum_threshold_reached(&authors)
         };
 
