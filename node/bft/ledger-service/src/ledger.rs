@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{fmt_id, spawn_blocking, LedgerService};
+use crate::{spawn_blocking, LedgerService};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
@@ -183,18 +183,13 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction_data)) => {
                 match transaction_data.clone().deserialize_blocking() {
                     Ok(transaction) => {
-                        let deserialized_transaction_data = Data::Object(transaction);
+                        let deserialized_transaction = Data::Object(transaction);
 
                         // Check that the transaction is valid.
-                        if let Err(err) = self
-                            .check_transaction_basic(expected_transaction_id, deserialized_transaction_data.clone())
-                            .await
-                        {
-                            bail!("Failed to check transmission - {err}")
-                        }
+                        self.check_transaction_basic(expected_transaction_id, deserialized_transaction.clone()).await?;
 
                         // Update the transmission with the deserialized transaction.
-                        *transaction_data = deserialized_transaction_data;
+                        *transaction_data = deserialized_transaction;
                     }
                     Err(err) => {
                         bail!("Failed to deserialize transaction: {err}");
@@ -204,17 +199,13 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution_data)) => {
                 match solution_data.clone().deserialize_blocking() {
                     Ok(solution) => {
-                        let deserialized_solution_data = Data::Object(solution);
+                        let deserialized_solution = Data::Object(solution);
 
                         // Check that the solution is valid.
-                        if let Err(err) =
-                            self.check_solution_basic(expected_commitment, deserialized_solution_data.clone()).await
-                        {
-                            bail!("Failed to check transmission - {err}")
-                        }
+                        self.check_solution_basic(expected_commitment, deserialized_solution.clone()).await?;
 
                         // Update the transmission with the deserialized solution.
-                        *solution_data = deserialized_solution_data;
+                        *solution_data = deserialized_solution;
                     }
                     Err(err) => {
                         bail!("Failed to deserialize solution: {err}");
