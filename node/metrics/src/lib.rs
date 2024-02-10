@@ -19,18 +19,10 @@ pub use names::*;
 // Re-export the snarkVM metrics.
 pub use snarkvm::metrics::*;
 
-/// Initialises the metrics and returns a handle to the task running the metrics exporter.
-pub fn initialize_metrics() -> tokio::task::JoinHandle<()> {
-    use metrics_exporter_prometheus::PrometheusBuilder;
-
-    // Build the recorder and set as global.
-    let (recorder, exporter) = PrometheusBuilder::new().build().expect("can't build the prometheus exporter");
-    metrics::set_boxed_recorder(Box::new(recorder)).expect("can't set the prometheus exporter");
-
-    // Spawn a dedicated task for the exporter on the runtime.
-    let metrics_exporter_task = tokio::task::spawn(async move {
-        exporter.await.expect("can't await the prometheus exporter");
-    });
+/// Initializes the metrics and returns a handle to the task running the metrics exporter.
+pub fn initialize_metrics() {
+    // Build the Prometheus exporter.
+    metrics_exporter_prometheus::PrometheusBuilder::new().install().expect("can't build the prometheus exporter");
 
     // Register the snarkVM metrics.
     snarkvm::metrics::register_metrics();
@@ -45,7 +37,4 @@ pub fn initialize_metrics() -> tokio::task::JoinHandle<()> {
     for name in crate::names::HISTOGRAM_NAMES {
         register_histogram(name);
     }
-
-    // Return the exporter's task handle to be tracked by the node's task handling.
-    metrics_exporter_task
 }
