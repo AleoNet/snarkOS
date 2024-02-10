@@ -450,11 +450,6 @@ impl<N: Network> Primary<N> {
         let transmission_ids = transmissions.keys().copied().collect();
         // Prepare the previous batch certificate IDs.
         let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
-        // Prepare the last election certificate IDs.
-        let last_election_certificate_ids = match self.bft_sender.get() {
-            Some(bft_sender) => bft_sender.get_last_election_certificate_ids().await?,
-            None => Default::default(),
-        };
         // Sign the batch header.
         let batch_header = spawn_blocking!(BatchHeader::new(
             &private_key,
@@ -462,7 +457,6 @@ impl<N: Network> Primary<N> {
             now(),
             transmission_ids,
             previous_certificate_ids,
-            last_election_certificate_ids,
             &mut rand::thread_rng()
         ))?;
         // Construct the proposal.
@@ -1316,18 +1310,7 @@ impl<N: Network> Primary<N> {
             self.fetch_missing_previous_certificates(peer_ip, batch_header).await.map_err(|e| {
                 anyhow!("Failed to fetch missing previous certificates for round {batch_round} from '{peer_ip}' - {e}")
             })?;
-        // Ensure the primary has all of the election certificates.
-        let missing_election_certificates = match self.fetch_missing_election_certificates(peer_ip, batch_header).await
-        {
-            Ok(missing_election_certificates) => missing_election_certificates,
-            Err(e) => {
-                // TODO (howardwu): Change this to return early, once we have persistence on the election certificates.
-                error!("Failed to fetch missing election certificates for round {batch_round} from '{peer_ip}' - {e}");
-                // Note: We do not return early on error, because we can still proceed without the election certificates,
-                // albeit with reduced safety guarantees for commits. This is not a long-term solution.
-                Default::default()
-            }
-        };
+
         // Ensure the primary has all of the transmissions.
         let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await.map_err(|e| {
             anyhow!("Failed to fetch missing transmissions for round {batch_round} from '{peer_ip}' - {e}")
@@ -1335,11 +1318,6 @@ impl<N: Network> Primary<N> {
 
         // Iterate through the missing previous certificates.
         for batch_certificate in missing_previous_certificates {
-            // Store the batch certificate (recursively fetching any missing previous certificates).
-            self.sync_with_certificate_from_peer(peer_ip, batch_certificate).await?;
-        }
-        // Iterate through the missing election certificates.
-        for batch_certificate in missing_election_certificates {
             // Store the batch certificate (recursively fetching any missing previous certificates).
             self.sync_with_certificate_from_peer(peer_ip, batch_certificate).await?;
         }
@@ -1423,32 +1401,6 @@ impl<N: Network> Primary<N> {
         }
         // Return the missing previous certificates.
         Ok(missing_previous_certificates)
-    }
-
-    /// Fetches any missing election certificates for the specified batch header from the specified peer.
-    async fn fetch_missing_election_certificates(
-        &self,
-        peer_ip: SocketAddr,
-        batch_header: &BatchHeader<N>,
-    ) -> Result<HashSet<BatchCertificate<N>>> {
-        // Retrieve the round.
-        let round = batch_header.round();
-        // If the previous round is 0, or is <= the GC round, return early.
-        if round == 1 || round <= self.storage.gc_round() + 1 {
-            return Ok(Default::default());
-        }
-
-        // Fetch the missing election certificates.
-        let missing_election_certificates =
-            self.fetch_missing_certificates(peer_ip, round, batch_header.last_election_certificate_ids()).await?;
-        if !missing_election_certificates.is_empty() {
-            debug!(
-                "Fetched {} missing election certificates for round {round} from '{peer_ip}'",
-                missing_election_certificates.len(),
-            );
-        }
-        // Return the missing election certificates.
-        Ok(missing_election_certificates)
     }
 
     /// Fetches any missing certificates for the specified batch header from the specified peer.
@@ -1628,16 +1580,8 @@ mod tests {
         ]
         .into();
         // Sign the batch header.
-        let batch_header = BatchHeader::new(
-            private_key,
-            round,
-            timestamp,
-            transmission_ids,
-            previous_certificate_ids,
-            Default::default(),
-            rng,
-        )
-        .unwrap();
+        let batch_header =
+            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
         // Construct the proposal.
         Proposal::new(committee, batch_header, transmissions).unwrap()
     }
@@ -1704,16 +1648,8 @@ mod tests {
         ]
         .into();
 
-        let batch_header = BatchHeader::new(
-            private_key,
-            round,
-            timestamp,
-            transmission_ids,
-            previous_certificate_ids,
-            Default::default(),
-            rng,
-        )
-        .unwrap();
+        let batch_header =
+            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
         let signatures = peer_signatures_for_batch(primary_address, accounts, batch_header.batch_id(), rng);
         let certificate = BatchCertificate::<CurrentNetwork>::from(batch_header, signatures).unwrap();
         (certificate, transmissions)
