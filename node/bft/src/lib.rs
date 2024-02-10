@@ -56,7 +56,8 @@ pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 pub const MAX_WORKERS: u8 = 1; // worker(s)
 
 /// The frequency at which each primary broadcasts a ping to every other node.
-pub const PRIMARY_PING_IN_MS: u64 = 8 * MAX_BATCH_DELAY_IN_MS; // ms
+/// Note: If this is updated, be sure to update `MAX_BLOCKS_BEHIND` to correspond properly.
+pub const PRIMARY_PING_IN_MS: u64 = 4 * MAX_BATCH_DELAY_IN_MS; // ms
 /// The frequency at which each worker broadcasts a ping to every other node.
 pub const WORKER_PING_IN_MS: u64 = 4 * MAX_BATCH_DELAY_IN_MS; // ms
 
