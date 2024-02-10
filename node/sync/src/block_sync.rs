@@ -45,7 +45,7 @@ const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
 /// The maximum number of blocks tolerated before the primary is considered behind its peers.
-pub const MAX_BLOCKS_BEHIND: u32 = 2; // blocks
+pub const MAX_BLOCKS_BEHIND: u32 = 1; // blocks
 
 /// This is a dummy IP address that is used to represent the local node.
 /// Note: This here does not need to be a real IP address, but it must be unique/distinct from all other connections.

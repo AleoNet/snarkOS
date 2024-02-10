@@ -17,7 +17,7 @@ use crate::{
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
     ProposedBatch,
     Transport,
-    MAX_BATCH_DELAY_IN_MS,
+    MAX_FETCH_TIMEOUT_IN_MS,
     MAX_WORKERS,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -391,7 +391,7 @@ impl<N: Network> Worker<N> {
             bail!("Unable to fetch transmission - failed to send request")
         }
         // Wait for the transmission to be fetched.
-        match timeout(Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
+        match timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {
             // If the transmission was fetched, return it.
             Ok(result) => Ok((transmission_id, result?)),
             // If the transmission was not fetched, return an error.

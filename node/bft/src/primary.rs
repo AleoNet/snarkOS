@@ -750,34 +750,6 @@ impl<N: Network> Primary<N> {
         }
         Ok(())
     }
-
-    /// Processes a batch certificate from a primary ping.
-    ///
-    /// This method performs the following steps:
-    /// 1. Stores the given batch certificate, after ensuring it is valid.
-    /// 2. If there are enough certificates to reach quorum threshold for the current round,
-    ///  then proceed to advance to the next round.
-    async fn process_batch_certificate_from_ping(
-        &self,
-        peer_ip: SocketAddr,
-        certificate: BatchCertificate<N>,
-    ) -> Result<()> {
-        // Ensure storage does not already contain the certificate.
-        if self.storage.contains_certificate(certificate.id()) {
-            return Ok(());
-        }
-
-        // Ensure the batch certificate is from an authorized validator.
-        if !self.gateway.is_authorized_validator_ip(peer_ip) {
-            // Proceed to disconnect the validator.
-            self.gateway.disconnect(peer_ip);
-            bail!("Malicious peer - Received a batch certificate from an unauthorized validator IP ({peer_ip})");
-        }
-
-        // Store the certificate, after ensuring it is valid.
-        self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
-        Ok(())
-    }
 }
 
 impl<N: Network> Primary<N> {
@@ -841,30 +813,8 @@ impl<N: Network> Primary<N> {
                         }
                     };
 
-                    // Retrieve the batch certificates.
-                    let batch_certificates = {
-                        // Retrieve the current round.
-                        let current_round = self_.current_round();
-                        // Retrieve the batch certificates for the current round.
-                        let mut current_certificates = self_.storage.get_certificates_for_round(current_round);
-                        // If there are no batch certificates for the current round,
-                        // then retrieve the batch certificates for the previous round.
-                        if current_certificates.is_empty() {
-                            // Retrieve the previous round.
-                            let previous_round = current_round.saturating_sub(1);
-                            // Retrieve the batch certificates for the previous round.
-                            current_certificates = self_.storage.get_certificates_for_round(previous_round);
-                        }
-                        current_certificates
-                    };
-
                     // Construct the primary ping.
-                    let primary_ping = PrimaryPing::from((
-                        <Event<N>>::VERSION,
-                        block_locators,
-                        primary_certificate,
-                        batch_certificates,
-                    ));
+                    let primary_ping = PrimaryPing::from((<Event<N>>::VERSION, block_locators, primary_certificate));
                     // Broadcast the event.
                     self_.gateway.broadcast(Event::PrimaryPing(primary_ping));
                 }
@@ -874,7 +824,7 @@ impl<N: Network> Primary<N> {
         // Start the primary ping handler.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((peer_ip, primary_certificate, batch_certificates)) = rx_primary_ping.recv().await {
+            while let Some((peer_ip, primary_certificate)) = rx_primary_ping.recv().await {
                 // If the primary is not synced, then do not process the primary ping.
                 if !self_.sync.is_synced() {
                     trace!("Skipping a primary ping from '{peer_ip}' {}", "(node is syncing)".dimmed());
@@ -894,34 +844,6 @@ impl<N: Network> Primary<N> {
                         // Process the primary certificate.
                         if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, primary_certificate).await {
                             warn!("Cannot process a primary certificate in a 'PrimaryPing' from '{peer_ip}' - {e}");
-                        }
-                    });
-                }
-
-                // Iterate through the batch certificates.
-                for (certificate_id, certificate) in batch_certificates {
-                    // Ensure storage does not already contain the certificate.
-                    if self_.storage.contains_certificate(certificate_id) {
-                        continue;
-                    }
-                    // Spawn a task to process the batch certificate.
-                    let self_ = self_.clone();
-                    tokio::spawn(async move {
-                        // Deserialize the batch certificate in the primary ping.
-                        let Ok(batch_certificate) = spawn_blocking!(certificate.deserialize_blocking()) else {
-                            warn!("Failed to deserialize batch certificate in a 'PrimaryPing' from '{peer_ip}'");
-                            return;
-                        };
-                        // Ensure the batch certificate ID matches.
-                        if batch_certificate.id() != certificate_id {
-                            warn!("Batch certificate ID mismatch in a 'PrimaryPing' from '{peer_ip}'");
-                            // Proceed to disconnect the validator.
-                            self_.gateway.disconnect(peer_ip);
-                            return;
-                        }
-                        // Process the batch certificate.
-                        if let Err(e) = self_.process_batch_certificate_from_ping(peer_ip, batch_certificate).await {
-                            warn!("Cannot process a batch certificate in a 'PrimaryPing' from '{peer_ip}' - {e}");
                         }
                     });
                 }
