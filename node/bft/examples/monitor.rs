@@ -14,6 +14,7 @@
 
 use axum::{routing::get, Router};
 use std::net::SocketAddr;
+use tokio::net::TcpListener;
 use tower_http::services::{ServeDir, ServeFile};
 
 const SERVER_URL: &str = "127.0.0.1:6060";
@@ -27,10 +28,9 @@ async fn start_server() {
 
     // Run the server.
     println!("Starting server at '{SERVER_URL}'...");
-    axum::Server::bind(&SERVER_URL.parse().unwrap())
-        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-        .await
-        .unwrap();
+    let rest_addr: SocketAddr = SERVER_URL.parse().unwrap();
+    let rest_listener = TcpListener::bind(rest_addr).await.unwrap();
+    axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
 }
 
 #[tokio::main]

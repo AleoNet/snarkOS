@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use super::CurrentNetwork;
-
 use snarkvm::{
     console::program::Ciphertext,
     prelude::{Record, ViewKey},
@@ -22,9 +21,10 @@ use snarkvm::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use std::str::FromStr;
+use zeroize::Zeroize;
 
 /// Decrypts a record ciphertext.
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Zeroize)]
 pub struct Decrypt {
     /// The record ciphertext to decrypt.
     #[clap(short, long)]

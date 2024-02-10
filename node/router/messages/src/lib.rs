@@ -185,21 +185,26 @@ impl<N: Network> FromBytes for Message<N> {
 
         // Deserialize the data field.
         let message = match id {
-            0 => Self::BlockRequest(BlockRequest::read_le(reader)?),
-            1 => Self::BlockResponse(BlockResponse::read_le(reader)?),
-            2 => Self::ChallengeRequest(ChallengeRequest::read_le(reader)?),
-            3 => Self::ChallengeResponse(ChallengeResponse::read_le(reader)?),
-            4 => Self::Disconnect(Disconnect::read_le(reader)?),
-            5 => Self::PeerRequest(PeerRequest::read_le(reader)?),
-            6 => Self::PeerResponse(PeerResponse::read_le(reader)?),
-            7 => Self::Ping(Ping::read_le(reader)?),
-            8 => Self::Pong(Pong::read_le(reader)?),
-            9 => Self::PuzzleRequest(PuzzleRequest::read_le(reader)?),
-            10 => Self::PuzzleResponse(PuzzleResponse::read_le(reader)?),
-            11 => Self::UnconfirmedSolution(UnconfirmedSolution::read_le(reader)?),
-            12 => Self::UnconfirmedTransaction(UnconfirmedTransaction::read_le(reader)?),
+            0 => Self::BlockRequest(BlockRequest::read_le(&mut reader)?),
+            1 => Self::BlockResponse(BlockResponse::read_le(&mut reader)?),
+            2 => Self::ChallengeRequest(ChallengeRequest::read_le(&mut reader)?),
+            3 => Self::ChallengeResponse(ChallengeResponse::read_le(&mut reader)?),
+            4 => Self::Disconnect(Disconnect::read_le(&mut reader)?),
+            5 => Self::PeerRequest(PeerRequest::read_le(&mut reader)?),
+            6 => Self::PeerResponse(PeerResponse::read_le(&mut reader)?),
+            7 => Self::Ping(Ping::read_le(&mut reader)?),
+            8 => Self::Pong(Pong::read_le(&mut reader)?),
+            9 => Self::PuzzleRequest(PuzzleRequest::read_le(&mut reader)?),
+            10 => Self::PuzzleResponse(PuzzleResponse::read_le(&mut reader)?),
+            11 => Self::UnconfirmedSolution(UnconfirmedSolution::read_le(&mut reader)?),
+            12 => Self::UnconfirmedTransaction(UnconfirmedTransaction::read_le(&mut reader)?),
             13.. => return Err(error("Unknown message ID {id}")),
         };
+
+        // Ensure that there are no "dangling" bytes.
+        if reader.bytes().next().is_some() {
+            return Err(error("Leftover bytes in a Message"));
+        }
 
         Ok(message)
     }

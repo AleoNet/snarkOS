@@ -20,8 +20,11 @@ edition = "2021"
 default = [ ]
 metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics" ]
 
+[dependencies.aleo-std]
+workspace = true
+
 [dependencies.anyhow]
-version = "1.0.70"
+version = "1.0.79"
 
 [dependencies.async-recursion]
 version = "1.0"
@@ -36,7 +39,7 @@ version = "1"
 version = "2"
 
 [dependencies.futures]
-version = "0.3.29"
+version = "0.3.30"
 features = [ "thread-pool" ]
 
 [dependencies.indexmap]
@@ -115,10 +118,10 @@ features = [ "codec" ]
 version = "0.1"
 
 [dev-dependencies.axum]
-version = "0.6"
+version = "0.7"
 
 [dev-dependencies.axum-extra]
-version = "0.8.0"
+version = "0.9"
 default-features = false
 features = [ "erased-json" ]
 
@@ -166,7 +169,7 @@ features = [ "test-helpers" ]
 version = "0.3.1"
 
 [dev-dependencies.tower-http]
-version = "0.4"
+version = "0.5"
 features = [ "fs", "trace" ]
 
 [dev-dependencies.tracing-subscriber]
@@ -177,4 +180,4 @@ features = [ "env-filter" ]
 version = "0.1"
 
 [dev-dependencies.mockall]
-version = "0.12.0"
+version = "0.12.1"

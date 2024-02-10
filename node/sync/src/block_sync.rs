@@ -40,7 +40,7 @@ pub const REDUNDANCY_FACTOR: usize = 3;
 const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
 const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
-const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
+const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 60; // 60 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
@@ -218,6 +218,20 @@ impl<N: Network> BlockSync<N> {
         let block_requests = self.prepare_block_requests();
         trace!("Prepared {} block requests", block_requests.len());
 
+        // If there are no block requests, but there are pending block responses in the sync pool,
+        // then try to advance the ledger using these pending block responses.
+        // Note: This condition is guarded by `mode.is_router()` because validators sync blocks
+        // using another code path that updates both `storage` and `ledger` when advancing blocks.
+        if block_requests.is_empty() && !self.responses.read().is_empty() && self.mode.is_router() {
+            // Retrieve the latest block height.
+            let current_height = self.canon.latest_block_height();
+            // Try to advance the ledger with the sync pool.
+            trace!("No block requests to send - try advancing with block responses (at block {current_height})");
+            self.try_advancing_with_block_responses(current_height);
+            // Return early.
+            return;
+        }
+
         // Process the block requests.
         'outer: for (height, (hash, previous_hash, sync_ips)) in block_requests {
             // Insert the block request into the sync pool.
@@ -281,8 +295,14 @@ impl<N: Network> BlockSync<N> {
         };
 
         // Retrieve the latest block height.
-        let mut current_height = self.canon.latest_block_height();
+        let current_height = self.canon.latest_block_height();
         // Try to advance the ledger with the sync pool.
+        self.try_advancing_with_block_responses(current_height);
+        Ok(())
+    }
+
+    /// Handles the block responses from the sync pool.
+    fn try_advancing_with_block_responses(&self, mut current_height: u32) {
         while let Some(block) = self.remove_block_response(current_height + 1) {
             // Ensure the block height matches.
             if block.height() != current_height + 1 {
@@ -302,7 +322,6 @@ impl<N: Network> BlockSync<N> {
             // Update the latest height.
             current_height = self.canon.latest_block_height();
         }
-        Ok(())
     }
 }
 
@@ -377,11 +396,11 @@ impl<N: Network> BlockSync<N> {
     /// Removes the peer from the sync pool, if they exist.
     pub fn remove_peer(&self, peer_ip: &SocketAddr) {
         // Remove the locators entry for the given peer IP.
-        self.locators.write().remove(peer_ip);
+        self.locators.write().swap_remove(peer_ip);
         // Remove all block requests to the peer.
         self.remove_block_requests_to_peer(peer_ip);
         // Remove the timeouts for the peer.
-        self.request_timeouts.write().remove(peer_ip);
+        self.request_timeouts.write().swap_remove(peer_ip);
     }
 }
 
@@ -450,7 +469,7 @@ impl<N: Network> BlockSync<N> {
 
         // Remove the peer IP from the request entry.
         if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
-            sync_ips.remove(&peer_ip);
+            sync_ips.swap_remove(&peer_ip);
         }
 
         // Acquire the write lock on the responses map.
@@ -548,6 +567,8 @@ impl<N: Network> BlockSync<N> {
         }
         // Remove the request entry for the given height.
         requests.remove(&height);
+        // Remove the request timestamp entry for the given height.
+        self.request_timestamps.write().remove(&height);
         // Remove the response entry for the given height.
         self.responses.write().remove(&height)
     }
@@ -560,7 +581,7 @@ impl<N: Network> BlockSync<N> {
         // Remove the peer IP from the request entry. If the request entry is now empty,
         // and the response entry for this height is also empty, then remove the request entry altogether.
         if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
-            sync_ips.remove(peer_ip);
+            sync_ips.swap_remove(peer_ip);
             can_revoke &= sync_ips.is_empty();
         }
 
@@ -572,6 +593,7 @@ impl<N: Network> BlockSync<N> {
 
     /// Removes all block requests for the given peer IP.
     fn remove_block_requests_to_peer(&self, peer_ip: &SocketAddr) {
+        trace!("Block sync is removing all block requests to peer {peer_ip}...");
         // Acquire the write lock on the requests map.
         let mut requests = self.requests.write();
         // Acquire the read lock on the responses map.
@@ -580,7 +602,7 @@ impl<N: Network> BlockSync<N> {
         // Remove the peer IP from the requests map. If any request entry is now empty,
         // and its corresponding response entry is also empty, then remove that request entry altogether.
         requests.retain(|height, (_, _, peer_ips)| {
-            peer_ips.remove(peer_ip);
+            peer_ips.swap_remove(peer_ip);
 
             let retain = !peer_ips.is_empty() || responses.get(height).is_some();
             if !retain {

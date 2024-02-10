@@ -20,14 +20,13 @@ edition = "2021"
 default = [ "snarkos-node/metrics" ]
 
 [dependencies.aleo-std]
-version = "0.1.18"
-default-features = false
+workspace = true
 
 [dependencies.anstyle]
 version = "1"
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0.79"
 
 [dependencies.bincode]
 version = "1.0"
@@ -117,6 +116,10 @@ features = [ "env-filter" ]
 
 [dependencies.ureq]
 version = "2.9"
+
+[dependencies.zeroize]
+version = "1"
+features = [ "derive" ]
 
 [target."cfg(target_family = \"unix\")".dependencies.nix]
 version = "0.26"

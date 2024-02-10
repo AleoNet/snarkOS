@@ -15,7 +15,7 @@ keywords = [
 categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
-rust-version = "1.66"
+rust-version = "1.74.1"
 
 [workspace]
 members = [
@@ -40,8 +40,14 @@ members = [
   ".integration"
 ]
 
+[workspace.dependencies.aleo-std]
+version = "=0.1.24"
+default-features = false
+
 [workspace.dependencies.snarkvm]
-version = "=0.16.15"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "2127981"
+#version = "=0.16.18"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
@@ -53,11 +59,14 @@ jemalloc = [ "tikv-jemallocator" ]
 metrics = [ "snarkos-node-metrics", "snarkos-node/metrics" ]
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0.79"
 
 [dependencies.clap]
 version = "4.4"
 features = [ "derive" ]
+
+[dependencies.crossterm]
+version = "0.27.0"
 
 [dependencies.once_cell]
 version = "1"

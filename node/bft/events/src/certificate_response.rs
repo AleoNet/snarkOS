@@ -108,8 +108,12 @@ pub mod prop_tests {
         any::<CommitteeContext>()
             .prop_flat_map(|committee| (Just(committee.clone()), any_batch_header(&committee)))
             .prop_map(|(committee, batch_header)| {
-                let CommitteeContext(_, validator_set) = committee;
+                let CommitteeContext(_, mut validator_set) = committee;
                 let mut rng = TestRng::default();
+
+                // Remove the author from the validator set passed to create the batch
+                // certificate, the author should not sign their own batch.
+                validator_set.0.retain(|v| v.address != batch_header.author());
                 BatchCertificate::from(batch_header.clone(), sign_batch_header(&validator_set, &batch_header, &mut rng))
                     .unwrap()
             })

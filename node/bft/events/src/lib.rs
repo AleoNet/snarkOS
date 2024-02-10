@@ -199,24 +199,29 @@ impl<N: Network> FromBytes for Event<N> {
 
         // Deserialize the data field.
         let event = match id {
-            0 => Self::BatchPropose(BatchPropose::read_le(reader)?),
-            1 => Self::BatchSignature(BatchSignature::read_le(reader)?),
-            2 => Self::BatchCertified(BatchCertified::read_le(reader)?),
-            3 => Self::BlockRequest(BlockRequest::read_le(reader)?),
-            4 => Self::BlockResponse(BlockResponse::read_le(reader)?),
-            5 => Self::CertificateRequest(CertificateRequest::read_le(reader)?),
-            6 => Self::CertificateResponse(CertificateResponse::read_le(reader)?),
-            7 => Self::ChallengeRequest(ChallengeRequest::read_le(reader)?),
-            8 => Self::ChallengeResponse(ChallengeResponse::read_le(reader)?),
-            9 => Self::Disconnect(Disconnect::read_le(reader)?),
-            10 => Self::PrimaryPing(PrimaryPing::read_le(reader)?),
-            11 => Self::TransmissionRequest(TransmissionRequest::read_le(reader)?),
-            12 => Self::TransmissionResponse(TransmissionResponse::read_le(reader)?),
-            13 => Self::ValidatorsRequest(ValidatorsRequest::read_le(reader)?),
-            14 => Self::ValidatorsResponse(ValidatorsResponse::read_le(reader)?),
-            15 => Self::WorkerPing(WorkerPing::read_le(reader)?),
+            0 => Self::BatchPropose(BatchPropose::read_le(&mut reader)?),
+            1 => Self::BatchSignature(BatchSignature::read_le(&mut reader)?),
+            2 => Self::BatchCertified(BatchCertified::read_le(&mut reader)?),
+            3 => Self::BlockRequest(BlockRequest::read_le(&mut reader)?),
+            4 => Self::BlockResponse(BlockResponse::read_le(&mut reader)?),
+            5 => Self::CertificateRequest(CertificateRequest::read_le(&mut reader)?),
+            6 => Self::CertificateResponse(CertificateResponse::read_le(&mut reader)?),
+            7 => Self::ChallengeRequest(ChallengeRequest::read_le(&mut reader)?),
+            8 => Self::ChallengeResponse(ChallengeResponse::read_le(&mut reader)?),
+            9 => Self::Disconnect(Disconnect::read_le(&mut reader)?),
+            10 => Self::PrimaryPing(PrimaryPing::read_le(&mut reader)?),
+            11 => Self::TransmissionRequest(TransmissionRequest::read_le(&mut reader)?),
+            12 => Self::TransmissionResponse(TransmissionResponse::read_le(&mut reader)?),
+            13 => Self::ValidatorsRequest(ValidatorsRequest::read_le(&mut reader)?),
+            14 => Self::ValidatorsResponse(ValidatorsResponse::read_le(&mut reader)?),
+            15 => Self::WorkerPing(WorkerPing::read_le(&mut reader)?),
             16.. => return Err(error("Unknown event ID {id}")),
         };
+
+        // Ensure that there are no "dangling" bytes.
+        if reader.bytes().next().is_some() {
+            return Err(error("Leftover bytes in an Event"));
+        }
 
         Ok(event)
     }
