@@ -124,8 +124,8 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Transmission '{transmission_id}' does not exist in prover")
     }
 
-    /// Ensures the given transmission ID matches the given transmission.
-    async fn ensure_transmission_id_matches(
+    /// Checks the given transmission is well-formed and unique.
+    async fn check_transmission_basic(
         &self,
         _transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,

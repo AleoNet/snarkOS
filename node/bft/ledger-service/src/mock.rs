@@ -143,13 +143,13 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         Ok(false)
     }
 
-    /// Ensures the given transmission ID matches the given transmission.
-    async fn ensure_transmission_id_matches(
+    /// Checks the given transmission is well-formed and unique.
+    async fn check_transmission_basic(
         &self,
         transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,
     ) -> Result<()> {
-        trace!("[MockLedgerService] Ensure transmission ID matches {:?} - Ok", fmt_id(transmission_id));
+        trace!("[MockLedgerService] Check transmission basic {:?} - Ok", fmt_id(transmission_id));
         Ok(())
     }
 

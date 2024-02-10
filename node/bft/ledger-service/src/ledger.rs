@@ -171,9 +171,8 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
     }
 
-    // TODO (raychu86): Rename to `check_transmission_basic`.
-    /// Ensures the given transmission ID matches the given transmission.
-    async fn ensure_transmission_id_matches(
+    /// Checks the given transmission is well-formed and unique.
+    async fn check_transmission_basic(
         &self,
         transmission_id: TransmissionID<N>,
         transmission: &mut Transmission<N>,
