@@ -340,8 +340,8 @@ impl<N: Network> Storage<N> {
             bail!("Batch for round {round} already exists in storage {gc_log}")
         }
 
-        // Retrieve the previous committee with lag for the batch round.
-        let Ok(previous_committee_with_lag) = self.ledger.get_previous_committee_with_lag_for_round(round) else {
+        // Retrieve the committee lookback for the batch round.
+        let Ok(previous_committee_with_lag) = self.ledger.get_committee_lookback_for_round(round) else {
             bail!("Storage failed to retrieve the committee with lag for round {round} {gc_log}")
         };
         // Ensure the author is in the committee.
@@ -363,8 +363,7 @@ impl<N: Network> Storage<N> {
         // Check if the previous round is within range of the GC round.
         if previous_round > gc_round {
             // Retrieve the committee with lag for the previous round.
-            let Ok(previous_committee_with_lag) = self.ledger.get_previous_committee_with_lag_for_round(previous_round)
-            else {
+            let Ok(previous_committee_with_lag) = self.ledger.get_committee_lookback_for_round(previous_round) else {
                 bail!("Missing committee for the previous round {previous_round} in storage {gc_log}")
             };
             // Ensure the previous round certificates exists in storage.
@@ -448,8 +447,8 @@ impl<N: Network> Storage<N> {
         // Check the timestamp for liveness.
         check_timestamp_for_liveness(certificate.timestamp())?;
 
-        // Retrieve the previous committee with lag for the batch round.
-        let Ok(previous_committee_with_lag) = self.ledger.get_previous_committee_with_lag_for_round(round) else {
+        // Retrieve the committee lookback for the batch round.
+        let Ok(previous_committee_with_lag) = self.ledger.get_committee_lookback_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
 
