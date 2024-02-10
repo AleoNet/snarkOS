@@ -15,7 +15,7 @@ keywords = [
 categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
-rust-version = "1.72.1"
+rust-version = "1.74.1"
 
 [workspace]
 members = [
@@ -39,6 +39,10 @@ members = [
   "node/tcp",
   ".integration"
 ]
+
+[workspace.dependencies.aleo-std]
+version = "=0.1.24"
+default-features = false
 
 [workspace.dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"

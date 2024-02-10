@@ -41,6 +41,7 @@ use snarkvm::{
     },
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use core::future::Future;
 use parking_lot::Mutex;
@@ -81,7 +82,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
         // Prepare the shutdown flag.
         let shutdown: Arc<AtomicBool> = Default::default();
@@ -90,16 +91,16 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         let signal_node = Self::handle_signals(shutdown.clone());
 
         // Initialize the ledger.
-        let ledger = Ledger::<N, C>::load(genesis.clone(), dev)?;
+        let ledger = Ledger::<N, C>::load(genesis.clone(), storage_mode.clone())?;
         // TODO: Remove me after Phase 3.
-        let ledger = crate::phase_3_reset(ledger, dev)?;
+        let ledger = crate::phase_3_reset(ledger, storage_mode.clone())?;
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
             if let Err((_, error)) =
                 snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone(), shutdown.clone()).await
             {
-                crate::log_clean_error(dev);
+                crate::log_clean_error(&storage_mode);
                 return Err(error);
             }
         }
@@ -116,7 +117,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
-            dev.is_some(),
+            matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
         // Load the coinbase puzzle.

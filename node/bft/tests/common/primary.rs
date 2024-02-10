@@ -41,16 +41,16 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
+use aleo_std::StorageMode;
+use indexmap::IndexMap;
+use itertools::Itertools;
+use parking_lot::Mutex;
 use std::{
     collections::HashMap,
     ops::RangeBounds,
     sync::{Arc, OnceLock},
     time::Duration,
 };
-
-use indexmap::IndexMap;
-use itertools::Itertools;
-use parking_lot::Mutex;
 use tokio::{task::JoinHandle, time::sleep};
 use tracing::*;
 
@@ -385,5 +385,5 @@ fn genesis_ledger(
         })
         .clone();
     // Initialize the ledger with the genesis block.
-    CurrentLedger::load(block, None).unwrap()
+    CurrentLedger::load(block, StorageMode::Production).unwrap()
 }
