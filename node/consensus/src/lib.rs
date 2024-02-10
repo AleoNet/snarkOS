@@ -41,6 +41,7 @@ use snarkvm::{
     prelude::*,
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use colored::Colorize;
 use indexmap::IndexMap;
@@ -79,10 +80,15 @@ impl<N: Network> Consensus<N> {
         ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
+        // Recover the development ID, if it is present.
+        let dev = match storage_mode {
+            StorageMode::Development(id) => Some(id),
+            StorageMode::Production | StorageMode::Custom(..) => None,
+        };
         // Initialize the Narwhal transmissions.
-        let transmissions = Arc::new(BFTPersistentStorage::open(dev)?);
+        let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode)?);
         // Initialize the Narwhal storage.
         let storage = NarwhalStorage::new(ledger.clone(), transmissions, BatchHeader::<N>::MAX_GC_ROUNDS as u64);
         // Initialize the BFT.

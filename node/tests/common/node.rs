@@ -17,6 +17,7 @@ use snarkos_account::Account;
 use snarkos_node::{Client, Prover, Validator};
 use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, Testnet3 as CurrentNetwork};
 
+use aleo_std::StorageMode;
 use std::str::FromStr;
 
 pub async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
@@ -28,7 +29,7 @@ pub async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
         &[],
         sample_genesis_block(),
         None, // No CDN.
-        None,
+        StorageMode::Production,
     )
     .await
     .expect("couldn't create client instance")
@@ -40,7 +41,7 @@ pub async fn prover() -> Prover<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         sample_genesis_block(),
-        None,
+        StorageMode::Production,
     )
     .await
     .expect("couldn't create prover instance")
@@ -57,7 +58,7 @@ pub async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNet
         &[],
         sample_genesis_block(), // Should load the current network's genesis block.
         None,                   // No CDN.
-        None,
+        StorageMode::Production,
     )
     .await
     .expect("couldn't create validator instance")
