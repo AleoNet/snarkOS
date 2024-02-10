@@ -144,7 +144,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Ensures the given transmission ID matches the given transmission.
-    fn ensure_transmission_id_matches(
+    async fn ensure_transmission_id_matches(
         &self,
         transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,

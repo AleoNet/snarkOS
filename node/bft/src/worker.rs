@@ -363,7 +363,7 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
                 // Process the transmission response.
-                self_.finish_transmission_request(peer_ip, transmission_response);
+                self_.finish_transmission_request(peer_ip, transmission_response).await;
             }
         });
     }
@@ -393,19 +393,19 @@ impl<N: Network> Worker<N> {
 
     /// Handles the incoming transmission response.
     /// This method ensures the transmission response is well-formed and matches the transmission ID.
-    fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) {
+    async fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) {
         let TransmissionResponse { transmission_id, mut transmission } = response;
         // Check if the peer IP exists in the pending queue for the given transmission ID.
         let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
             // Ensure the transmission ID matches the transmission.
-            match self.ledger.ensure_transmission_id_matches(transmission_id, &mut transmission) {
+            match self.ledger.ensure_transmission_id_matches(transmission_id, &mut transmission).await {
                 Ok(()) => {
                     // Remove the transmission ID from the pending queue.
                     self.pending.remove(transmission_id, Some(transmission));
                 }
-                Err(err) => warn!("Failed to finish transmission response from peer '{peer_ip}': {err}"),
+                Err(err) => warn!("Malicious peer ('{peer_ip}') send an invalid transmission: {err}"),
             };
         }
     }
@@ -487,7 +487,7 @@ mod tests {
             fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
             fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
-            fn ensure_transmission_id_matches(
+            async fn ensure_transmission_id_matches(
                 &self,
                 transmission_id: TransmissionID<N>,
                 transmission: &mut Transmission<N>,
@@ -572,10 +572,12 @@ mod tests {
         assert!(worker.pending.contains(transmission_id));
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
         // Fake the transmission response.
-        worker.finish_transmission_request(peer_ip, TransmissionResponse {
-            transmission_id,
-            transmission: Transmission::Solution(Data::Buffer(Bytes::from(vec![0; 512]))),
-        });
+        worker
+            .finish_transmission_request(peer_ip, TransmissionResponse {
+                transmission_id,
+                transmission: Transmission::Solution(Data::Buffer(Bytes::from(vec![0; 512]))),
+            })
+            .await;
         // Check the transmission was removed from the pending set.
         assert!(!worker.pending.contains(transmission_id));
     }

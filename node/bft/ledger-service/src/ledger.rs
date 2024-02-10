@@ -171,8 +171,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
     }
 
+    // TODO (raychu86): Rename to `check_transmission_basic`.
     /// Ensures the given transmission ID matches the given transmission.
-    fn ensure_transmission_id_matches(
+    async fn ensure_transmission_id_matches(
         &self,
         transmission_id: TransmissionID<N>,
         transmission: &mut Transmission<N>,
@@ -182,16 +183,18 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction_data)) => {
                 match transaction_data.clone().deserialize_blocking() {
                     Ok(transaction) => {
-                        if transaction.id() != expected_transaction_id {
-                            bail!(
-                                "Received mismatching transaction ID  - expected {}, found {}",
-                                fmt_id(expected_transaction_id),
-                                fmt_id(transaction.id()),
-                            );
+                        let deserialized_transaction_data = Data::Object(transaction);
+
+                        // Check that the transaction is valid.
+                        if let Err(err) = self
+                            .check_transaction_basic(expected_transaction_id, deserialized_transaction_data.clone())
+                            .await
+                        {
+                            bail!("Failed to check transmission - {err}")
                         }
 
                         // Update the transmission with the deserialized transaction.
-                        *transaction_data = Data::Object(transaction);
+                        *transaction_data = deserialized_transaction_data;
                     }
                     Err(err) => {
                         bail!("Failed to deserialize transaction: {err}");
@@ -201,16 +204,17 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution_data)) => {
                 match solution_data.clone().deserialize_blocking() {
                     Ok(solution) => {
-                        if solution.commitment() != expected_commitment {
-                            bail!(
-                                "Received mismatching solution ID - expected {}, found {}",
-                                fmt_id(expected_commitment),
-                                fmt_id(solution.commitment()),
-                            );
+                        let deserialized_solution_data = Data::Object(solution);
+
+                        // Check that the solution is valid.
+                        if let Err(err) =
+                            self.check_solution_basic(expected_commitment, deserialized_solution_data.clone()).await
+                        {
+                            bail!("Failed to check transmission - {err}")
                         }
 
                         // Update the transmission with the deserialized solution.
-                        *solution_data = Data::Object(solution);
+                        *solution_data = deserialized_solution_data;
                     }
                     Err(err) => {
                         bail!("Failed to deserialize solution: {err}");
