@@ -551,6 +551,10 @@ impl<N: Network> Storage<N> {
         // Compute the author of the batch.
         let author = certificate.author();
 
+        // TODO (howardwu): We may want to use `shift_remove` below, in order to align compatibility
+        //  with tests written to for `remove_certificate`. However, this will come with performance hits.
+        //  It will be better to write tests that compare the union of the sets.
+
         // Update the round.
         match self.rounds.write().entry(round) {
             Entry::Occupied(mut entry) => {
@@ -558,7 +562,7 @@ impl<N: Network> Storage<N> {
                 entry.get_mut().swap_remove(&(certificate_id, batch_id, author));
                 // If the round is empty, remove it.
                 if entry.get().is_empty() {
-                    entry.shift_remove();
+                    entry.swap_remove();
                 }
             }
             Entry::Vacant(_) => {}
@@ -613,7 +617,7 @@ impl<N: Network> Storage<N> {
         // Reconstruct the unconfirmed transactions.
         let mut unconfirmed_transactions = cfg_iter!(block.transactions())
             .filter_map(|tx| tx.to_unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok())
-            .collect::<IndexMap<_, _>>();
+            .collect::<HashMap<_, _>>();
 
         // Iterate over the transmission IDs.
         for transmission_id in certificate.transmission_ids() {
@@ -646,7 +650,7 @@ impl<N: Network> Storage<N> {
                 }
                 TransmissionID::Transaction(transaction_id) => {
                     // Retrieve the transaction.
-                    match unconfirmed_transactions.swap_remove(transaction_id) {
+                    match unconfirmed_transactions.remove(transaction_id) {
                         // Insert the transaction.
                         Some(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
                         // Otherwise, try to load the unconfirmed transaction from the ledger.
