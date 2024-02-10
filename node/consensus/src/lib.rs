@@ -43,6 +43,7 @@ use snarkvm::{
     prelude::*,
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use colored::Colorize;
 use indexmap::IndexMap;
@@ -63,9 +64,9 @@ pub struct Consensus<N: Network> {
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The unconfirmed solutions queue.
-    solutions_queue: Arc<Mutex<IndexMap<PuzzleCommitment<N>, ProverSolution<N>>>>,
+    solutions_queue: Arc<Mutex<LruCache<PuzzleCommitment<N>, ProverSolution<N>>>>,
     /// The unconfirmed transactions queue.
-    transactions_queue: Arc<Mutex<IndexMap<N::TransactionID, Transaction<N>>>>,
+    transactions_queue: Arc<Mutex<LruCache<N::TransactionID, Transaction<N>>>>,
     /// The recently-seen unconfirmed solutions.
     seen_solutions: Arc<Mutex<LruCache<PuzzleCommitment<N>, ()>>>,
     /// The recently-seen unconfirmed transactions.
@@ -81,10 +82,15 @@ impl<N: Network> Consensus<N> {
         ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
+        // Recover the development ID, if it is present.
+        let dev = match storage_mode {
+            StorageMode::Development(id) => Some(id),
+            StorageMode::Production | StorageMode::Custom(..) => None,
+        };
         // Initialize the Narwhal transmissions.
-        let transmissions = Arc::new(BFTPersistentStorage::open(dev)?);
+        let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode)?);
         // Initialize the Narwhal storage.
         let storage = NarwhalStorage::new(ledger.clone(), transmissions, MAX_GC_ROUNDS);
         // Initialize the BFT.
@@ -94,8 +100,12 @@ impl<N: Network> Consensus<N> {
             ledger,
             bft,
             primary_sender: Default::default(),
-            solutions_queue: Default::default(),
-            transactions_queue: Default::default(),
+            solutions_queue: Arc::new(Mutex::new(LruCache::new(
+                NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
+            ))),
+            transactions_queue: Arc::new(Mutex::new(LruCache::new(
+                NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
+            ))),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             handles: Default::default(),
@@ -195,7 +205,7 @@ impl<N: Network> Consensus<N> {
             }
             // Add the solution to the memory pool.
             trace!("Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
-            if self.solutions_queue.lock().insert(solution_id, solution).is_some() {
+            if self.solutions_queue.lock().put(solution_id, solution).is_some() {
                 bail!("Solution '{}' exists in the memory pool", fmt_id(solution_id));
             }
         }
@@ -214,10 +224,10 @@ impl<N: Network> Consensus<N> {
             // Determine the number of solutions to send.
             let num_solutions = queue.len().min(capacity);
             // Drain the solutions from the queue.
-            queue.drain(..num_solutions).collect::<Vec<_>>()
+            (0..num_solutions).filter_map(|_| queue.pop_lru().map(|(_, solution)| solution)).collect::<Vec<_>>()
         };
         // Iterate over the solutions.
-        for (_, solution) in solutions.into_iter() {
+        for solution in solutions.into_iter() {
             let solution_id = solution.commitment();
             trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
             // Send the unconfirmed solution to the primary.
@@ -249,7 +259,7 @@ impl<N: Network> Consensus<N> {
             }
             // Add the transaction to the memory pool.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
-            if self.transactions_queue.lock().insert(transaction_id, transaction).is_some() {
+            if self.transactions_queue.lock().put(transaction_id, transaction).is_some() {
                 bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
             }
         }
@@ -268,10 +278,12 @@ impl<N: Network> Consensus<N> {
             // Determine the number of transactions to send.
             let num_transactions = queue.len().min(capacity);
             // Drain the solutions from the queue.
-            queue.drain(..num_transactions).collect::<Vec<_>>()
+            (0..num_transactions)
+                .filter_map(|_| queue.pop_lru().map(|(_, transaction)| transaction))
+                .collect::<Vec<_>>()
         };
         // Iterate over the transactions.
-        for (_, transaction) in transactions.into_iter() {
+        for transaction in transactions.into_iter() {
             let transaction_id = transaction.id();
             trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
             // Send the unconfirmed transaction to the primary.

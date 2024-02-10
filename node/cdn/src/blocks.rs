@@ -153,7 +153,7 @@ pub async fn load_blocks<N: Network>(
         return Ok(cdn_end);
     }
 
-    // A collection of dowloaded blocks pending insertion into the ledger.
+    // A collection of downloaded blocks pending insertion into the ledger.
     let pending_blocks: Arc<Mutex<Vec<Block<N>>>> = Default::default();
 
     // Start a timer.
@@ -213,9 +213,14 @@ pub async fn load_blocks<N: Network>(
                     std::process::exit(0);
                 }
 
+                // Register the next block's height, as the block gets consumed next.
+                let block_height = block.height();
+
                 // Insert the block into the ledger.
                 process_clone(block)?;
-                current_height += 1;
+
+                // Update the current height.
+                current_height = block_height;
 
                 // Log the progress.
                 log_progress::<BLOCKS_PER_FILE>(timer, current_height, cdn_start, cdn_end, "block");
@@ -318,7 +323,7 @@ async fn download_block_bundles<N: Network>(
                                 shutdown_clone.store(true, Ordering::Relaxed);
                                 break;
                             }
-                            tokio::time::sleep(Duration::from_secs(attempts as u64)).await;
+                            tokio::time::sleep(Duration::from_secs(attempts as u64 * 10)).await;
                             warn!("{error} - retrying ({attempts} attempt(s) so far)");
                         }
                     }
@@ -465,10 +470,10 @@ mod tests {
     }
 
     #[test]
-    fn test_load_blocks_1_to_50() {
-        let start_height = 1;
+    fn test_load_blocks_0_to_50() {
+        let start_height = 0;
         let end_height = Some(50);
-        check_load_blocks(start_height, end_height, 49);
+        check_load_blocks(start_height, end_height, 50);
     }
 
     #[test]
@@ -479,10 +484,10 @@ mod tests {
     }
 
     #[test]
-    fn test_load_blocks_1_to_123() {
-        let start_height = 1;
+    fn test_load_blocks_0_to_123() {
+        let start_height = 0;
         let end_height = Some(123);
-        check_load_blocks(start_height, end_height, 122);
+        check_load_blocks(start_height, end_height, 123);
     }
 
     #[test]

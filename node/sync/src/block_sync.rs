@@ -40,7 +40,7 @@ pub const REDUNDANCY_FACTOR: usize = 3;
 const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
 const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
-const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
+const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 60; // 60 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
@@ -220,7 +220,9 @@ impl<N: Network> BlockSync<N> {
 
         // If there are no block requests, but there are pending block responses in the sync pool,
         // then try to advance the ledger using these pending block responses.
-        if block_requests.is_empty() && !self.responses.read().is_empty() {
+        // Note: This condition is guarded by `mode.is_router()` because validators sync blocks
+        // using another code path that updates both `storage` and `ledger` when advancing blocks.
+        if block_requests.is_empty() && !self.responses.read().is_empty() && self.mode.is_router() {
             // Retrieve the latest block height.
             let current_height = self.canon.latest_block_height();
             // Try to advance the ledger with the sync pool.
