@@ -686,11 +686,13 @@ impl<N: Network> Gateway<N> {
             }
             Event::ValidatorsRequest(_) => {
                 // Retrieve the connected peers.
-                let mut connected_peers: Vec<_> = if self.dev.is_some() {
-                    // Relax the validity requirements in dev mode.
-                    self.connected_peers.read().iter().cloned().collect()
-                } else {
-                    self.connected_peers.read().iter().copied().filter(|ip| self.is_valid_peer_ip(*ip)).collect()
+                let mut connected_peers: Vec<_> = match self.dev.is_some() {
+                    // In development mode, relax the validity requirements to make operating devnets more flexible.
+                    true => self.connected_peers.read().iter().copied().collect(),
+                    // In production mode, ensure the peer IPs are valid.
+                    false => {
+                        self.connected_peers.read().iter().copied().filter(|ip| self.is_valid_peer_ip(*ip)).collect()
+                    }
                 };
                 // Shuffle the connected peers.
                 connected_peers.shuffle(&mut rand::thread_rng());
