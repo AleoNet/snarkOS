@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use indexmap::IndexMap;
 use parking_lot::RwLock;
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 #[derive(Debug)]
 pub struct Resolver {
     /// The map of the listener address to (ambiguous) peer address.
-    from_listener: RwLock<IndexMap<SocketAddr, SocketAddr>>,
+    from_listener: RwLock<HashMap<SocketAddr, SocketAddr>>,
     /// The map of the (ambiguous) peer address to listener address.
-    to_listener: RwLock<IndexMap<SocketAddr, SocketAddr>>,
+    to_listener: RwLock<HashMap<SocketAddr, SocketAddr>>,
 }
 
 impl Default for Resolver {
@@ -55,8 +54,8 @@ impl Resolver {
 
     /// Removes the bidirectional mapping of the listener address and the (ambiguous) peer address.
     pub fn remove_peer(&self, listener_ip: &SocketAddr) {
-        if let Some(peer_addr) = self.from_listener.write().swap_remove(listener_ip) {
-            self.to_listener.write().swap_remove(&peer_addr);
+        if let Some(peer_addr) = self.from_listener.write().remove(listener_ip) {
+            self.to_listener.write().remove(&peer_addr);
         }
     }
 }
