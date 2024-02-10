@@ -291,16 +291,16 @@ impl<N: Network> BFT<N> {
             return false;
         }
 
-        // Retrieve the previous committee of the current round.
-        let previous_committee = match self.ledger().get_previous_committee_for_round(current_round) {
+        // Retrieve the committee lookback of the current round.
+        let committee_lookback = match self.ledger().get_committee_lookback_for_round(current_round) {
             Ok(committee) => committee,
             Err(e) => {
-                error!("BFT failed to retrieve the previous committee for the even round {current_round} - {e}");
+                error!("BFT failed to retrieve the committee lookback for the even round {current_round} - {e}");
                 return false;
             }
         };
         // Determine the leader of the current round.
-        let leader = match previous_committee.get_leader(current_round) {
+        let leader = match committee_lookback.get_leader(current_round) {
             Ok(leader) => leader,
             Err(e) => {
                 error!("BFT failed to compute the leader for the even round {current_round} - {e}");
@@ -311,7 +311,7 @@ impl<N: Network> BFT<N> {
         let leader_certificate = current_certificates.iter().find(|certificate| certificate.author() == leader);
         *self.leader_certificate.write() = leader_certificate.cloned();
 
-        self.is_even_round_ready_for_next_round(current_certificates, previous_committee, current_round)
+        self.is_even_round_ready_for_next_round(current_certificates, committee_lookback, current_round)
     }
 
     /// Returns 'true' under one of the following conditions:
@@ -375,21 +375,21 @@ impl<N: Network> BFT<N> {
         let leader_certificate_id = leader_certificate.id();
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
-        // Retrieve the previous committee of the current round.
-        let previous_committee = match self.ledger().get_previous_committee_for_round(current_round) {
+        // Retrieve the committee lookback for the current round.
+        let committee_lookback = match self.ledger().get_committee_lookback_for_round(current_round) {
             Ok(committee) => committee,
             Err(e) => {
-                error!("BFT failed to retrieve the previous committee for the odd round {current_round} - {e}");
+                error!("BFT failed to retrieve the committee lookback for the odd round {current_round} - {e}");
                 return false;
             }
         };
 
         // Compute the stake for the leader certificate.
         let (stake_with_leader, stake_without_leader) =
-            self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &previous_committee);
+            self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &committee_lookback);
         // Return 'true' if any of the following conditions hold:
-        stake_with_leader >= previous_committee.availability_threshold()
-            || stake_without_leader >= previous_committee.quorum_threshold()
+        stake_with_leader >= committee_lookback.availability_threshold()
+            || stake_without_leader >= committee_lookback.quorum_threshold()
             || self.is_timer_expired()
     }
 
@@ -448,12 +448,12 @@ impl<N: Network> BFT<N> {
             return Ok(());
         }
 
-        // Retrieve the previous committee for the commit round.
-        let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(commit_round) else {
-            bail!("BFT failed to retrieve the committee for commit round {commit_round}");
+        // Retrieve the committee lookback for the commit round.
+        let Ok(committee_lookback) = self.ledger().get_committee_lookback_for_round(commit_round) else {
+            bail!("BFT failed to retrieve the committee with lag for commit round {commit_round}");
         };
         // Compute the leader for the commit round.
-        let Ok(leader) = previous_committee.get_leader(commit_round) else {
+        let Ok(leader) = committee_lookback.get_leader(commit_round) else {
             bail!("BFT failed to compute the leader for commit round {commit_round}");
         };
         // Retrieve the leader certificate for the commit round.
@@ -476,7 +476,7 @@ impl<N: Network> BFT<N> {
             })
             .collect();
         // Check if the leader is ready to be committed.
-        if !previous_committee.is_availability_threshold_reached(&authors) {
+        if !committee_lookback.is_availability_threshold_reached(&authors) {
             // If the leader is not ready to be committed, return early.
             trace!("BFT is not ready to commit {commit_round}");
             return Ok(());
@@ -508,14 +508,14 @@ impl<N: Network> BFT<N> {
             for round in (self.dag.read().last_committed_round() + 2..=leader_round.saturating_sub(2)).rev().step_by(2)
             {
                 // Retrieve the previous committee for the leader round.
-                let previous_committee = match self.ledger().get_previous_committee_for_round(round) {
+                let previous_committee_lookback = match self.ledger().get_committee_lookback_for_round(round) {
                     Ok(committee) => committee,
                     Err(e) => {
-                        bail!("BFT failed to retrieve the previous committee for the even round {round} - {e}");
+                        bail!("BFT failed to retrieve a previous committee lookback for the even round {round} - {e}");
                     }
                 };
                 // Compute the leader address for the leader round.
-                let leader = match previous_committee.get_leader(round) {
+                let leader = match previous_committee_lookback.get_leader(round) {
                     Ok(leader) => leader,
                     Err(e) => {
                         bail!("BFT failed to compute the leader for the even round {round} - {e}");
