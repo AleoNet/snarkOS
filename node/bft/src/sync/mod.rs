@@ -16,7 +16,7 @@ use crate::{
     helpers::{BFTSender, Pending, Storage, SyncReceiver},
     Gateway,
     Transport,
-    MAX_BATCH_DELAY_IN_MS,
+    MAX_FETCH_TIMEOUT_IN_MS,
     PRIMARY_PING_IN_MS,
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
@@ -339,7 +339,8 @@ impl<N: Network> Sync<N> {
             }
         }
         // Wait for the certificate to be fetched.
-        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
+        match tokio::time::timeout(core::time::Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await
+        {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
