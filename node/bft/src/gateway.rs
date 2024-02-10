@@ -124,7 +124,7 @@ pub struct Gateway<N: Network> {
     sync_sender: Arc<OnceCell<SyncSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
-    /// The dev mode setting.
+    /// The development mode.
     dev: Option<u16>,
 }
 
