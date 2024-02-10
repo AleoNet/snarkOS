@@ -448,7 +448,7 @@ impl<N: Network> Storage<N> {
         check_timestamp_for_liveness(certificate.timestamp())?;
 
         // Retrieve the committee lookback for the batch round.
-        let Ok(previous_committee_lookback) = self.ledger.get_committee_lookback_for_round(round) else {
+        let Ok(committee_lookback) = self.ledger.get_committee_lookback_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
 
@@ -462,7 +462,7 @@ impl<N: Network> Storage<N> {
             // Retrieve the signer.
             let signer = signature.to_address();
             // Ensure the signer is in the committee.
-            if !previous_committee_lookback.is_committee_member(signer) {
+            if !committee_lookback.is_committee_member(signer) {
                 bail!("Signer {signer} is not in the committee for round {round} {gc_log}")
             }
             // Append the signer.
@@ -470,7 +470,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Ensure the signatures have reached the quorum threshold.
-        if !previous_committee_lookback.is_quorum_threshold_reached(&signers) {
+        if !committee_lookback.is_quorum_threshold_reached(&signers) {
             bail!("Signatures for a batch in round {round} did not reach quorum threshold {gc_log}")
         }
         Ok(missing_transmissions)

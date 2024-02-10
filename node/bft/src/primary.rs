@@ -657,16 +657,16 @@ impl<N: Network> Primary<N> {
                         }
                     }
                     // Retrieve the committee lookback for the round.
-                    let previous_committee_lookback = self.ledger.get_committee_lookback_for_round(proposal.round())?;
+                    let committee_lookback = self.ledger.get_committee_lookback_for_round(proposal.round())?;
                     // Retrieve the address of the validator.
                     let Some(signer) = self.gateway.resolver().get_address(peer_ip) else {
                         bail!("Signature is from a disconnected validator");
                     };
                     // Add the signature to the batch.
-                    proposal.add_signature(signer, signature, &previous_committee_lookback)?;
+                    proposal.add_signature(signer, signature, &committee_lookback)?;
                     info!("Received a batch signature for round {} from '{peer_ip}'", proposal.round());
                     // Check if the batch is ready to be certified.
-                    if !proposal.is_quorum_threshold_reached(&previous_committee_lookback) {
+                    if !proposal.is_quorum_threshold_reached(&committee_lookback) {
                         // If the batch is not ready to be certified, return early.
                         return Ok(());
                     }
@@ -686,10 +686,10 @@ impl<N: Network> Primary<N> {
         info!("Quorum threshold reached - Preparing to certify our batch for round {}...", proposal.round());
 
         // Retrieve the committee lookback for the round.
-        let previous_committee_lookback = self.ledger.get_committee_lookback_for_round(proposal.round())?;
+        let committee_lookback = self.ledger.get_committee_lookback_for_round(proposal.round())?;
         // Store the certified batch and broadcast it to all validators.
         // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
-        if let Err(e) = self.store_and_broadcast_certificate(&proposal, &previous_committee_lookback).await {
+        if let Err(e) = self.store_and_broadcast_certificate(&proposal, &committee_lookback).await {
             // Reinsert the transmissions back into the ready queue for the next proposal.
             self.reinsert_transmissions_into_workers(proposal)?;
             return Err(e);
@@ -736,13 +736,13 @@ impl<N: Network> Primary<N> {
         // Retrieve the current round.
         let current_round = self.current_round();
         // Retrieve the committee lookback.
-        let previous_committee_lookback = self.ledger.get_committee_lookback_for_round(current_round)?;
+        let committee_lookback = self.ledger.get_committee_lookback_for_round(current_round)?;
         // Retrieve the certificates.
         let certificates = self.storage.get_certificates_for_round(current_round);
         // Construct a set over the authors.
         let authors = certificates.iter().map(BatchCertificate::author).collect();
         // Check if the certificates have reached the quorum threshold.
-        let is_quorum = previous_committee_lookback.is_quorum_threshold_reached(&authors);
+        let is_quorum = committee_lookback.is_quorum_threshold_reached(&authors);
 
         // Determine if we are currently proposing a round.
         // Note: This is important, because while our peers have advanced,
@@ -1294,8 +1294,8 @@ impl<N: Network> Primary<N> {
         let is_quorum_threshold_reached = {
             let certificates = self.storage.get_certificates_for_round(batch_round);
             let authors = certificates.iter().map(BatchCertificate::author).collect();
-            let previous_committee_lookback = self.ledger.get_committee_lookback_for_round(batch_round)?;
-            previous_committee_lookback.is_quorum_threshold_reached(&authors)
+            let committee_lookback = self.ledger.get_committee_lookback_for_round(batch_round)?;
+            committee_lookback.is_quorum_threshold_reached(&authors)
         };
 
         // Check if our primary should move to the next round.
