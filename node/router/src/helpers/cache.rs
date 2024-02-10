@@ -16,11 +16,10 @@ use crate::messages::BlockRequest;
 use snarkvm::prelude::{coinbase::PuzzleCommitment, Network};
 
 use core::hash::Hash;
-use indexmap::{IndexMap, IndexSet};
 use linked_hash_map::LinkedHashMap;
 use parking_lot::RwLock;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     net::{IpAddr, SocketAddr},
 };
 use time::{Duration, OffsetDateTime};
@@ -46,7 +45,7 @@ pub struct Cache<N: Network> {
     /// The map of transaction IDs to their last seen timestamp.
     seen_inbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
     /// The map of peer IPs to their block requests.
-    seen_outbound_block_requests: RwLock<HashMap<SocketAddr, IndexSet<BlockRequest>>>,
+    seen_outbound_block_requests: RwLock<HashMap<SocketAddr, HashSet<BlockRequest>>>,
     /// The map of peer IPs to the number of puzzle requests.
     seen_outbound_puzzle_requests: RwLock<HashMap<SocketAddr, u32>>,
     /// The map of solution commitments to their last seen timestamp.
