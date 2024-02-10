@@ -154,10 +154,10 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         };
 
         // Get the committee lookback round.
-        let previous_round_with_lag = previous_round.saturating_sub(Committee::<N>::COMMITTEE_LOOKBACK_RANGE);
+        let committee_lookback_round = previous_round.saturating_sub(Committee::<N>::COMMITTEE_LOOKBACK_RANGE);
 
         // Retrieve the committee for the committee lookback round.
-        self.get_committee_for_round(previous_round_with_lag)
+        self.get_committee_for_round(committee_lookback_round)
     }
 
     /// Returns `true` if the ledger contains the given certificate ID in block history.
