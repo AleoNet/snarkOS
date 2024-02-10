@@ -40,7 +40,7 @@ pub const REDUNDANCY_FACTOR: usize = 3;
 const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
 const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
-const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
+const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 60; // 60 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
@@ -220,7 +220,9 @@ impl<N: Network> BlockSync<N> {
 
         // If there are no block requests, but there are pending block responses in the sync pool,
         // then try to advance the ledger using these pending block responses.
-        if block_requests.is_empty() && !self.responses.read().is_empty() {
+        // Note: This condition is guarded by `mode.is_router()` because validators sync blocks
+        // using another code path that updates both `storage` and `ledger` when advancing blocks.
+        if block_requests.is_empty() && !self.responses.read().is_empty() && self.mode.is_router() {
             // Retrieve the latest block height.
             let current_height = self.canon.latest_block_height();
             // Try to advance the ledger with the sync pool.
@@ -394,11 +396,11 @@ impl<N: Network> BlockSync<N> {
     /// Removes the peer from the sync pool, if they exist.
     pub fn remove_peer(&self, peer_ip: &SocketAddr) {
         // Remove the locators entry for the given peer IP.
-        self.locators.write().remove(peer_ip);
+        self.locators.write().swap_remove(peer_ip);
         // Remove all block requests to the peer.
         self.remove_block_requests_to_peer(peer_ip);
         // Remove the timeouts for the peer.
-        self.request_timeouts.write().remove(peer_ip);
+        self.request_timeouts.write().swap_remove(peer_ip);
     }
 }
 
@@ -467,7 +469,7 @@ impl<N: Network> BlockSync<N> {
 
         // Remove the peer IP from the request entry.
         if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
-            sync_ips.remove(&peer_ip);
+            sync_ips.swap_remove(&peer_ip);
         }
 
         // Acquire the write lock on the responses map.
@@ -579,7 +581,7 @@ impl<N: Network> BlockSync<N> {
         // Remove the peer IP from the request entry. If the request entry is now empty,
         // and the response entry for this height is also empty, then remove the request entry altogether.
         if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
-            sync_ips.remove(peer_ip);
+            sync_ips.swap_remove(peer_ip);
             can_revoke &= sync_ips.is_empty();
         }
 
@@ -600,7 +602,7 @@ impl<N: Network> BlockSync<N> {
         // Remove the peer IP from the requests map. If any request entry is now empty,
         // and its corresponding response entry is also empty, then remove that request entry altogether.
         requests.retain(|height, (_, _, peer_ips)| {
-            peer_ips.remove(peer_ip);
+            peer_ips.swap_remove(peer_ip);
 
             let retain = !peer_ips.is_empty() || responses.get(height).is_some();
             if !retain {
