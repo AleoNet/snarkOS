@@ -53,8 +53,10 @@ pub struct Sync<N: Network> {
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// The response lock.
+    response_lock: Arc<TMutex<()>>,
     /// The sync lock.
-    lock: Arc<TMutex<()>>,
+    sync_lock: Arc<TMutex<()>>,
 }
 
 impl<N: Network> Sync<N> {
@@ -71,7 +73,8 @@ impl<N: Network> Sync<N> {
             pending: Default::default(),
             bft_sender: Default::default(),
             handles: Default::default(),
-            lock: Default::default(),
+            response_lock: Default::default(),
+            sync_lock: Default::default(),
         }
     }
 
@@ -122,6 +125,13 @@ impl<N: Network> Sync<N> {
             while let Some((peer_ip, blocks, callback)) = rx_block_sync_advance_with_sync_blocks.recv().await {
                 // Process the block response.
                 if let Err(e) = self_.block_sync.process_block_response(peer_ip, blocks) {
+                    // Send the error to the callback.
+                    callback.send(Err(e)).ok();
+                    continue;
+                }
+
+                // Sync the storage with the blocks.
+                if let Err(e) = self_.sync_storage_with_blocks().await {
                     // Send the error to the callback.
                     callback.send(Err(e)).ok();
                     continue;
@@ -192,7 +202,7 @@ impl<N: Network> Sync<N> {
         let blocks = self.ledger.get_blocks(gc_height..block_height.saturating_add(1))?;
 
         // Acquire the sync lock.
-        let _lock = self.lock.lock().await;
+        let _lock = self.sync_lock.lock().await;
 
         debug!("Syncing storage with the ledger from block {} to {}...", gc_height, block_height.saturating_add(1));
 
@@ -267,6 +277,9 @@ impl<N: Network> Sync<N> {
 
     /// Syncs the storage with the given blocks.
     pub async fn sync_storage_with_blocks(&self) -> Result<()> {
+        // Acquire the response lock.
+        let _lock = self.response_lock.lock().await;
+
         // Retrieve the latest block height.
         let mut current_height = self.ledger.latest_block_height() + 1;
 
@@ -312,7 +325,7 @@ impl<N: Network> Sync<N> {
     /// Syncs the ledger with the given block without updating the BFT.
     async fn sync_ledger_with_block_without_bft(&self, block: Block<N>) -> Result<()> {
         // Acquire the sync lock.
-        let _lock = self.lock.lock().await;
+        let _lock = self.sync_lock.lock().await;
 
         // Check the next block.
         self.ledger.check_next_block(&block)?;
@@ -330,7 +343,7 @@ impl<N: Network> Sync<N> {
     /// Syncs the storage with the given blocks.
     pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
         // Acquire the sync lock.
-        let _lock = self.lock.lock().await;
+        let _lock = self.sync_lock.lock().await;
 
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
@@ -454,8 +467,10 @@ impl<N: Network> Sync<N> {
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
         info!("Shutting down the sync module...");
+        // Acquire the response lock.
+        let _lock = self.response_lock.lock().await;
         // Acquire the sync lock.
-        let _lock = self.lock.lock().await;
+        let _lock = self.sync_lock.lock().await;
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
     }
