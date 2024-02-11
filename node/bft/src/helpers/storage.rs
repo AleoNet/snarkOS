@@ -604,7 +604,7 @@ impl<N: Network> Storage<N> {
     pub(crate) fn sync_certificate_with_block(
         &self,
         block: &Block<N>,
-        certificate: &BatchCertificate<N>,
+        certificate: BatchCertificate<N>,
         unconfirmed_transactions: &HashMap<N::TransactionID, Transaction<N>>,
     ) {
         // Skip if the certificate round is below the GC round.
@@ -672,7 +672,7 @@ impl<N: Network> Storage<N> {
             certificate.round(),
             certificate.transmission_ids().len()
         );
-        if let Err(error) = self.insert_certificate(certificate.clone(), missing_transmissions) {
+        if let Err(error) = self.insert_certificate(certificate, missing_transmissions) {
             error!("Failed to insert certificate '{certificate_id}' from block {} - {error}", block.height());
         }
     }

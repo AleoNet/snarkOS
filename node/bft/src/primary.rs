@@ -554,10 +554,15 @@ impl<N: Network> Primary<N> {
         // Ensure the batch is for the current round.
         // This method must be called after fetching previous certificates (above),
         // and prior to checking the batch header (below).
-        self.ensure_is_signing_round(batch_round)?;
+        if let Err(e) = self.ensure_is_signing_round(batch_round) {
+            // If the primary is not signing for the peer's round, then return early.
+            debug!("{e} from '{peer_ip}'");
+            return Ok(());
+        }
 
         // Ensure the batch header from the peer is valid.
-        let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
+        let (storage, header) = (self.storage.clone(), batch_header.clone());
+        let missing_transmissions = spawn_blocking!(storage.check_batch_header(&header, transmissions))?;
         // Inserts the missing transmissions into the workers.
         self.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
 
@@ -1104,7 +1109,8 @@ impl<N: Network> Primary<N> {
         // Note: Do not change the `Proposal` to use a HashMap. The ordering there is necessary for safety.
         let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
         // Store the certified batch.
-        self.storage.insert_certificate(certificate.clone(), transmissions)?;
+        let (storage, certificate_) = (self.storage.clone(), certificate.clone());
+        spawn_blocking!(storage.insert_certificate(certificate_, transmissions))?;
         debug!("Stored a batch certificate for round {}", certificate.round());
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
@@ -1183,7 +1189,8 @@ impl<N: Network> Primary<N> {
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.id()) {
             // Store the batch certificate.
-            self.storage.insert_certificate(certificate.clone(), missing_transmissions)?;
+            let (storage, certificate_) = (self.storage.clone(), certificate.clone());
+            spawn_blocking!(storage.insert_certificate(certificate_, missing_transmissions))?;
             debug!("Stored a batch certificate for round {batch_round} from '{peer_ip}'");
             // If a BFT sender was provided, send the round and certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
@@ -1263,9 +1270,10 @@ impl<N: Network> Primary<N> {
             return Ok(Default::default());
         }
 
-        // Ensure this batch ID is new.
+        // Ensure this batch ID is new, otherwise return early.
         if self.storage.contains_batch(batch_header.batch_id()) {
-            bail!("Batch for round {} from peer has already been processed", batch_header.round())
+            trace!("Batch for round {} from peer has already been processed", batch_header.round());
+            return Ok(Default::default());
         }
 
         // Retrieve the workers.

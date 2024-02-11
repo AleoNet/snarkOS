@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{BFTSender, Pending, Storage, SyncReceiver},
+    helpers::{fmt_id, BFTSender, Pending, Storage, SyncReceiver},
     Gateway,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -25,7 +25,7 @@ use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
-    prelude::cfg_iter,
+    prelude::{cfg_into_iter, cfg_iter},
 };
 
 use anyhow::{bail, Result};
@@ -214,9 +214,10 @@ impl<N: Network> Sync<N> {
                     .collect::<HashMap<_, _>>();
 
                 // Iterate over the certificates.
-                for certificate in subdag.values().flatten() {
-                    // Sync the batch certificate with the block.
-                    self.storage.sync_certificate_with_block(block, certificate, &unconfirmed_transactions);
+                for certificates in subdag.values().cloned() {
+                    cfg_into_iter!(certificates).for_each(|certificate| {
+                        self.storage.sync_certificate_with_block(block, certificate, &unconfirmed_transactions);
+                    });
                 }
             }
         }
@@ -294,15 +295,21 @@ impl<N: Network> Sync<N> {
                 .collect::<HashMap<_, _>>();
 
             // Iterate over the certificates.
-            for certificate in subdag.values().flatten() {
-                // Sync the batch certificate with the block.
-                self.storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
-                // If a BFT sender was provided, send the certificate to the BFT.
-                if let Some(bft_sender) = self.bft_sender.get() {
-                    // Await the callback to continue.
-                    if let Err(e) = bft_sender.send_sync_bft(certificate.clone()).await {
-                        bail!("Sync - {e}");
-                    };
+            for certificates in subdag.values().cloned() {
+                cfg_into_iter!(certificates.clone()).for_each(|certificate| {
+                    // Sync the batch certificate with the block.
+                    self.storage.sync_certificate_with_block(&block, certificate.clone(), &unconfirmed_transactions);
+                });
+
+                // Sync the BFT DAG with the certificates.
+                for certificate in certificates {
+                    // If a BFT sender was provided, send the certificate to the BFT.
+                    if let Some(bft_sender) = self.bft_sender.get() {
+                        // Await the callback to continue.
+                        if let Err(e) = bft_sender.send_sync_bft(certificate).await {
+                            bail!("Sync - {e}");
+                        };
+                    }
                 }
             }
         }
@@ -351,7 +358,7 @@ impl<N: Network> Sync<N> {
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
             // Send the certificate request to the peer.
             if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
-                bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
+                bail!("Unable to fetch certificate {} - failed to send request", fmt_id(certificate_id))
             }
         }
         // Wait for the certificate to be fetched.
@@ -360,7 +367,7 @@ impl<N: Network> Sync<N> {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
-            Err(e) => bail!("Unable to fetch batch certificate {certificate_id} - (timeout) {e}"),
+            Err(e) => bail!("Unable to fetch certificate {} - (timeout) {e}", fmt_id(certificate_id)),
         }
     }
 
