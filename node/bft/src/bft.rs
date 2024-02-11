@@ -440,6 +440,9 @@ impl<N: Network> BFT<N> {
             return Ok(());
         }
 
+        /* Proceeding to check if the leader is ready to be committed. */
+        trace!("Checking if the leader is ready to be committed for round {commit_round}...");
+
         // Retrieve the committee lookback for the commit round.
         let Ok(committee_lookback) = self.ledger().get_committee_lookback_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee with lag for commit round {commit_round}");
