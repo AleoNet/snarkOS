@@ -281,18 +281,20 @@ impl<N: Network> Sync<N> {
         if current_height <= max_gc_height {
             // Try to advance the ledger without updating the BFT.
             while let Some(block) = self.block_sync.process_next_block(current_height) {
-                // Break if the block height is greater than the maximum GC height.
-                if block.height() >= max_gc_height {
-                    break;
-                }
                 info!("Syncing the ledger to block {}...", block.height());
                 self.sync_ledger_with_block_without_bft(block).await?;
                 // Update the current height.
                 current_height += 1;
+                // Break if the current height exceeds the maximum GC height.
+                if current_height > max_gc_height {
+                    break;
+                }
             }
             // Sync the storage with the ledger if we should transition to the BFT sync.
-            if current_height >= max_gc_height {
-                self.sync_storage_with_ledger_at_bootup().await?;
+            if current_height > max_gc_height {
+                if let Err(e) = self.sync_storage_with_ledger_at_bootup().await {
+                    error!("BFT sync (with bootup routine) failed - {e}");
+                }
             }
         }
 
@@ -307,7 +309,7 @@ impl<N: Network> Sync<N> {
         Ok(())
     }
 
-    /// Syncs the ledger with the given block without using the BFT.
+    /// Syncs the ledger with the given block without updating the BFT.
     async fn sync_ledger_with_block_without_bft(&self, block: Block<N>) -> Result<()> {
         // Acquire the sync lock.
         let _lock = self.lock.lock().await;
