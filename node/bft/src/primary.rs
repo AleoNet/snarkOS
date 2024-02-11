@@ -554,7 +554,11 @@ impl<N: Network> Primary<N> {
         // Ensure the batch is for the current round.
         // This method must be called after fetching previous certificates (above),
         // and prior to checking the batch header (below).
-        self.ensure_is_signing_round(batch_round)?;
+        if let Err(e) = self.ensure_is_signing_round(batch_round) {
+            // If the primary is not signing for the peer's round, then return early.
+            trace!("Skipped signing a batch for round {batch_round} from '{peer_ip}' - {e}");
+            return Ok(());
+        }
 
         // Ensure the batch header from the peer is valid.
         let (storage, header) = (self.storage.clone(), batch_header.clone());
@@ -1266,9 +1270,10 @@ impl<N: Network> Primary<N> {
             return Ok(Default::default());
         }
 
-        // Ensure this batch ID is new.
+        // Ensure this batch ID is new, otherwise return early.
         if self.storage.contains_batch(batch_header.batch_id()) {
-            bail!("Batch for round {} from peer has already been processed", batch_header.round())
+            trace!("Batch for round {} from peer has already been processed", batch_header.round());
+            return Ok(Default::default());
         }
 
         // Retrieve the workers.
