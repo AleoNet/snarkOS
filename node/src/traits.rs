@@ -16,7 +16,13 @@ use snarkos_node_router::{messages::NodeType, Routing};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use once_cell::sync::OnceCell;
-use std::sync::Arc;
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 #[async_trait]
 pub trait NodeInterface<N: Network>: Routing<N> {
@@ -46,8 +52,9 @@ pub trait NodeInterface<N: Network>: Routing<N> {
     }
 
     /// Handles OS signals for the node to intercept and perform a clean shutdown.
+    /// The optional `shutdown_flag` flag can be used to cleanly terminate the syncing process.
     /// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
-    fn handle_signals() -> Arc<OnceCell<Self>> {
+    fn handle_signals(shutdown_flag: Arc<AtomicBool>) -> Arc<OnceCell<Self>> {
         // In order for the signal handler to be started as early as possible, a reference to the node needs
         // to be passed to it at a later time.
         let node: Arc<OnceCell<Self>> = Default::default();
@@ -56,9 +63,17 @@ pub trait NodeInterface<N: Network>: Routing<N> {
         tokio::task::spawn(async move {
             match tokio::signal::ctrl_c().await {
                 Ok(()) => {
-                    if let Some(node) = node_clone.get() {
-                        node.shut_down().await;
+                    match node_clone.get() {
+                        // If the node is already initialized, then shut it down.
+                        Some(node) => node.shut_down().await,
+                        // Otherwise, if the node is not yet initialized, then set the shutdown flag directly.
+                        None => shutdown_flag.store(true, Ordering::Relaxed),
                     }
+
+                    // A best-effort attempt to let any ongoing activity conclude.
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+
+                    // Terminate the process.
                     std::process::exit(0);
                 }
                 Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),

@@ -17,7 +17,7 @@ use crate::{
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
     ProposedBatch,
     Transport,
-    MAX_BATCH_DELAY,
+    MAX_BATCH_DELAY_IN_MS,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_TRANSMISSIONS_PER_WORKER_PING,
     MAX_WORKERS,
@@ -234,7 +234,7 @@ impl<N: Network> Worker<N> {
         // Attempt to fetch the transmission from the peer.
         let self_ = self.clone();
         tokio::spawn(async move {
-            // Send an transmission request to the peer.
+            // Send a transmission request to the peer.
             match self_.send_transmission_request(peer_ip, transmission_id).await {
                 // If the transmission was fetched, then process it.
                 Ok((candidate_id, transmission)) => {
@@ -368,7 +368,7 @@ impl<N: Network> Worker<N> {
         });
     }
 
-    /// Sends an transmission request to the specified peer.
+    /// Sends a transmission request to the specified peer.
     async fn send_transmission_request(
         &self,
         peer_ip: SocketAddr,
@@ -383,7 +383,7 @@ impl<N: Network> Worker<N> {
             bail!("Unable to fetch transmission - failed to send request")
         }
         // Wait for the transmission to be fetched.
-        match timeout(Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
+        match timeout(Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
             // If the transmission was fetched, return it.
             Ok(result) => Ok((transmission_id, result?)),
             // If the transmission was not fetched, return an error.
@@ -394,16 +394,19 @@ impl<N: Network> Worker<N> {
     /// Handles the incoming transmission response.
     /// This method ensures the transmission response is well-formed and matches the transmission ID.
     fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) {
-        let TransmissionResponse { transmission_id, transmission } = response;
+        let TransmissionResponse { transmission_id, mut transmission } = response;
         // Check if the peer IP exists in the pending queue for the given transmission ID.
         let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
-            // TODO: Validate the transmission.
-            // TODO (howardwu): Deserialize the transmission, and ensure it matches the transmission ID.
-            //  Note: This is difficult for testing and example purposes, since those transmissions are fake.
-            // Remove the transmission ID from the pending queue.
-            self.pending.remove(transmission_id, Some(transmission));
+            // Ensure the transmission ID matches the transmission.
+            match self.ledger.ensure_transmission_id_matches(transmission_id, &mut transmission) {
+                Ok(()) => {
+                    // Remove the transmission ID from the pending queue.
+                    self.pending.remove(transmission_id, Some(transmission));
+                }
+                Err(err) => warn!("Failed to finish transmission response from peer '{peer_ip}': {err}"),
+            };
         }
     }
 
@@ -437,6 +440,7 @@ impl<N: Network> Worker<N> {
 mod tests {
     use super::*;
     use snarkos_node_bft_ledger_service::LedgerService;
+    use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         console::{network::Network, types::Field},
         ledger::{
@@ -476,13 +480,18 @@ mod tests {
             fn get_block(&self, height: u32) -> Result<Block<N>>;
             fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
             fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
-            fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
+            fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
             fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
             fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
+            fn ensure_transmission_id_matches(
+                &self,
+                transmission_id: TransmissionID<N>,
+                transmission: &mut Transmission<N>,
+            ) -> Result<()>;
             async fn check_solution_basic(
                 &self,
                 puzzle_commitment: PuzzleCommitment<N>,
@@ -516,7 +525,7 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -549,9 +558,10 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_ensure_transmission_id_matches().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -587,7 +597,7 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -625,7 +635,7 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -663,7 +673,7 @@ mod tests {
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
@@ -701,7 +711,7 @@ mod tests {
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();

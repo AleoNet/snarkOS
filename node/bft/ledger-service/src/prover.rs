@@ -87,8 +87,8 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Solution '{solution_id}' does not exist in prover")
     }
 
-    /// Returns the transaction for the given transaction ID.
-    fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
+    /// Returns the unconfirmed transaction for the given transaction ID.
+    fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
         bail!("Transaction '{transaction_id}' does not exist in prover")
     }
 
@@ -122,6 +122,15 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     /// Returns `true` if the transmission exists in the ledger.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         bail!("Transmission '{transmission_id}' does not exist in prover")
+    }
+
+    /// Ensures the given transmission ID matches the given transmission.
+    fn ensure_transmission_id_matches(
+        &self,
+        _transmission_id: TransmissionID<N>,
+        _transmission: &mut Transmission<N>,
+    ) -> Result<()> {
+        Ok(())
     }
 
     /// Checks the given solution is well-formed.

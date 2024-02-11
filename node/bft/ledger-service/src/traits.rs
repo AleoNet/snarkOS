@@ -55,8 +55,8 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// Returns the solution for the given solution ID.
     fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
 
-    /// Returns the transaction for the given transaction ID.
-    fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
+    /// Returns the unconfirmed transaction for the given transaction ID.
+    fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
 
     /// Returns the batch certificate for the given batch certificate ID.
     fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;
@@ -77,6 +77,13 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
 
     /// Returns `true` if the ledger contains the given transmission ID.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
+
+    /// Ensures the given transmission ID matches the given transmission.
+    fn ensure_transmission_id_matches(
+        &self,
+        transmission_id: TransmissionID<N>,
+        transmission: &mut Transmission<N>,
+    ) -> Result<()>;
 
     /// Checks the given solution is well-formed.
     async fn check_solution_basic(

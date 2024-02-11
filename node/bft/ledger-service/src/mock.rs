@@ -105,9 +105,9 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         unreachable!("MockLedgerService does not support get_solution")
     }
 
-    /// Returns the transaction for the given transaction ID.
-    fn get_transaction(&self, _transaction_id: N::TransactionID) -> Result<Transaction<N>> {
-        unreachable!("MockLedgerService does not support get_transaction")
+    /// Returns the unconfirmed transaction for the given transaction ID.
+    fn get_unconfirmed_transaction(&self, _transaction_id: N::TransactionID) -> Result<Transaction<N>> {
+        unreachable!("MockLedgerService does not support get_unconfirmed_transaction")
     }
 
     /// Returns the batch certificate for the given batch certificate ID.
@@ -141,6 +141,16 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         trace!("[MockLedgerService] Contains transmission ID {} - false", fmt_id(transmission_id));
         Ok(false)
+    }
+
+    /// Ensures the given transmission ID matches the given transmission.
+    fn ensure_transmission_id_matches(
+        &self,
+        transmission_id: TransmissionID<N>,
+        _transmission: &mut Transmission<N>,
+    ) -> Result<()> {
+        trace!("[MockLedgerService] Ensure transmission ID matches {:?} - Ok", fmt_id(transmission_id));
+        Ok(())
     }
 
     /// Checks the given solution is well-formed.

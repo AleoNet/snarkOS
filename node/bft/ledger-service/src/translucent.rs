@@ -26,7 +26,11 @@ use snarkvm::{
     },
     prelude::{narwhal::BatchCertificate, Field, Network, Result},
 };
-use std::{fmt, ops::Range};
+use std::{
+    fmt,
+    ops::Range,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 pub struct TranslucentLedgerService<N: Network, C: ConsensusStorage<N>> {
     inner: CoreLedgerService<N, C>,
@@ -41,8 +45,8 @@ impl<N: Network, C: ConsensusStorage<N>> fmt::Debug for TranslucentLedgerService
 
 impl<N: Network, C: ConsensusStorage<N>> TranslucentLedgerService<N, C> {
     /// Initializes a new ledger service wrapper.
-    pub fn new(ledger: Ledger<N, C>) -> Self {
-        Self { inner: CoreLedgerService::new(ledger) }
+    pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
+        Self { inner: CoreLedgerService::new(ledger, shutdown) }
     }
 }
 
@@ -94,9 +98,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.get_solution(solution_id)
     }
 
-    /// Returns the transaction for the given transaction ID.
-    fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
-        self.inner.get_transaction(transaction_id)
+    /// Returns the unconfirmed transaction for the given transaction ID.
+    fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
+        self.inner.get_unconfirmed_transaction(transaction_id)
     }
 
     /// Returns the batch certificate for the given batch certificate ID.
@@ -127,6 +131,15 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     /// Returns `true` if the transmission exists in the ledger.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         self.inner.contains_transmission(transmission_id)
+    }
+
+    /// Always succeeds.
+    fn ensure_transmission_id_matches(
+        &self,
+        _transmission_id: TransmissionID<N>,
+        _transmission: &mut Transmission<N>,
+    ) -> Result<()> {
+        Ok(())
     }
 
     /// Always succeeds.

@@ -15,8 +15,7 @@
 #![allow(clippy::type_complexity)]
 
 use super::CurrentNetwork;
-
-use snarkvm::prelude::{block::Block, Ciphertext, Field, Network, Plaintext, PrivateKey, Record, ViewKey};
+use snarkvm::prelude::{block::Block, Ciphertext, Field, FromBytes, Network, Plaintext, PrivateKey, Record, ViewKey};
 
 use anyhow::{bail, ensure, Result};
 use clap::Parser;
@@ -26,11 +25,13 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+use zeroize::Zeroize;
 
 const MAX_BLOCK_RANGE: u32 = 50;
+const CDN_ENDPOINT: &str = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3";
 
 /// Scan the snarkOS node for records.
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Zeroize)]
 pub struct Scan {
     /// An optional private key scan for unspent records.
     #[clap(short, long)]
@@ -55,10 +56,6 @@ pub struct Scan {
     /// The endpoint to scan blocks from.
     #[clap(long)]
     endpoint: String,
-
-    /// Enables the node to prefetch initial blocks from a CDN
-    #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
-    cdn: String,
 }
 
 impl Scan {
@@ -70,7 +67,7 @@ impl Scan {
         let (start_height, end_height) = self.parse_block_range()?;
 
         // Fetch the records from the network.
-        let records = Self::fetch_records(private_key, &view_key, &self.cdn, &self.endpoint, start_height, end_height)?;
+        let records = Self::fetch_records(private_key, &view_key, &self.endpoint, start_height, end_height)?;
 
         // Output the decrypted records associated with the view key.
         if records.is_empty() {
@@ -128,7 +125,7 @@ impl Scan {
                 let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
                 let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
-                // Print warning message if the user is attempting to scan the whole chain.
+                // Print a warning message if the user is attempting to scan the whole chain.
                 if start == 0 {
                     println!("⚠️  Attention - Scanning the entire chain. This may take a while...\n");
                 }
@@ -152,7 +149,6 @@ impl Scan {
     fn fetch_records(
         private_key: Option<PrivateKey<CurrentNetwork>>,
         view_key: &ViewKey<CurrentNetwork>,
-        cdn: &str,
         endpoint: &str,
         start_height: u32,
         end_height: u32,
@@ -175,20 +171,34 @@ impl Scan {
         print!("\rScanning {total_blocks} blocks for records (0% complete)...");
         stdout().flush()?;
 
-        // Scan the CDN first for records.
-        Self::scan_from_cdn(
-            start_height,
-            end_height,
-            cdn.to_string(),
-            endpoint.to_string(),
-            private_key,
-            *view_key,
-            address_x_coordinate,
-            records.clone(),
-        )?;
+        // Fetch the genesis block from the endpoint.
+        let genesis_block: Block<CurrentNetwork> =
+            ureq::get(&format!("{endpoint}/testnet3/block/0")).call()?.into_json()?;
+        // Determine if the endpoint is on a development network.
+        let is_development_network = genesis_block != Block::from_bytes_le(CurrentNetwork::genesis_bytes())?;
+
+        // Determine the request start height.
+        let mut request_start = match is_development_network {
+            true => start_height,
+            false => {
+                // Scan the CDN first for records.
+                Self::scan_from_cdn(
+                    start_height,
+                    end_height,
+                    CDN_ENDPOINT.to_string(),
+                    endpoint.to_string(),
+                    private_key,
+                    *view_key,
+                    address_x_coordinate,
+                    records.clone(),
+                )?;
+
+                // Scan the remaining blocks from the endpoint.
+                end_height.saturating_sub(start_height % MAX_BLOCK_RANGE)
+            }
+        };
 
         // Scan the endpoint for the remaining blocks.
-        let mut request_start = end_height.saturating_sub(start_height % MAX_BLOCK_RANGE);
         while request_start <= end_height {
             // Log the progress.
             let percentage_complete = request_start.saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
@@ -212,7 +222,7 @@ impl Scan {
             request_start = request_start.saturating_add(num_blocks_to_request);
         }
 
-        // Print final complete message.
+        // Print the final complete message.
         println!("\rScanning {total_blocks} blocks for records (100% complete)...   \n");
         stdout().flush()?;
 
@@ -242,25 +252,41 @@ impl Scan {
         // Construct the runtime.
         let rt = tokio::runtime::Runtime::new()?;
 
+        // Create a placeholder shutdown flag.
+        let _shutdown = Default::default();
+
         // Scan the blocks via the CDN.
         rt.block_on(async move {
-            let _ = snarkos_node_cdn::load_blocks(&cdn, cdn_request_start, Some(cdn_request_end), move |block| {
-                // Check if the block is within the requested range.
-                if block.height() < start_height || block.height() > end_height {
-                    return Ok(());
-                }
+            let _ = snarkos_node_cdn::load_blocks(
+                &cdn,
+                cdn_request_start,
+                Some(cdn_request_end),
+                _shutdown,
+                move |block| {
+                    // Check if the block is within the requested range.
+                    if block.height() < start_height || block.height() > end_height {
+                        return Ok(());
+                    }
 
-                // Log the progress.
-                let percentage_complete =
-                    block.height().saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
-                print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
-                stdout().flush()?;
+                    // Log the progress.
+                    let percentage_complete =
+                        block.height().saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
+                    print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
+                    stdout().flush()?;
 
-                // Scan the block for records.
-                Self::scan_block(&block, &endpoint, private_key, &view_key, &address_x_coordinate, records.clone())?;
+                    // Scan the block for records.
+                    Self::scan_block(
+                        &block,
+                        &endpoint,
+                        private_key,
+                        &view_key,
+                        &address_x_coordinate,
+                        records.clone(),
+                    )?;
 
-                Ok(())
-            })
+                    Ok(())
+                },
+            )
             .await;
         });
 

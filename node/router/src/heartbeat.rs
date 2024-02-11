@@ -33,7 +33,7 @@ pub const fn max(a: usize, b: usize) -> usize {
 
 pub trait Heartbeat<N: Network>: Outbound<N> {
     /// The duration in seconds to sleep in between heartbeat executions.
-    const HEARTBEAT_IN_SECS: u64 = 15; // 15 seconds
+    const HEARTBEAT_IN_SECS: u64 = 25; // 25 seconds
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize = 3;
     /// The median number of peers to maintain connections with.
@@ -191,7 +191,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         }
     }
 
-    // TODO (howardwu): Remove this for Phase 3.
     /// This function keeps the number of bootstrap peers within the allowed range.
     fn handle_bootstrap_peers(&self) {
         // Split the bootstrap peers into connected and candidate lists.

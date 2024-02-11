@@ -15,6 +15,8 @@
 use snarkos_cli::{commands::CLI, helpers::Updater};
 
 use clap::Parser;
+use std::process::exit;
+
 #[cfg(feature = "jemalloc")]
 use tikv_jemallocator::Jemalloc;
 
@@ -30,7 +32,10 @@ fn main() -> anyhow::Result<()> {
     // Run the CLI.
     match cli.command.parse() {
         Ok(output) => println!("{output}\n"),
-        Err(error) => println!("⚠️  {error}\n"),
+        Err(error) => {
+            println!("⚠️  {error}\n");
+            exit(1);
+        }
     }
     Ok(())
 }
