@@ -40,6 +40,7 @@ use snarkvm::{
     },
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
@@ -88,7 +89,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
         // Prepare the shutdown flag.
         let shutdown: Arc<AtomicBool> = Default::default();
@@ -108,7 +109,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
-            dev.is_some(),
+            matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
         // Load the coinbase puzzle.
