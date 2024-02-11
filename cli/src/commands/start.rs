@@ -55,7 +55,7 @@ const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
     /// Specify the network ID of this node
-    #[clap(default_value = "3", long = "network")]
+    #[clap(default_value = "0", long = "network")]
     pub network: u16,
 
     /// Specify this node as a validator
@@ -140,7 +140,7 @@ impl Start {
             let mut cli = self.clone();
             // Parse the network.
             match cli.network {
-                3 => {
+                0 => {
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<MainnetV0>().await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
