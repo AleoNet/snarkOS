@@ -14,7 +14,6 @@
 
 use crate::{
     helpers::{BFTSender, Pending, Storage, SyncReceiver},
-    spawn_blocking,
     Gateway,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -217,14 +216,7 @@ impl<N: Network> Sync<N> {
                 // Iterate over the certificates.
                 for certificates in subdag.values().cloned() {
                     cfg_into_iter!(certificates).for_each(|certificate| {
-                        // Sync the batch certificate with the block.
-                        // let (storage, block) = (self.storage.clone(), block.clone());
-                        // let unconfirmed_transactions = unconfirmed_transactions.clone();
-                        // let _ = spawn_blocking!({
-                        //     storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
-                        //     Ok(())
-                        // });
-                        self.storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
+                        self.storage.sync_certificate_with_block(block, certificate, &unconfirmed_transactions);
                     });
                 }
             }
@@ -304,27 +296,21 @@ impl<N: Network> Sync<N> {
 
             // Iterate over the certificates.
             for certificates in subdag.values().cloned() {
-                cfg_into_iter!(certificates).for_each(|certificate| {
+                cfg_into_iter!(certificates.clone()).for_each(|certificate| {
                     // Sync the batch certificate with the block.
-                    // let (storage, block_, certificate_) = (self.storage.clone(), block.clone(), certificate.clone());
-                    // let unconfirmed_transactions = unconfirmed_transactions.clone();
-                    // let _ = spawn_blocking!({
-                    //     storage.sync_certificate_with_block(&block_, certificate_, &unconfirmed_transactions);
-                    //     Ok(())
-                    // });
                     self.storage.sync_certificate_with_block(&block, certificate.clone(), &unconfirmed_transactions);
+                });
 
+                // Sync the BFT DAG with the certificates.
+                for certificate in certificates {
                     // If a BFT sender was provided, send the certificate to the BFT.
                     if let Some(bft_sender) = self.bft_sender.get() {
                         // Await the callback to continue.
-                        let bft_sender = bft_sender.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = bft_sender.send_sync_bft(certificate).await {
-                                warn!("Sync - {e}");
-                            };
-                        });
+                        if let Err(e) = bft_sender.send_sync_bft(certificate).await {
+                            bail!("Sync - {e}");
+                        };
                     }
-                })
+                }
             }
         }
 
