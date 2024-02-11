@@ -480,7 +480,7 @@ impl Start {
         };
 
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
-            { (num_cores.min(main_cores), 512, num_cores.saturating_sub(main_cores).max(1)) };
+            (num_cores, 512, main_cores);
 
         // Initialize the parallelization parameters.
         rayon::ThreadPoolBuilder::new()
