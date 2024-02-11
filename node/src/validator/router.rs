@@ -27,7 +27,7 @@ use snarkos_node_router::messages::{
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Transaction, coinbase::EpochChallenge, error, Network},
+    prelude::{block::Transaction, coinbase::EpochChallenge, error, Network, ToBytes},
 };
 
 use std::{io, net::SocketAddr, time::Duration};
@@ -257,8 +257,20 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         serialized: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
     ) -> bool {
+        // Get the serialized size of transactions.
+        let transaction_size = match &serialized.transaction {
+            // Transaction was received from another node.
+            Data::Buffer(buffer) => buffer.len(),
+            // Transaction was received from own node.
+            Data::Object(tx) => {
+                let Ok(bytes) = tx.to_bytes_le() else {
+                    return false;
+                };
+                bytes.len()
+            }
+        };
         // Add the unconfirmed transaction to the memory pool.
-        if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction).await {
+        if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction, transaction_size).await {
             trace!("[UnconfirmedTransaction] {error}");
             return true; // Maintain the connection.
         }
