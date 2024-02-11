@@ -217,9 +217,12 @@ impl<N: Network> Sync<N> {
                 // Iterate over the certificates.
                 for certificate in subdag.values().flatten().cloned() {
                     // Sync the batch certificate with the block.
-                    let storage = self.storage.clone();
-                    let block = block.clone();
-                    let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block, &certificate, &unconfirmed_transactions)));
+                    let (storage, block) = (self.storage.clone(), block.clone());
+                    let unconfirmed_transactions = unconfirmed_transactions.clone();
+                    let _ = spawn_blocking!({
+                        storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
+                        Ok(())
+                    });
                 }
             }
         }
@@ -299,10 +302,12 @@ impl<N: Network> Sync<N> {
             // Iterate over the certificates.
             for certificate in subdag.values().flatten() {
                 // Sync the batch certificate with the block.
-                let storage = self.storage.clone();
-                let block_clone = block.clone();
-                let certificate_clone = certificate.clone();
-                let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block_clone, &certificate_clone, &unconfirmed_transactions)));
+                let (storage, block_, certificate_) = (self.storage.clone(), block.clone(), certificate.clone());
+                let unconfirmed_transactions = unconfirmed_transactions.clone();
+                let _ = spawn_blocking!({
+                    storage.sync_certificate_with_block(&block_, certificate_, &unconfirmed_transactions);
+                    Ok(())
+                });
 
                 // If a BFT sender was provided, send the certificate to the BFT.
                 if let Some(bft_sender) = self.bft_sender.get() {
