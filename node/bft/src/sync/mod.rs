@@ -306,7 +306,7 @@ impl<N: Network> Sync<N> {
     }
 
     /// Syncs the ledger with the given block without using the BFT.
-    pub async fn sync_ledger_with_block_without_bft(&self, block: Block<N>) -> Result<()> {
+    async fn sync_ledger_with_block_without_bft(&self, block: Block<N>) -> Result<()> {
         // Acquire the sync lock.
         let _lock = self.lock.lock().await;
 
