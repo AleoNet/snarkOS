@@ -789,8 +789,8 @@ mod tests {
             Start::try_parse_from(["snarkos", "--dev", "3", "--client", "--private-key", ""].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
+        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4133").unwrap());
+        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
         assert_eq!(trusted_peers.len(), 3);
         assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
