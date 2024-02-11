@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Prompt the user for the branch to install (default is "testnet3")
-read -p "Enter the branch to install (default: testnet3): " BRANCH
-BRANCH=${BRANCH:-testnet3}
+# Prompt the user for the branch to install (default is "mainnet")
+read -p "Enter the branch to install (default: mainnet): " BRANCH
+BRANCH=${BRANCH:-mainnet}
 
 # Determine the number of AWS EC2 instances by checking ~/.ssh/config
 NODE_ID=0

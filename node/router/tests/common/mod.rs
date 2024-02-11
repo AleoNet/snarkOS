@@ -24,7 +24,7 @@ use std::{
 
 use snarkos_account::Account;
 use snarkos_node_router::{messages::NodeType, Router};
-use snarkvm::prelude::{block::Block, FromBytes, Network, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{block::Block, FromBytes, MainnetV0 as CurrentNetwork, Network};
 
 /// A helper macro to print the TCP listening address, along with the connected and connecting peers.
 #[macro_export]

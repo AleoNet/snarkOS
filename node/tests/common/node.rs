@@ -15,7 +15,7 @@
 use crate::common::test_peer::sample_genesis_block;
 use snarkos_account::Account;
 use snarkos_node::{Client, Prover, Validator};
-use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, MainnetV0 as CurrentNetwork};
 
 use aleo_std::StorageMode;
 use std::str::FromStr;

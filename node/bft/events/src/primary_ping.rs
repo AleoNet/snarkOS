@@ -84,7 +84,7 @@ pub mod prop_tests {
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_block_locators() -> BoxedStrategy<BlockLocators<CurrentNetwork>> {
         any::<u32>().prop_map(sample_block_locators).boxed()

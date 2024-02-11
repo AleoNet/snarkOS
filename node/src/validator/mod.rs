@@ -454,7 +454,7 @@ mod tests {
     use super::*;
     use snarkvm::prelude::{
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Testnet3,
+        MainnetV0,
         VM,
     };
 
@@ -463,15 +463,15 @@ mod tests {
     use rand_chacha::ChaChaRng;
     use std::str::FromStr;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     /// Use `RUST_MIN_STACK=67108864 cargo test --release profiler --features timer` to run this test.
     #[ignore]
     #[tokio::test]
     async fn test_profiler() -> Result<()> {
         // Specify the node attributes.
-        let node = SocketAddr::from_str("0.0.0.0:4133").unwrap();
-        let rest = SocketAddr::from_str("0.0.0.0:3033").unwrap();
+        let node = SocketAddr::from_str("0.0.0.0:4130").unwrap();
+        let rest = SocketAddr::from_str("0.0.0.0:3030").unwrap();
         let storage_mode = StorageMode::Development(0);
 
         // Initialize an (insecure) fixed RNG.

@@ -19,7 +19,7 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey},
         algorithms::Hash,
-        network::{Network, Testnet3},
+        network::{MainnetV0, Network},
     },
     ledger::{
         block::Block,
@@ -76,7 +76,7 @@ pub struct Start {
     pub private_key_file: Option<PathBuf>,
 
     /// Specify the IP address and port for the node server
-    #[clap(default_value = "0.0.0.0:4133", long = "node")]
+    #[clap(default_value = "0.0.0.0:4130", long = "node")]
     pub node: SocketAddr,
     /// Specify the IP address and port for the BFT
     #[clap(long = "bft")]
@@ -89,7 +89,7 @@ pub struct Start {
     pub validators: String,
 
     /// Specify the IP address and port for the REST server
-    #[clap(default_value = "0.0.0.0:3033", long = "rest")]
+    #[clap(default_value = "0.0.0.0:3030", long = "rest")]
     pub rest: SocketAddr,
     /// Specify the requests per second (RPS) rate limit per IP for the REST server
     #[clap(default_value = "10", long = "rest-rps")]
@@ -142,7 +142,7 @@ impl Start {
             match cli.network {
                 3 => {
                     // Parse the node from the configurations.
-                    let node = cli.parse_node::<Testnet3>().await.expect("Failed to parse the node");
+                    let node = cli.parse_node::<MainnetV0>().await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
                     if !cli.nodisplay {
                         // Initialize the display.
@@ -537,18 +537,18 @@ fn load_or_compute_genesis<N: Network>(
     preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
 
     // Input the parameters' metadata.
-    preimage.extend(snarkvm::parameters::testnet3::BondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::UnbondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::UnbondDelegatorAsValidatorVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::SetValidatorStateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::TransferPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::FeePrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::FeePublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::InclusionVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::UnbondDelegatorAsValidatorVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
 
     // Initialize the hasher.
     let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
@@ -589,9 +589,9 @@ fn load_or_compute_genesis<N: Network>(
 mod tests {
     use super::*;
     use crate::commands::{Command, CLI};
-    use snarkvm::prelude::Testnet3;
+    use snarkvm::prelude::MainnetV0;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     #[test]
     fn test_parse_trusted_peers() {
@@ -817,7 +817,7 @@ mod tests {
             "--validators",
             "IP1,IP2,IP3",
             "--rest",
-            "127.0.0.1:3033",
+            "127.0.0.1:3030",
         ];
         let cli = CLI::parse_from(arg_vec);
 
@@ -827,7 +827,7 @@ mod tests {
             assert!(start.validator);
             assert_eq!(start.private_key.as_deref(), Some("PRIVATE_KEY"));
             assert_eq!(start.cdn, "CDN");
-            assert_eq!(start.rest, "127.0.0.1:3033".parse().unwrap());
+            assert_eq!(start.rest, "127.0.0.1:3030".parse().unwrap());
             assert_eq!(start.network, 3);
             assert_eq!(start.peers, "IP1,IP2,IP3");
             assert_eq!(start.validators, "IP1,IP2,IP3");

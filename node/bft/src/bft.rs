@@ -858,7 +858,7 @@ mod tests {
     use indexmap::IndexSet;
     use std::sync::{atomic::Ordering, Arc};
 
-    type CurrentNetwork = snarkvm::console::network::Testnet3;
+    type CurrentNetwork = snarkvm::console::network::MainnetV0;
 
     /// Samples a new test instance, with an optional committee round and the given maximum GC rounds.
     fn sample_test_instance(

@@ -19,7 +19,7 @@ use snarkos_node_router::{
 };
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Block, error, Address, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork},
+    prelude::{block::Block, error, Address, FromBytes, MainnetV0 as CurrentNetwork, Network, TestRng},
 };
 
 use std::{

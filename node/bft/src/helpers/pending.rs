@@ -114,7 +114,7 @@ mod tests {
         prelude::{Rng, TestRng},
     };
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     #[test]
     fn test_pending() {

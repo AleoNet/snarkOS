@@ -463,7 +463,7 @@ mod tests {
     use mockall::mock;
     use std::{io, ops::Range};
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     mock! {
         Gateway<N: Network> {}
@@ -753,7 +753,7 @@ mod prop_tests {
 
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     // Initializes a new test committee.
     fn new_test_committee(n: u16) -> Committee<CurrentNetwork> {

@@ -1345,7 +1345,7 @@ mod prop_tests {
             prop_tests::{CommitteeContext, ValidatorSet},
             Committee,
         },
-        prelude::{PrivateKey, Testnet3},
+        prelude::{MainnetV0, PrivateKey},
     };
 
     use indexmap::IndexMap;
@@ -1360,7 +1360,7 @@ mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     impl Debug for Gateway<CurrentNetwork> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

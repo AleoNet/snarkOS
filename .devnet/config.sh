@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Read the EC2 instance name from the user
-read -p "Enter the EC2 instance name to filter by (e.g. Name) (default: testnet3): " INSTANCE_NAME
-INSTANCE_NAME="${INSTANCE_NAME:-testnet3}"
+read -p "Enter the EC2 instance name to filter by (e.g. Name) (default: devnet): " INSTANCE_NAME
+INSTANCE_NAME="${INSTANCE_NAME:-devnet}"
 
 # Read the PEM file path from the user or use the default in ~/.ssh
-read -p "Enter the PEM file path (default: ~/.ssh/s3-testnet3.pem): " PEM_FILE
-PEM_FILE="${PEM_FILE:-~/.ssh/s3-testnet3.pem}"
+read -p "Enter the PEM file path (default: ~/.ssh/s3-devnet.pem): " PEM_FILE
+PEM_FILE="${PEM_FILE:-~/.ssh/s3-devnet.pem}"
 
 # Use the AWS CLI to describe running EC2 instances, filter by the provided name, and store the JSON output in a variable
 instance_info=$(aws ec2 describe-instances \
