@@ -46,6 +46,10 @@ pub const CONTEXT: &str = "[MemoryPool]";
 /// The port on which the memory pool listens for incoming connections.
 pub const MEMORY_POOL_PORT: u16 = 5000; // port
 
+/// TODO: Remove this constant, as mainnet already has one in snarkVM.
+/// The maximum number of rounds to store before garbage collecting.
+pub const MAX_GC_ROUNDS: u64 = 50; // rounds
+
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
 /// The maximum number of seconds allowed for the leader to send their certificate.
