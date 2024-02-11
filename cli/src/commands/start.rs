@@ -464,23 +464,12 @@ impl Start {
     fn runtime() -> Runtime {
         // Retrieve the number of cores.
         let num_cores = num_cpus::get();
-        // Determine the number of main cores.
-        let main_cores = match num_cores {
-            // Insufficient
-            0..=3 => {
-                eprintln!("The number of cores is insufficient, at least 4 are needed.");
-                std::process::exit(1);
-            }
-            // Efficiency mode
-            4..=8 => 2,
-            // Standard mode
-            9..=16 => 8,
-            // Performance mode
-            _ => 16,
-        };
 
+        // Initialize the number of tokio worker threads, max tokio blocking threads, and rayon cores.
+        // Note: We intentionally set the number of tokio worker threads and number of rayon cores to be
+        // more than the number of physical cores, because the node is expected to be I/O-bound.
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
-            (num_cores, 512, main_cores);
+            (2 * num_cores, 512, num_cores);
 
         // Initialize the parallelization parameters.
         rayon::ThreadPoolBuilder::new()
