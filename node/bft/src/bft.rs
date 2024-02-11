@@ -483,7 +483,7 @@ impl<N: Network> BFT<N> {
         }
 
         /* Proceeding to commit the leader. */
-        info!("Proceeding to commit round {commit_round} with leader {leader}...");
+        info!("Proceeding to commit round {commit_round} with leader '{}'", fmt_id(leader));
 
         // Commit the leader certificate, and all previous leader certificates since the last committed round.
         self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, false>(leader_certificate).await

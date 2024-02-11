@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{BFTSender, Pending, Storage, SyncReceiver},
+    helpers::{fmt_id, BFTSender, Pending, Storage, SyncReceiver},
     Gateway,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -358,7 +358,7 @@ impl<N: Network> Sync<N> {
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
             // Send the certificate request to the peer.
             if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
-                bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
+                bail!("Unable to fetch certificate {} - failed to send request", fmt_id(certificate_id))
             }
         }
         // Wait for the certificate to be fetched.
@@ -367,7 +367,7 @@ impl<N: Network> Sync<N> {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
-            Err(e) => bail!("Unable to fetch batch certificate {certificate_id} - (timeout) {e}"),
+            Err(e) => bail!("Unable to fetch certificate {} - (timeout) {e}", fmt_id(certificate_id)),
         }
     }
 
