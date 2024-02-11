@@ -248,7 +248,7 @@ impl Start {
                         let _ = PrivateKey::<N>::new(&mut rng)?;
                     }
                     let private_key = PrivateKey::<N>::new(&mut rng)?;
-                    println!("🔑 Your development private key for node {dev} is {}\n", private_key.to_string().bold());
+                    println!("🔑 Your development private key for node {dev} is {}.\n", private_key.to_string().bold());
                     private_key
                 })
             }
@@ -411,7 +411,7 @@ impl Start {
         // If the display is not enabled, render the welcome message.
         if self.nodisplay {
             // Print the Aleo address.
-            println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
+            println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
             // Print the node type and network.
             println!(
                 "🧭 Starting {} on {} {} at {}.\n",

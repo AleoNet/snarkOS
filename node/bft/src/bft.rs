@@ -483,7 +483,7 @@ impl<N: Network> BFT<N> {
         }
 
         /* Proceeding to commit the leader. */
-        info!("Proceeding to commit round {commit_round} with leader {leader}...");
+        info!("Proceeding to commit round {commit_round} with leader '{}'", fmt_id(leader));
 
         // Prepare the election certificate IDs.
         let election_certificate_ids = certificates.values().map(|c| c.id()).collect::<IndexSet<_>>();

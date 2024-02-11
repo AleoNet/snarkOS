@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{BFTSender, Pending, Storage, SyncReceiver},
+    helpers::{fmt_id, BFTSender, Pending, Storage, SyncReceiver},
     spawn_blocking,
     Gateway,
     Transport,
@@ -178,6 +178,7 @@ impl<N: Network> Sync<N> {
 // Methods to manage storage.
 impl<N: Network> Sync<N> {
     /// Syncs the storage with the ledger at bootup.
+    #[allow(clippy::unnecessary_to_owned)]
     pub async fn sync_storage_with_ledger_at_bootup(&self) -> Result<()> {
         // Retrieve the latest block in the ledger.
         let latest_block = self.ledger.latest_block();
@@ -343,7 +344,7 @@ impl<N: Network> Sync<N> {
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
             // Send the certificate request to the peer.
             if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
-                bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
+                bail!("Unable to fetch certificate {} - failed to send request", fmt_id(certificate_id))
             }
         }
         // Wait for the certificate to be fetched.
@@ -351,7 +352,7 @@ impl<N: Network> Sync<N> {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
-            Err(e) => bail!("Unable to fetch batch certificate {certificate_id} - (timeout) {e}"),
+            Err(e) => bail!("Unable to fetch certificate {} - (timeout) {e}", fmt_id(certificate_id)),
         }
     }
 

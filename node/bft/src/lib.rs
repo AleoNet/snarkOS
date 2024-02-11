@@ -14,6 +14,7 @@
 
 #![forbid(unsafe_code)]
 #![allow(clippy::type_complexity)]
+#![allow(clippy::unit_arg)]
 
 #[macro_use]
 extern crate async_trait;
