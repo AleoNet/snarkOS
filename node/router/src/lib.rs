@@ -21,13 +21,13 @@ extern crate tracing;
 
 pub use snarkos_node_router_messages as messages;
 
-mod helpers;
-pub use helpers::*;
-
 mod handshake;
 
 mod heartbeat;
 pub use heartbeat::*;
+
+mod helpers;
+pub use helpers::*;
 
 mod inbound;
 pub use inbound::*;
