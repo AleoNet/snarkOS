@@ -26,7 +26,7 @@ use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
-    prelude::cfg_iter,
+    prelude::{cfg_into_iter, cfg_iter},
 };
 
 use anyhow::{bail, Result};
@@ -215,13 +215,16 @@ impl<N: Network> Sync<N> {
                     .collect::<HashMap<_, _>>();
 
                 // Iterate over the certificates.
-                for certificate in subdag.values().flatten().cloned() {
-                    // Sync the batch certificate with the block.
-                    let (storage, block) = (self.storage.clone(), block.clone());
-                    let unconfirmed_transactions = unconfirmed_transactions.clone();
-                    let _ = spawn_blocking!({
-                        storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
-                        Ok(())
+                for certificates in subdag.values().cloned() {
+                    cfg_into_iter!(certificates).for_each(|certificate| {
+                        // Sync the batch certificate with the block.
+                        // let (storage, block) = (self.storage.clone(), block.clone());
+                        // let unconfirmed_transactions = unconfirmed_transactions.clone();
+                        // let _ = spawn_blocking!({
+                        //     storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
+                        //     Ok(())
+                        // });
+                        self.storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
                     });
                 }
             }
@@ -300,22 +303,28 @@ impl<N: Network> Sync<N> {
                 .collect::<HashMap<_, _>>();
 
             // Iterate over the certificates.
-            for certificate in subdag.values().flatten() {
-                // Sync the batch certificate with the block.
-                let (storage, block_, certificate_) = (self.storage.clone(), block.clone(), certificate.clone());
-                let unconfirmed_transactions = unconfirmed_transactions.clone();
-                let _ = spawn_blocking!({
-                    storage.sync_certificate_with_block(&block_, certificate_, &unconfirmed_transactions);
-                    Ok(())
-                });
+            for certificates in subdag.values().cloned() {
+                cfg_into_iter!(certificates).for_each(|certificate| {
+                    // Sync the batch certificate with the block.
+                    // let (storage, block_, certificate_) = (self.storage.clone(), block.clone(), certificate.clone());
+                    // let unconfirmed_transactions = unconfirmed_transactions.clone();
+                    // let _ = spawn_blocking!({
+                    //     storage.sync_certificate_with_block(&block_, certificate_, &unconfirmed_transactions);
+                    //     Ok(())
+                    // });
+                    self.storage.sync_certificate_with_block(&block, certificate.clone(), &unconfirmed_transactions);
 
-                // If a BFT sender was provided, send the certificate to the BFT.
-                if let Some(bft_sender) = self.bft_sender.get() {
-                    // Await the callback to continue.
-                    if let Err(e) = bft_sender.send_sync_bft(certificate.clone()).await {
-                        bail!("Sync - {e}");
-                    };
-                }
+                    // If a BFT sender was provided, send the certificate to the BFT.
+                    if let Some(bft_sender) = self.bft_sender.get() {
+                        // Await the callback to continue.
+                        let bft_sender = bft_sender.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = bft_sender.send_sync_bft(certificate).await {
+                                warn!("Sync - {e}");
+                            };
+                        });
+                    }
+                })
             }
         }
 
