@@ -17,15 +17,14 @@ use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_bft_storage_service::StorageService;
 use snarkvm::{
     ledger::{
-        block::Block,
+        block::{Block, Transaction},
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{anyhow, bail, cfg_iter, ensure, Address, Field, Network, Result},
+    prelude::{anyhow, bail, ensure, Address, Field, Network, Result},
 };
 
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
-use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     sync::{
@@ -602,7 +601,12 @@ impl<N: Network> Storage<N> {
     }
 
     /// Syncs the batch certificate with the block.
-    pub(crate) fn sync_certificate_with_block(&self, block: &Block<N>, certificate: &BatchCertificate<N>) {
+    pub(crate) fn sync_certificate_with_block(
+        &self,
+        block: &Block<N>,
+        certificate: &BatchCertificate<N>,
+        unconfirmed_transactions: &HashMap<N::TransactionID, Transaction<N>>,
+    ) {
         // Skip if the certificate round is below the GC round.
         if certificate.round() <= self.gc_round() {
             return;
@@ -613,11 +617,6 @@ impl<N: Network> Storage<N> {
         }
         // Retrieve the transmissions for the certificate.
         let mut missing_transmissions = HashMap::new();
-
-        // Reconstruct the unconfirmed transactions.
-        let mut unconfirmed_transactions = cfg_iter!(block.transactions())
-            .filter_map(|tx| tx.to_unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok())
-            .collect::<HashMap<_, _>>();
 
         // Iterate over the transmission IDs.
         for transmission_id in certificate.transmission_ids() {
@@ -650,9 +649,9 @@ impl<N: Network> Storage<N> {
                 }
                 TransmissionID::Transaction(transaction_id) => {
                     // Retrieve the transaction.
-                    match unconfirmed_transactions.remove(transaction_id) {
+                    match unconfirmed_transactions.get(transaction_id) {
                         // Insert the transaction.
-                        Some(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
+                        Some(transaction) => missing_transmissions.insert(*transmission_id, transaction.clone().into()),
                         // Otherwise, try to load the unconfirmed transaction from the ledger.
                         None => match self.ledger.get_unconfirmed_transaction(*transaction_id) {
                             // Insert the transaction.

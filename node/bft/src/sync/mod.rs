@@ -25,11 +25,13 @@ use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
+    prelude::cfg_iter,
 };
 
 use anyhow::{bail, Result};
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use rayon::prelude::*;
+use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{oneshot, Mutex as TMutex, OnceCell},
     task::JoinHandle,
@@ -204,10 +206,17 @@ impl<N: Network> Sync<N> {
         for block in &blocks {
             // If the block authority is a subdag, then sync the batch certificates with the block.
             if let Authority::Quorum(subdag) = block.authority() {
+                // Reconstruct the unconfirmed transactions.
+                let unconfirmed_transactions = cfg_iter!(block.transactions())
+                    .filter_map(|tx| {
+                        tx.to_unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok()
+                    })
+                    .collect::<HashMap<_, _>>();
+
                 // Iterate over the certificates.
                 for certificate in subdag.values().flatten() {
                     // Sync the batch certificate with the block.
-                    self.storage.sync_certificate_with_block(block, certificate);
+                    self.storage.sync_certificate_with_block(block, certificate, &unconfirmed_transactions);
                 }
             }
         }
@@ -277,10 +286,17 @@ impl<N: Network> Sync<N> {
 
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
+            // Reconstruct the unconfirmed transactions.
+            let unconfirmed_transactions = cfg_iter!(block.transactions())
+                .filter_map(|tx| {
+                    tx.to_unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok()
+                })
+                .collect::<HashMap<_, _>>();
+
             // Iterate over the certificates.
             for certificate in subdag.values().flatten() {
                 // Sync the batch certificate with the block.
-                self.storage.sync_certificate_with_block(&block, certificate);
+                self.storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
                 // If a BFT sender was provided, send the certificate to the BFT.
                 if let Some(bft_sender) = self.bft_sender.get() {
                     // Await the callback to continue.
