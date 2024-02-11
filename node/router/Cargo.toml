@@ -21,7 +21,7 @@ test = [ ]
 metrics = [ "dep:metrics" ]
 
 [dependencies.anyhow]
-version = "1.0.77"
+version = "1.0.79"
 
 [dependencies.async-trait]
 version = "0.1"

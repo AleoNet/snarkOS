@@ -17,10 +17,13 @@ license = "Apache-2.0"
 edition = "2021"
 
 [dependencies.anyhow]
-version = "1.0.77"
+version = "1.0.79"
 
 [dependencies.crossterm]
 version = "0.27"
+
+[dependencies.ratatui]
+version = "0.25"
 
 [dependencies.snarkos-node]
 path = "../node"
@@ -32,6 +35,3 @@ workspace = true
 [dependencies.tokio]
 version = "1.28"
 features = [ "rt" ]
-
-[dependencies.tui]
-version = "0.19"
