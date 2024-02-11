@@ -50,7 +50,7 @@ use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
 use lru::LruCache;
 use parking_lot::Mutex;
-use std::{collections::BTreeMap, future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
+use std::{cmp::Reverse, collections::BTreeMap, future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -61,7 +61,7 @@ const MAX_TX_QUEUE_SIZE: usize = 1 << 30; // in bytes
 type PriorityFee<N> = U64<N>;
 type Timestamp = i128;
 // Transactions are sorted by PriorityFee first, oldest Timestamp second, and TransactionID last.
-type TransactionKey<N> = (PriorityFee<N>, Timestamp, Field<N>);
+type TransactionKey<N> = (PriorityFee<N>, Reverse<Timestamp>, Field<N>);
 
 #[derive(Clone)]
 pub struct Consensus<N: Network> {
@@ -331,7 +331,7 @@ impl<N: Network> Consensus<N> {
         let inserted = self.transactions_in_queue.lock().insert(id);
         ensure!(inserted, "Transaction '{}' exists in the queue", fmt_id(id));
         // Add the Transaction to the queue.
-        let found = self.transactions_queue.lock().insert((priority_fee, -timestamp, *id.deref()), transaction);
+        let found = self.transactions_queue.lock().insert((priority_fee, Reverse(timestamp), *id.deref()), transaction);
         ensure!(found.is_none(), "Transaction '{}' exists in the memory pool", fmt_id(id));
         Ok(())
     }
