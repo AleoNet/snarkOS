@@ -22,7 +22,7 @@ use crate::events::{
 };
 use snarkos_node_sync::locators::BlockLocators;
 use snarkvm::{
-    console::{network::*, types::Field},
+    console::network::*,
     ledger::{
         block::{Block, Transaction},
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -31,7 +31,7 @@ use snarkvm::{
     prelude::Result,
 };
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use std::net::SocketAddr;
 use tokio::sync::{mpsc, oneshot};
 
