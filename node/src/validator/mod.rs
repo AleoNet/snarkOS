@@ -470,8 +470,8 @@ mod tests {
     #[tokio::test]
     async fn test_profiler() -> Result<()> {
         // Specify the node attributes.
-        let node = SocketAddr::from_str("0.0.0.0:4133").unwrap();
-        let rest = SocketAddr::from_str("0.0.0.0:3033").unwrap();
+        let node = SocketAddr::from_str("0.0.0.0:4130").unwrap();
+        let rest = SocketAddr::from_str("0.0.0.0:3030").unwrap();
         let storage_mode = StorageMode::Development(0);
 
         // Initialize an (insecure) fixed RNG.

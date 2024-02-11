@@ -76,7 +76,7 @@ pub struct Start {
     pub private_key_file: Option<PathBuf>,
 
     /// Specify the IP address and port for the node server
-    #[clap(default_value = "0.0.0.0:4133", long = "node")]
+    #[clap(default_value = "0.0.0.0:4130", long = "node")]
     pub node: SocketAddr,
     /// Specify the IP address and port for the BFT
     #[clap(long = "bft")]
@@ -89,7 +89,7 @@ pub struct Start {
     pub validators: String,
 
     /// Specify the IP address and port for the REST server
-    #[clap(default_value = "0.0.0.0:3033", long = "rest")]
+    #[clap(default_value = "0.0.0.0:3030", long = "rest")]
     pub rest: SocketAddr,
     /// Specify the requests per second (RPS) rate limit per IP for the REST server
     #[clap(default_value = "10", long = "rest-rps")]
@@ -789,8 +789,8 @@ mod tests {
             Start::try_parse_from(["snarkos", "--dev", "3", "--client", "--private-key", ""].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4133").unwrap());
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
+        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
+        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 3);
         assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
@@ -817,7 +817,7 @@ mod tests {
             "--validators",
             "IP1,IP2,IP3",
             "--rest",
-            "127.0.0.1:3033",
+            "127.0.0.1:3030",
         ];
         let cli = CLI::parse_from(arg_vec);
 
@@ -827,7 +827,7 @@ mod tests {
             assert!(start.validator);
             assert_eq!(start.private_key.as_deref(), Some("PRIVATE_KEY"));
             assert_eq!(start.cdn, "CDN");
-            assert_eq!(start.rest, "127.0.0.1:3033".parse().unwrap());
+            assert_eq!(start.rest, "127.0.0.1:3030".parse().unwrap());
             assert_eq!(start.network, 3);
             assert_eq!(start.peers, "IP1,IP2,IP3");
             assert_eq!(start.validators, "IP1,IP2,IP3");

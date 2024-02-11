@@ -92,7 +92,7 @@ Lastly, install `snarkOS`:
 cargo install --locked --path .
 ```
 
-Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
+Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS firewall.
 
 ## 3. Run an Aleo Node
 
@@ -144,7 +144,7 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ### 2. My node is unable to connect to peers on the network.
 
-- Ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
+- Ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS firewall.
 - Ensure `snarkOS` is started using `./run-client.sh` or `./run-prover.sh`.
 
 ### 3. I can't generate a new address ### 
@@ -191,10 +191,10 @@ OPTIONS:
         --private-key <PRIVATE_KEY>             Specify the node's account private key
         --private-key-file <PRIVATE_KEY_FILE>   Specify the path to a file containing the node's account private key
         
-        --node <IP:PORT>                        Specify the IP address and port for the node server [default: 0.0.0.0:4133]
+        --node <IP:PORT>                        Specify the IP address and port for the node server [default: 0.0.0.0:4130]
         --connect <IP:PORT>                     Specify the IP address and port of a peer to connect to
  
-        --rest <REST>                           Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
+        --rest <REST>                           Specify the IP address and port for the REST server [default: 0.0.0.0:3030]
         --norest                                If the flag is set, the node will not initialize the REST server
         
         --nodisplay                             If the flag is set, the node will not render the display

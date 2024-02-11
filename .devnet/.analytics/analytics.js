@@ -134,7 +134,7 @@ async function main() {
 
     if (match && match[1]) {
         const ipAddress = match[1];
-        const baseUrl = `http://${ipAddress}:3033/mainnet/block`;
+        const baseUrl = `http://${ipAddress}:3030/mainnet/block`;
 
         console.log(`${dimStart}IP Address: ${ipAddress}${dimEnd}`);
         console.log(`${dimStart}Base URL: ${baseUrl}${dimEnd}`);
