@@ -558,7 +558,7 @@ impl<N: Network> Primary<N> {
         // and prior to checking the batch header (below).
         if let Err(e) = self.ensure_is_signing_round(batch_round) {
             // If the primary is not signing for the peer's round, then return early.
-            trace!("Skipped signing a batch for round {batch_round} from '{peer_ip}' - {e}");
+            debug!("{e} from '{peer_ip}'");
             return Ok(());
         }
 
