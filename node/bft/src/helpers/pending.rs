@@ -18,16 +18,15 @@ use std::{
     hash::Hash,
     net::SocketAddr,
 };
+use time::OffsetDateTime;
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
 pub struct Pending<T: PartialEq + Eq + Hash, V: Clone> {
     /// The map of pending `items` to `peer IPs` that have the item.
     pending: RwLock<HashMap<T, HashSet<SocketAddr>>>,
-    /// TODO (howardwu): Expire callbacks that have not been called after a certain amount of time,
-    ///  or clear the callbacks that are older than a certain round.
     /// The optional callback queue.
-    callbacks: Mutex<HashMap<T, Vec<oneshot::Sender<V>>>>,
+    callbacks: Mutex<HashMap<T, Vec<(oneshot::Sender<V>, i64)>>>,
 }
 
 impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Default for Pending<T, V> {
@@ -68,6 +67,16 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         self.pending.read().get(&item.into()).cloned()
     }
 
+    /// Returns the number of pending callbacks for the specified `item`.
+    pub fn num_callbacks(&self, item: impl Into<T>) -> usize {
+        let item = item.into();
+        // Clear the callbacks that have expired.
+        self.clear_expired_callbacks_for_item(item);
+
+        // Return the number of live callbacks.
+        self.callbacks.lock().get(&item).map_or(0, |callbacks| callbacks.len())
+    }
+
     /// Inserts the specified `item` and `peer IP` to the pending queue,
     /// returning `true` if the `peer IP` was newly-inserted into the entry for the `item`.
     ///
@@ -77,9 +86,13 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         let item = item.into();
         // Insert the peer IP into the pending queue.
         let result = self.pending.write().entry(item).or_default().insert(peer_ip);
+
+        // Clear the callbacks that have expired.
+        self.clear_expired_callbacks_for_item(item);
+
         // If a callback is provided, insert it into the callback queue.
         if let Some(callback) = callback {
-            self.callbacks.lock().entry(item).or_default().push(callback);
+            self.callbacks.lock().entry(item).or_default().push((callback, OffsetDateTime::now_utc().unix_timestamp()));
         }
         // Return the result.
         result
@@ -96,13 +109,28 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         if let Some(callbacks) = self.callbacks.lock().remove(&item) {
             if let Some(callback_value) = callback_value {
                 // Send a notification to the callback.
-                for callback in callbacks {
+                for (callback, _) in callbacks {
                     callback.send(callback_value.clone()).ok();
                 }
             }
         }
         // Return the result.
         result
+    }
+
+    /// Removes the callbacks for the specified `item` that have expired.
+    pub fn clear_expired_callbacks_for_item(&self, item: impl Into<T>) {
+        // Initialize the callback timeout in seconds.
+        const CALLBACK_TIMEOUT_IN_SECS: i64 = 5;
+
+        // Fetch the current timestamp.
+        let now = OffsetDateTime::now_utc().unix_timestamp();
+
+        // Clear the callbacks that have expired.
+        if let Some(callbacks) = self.callbacks.lock().get_mut(&item.into()) {
+            // Remove the callbacks that have expired.
+            callbacks.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_TIMEOUT_IN_SECS);
+        }
     }
 }
 

@@ -387,10 +387,10 @@ impl<N: Network> Worker<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Insert the transmission ID into the pending queue.
         self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
-        // Determine how many requests have been sent for the transmission.
-        let num_requests = self.pending.get(transmission_id).map(|pending| pending.len()).unwrap_or(0);
-        // If the number of requests is less than the redundancy factor, send the transmission request to the peer.
-        if num_requests <= REDUNDANCY_FACTOR {
+        // Determine how many requests are pending for the transmission.
+        let num_pending_requests = self.pending.num_callbacks(transmission_id);
+        // If the number of requests is less than or equal to the the redundancy factor, send the transmission request to the peer.
+        if num_pending_requests <= REDUNDANCY_FACTOR {
             // Send the transmission request to the peer.
             if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
                 bail!("Unable to fetch transmission - failed to send request")

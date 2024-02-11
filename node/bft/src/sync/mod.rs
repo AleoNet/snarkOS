@@ -356,10 +356,10 @@ impl<N: Network> Sync<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Insert the certificate ID into the pending queue.
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
-            // Determine how many requests have been sent for the certificate.
-            let num_requests = self.pending.get(certificate_id).map(|pending| pending.len()).unwrap_or(0);
-            // If the number of requests is less than the redundancy factor, send the certificate request to the peer.
-            if num_requests <= REDUNDANCY_FACTOR {
+            // Determine how many requests are pending for the certificate.
+            let num_pending_requests = self.pending.num_callbacks(certificate_id);
+            // If the number of requests is less than or equal to the redundancy factor, send the certificate request to the peer.
+            if num_pending_requests <= REDUNDANCY_FACTOR {
                 // Send the certificate request to the peer.
                 if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
                     bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
