@@ -152,13 +152,13 @@ pub(crate) mod test_helpers {
 mod tests {
     use super::*;
     use snarkvm::{
-        prelude::{narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round, Testnet3},
+        prelude::{narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round, MainnetV0},
         utilities::TestRng,
     };
 
     #[test]
     fn test_dag_empty() {
-        let dag = DAG::<Testnet3>::new();
+        let dag = DAG::<MainnetV0>::new();
 
         assert_eq!(dag.get_certificates_for_round(0), None);
         assert_eq!(dag.last_committed_round(), 0);
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn test_dag_insert() {
         let rng = &mut TestRng::default();
-        let mut dag = DAG::<Testnet3>::new();
+        let mut dag = DAG::<MainnetV0>::new();
 
         const ROUND: u64 = 2;
 
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_dag_commit() {
         let rng = &mut TestRng::default();
-        let mut dag = DAG::<Testnet3>::new();
+        let mut dag = DAG::<MainnetV0>::new();
 
         // Sample a certificate for round 2 and 3 with the same author.
         let certificate_2 = sample_batch_certificate_for_round(2, &mut TestRng::fixed(123456789));
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn test_is_recently_committed() {
-        let mut dag = DAG::<Testnet3>::new();
+        let mut dag = DAG::<MainnetV0>::new();
 
         // Sample a certificate for round 2, 3, and 4 with the same author.
         let certificate_2 = sample_batch_certificate_for_round(2, &mut TestRng::fixed(123456789));

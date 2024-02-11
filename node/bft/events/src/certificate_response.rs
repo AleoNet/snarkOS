@@ -80,7 +80,7 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_batch_header(committee: &CommitteeContext) -> BoxedStrategy<BatchHeader<CurrentNetwork>> {
         (Just(committee.clone()), any::<Selector>(), vec(any_transmission(), 0..16))

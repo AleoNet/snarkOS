@@ -438,12 +438,12 @@ mod tests {
         blocks::{cdn_get, cdn_height, log_progress, BLOCKS_PER_FILE},
         load_blocks,
     };
-    use snarkvm::prelude::{block::Block, Testnet3};
+    use snarkvm::prelude::{block::Block, MainnetV0};
 
     use parking_lot::RwLock;
     use std::{sync::Arc, time::Instant};
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     const TEST_BASE_URL: &str = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3";
 

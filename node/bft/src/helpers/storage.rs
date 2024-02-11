@@ -754,7 +754,7 @@ mod tests {
     use ::bytes::Bytes;
     use indexmap::indexset;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Asserts that the storage matches the expected layout.
     pub fn assert_storage<N: Network>(
@@ -968,7 +968,7 @@ pub mod prop_tests {
     use std::fmt::Debug;
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     impl Arbitrary for Storage<CurrentNetwork> {
         type Parameters = CommitteeContext;

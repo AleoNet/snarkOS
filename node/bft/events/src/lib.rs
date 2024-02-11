@@ -231,7 +231,7 @@ mod tests {
     use crate::Event;
     use bytes::{Buf, BufMut, BytesMut};
     use snarkvm::console::prelude::{FromBytes, ToBytes};
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     #[test]
     fn deserializing_invalid_data_panics() {
@@ -275,7 +275,7 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Returns the current UTC epoch timestamp.
     pub fn now() -> i64 {

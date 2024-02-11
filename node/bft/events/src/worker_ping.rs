@@ -74,7 +74,7 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_worker_ping() -> BoxedStrategy<WorkerPing<CurrentNetwork>> {
         hash_set(any_transmission_id(), 1..16).prop_map(|ids| WorkerPing::new(ids.into_iter().collect())).boxed()

@@ -10,7 +10,7 @@ Start by creating EC2 instances in the AWS console.
   - Custom TCP - Port 4133 - 0.0.0.0/0
   - Custom TCP - Port 5000 - 0.0.0.0/0
 
-Be sure the give the EC2 instances a name tag, i.e. `testnet3`.
+Be sure the give the EC2 instances a name tag, i.e. `devnet`.
 
 Make sure you set the correct SSH `.pem` and have the `.pem` in your `~/.ssh` directory.
 

@@ -454,7 +454,7 @@ mod tests {
     use super::*;
     use snarkvm::prelude::{
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Testnet3,
+        MainnetV0,
         VM,
     };
 
@@ -463,7 +463,7 @@ mod tests {
     use rand_chacha::ChaChaRng;
     use std::str::FromStr;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     /// Use `RUST_MIN_STACK=67108864 cargo test --release profiler --features timer` to run this test.
     #[ignore]

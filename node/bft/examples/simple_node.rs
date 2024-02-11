@@ -54,7 +54,7 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
 };
 
-type CurrentNetwork = snarkvm::prelude::Testnet3;
+type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
 /**************************************************************************************************/
 

@@ -249,7 +249,7 @@ pub fn notification_message() -> String {
     - IMPORTANT: EXPECT MULTIPLE NETWORK RESETS.
     - If participating, BE PREPARED TO RESET YOUR NODE AT ANY TIME.
     - When a reset occurs, RUN THE FOLLOWING TO RESET YOUR NODE:
-        - git checkout testnet3 && git pull
+        - git checkout mainnet && git pull
         - cargo install --locked --path .
         - snarkos clean
         - snarkos start --nodisplay --client

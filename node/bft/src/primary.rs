@@ -1402,7 +1402,7 @@ mod tests {
     use indexmap::IndexSet;
     use rand::RngCore;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     // Returns a primary and a list of accounts in the configured committee.
     async fn primary_without_handlers(

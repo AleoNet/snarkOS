@@ -420,6 +420,6 @@ workflows:
           filters:
             branches:
               only:
-                - testnet3
+                - mainnet
     jobs:
       - integration

@@ -173,7 +173,7 @@ impl Scan {
 
         // Fetch the genesis block from the endpoint.
         let genesis_block: Block<CurrentNetwork> =
-            ureq::get(&format!("{endpoint}/testnet3/block/0")).call()?.into_json()?;
+            ureq::get(&format!("{endpoint}/mainnet/block/0")).call()?.into_json()?;
         // Determine if the endpoint is on a development network.
         let is_development_network = genesis_block != Block::from_bytes_le(CurrentNetwork::genesis_bytes())?;
 
@@ -210,7 +210,7 @@ impl Scan {
             let request_end = request_start.saturating_add(num_blocks_to_request);
 
             // Establish the endpoint.
-            let blocks_endpoint = format!("{endpoint}/testnet3/blocks?start={request_start}&end={request_end}");
+            let blocks_endpoint = format!("{endpoint}/mainnet/blocks?start={request_start}&end={request_end}");
             // Fetch blocks
             let blocks: Vec<Block<CurrentNetwork>> = ureq::get(&blocks_endpoint).call()?.into_json()?;
 
@@ -332,7 +332,7 @@ impl Scan {
                 Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::serial_number(private_key, commitment)?;
 
             // Establish the endpoint.
-            let endpoint = format!("{endpoint}/testnet3/find/transitionID/{serial_number}");
+            let endpoint = format!("{endpoint}/mainnet/find/transitionID/{serial_number}");
 
             // Check if the record is spent.
             match ureq::get(&endpoint).call() {
@@ -357,9 +357,9 @@ impl Scan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::{TestRng, Testnet3};
+    use snarkvm::prelude::{MainnetV0, TestRng};
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     #[test]
     fn test_parse_account() {

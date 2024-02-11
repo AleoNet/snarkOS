@@ -891,7 +891,7 @@ mod tests {
     use snarkvm::ledger::committee::Committee;
     use std::net::{IpAddr, Ipv4Addr};
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Returns the peer IP for the sync pool.
     fn sample_peer_ip(id: u16) -> SocketAddr {
