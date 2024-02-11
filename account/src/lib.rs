@@ -162,9 +162,9 @@ impl<N: Network> Display for Account<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::Testnet3;
+    use snarkvm::prelude::MainnetV0;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     #[test]
     fn test_sign() {

@@ -311,7 +311,7 @@ pub mod test_helpers {
     use super::*;
     use snarkvm::prelude::Field;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Simulates a block locator at the given height.
     pub fn sample_block_locators(height: u32) -> BlockLocators<CurrentNetwork> {
@@ -392,7 +392,7 @@ mod tests {
 
     use core::ops::Range;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Simulates block locators for a ledger within the given `heights` range.
     fn check_is_valid(checkpoints: IndexMap<u32, <CurrentNetwork as Network>::BlockHash>, heights: Range<u32>) {

@@ -23,29 +23,21 @@ use snarkos_node_bft::{
     Primary,
     BFT,
     MAX_BATCH_DELAY_IN_MS,
-    MAX_GC_ROUNDS,
 };
 use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
-    console::algorithms::BHP256,
+    console::{
+        account::{Address, PrivateKey},
+        algorithms::{Hash, BHP256},
+    },
     ledger::{
         block::Block,
         committee::{Committee, MIN_VALIDATOR_STAKE},
+        narwhal::BatchHeader,
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
         Ledger,
     },
-    prelude::{
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Address,
-        CryptoRng,
-        FromBytes,
-        Hash,
-        PrivateKey,
-        Rng,
-        TestRng,
-        ToBits,
-        ToBytes,
-        VM,
-    },
+    prelude::{CryptoRng, FromBytes, Rng, TestRng, ToBits, ToBytes, VM},
     utilities::to_bytes_le,
 };
 
@@ -152,7 +144,11 @@ impl TestNetwork {
             let mut rng = TestRng::fixed(id as u64);
             let gen_ledger = genesis_ledger(gen_key, committee.clone(), balances.clone(), &mut rng);
             let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger, Default::default()));
-            let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
+            let storage = Storage::new(
+                ledger.clone(),
+                Arc::new(BFTMemoryService::new()),
+                BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+            );
 
             let (primary, bft) = if config.bft {
                 let bft = BFT::<CurrentNetwork>::new(account, storage, ledger, None, &[], Some(id as u16)).unwrap();

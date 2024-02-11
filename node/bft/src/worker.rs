@@ -17,18 +17,16 @@ use crate::{
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
     ProposedBatch,
     Transport,
-    MAX_BATCH_DELAY_IN_MS,
-    MAX_TRANSMISSIONS_PER_BATCH,
-    MAX_TRANSMISSIONS_PER_WORKER_PING,
+    MAX_FETCH_TIMEOUT_IN_MS,
     MAX_WORKERS,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Data, Transmission, TransmissionID},
-    prelude::{
+    ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{BatchHeader, Data, Transmission, TransmissionID},
     },
 };
 
@@ -36,8 +34,6 @@ use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
-
-const MAX_TRANSMISSIONS_PER_WORKER: usize = MAX_TRANSMISSIONS_PER_BATCH / MAX_WORKERS as usize;
 
 #[derive(Clone)]
 pub struct Worker<N: Network> {
@@ -97,6 +93,14 @@ impl<N: Network> Worker<N> {
 }
 
 impl<N: Network> Worker<N> {
+    /// The maximum number of transmissions allowed in a worker.
+    pub const MAX_TRANSMISSIONS_PER_WORKER: usize =
+        BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / MAX_WORKERS as usize;
+    /// The maximum number of transmissions allowed in a worker ping.
+    pub const MAX_TRANSMISSIONS_PER_WORKER_PING: usize = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / 10;
+
+    // transmissions
+
     /// Returns the number of transmissions in the ready queue.
     pub fn num_transmissions(&self) -> usize {
         self.ready.num_transmissions()
@@ -209,8 +213,12 @@ impl<N: Network> Worker<N> {
     /// Broadcasts a worker ping event.
     pub(crate) fn broadcast_ping(&self) {
         // Retrieve the transmission IDs.
-        let transmission_ids =
-            self.ready.transmission_ids().into_iter().take(MAX_TRANSMISSIONS_PER_WORKER_PING).collect::<IndexSet<_>>();
+        let transmission_ids = self
+            .ready
+            .transmission_ids()
+            .into_iter()
+            .take(Self::MAX_TRANSMISSIONS_PER_WORKER_PING)
+            .collect::<IndexSet<_>>();
 
         // Broadcast the ping event.
         if !transmission_ids.is_empty() {
@@ -228,7 +236,7 @@ impl<N: Network> Worker<N> {
         }
         // If the ready queue is full, then skip this transmission.
         // Note: We must prioritize the unconfirmed solutions and unconfirmed transactions, not transmissions.
-        if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_WORKER {
+        if self.ready.num_transmissions() > Self::MAX_TRANSMISSIONS_PER_WORKER {
             return;
         }
         // Attempt to fetch the transmission from the peer.
@@ -383,7 +391,7 @@ impl<N: Network> Worker<N> {
             bail!("Unable to fetch transmission - failed to send request")
         }
         // Wait for the transmission to be fetched.
-        match timeout(Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
+        match timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {
             // If the transmission was fetched, return it.
             Ok(result) => Ok((transmission_id, result?)),
             // If the transmission was not fetched, return an error.
@@ -455,7 +463,7 @@ mod tests {
     use mockall::mock;
     use std::{io, ops::Range};
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     mock! {
         Gateway<N: Network> {}
@@ -484,7 +492,7 @@ mod tests {
             fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
-            fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
+            fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
             fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
             fn ensure_transmission_id_matches(
@@ -745,7 +753,7 @@ mod prop_tests {
 
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     // Initializes a new test committee.
     fn new_test_committee(n: u16) -> Committee<CurrentNetwork> {

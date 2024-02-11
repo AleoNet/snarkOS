@@ -6,11 +6,11 @@ Start by creating EC2 instances in the AWS console.
 - Ubuntu 22.04 LTS (not Amazon Linux)
 - Security Group - Inbound Policy
   - SSH - Port 22 - 0.0.0.0/0 (or your IP)
-  - Custom TCP - Port 3033 - 0.0.0.0/0 (or your IP)
-  - Custom TCP - Port 4133 - 0.0.0.0/0
+  - Custom TCP - Port 3030 - 0.0.0.0/0 (or your IP)
+  - Custom TCP - Port 4130 - 0.0.0.0/0
   - Custom TCP - Port 5000 - 0.0.0.0/0
 
-Be sure the give the EC2 instances a name tag, i.e. `testnet3`.
+Be sure the give the EC2 instances a name tag, i.e. `devnet`.
 
 Make sure you set the correct SSH `.pem` and have the `.pem` in your `~/.ssh` directory.
 

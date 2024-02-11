@@ -18,7 +18,7 @@ pub mod test_peer;
 use std::{env, str::FromStr};
 
 use snarkos_account::Account;
-use snarkvm::prelude::{block::Block, FromBytes, Network, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{block::Block, FromBytes, MainnetV0 as CurrentNetwork, Network};
 
 /// Returns a fixed account.
 pub fn sample_account() -> Account<CurrentNetwork> {

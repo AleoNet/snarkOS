@@ -23,13 +23,13 @@ mod tests {
         store::helpers::memory::ConsensusMemory,
         FromBytes,
         Ledger,
+        MainnetV0,
         Network,
-        Testnet3,
     };
 
     use tracing_test::traced_test;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     const TEST_BASE_URL: &str = "https://testnet3.blocks.aleo.org/phase3";
 

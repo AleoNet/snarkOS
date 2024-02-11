@@ -70,7 +70,6 @@ use snarkvm::{
     console::prelude::{error, FromBytes, Network, Read, ToBytes, Write},
     ledger::{
         block::Block,
-        committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     },
     prelude::{Address, Field, Signature},
@@ -118,7 +117,7 @@ impl<N: Network> From<DisconnectReason> for Event<N> {
 
 impl<N: Network> Event<N> {
     /// The version of the event protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 5;
+    pub const VERSION: u32 = 6;
 
     /// Returns the event name.
     #[inline]
@@ -232,7 +231,7 @@ mod tests {
     use crate::Event;
     use bytes::{Buf, BufMut, BytesMut};
     use snarkvm::console::prelude::{FromBytes, ToBytes};
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     #[test]
     fn deserializing_invalid_data_panics() {
@@ -276,7 +275,7 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Returns the current UTC epoch timestamp.
     pub fn now() -> i64 {

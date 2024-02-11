@@ -260,11 +260,11 @@ impl<N: Network> Cache<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::Testnet3;
+    use snarkvm::prelude::MainnetV0;
 
     use std::net::Ipv4Addr;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     #[test]
     fn test_inbound_solution() {

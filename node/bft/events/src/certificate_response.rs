@@ -80,7 +80,7 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_batch_header(committee: &CommitteeContext) -> BoxedStrategy<BatchHeader<CurrentNetwork>> {
         (Just(committee.clone()), any::<Selector>(), vec(any_transmission(), 0..16))
@@ -90,16 +90,7 @@ pub mod prop_tests {
                 let signer = selector.select(validators);
                 let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
 
-                BatchHeader::new(
-                    &signer.private_key,
-                    0,
-                    now(),
-                    transmission_ids,
-                    Default::default(),
-                    Default::default(),
-                    &mut rng,
-                )
-                .unwrap()
+                BatchHeader::new(&signer.private_key, 0, now(), transmission_ids, Default::default(), &mut rng).unwrap()
             })
             .boxed()
     }

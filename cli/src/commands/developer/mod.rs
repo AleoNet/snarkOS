@@ -52,7 +52,7 @@ use colored::Colorize;
 use std::{path::PathBuf, str::FromStr};
 
 type CurrentAleo = snarkvm::circuit::AleoV0;
-type CurrentNetwork = snarkvm::prelude::Testnet3;
+type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
 /// Commands to deploy and execute transactions
 #[derive(Debug, Parser)]
@@ -121,7 +121,7 @@ impl Developer {
     /// Fetch the program from the given endpoint.
     fn fetch_program(program_id: &ProgramID<CurrentNetwork>, endpoint: &str) -> Result<Program<CurrentNetwork>> {
         // Send a request to the query node.
-        let response = ureq::get(&format!("{endpoint}/testnet3/program/{program_id}")).call();
+        let response = ureq::get(&format!("{endpoint}/mainnet/program/{program_id}")).call();
 
         // Deserialize the program.
         match response {
@@ -143,7 +143,7 @@ impl Developer {
 
         // Send a request to the query node.
         let response =
-            ureq::get(&format!("{endpoint}/testnet3/program/{credits}/mapping/{account_mapping}/{address}")).call();
+            ureq::get(&format!("{endpoint}/mainnet/program/{credits}/mapping/{account_mapping}/{address}")).call();
 
         // Deserialize the balance.
         let balance: Result<Option<Value<CurrentNetwork>>> = match response {

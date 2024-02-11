@@ -335,7 +335,7 @@ mod tests {
     use snow::{params::NoiseParams, Builder};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     fn handshake_xx() -> (NoiseCodec<CurrentNetwork>, NoiseCodec<CurrentNetwork>) {
         let params: NoiseParams = NOISE_HANDSHAKE_TYPE.parse().unwrap();

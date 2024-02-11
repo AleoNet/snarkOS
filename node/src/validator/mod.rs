@@ -92,8 +92,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, storage_mode.clone())?;
-        // TODO: Remove me after Phase 3.
-        let ledger = crate::phase_3_reset(ledger, storage_mode.clone())?;
+
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
@@ -454,7 +453,7 @@ mod tests {
     use super::*;
     use snarkvm::prelude::{
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Testnet3,
+        MainnetV0,
         VM,
     };
 
@@ -463,15 +462,15 @@ mod tests {
     use rand_chacha::ChaChaRng;
     use std::str::FromStr;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     /// Use `RUST_MIN_STACK=67108864 cargo test --release profiler --features timer` to run this test.
     #[ignore]
     #[tokio::test]
     async fn test_profiler() -> Result<()> {
         // Specify the node attributes.
-        let node = SocketAddr::from_str("0.0.0.0:4133").unwrap();
-        let rest = SocketAddr::from_str("0.0.0.0:3033").unwrap();
+        let node = SocketAddr::from_str("0.0.0.0:4130").unwrap();
+        let rest = SocketAddr::from_str("0.0.0.0:3030").unwrap();
         let storage_mode = StorageMode::Development(0);
 
         // Initialize an (insecure) fixed RNG.

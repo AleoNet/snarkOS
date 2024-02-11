@@ -92,8 +92,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
 
         // Initialize the ledger.
         let ledger = Ledger::<N, C>::load(genesis.clone(), storage_mode.clone())?;
-        // TODO: Remove me after Phase 3.
-        let ledger = crate::phase_3_reset(ledger, storage_mode.clone())?;
+
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.

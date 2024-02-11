@@ -21,7 +21,7 @@ use common::{node::*, test_peer::TestPeer};
 use snarkos_node::{Client, Prover, Validator};
 use snarkos_node_router::Outbound;
 use snarkos_node_tcp::P2P;
-use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, MainnetV0 as CurrentNetwork};
 
 use pea2pea::Pea2Pea;
 

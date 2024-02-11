@@ -70,7 +70,7 @@ pub mod prop_tests {
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_valid_address() -> BoxedStrategy<Address<CurrentNetwork>> {
         any::<u64>().prop_map(|seed| Address::rand(&mut TestRng::fixed(seed))).boxed()

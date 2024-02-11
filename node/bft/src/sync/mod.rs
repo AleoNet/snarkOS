@@ -17,7 +17,7 @@ use crate::{
     spawn_blocking,
     Gateway,
     Transport,
-    MAX_BATCH_DELAY_IN_MS,
+    MAX_FETCH_TIMEOUT_IN_MS,
     PRIMARY_PING_IN_MS,
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
@@ -26,11 +26,13 @@ use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
+    prelude::cfg_iter,
 };
 
 use anyhow::{bail, Result};
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use rayon::prelude::*;
+use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{oneshot, Mutex as TMutex, OnceCell},
     task::JoinHandle,
@@ -205,12 +207,19 @@ impl<N: Network> Sync<N> {
         for block in &blocks {
             // If the block authority is a subdag, then sync the batch certificates with the block.
             if let Authority::Quorum(subdag) = block.authority() {
+                // Reconstruct the unconfirmed transactions.
+                let unconfirmed_transactions = cfg_iter!(block.transactions())
+                    .filter_map(|tx| {
+                        tx.to_unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok()
+                    })
+                    .collect::<HashMap<_, _>>();
+
                 // Iterate over the certificates.
                 for certificate in subdag.values().flatten().cloned() {
                     // Sync the batch certificate with the block.
                     let storage = self.storage.clone();
                     let block = block.clone();
-                    let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block, &certificate)));
+                    let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block, &certificate, &unconfirmed_transactions)));
                 }
             }
         }
@@ -225,9 +234,7 @@ impl<N: Network> Sync<N> {
                     // If the block authority is a beacon, then skip the block.
                     Authority::Beacon(_) => None,
                     // If the block authority is a subdag, then retrieve the certificates.
-                    Authority::Quorum(subdag) => {
-                        Some((subdag.leader_certificate().clone(), subdag.election_certificate_ids().clone()))
-                    }
+                    Authority::Quorum(subdag) => Some(subdag.leader_certificate().clone()),
                 }
             })
             .collect::<Vec<_>>();
@@ -282,13 +289,21 @@ impl<N: Network> Sync<N> {
 
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
+            // Reconstruct the unconfirmed transactions.
+            let unconfirmed_transactions = cfg_iter!(block.transactions())
+                .filter_map(|tx| {
+                    tx.to_unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok()
+                })
+                .collect::<HashMap<_, _>>();
+
             // Iterate over the certificates.
             for certificate in subdag.values().flatten() {
                 // Sync the batch certificate with the block.
                 let storage = self.storage.clone();
                 let block_clone = block.clone();
                 let certificate_clone = certificate.clone();
-                let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block_clone, &certificate_clone)));
+                let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block_clone, &certificate_clone, &unconfirmed_transactions)));
+
                 // If a BFT sender was provided, send the certificate to the BFT.
                 if let Some(bft_sender) = self.bft_sender.get() {
                     // Await the callback to continue.
@@ -347,7 +362,8 @@ impl<N: Network> Sync<N> {
             }
         }
         // Wait for the certificate to be fetched.
-        match tokio::time::timeout(core::time::Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
+        match tokio::time::timeout(core::time::Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await
+        {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.

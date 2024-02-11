@@ -29,8 +29,6 @@ use snarkos_node_bft::{
     },
     spawn_blocking,
     BFT,
-    MAX_GC_ROUNDS,
-    MAX_TRANSMISSIONS_PER_BATCH,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_bft_storage_service::BFTPersistentStorage;
@@ -38,7 +36,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        narwhal::{Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchHeader, Data, Subdag, Transmission, TransmissionID},
     },
     prelude::*,
 };
@@ -92,7 +90,7 @@ impl<N: Network> Consensus<N> {
         // Initialize the Narwhal transmissions.
         let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode)?);
         // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new(ledger.clone(), transmissions, MAX_GC_ROUNDS);
+        let storage = NarwhalStorage::new(ledger.clone(), transmissions, BatchHeader::<N>::MAX_GC_ROUNDS as u64);
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
         // Return the consensus.
@@ -101,10 +99,10 @@ impl<N: Network> Consensus<N> {
             bft,
             primary_sender: Default::default(),
             solutions_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
+                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
             ))),
             transactions_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
+                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
             ))),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
@@ -212,7 +210,7 @@ impl<N: Network> Consensus<N> {
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         // Retrieve the solutions.
@@ -232,7 +230,10 @@ impl<N: Network> Consensus<N> {
             trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
             // Send the unconfirmed solution to the primary.
             if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
-                warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+                // If the BFT is synced, then log the warning.
+                if self.bft.is_synced() {
+                    warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+                }
             }
         }
         Ok(())
@@ -266,13 +267,13 @@ impl<N: Network> Consensus<N> {
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         // Retrieve the transactions.
         let transactions = {
             // Determine the available capacity.
-            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+            let capacity = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
             // Acquire the lock on the queue.
             let mut queue = self.transactions_queue.lock();
             // Determine the number of transactions to send.
@@ -290,7 +291,13 @@ impl<N: Network> Consensus<N> {
             if let Err(e) =
                 self.primary_sender().send_unconfirmed_transaction(transaction_id, Data::Object(transaction)).await
             {
-                warn!("Failed to add unconfirmed transaction '{}' to the memory pool - {e}", fmt_id(transaction_id));
+                // If the BFT is synced, then log the warning.
+                if self.bft.is_synced() {
+                    warn!(
+                        "Failed to add unconfirmed transaction '{}' to the memory pool - {e}",
+                        fmt_id(transaction_id)
+                    );
+                }
             }
         }
         Ok(())

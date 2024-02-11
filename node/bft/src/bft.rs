@@ -67,8 +67,6 @@ pub struct BFT<N: Network> {
     leader_certificate: Arc<RwLock<Option<BatchCertificate<N>>>>,
     /// The timer for the leader certificate to be received.
     leader_certificate_timer: Arc<AtomicI64>,
-    /// The last election certificate IDs.
-    last_election_certificate_ids: Arc<RwLock<IndexSet<Field<N>>>>,
     /// The consensus sender.
     consensus_sender: Arc<OnceCell<ConsensusSender<N>>>,
     /// The spawned handles.
@@ -92,7 +90,6 @@ impl<N: Network> BFT<N> {
             dag: Default::default(),
             leader_certificate: Default::default(),
             leader_certificate_timer: Default::default(),
-            last_election_certificate_ids: Default::default(),
             consensus_sender: Default::default(),
             handles: Default::default(),
             lock: Default::default(),
@@ -121,6 +118,11 @@ impl<N: Network> BFT<N> {
         Ok(())
     }
 
+    /// Returns `true` if the primary is synced.
+    pub fn is_synced(&self) -> bool {
+        self.primary.is_synced()
+    }
+
     /// Returns the primary.
     pub const fn primary(&self) -> &Primary<N> {
         &self.primary
@@ -144,11 +146,6 @@ impl<N: Network> BFT<N> {
     /// Returns the certificate of the leader from the current even round, if one was present.
     pub const fn leader_certificate(&self) -> &Arc<RwLock<Option<BatchCertificate<N>>>> {
         &self.leader_certificate
-    }
-
-    /// Returns the last election certificate IDs.
-    pub fn last_election_certificate_ids(&self) -> IndexSet<Field<N>> {
-        self.last_election_certificate_ids.read().clone()
     }
 }
 
@@ -291,16 +288,16 @@ impl<N: Network> BFT<N> {
             return false;
         }
 
-        // Retrieve the previous committee of the current round.
-        let previous_committee = match self.ledger().get_previous_committee_for_round(current_round) {
+        // Retrieve the committee lookback of the current round.
+        let committee_lookback = match self.ledger().get_committee_lookback_for_round(current_round) {
             Ok(committee) => committee,
             Err(e) => {
-                error!("BFT failed to retrieve the previous committee for the even round {current_round} - {e}");
+                error!("BFT failed to retrieve the committee lookback for the even round {current_round} - {e}");
                 return false;
             }
         };
         // Determine the leader of the current round.
-        let leader = match previous_committee.get_leader(current_round) {
+        let leader = match committee_lookback.get_leader(current_round) {
             Ok(leader) => leader,
             Err(e) => {
                 error!("BFT failed to compute the leader for the even round {current_round} - {e}");
@@ -311,7 +308,7 @@ impl<N: Network> BFT<N> {
         let leader_certificate = current_certificates.iter().find(|certificate| certificate.author() == leader);
         *self.leader_certificate.write() = leader_certificate.cloned();
 
-        self.is_even_round_ready_for_next_round(current_certificates, previous_committee, current_round)
+        self.is_even_round_ready_for_next_round(current_certificates, committee_lookback, current_round)
     }
 
     /// Returns 'true' under one of the following conditions:
@@ -375,21 +372,21 @@ impl<N: Network> BFT<N> {
         let leader_certificate_id = leader_certificate.id();
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
-        // Retrieve the previous committee of the current round.
-        let previous_committee = match self.ledger().get_previous_committee_for_round(current_round) {
+        // Retrieve the committee lookback for the current round.
+        let committee_lookback = match self.ledger().get_committee_lookback_for_round(current_round) {
             Ok(committee) => committee,
             Err(e) => {
-                error!("BFT failed to retrieve the previous committee for the odd round {current_round} - {e}");
+                error!("BFT failed to retrieve the committee lookback for the odd round {current_round} - {e}");
                 return false;
             }
         };
 
         // Compute the stake for the leader certificate.
         let (stake_with_leader, stake_without_leader) =
-            self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &previous_committee);
+            self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &committee_lookback);
         // Return 'true' if any of the following conditions hold:
-        stake_with_leader >= previous_committee.availability_threshold()
-            || stake_without_leader >= previous_committee.quorum_threshold()
+        stake_with_leader >= committee_lookback.availability_threshold()
+            || stake_without_leader >= committee_lookback.quorum_threshold()
             || self.is_timer_expired()
     }
 
@@ -448,12 +445,15 @@ impl<N: Network> BFT<N> {
             return Ok(());
         }
 
-        // Retrieve the previous committee for the commit round.
-        let Ok(previous_committee) = self.ledger().get_previous_committee_for_round(commit_round) else {
-            bail!("BFT failed to retrieve the committee for commit round {commit_round}");
+        /* Proceeding to check if the leader is ready to be committed. */
+        trace!("Checking if the leader is ready to be committed for round {commit_round}...");
+
+        // Retrieve the committee lookback for the commit round.
+        let Ok(committee_lookback) = self.ledger().get_committee_lookback_for_round(commit_round) else {
+            bail!("BFT failed to retrieve the committee with lag for commit round {commit_round}");
         };
         // Compute the leader for the commit round.
-        let Ok(leader) = previous_committee.get_leader(commit_round) else {
+        let Ok(leader) = committee_lookback.get_leader(commit_round) else {
             bail!("BFT failed to compute the leader for commit round {commit_round}");
         };
         // Retrieve the leader certificate for the commit round.
@@ -476,7 +476,7 @@ impl<N: Network> BFT<N> {
             })
             .collect();
         // Check if the leader is ready to be committed.
-        if !previous_committee.is_availability_threshold_reached(&authors) {
+        if !committee_lookback.is_availability_threshold_reached(&authors) {
             // If the leader is not ready to be committed, return early.
             trace!("BFT is not ready to commit {commit_round}");
             return Ok(());
@@ -485,106 +485,140 @@ impl<N: Network> BFT<N> {
         /* Proceeding to commit the leader. */
         info!("Proceeding to commit round {commit_round} with leader {leader}...");
 
-        // Prepare the election certificate IDs.
-        let election_certificate_ids = certificates.values().map(|c| c.id()).collect::<IndexSet<_>>();
         // Commit the leader certificate, and all previous leader certificates since the last committed round.
-        self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, false>(leader_certificate, election_certificate_ids).await
+        self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, false>(leader_certificate).await
     }
 
     /// Commits the leader certificate, and all previous leader certificates since the last committed round.
     async fn commit_leader_certificate<const ALLOW_LEDGER_ACCESS: bool, const IS_SYNCING: bool>(
         &self,
         leader_certificate: BatchCertificate<N>,
-        election_certificate_ids: IndexSet<Field<N>>,
     ) -> Result<()> {
-        // Retrieve the leader certificate round.
-        let leader_round = leader_certificate.round();
-        // Compute the commit subdag.
-        let commit_subdag = match self.order_dag_with_dfs::<ALLOW_LEDGER_ACCESS>(leader_certificate) {
-            Ok(subdag) => subdag,
-            Err(e) => bail!("BFT failed to order the DAG with DFS - {e}"),
-        };
-        // Initialize a map for the deduped transmissions.
-        let mut transmissions = IndexMap::new();
-        // Start from the oldest leader certificate.
-        for certificate in commit_subdag.values().flatten() {
-            // Update the DAG.
-            if IS_SYNCING {
-                self.dag.write().commit(certificate, self.storage().max_gc_rounds());
-            }
-            // Retrieve the transmissions.
-            for transmission_id in certificate.transmission_ids() {
-                // If the transmission already exists in the map, skip it.
-                if transmissions.contains_key(transmission_id) {
-                    continue;
-                }
-                // If the transmission already exists in the ledger, skip it.
-                // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
-                if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
-                    continue;
-                }
-                // Retrieve the transmission.
-                let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
-                    bail!(
-                        "BFT failed to retrieve transmission '{}' from round {}",
-                        fmt_id(transmission_id),
-                        certificate.round()
-                    );
-                };
-                // Add the transmission to the set.
-                transmissions.insert(*transmission_id, transmission);
-            }
-        }
-        // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
-        if !IS_SYNCING {
-            // Construct the subdag.
-            let subdag = Subdag::from(commit_subdag.clone(), election_certificate_ids.clone())?;
-            // Retrieve the anchor round.
-            let anchor_round = subdag.anchor_round();
-            // Retrieve the number of transmissions.
-            let num_transmissions = transmissions.len();
-            // Retrieve metadata about the subdag.
-            let subdag_metadata = subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
-
-            // Ensure the subdag anchor round matches the leader round.
-            ensure!(
-                anchor_round == leader_round,
-                "BFT failed to commit - the subdag anchor round {anchor_round} does not match the leader round {leader_round}",
-            );
-
-            // Trigger consensus.
-            if let Some(consensus_sender) = self.consensus_sender.get() {
-                // Initialize a callback sender and receiver.
-                let (callback_sender, callback_receiver) = oneshot::channel();
-                // Send the subdag and transmissions to consensus.
-                consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
-                // Await the callback to continue.
-                match callback_receiver.await {
-                    Ok(Ok(())) => (), // continue
-                    Ok(Err(e)) => {
-                        error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        error!("BFT failed to receive the callback for round {anchor_round} - {e}");
-                        return Ok(());
-                    }
-                }
-            }
-
-            info!(
-                "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
-            );
-            // Update the DAG, as the subdag was successfully included into a block.
-            let mut dag_write = self.dag.write();
-            for certificate in commit_subdag.values().flatten() {
-                dag_write.commit(certificate, self.storage().max_gc_rounds());
-            }
-        }
-        // Update the last election certificate IDs.
+        // Determine the list of all previous leader certificates since the last committed round.
+        // The order of the leader certificates is from **newest** to **oldest**.
+        let mut leader_certificates = vec![leader_certificate.clone()];
         {
-            let mut last_election_certificate_ids = self.last_election_certificate_ids.write();
-            *last_election_certificate_ids = election_certificate_ids;
+            // Retrieve the leader round.
+            let leader_round = leader_certificate.round();
+
+            let mut current_certificate = leader_certificate;
+            for round in (self.dag.read().last_committed_round() + 2..=leader_round.saturating_sub(2)).rev().step_by(2)
+            {
+                // Retrieve the previous committee for the leader round.
+                let previous_committee_lookback = match self.ledger().get_committee_lookback_for_round(round) {
+                    Ok(committee) => committee,
+                    Err(e) => {
+                        bail!("BFT failed to retrieve a previous committee lookback for the even round {round} - {e}");
+                    }
+                };
+                // Compute the leader address for the leader round.
+                let leader = match previous_committee_lookback.get_leader(round) {
+                    Ok(leader) => leader,
+                    Err(e) => {
+                        bail!("BFT failed to compute the leader for the even round {round} - {e}");
+                    }
+                };
+                // Retrieve the previous leader certificate.
+                let Some(previous_certificate) = self.dag.read().get_certificate_for_round_with_author(round, leader)
+                else {
+                    continue;
+                };
+                // Determine if there is a path between the previous certificate and the current certificate.
+                if self.is_linked(previous_certificate.clone(), current_certificate.clone())? {
+                    // Add the previous leader certificate to the list of certificates to commit.
+                    leader_certificates.push(previous_certificate.clone());
+                    // Update the current certificate to the previous leader certificate.
+                    current_certificate = previous_certificate;
+                }
+            }
+        }
+
+        // Iterate over the leader certificates to commit.
+        for leader_certificate in leader_certificates.into_iter().rev() {
+            // Retrieve the leader certificate round.
+            let leader_round = leader_certificate.round();
+            // Compute the commit subdag.
+            let commit_subdag = match self.order_dag_with_dfs::<ALLOW_LEDGER_ACCESS>(leader_certificate) {
+                Ok(subdag) => subdag,
+                Err(e) => bail!("BFT failed to order the DAG with DFS - {e}"),
+            };
+            // Initialize a map for the deduped transmissions.
+            let mut transmissions = IndexMap::new();
+            // Start from the oldest leader certificate.
+            for certificate in commit_subdag.values().flatten() {
+                // Update the DAG.
+                if IS_SYNCING {
+                    self.dag.write().commit(certificate, self.storage().max_gc_rounds());
+                }
+                // Retrieve the transmissions.
+                for transmission_id in certificate.transmission_ids() {
+                    // If the transmission already exists in the map, skip it.
+                    if transmissions.contains_key(transmission_id) {
+                        continue;
+                    }
+                    // If the transmission already exists in the ledger, skip it.
+                    // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
+                    if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
+                        continue;
+                    }
+                    // Retrieve the transmission.
+                    let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
+                        bail!(
+                            "BFT failed to retrieve transmission '{}' from round {}",
+                            fmt_id(transmission_id),
+                            certificate.round()
+                        );
+                    };
+                    // Add the transmission to the set.
+                    transmissions.insert(*transmission_id, transmission);
+                }
+            }
+            // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
+            if !IS_SYNCING {
+                // Construct the subdag.
+                let subdag = Subdag::from(commit_subdag.clone())?;
+                // Retrieve the anchor round.
+                let anchor_round = subdag.anchor_round();
+                // Retrieve the number of transmissions.
+                let num_transmissions = transmissions.len();
+                // Retrieve metadata about the subdag.
+                let subdag_metadata = subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
+
+                // Ensure the subdag anchor round matches the leader round.
+                ensure!(
+                    anchor_round == leader_round,
+                    "BFT failed to commit - the subdag anchor round {anchor_round} does not match the leader round {leader_round}",
+                );
+
+                // Trigger consensus.
+                if let Some(consensus_sender) = self.consensus_sender.get() {
+                    // Initialize a callback sender and receiver.
+                    let (callback_sender, callback_receiver) = oneshot::channel();
+                    // Send the subdag and transmissions to consensus.
+                    consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
+                    // Await the callback to continue.
+                    match callback_receiver.await {
+                        Ok(Ok(())) => (), // continue
+                        Ok(Err(e)) => {
+                            error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            error!("BFT failed to receive the callback for round {anchor_round} - {e}");
+                            return Ok(());
+                        }
+                    }
+                }
+
+                info!(
+                    "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
+                );
+                // Update the DAG, as the subdag was successfully included into a block.
+                let mut dag_write = self.dag.write();
+                for certificate in commit_subdag.values().flatten() {
+                    dag_write.commit(certificate, self.storage().max_gc_rounds());
+                }
+            }
         }
         Ok(())
     }
@@ -668,27 +702,42 @@ impl<N: Network> BFT<N> {
         // Return the certificates to commit.
         Ok(commit)
     }
+
+    /// Returns `true` if there is a path from the previous certificate to the current certificate.
+    fn is_linked(
+        &self,
+        previous_certificate: BatchCertificate<N>,
+        current_certificate: BatchCertificate<N>,
+    ) -> Result<bool> {
+        // Initialize the list containing the traversal.
+        let mut traversal = vec![current_certificate.clone()];
+        // Iterate over the rounds from the current certificate to the previous certificate.
+        for round in (previous_certificate.round()..current_certificate.round()).rev() {
+            // Retrieve all of the certificates for this past round.
+            let Some(certificates) = self.dag.read().get_certificates_for_round(round) else {
+                // This is a critical error, as the traversal should have these certificates.
+                // If this error is hit, it is likely that the maximum GC rounds should be increased.
+                bail!("BFT failed to retrieve the certificates for past round {round}");
+            };
+            // Filter the certificates to only include those that are in the traversal.
+            traversal = certificates
+                .into_values()
+                .filter(|p| traversal.iter().any(|c| c.previous_certificate_ids().contains(&p.id())))
+                .collect();
+        }
+        Ok(traversal.contains(&previous_certificate))
+    }
 }
 
 impl<N: Network> BFT<N> {
     /// Starts the BFT handlers.
     fn start_handlers(&self, bft_receiver: BFTReceiver<N>) {
         let BFTReceiver {
-            mut rx_last_election_certificate_ids,
             mut rx_primary_round,
             mut rx_primary_certificate,
             mut rx_sync_bft_dag_at_bootup,
             mut rx_sync_bft,
         } = bft_receiver;
-
-        // Process the request for the last election certificate IDs.
-        let self_ = self.clone();
-        self.spawn(async move {
-            while let Some(callback) = rx_last_election_certificate_ids.recv().await {
-                // Retrieve the last election certificate IDs, and send them to the callback.
-                callback.send(self_.last_election_certificate_ids()).ok();
-            }
-        });
 
         // Process the current round from the primary.
         let self_ = self.clone();
@@ -738,11 +787,11 @@ impl<N: Network> BFT<N> {
     /// Finally, it updates the DAG with the latest leader certificate.
     async fn sync_bft_dag_at_bootup(
         &self,
-        leader_certificates: Vec<(BatchCertificate<N>, IndexSet<Field<N>>)>,
+        leader_certificates: Vec<BatchCertificate<N>>,
         certificates: Vec<BatchCertificate<N>>,
     ) {
-        // Split the leader certificates into past leader certificates, the latest leader certificate, and the election certificate IDs.
-        let (past_leader_certificates, leader_certificate, election_certificate_ids) = {
+        // Split the leader certificates into past leader certificates and the latest leader certificate.
+        let (past_leader_certificates, leader_certificate) = {
             // Compute the penultimate index.
             let index = leader_certificates.len().saturating_sub(1);
             // Split the leader certificates.
@@ -750,9 +799,7 @@ impl<N: Network> BFT<N> {
             debug_assert!(latest.len() == 1, "There should only be one latest leader certificate");
             // Retrieve the latest leader certificate.
             match latest.first() {
-                Some((leader_certificate, election_certificate_ids)) => {
-                    (past, leader_certificate.clone(), election_certificate_ids.clone())
-                }
+                Some(leader_certificate) => (past, leader_certificate.clone()),
                 // If there is no latest leader certificate, return early.
                 None => return,
             }
@@ -769,23 +816,14 @@ impl<N: Network> BFT<N> {
                 }
             }
 
-            // Acquire the last election certificate IDs.
-            let mut last_election_certificate_ids = self.last_election_certificate_ids.write();
             // Iterate over the leader certificates.
-            for (leader_certificate, election_certificate_ids) in past_leader_certificates {
+            for leader_certificate in past_leader_certificates {
                 // Commit the leader certificate.
                 dag.commit(leader_certificate, self.storage().max_gc_rounds());
-                // Update the last election certificate IDs.
-                //
-                // Note: Because we will be committing the latest leader certificate after this,
-                // technically we do not need to be updating the last election certificate IDs
-                // for intermediate leader certificates. However, this is a safety mechanic to ensure completeness.
-                *last_election_certificate_ids = election_certificate_ids.clone();
             }
         }
         // Commit the latest leader certificate.
-        if let Err(e) = self.commit_leader_certificate::<true, true>(leader_certificate, election_certificate_ids).await
-        {
+        if let Err(e) = self.commit_leader_certificate::<true, true>(leader_certificate).await {
             error!("BFT failed to update the DAG with the latest leader certificate - {e}");
         }
     }
@@ -828,7 +866,7 @@ mod tests {
     use indexmap::IndexSet;
     use std::sync::{atomic::Ordering, Arc};
 
-    type CurrentNetwork = snarkvm::console::network::Testnet3;
+    type CurrentNetwork = snarkvm::console::network::MainnetV0;
 
     /// Samples a new test instance, with an optional committee round and the given maximum GC rounds.
     fn sample_test_instance(
