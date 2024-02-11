@@ -230,7 +230,10 @@ impl<N: Network> Consensus<N> {
             trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
             // Send the unconfirmed solution to the primary.
             if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
-                warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+                // If the BFT is synced, then log the warning.
+                if self.bft.is_synced() {
+                    warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+                }
             }
         }
         Ok(())
@@ -288,7 +291,13 @@ impl<N: Network> Consensus<N> {
             if let Err(e) =
                 self.primary_sender().send_unconfirmed_transaction(transaction_id, Data::Object(transaction)).await
             {
-                warn!("Failed to add unconfirmed transaction '{}' to the memory pool - {e}", fmt_id(transaction_id));
+                // If the BFT is synced, then log the warning.
+                if self.bft.is_synced() {
+                    warn!(
+                        "Failed to add unconfirmed transaction '{}' to the memory pool - {e}",
+                        fmt_id(transaction_id)
+                    );
+                }
             }
         }
         Ok(())

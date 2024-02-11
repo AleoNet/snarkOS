@@ -185,6 +185,11 @@ impl<N: Network> Primary<N> {
         self.storage.current_round()
     }
 
+    /// Returns `true` if the primary is synced.
+    pub fn is_synced(&self) -> bool {
+        self.sync.is_synced()
+    }
+
     /// Returns the gateway.
     pub const fn gateway(&self) -> &Gateway<N> {
         &self.gateway

@@ -118,6 +118,11 @@ impl<N: Network> BFT<N> {
         Ok(())
     }
 
+    /// Returns `true` if the primary is synced.
+    pub fn is_synced(&self) -> bool {
+        self.primary.is_synced()
+    }
+
     /// Returns the primary.
     pub const fn primary(&self) -> &Primary<N> {
         &self.primary
