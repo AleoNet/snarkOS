@@ -207,7 +207,7 @@ pub fn start_notification_message_loop() -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
             interval.tick().await;
-            // TODO (howardwu): Swap this with the official message for Testnet 3 announcements.
+            // TODO (howardwu): Swap this with the official message for announcements.
             // info!("{}", notification_message());
         }
     })
@@ -222,7 +222,7 @@ pub fn notification_message() -> String {
 
  ==================================================================================================
 
-                     🚧 Welcome to Aleo Testnet 3 Phase 3 - Calibration Period 🚧
+                     🚧 Welcome to Aleo - Calibration Period 🚧
 
  ==================================================================================================
 

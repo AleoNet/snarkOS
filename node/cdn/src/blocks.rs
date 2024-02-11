@@ -513,7 +513,7 @@ mod tests {
         rt.block_on(async {
             let client = reqwest::Client::new();
             let height =
-                cdn_get::<u32>(client, &format!("{TEST_BASE_URL}/testnet3/latest/height"), "height").await.unwrap();
+                cdn_get::<u32>(client, &format!("{TEST_BASE_URL}/mainnet/latest/height"), "height").await.unwrap();
             assert!(height > 0);
         });
     }

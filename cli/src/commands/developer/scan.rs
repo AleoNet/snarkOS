@@ -122,7 +122,7 @@ impl Scan {
             }
             (Some(start), None, None) => {
                 // Request the latest block height from the endpoint.
-                let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
+                let endpoint = format!("{}/mainnet/latest/height", self.endpoint);
                 let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
                 // Print a warning message if the user is attempting to scan the whole chain.
@@ -135,7 +135,7 @@ impl Scan {
             (None, Some(end), None) => Ok((0, end)),
             (None, None, Some(last)) => {
                 // Request the latest block height from the endpoint.
-                let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
+                let endpoint = format!("{}/mainnet/latest/height", self.endpoint);
                 let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
                 Ok((latest_height.saturating_sub(last), latest_height))
