@@ -99,6 +99,11 @@ impl<N: Network> Sync<N> {
                 let communication = &self_.gateway;
                 // let communication = &node.router;
                 self_.block_sync.try_block_sync(communication).await;
+
+                // Sync the storage with the blocks.
+                if let Err(e) = self_.sync_storage_with_blocks().await {
+                    error!("Unable to sync storage with blocks - {e}");
+                }
             }
         }));
 
@@ -117,13 +122,6 @@ impl<N: Network> Sync<N> {
             while let Some((peer_ip, blocks, callback)) = rx_block_sync_advance_with_sync_blocks.recv().await {
                 // Process the block response.
                 if let Err(e) = self_.block_sync.process_block_response(peer_ip, blocks) {
-                    // Send the error to the callback.
-                    callback.send(Err(e)).ok();
-                    continue;
-                }
-
-                // Sync the storage with the blocks.
-                if let Err(e) = self_.sync_storage_with_blocks().await {
                     // Send the error to the callback.
                     callback.send(Err(e)).ok();
                     continue;
@@ -185,9 +183,11 @@ impl<N: Network> Sync<N> {
 
         // Retrieve the block height.
         let block_height = latest_block.height();
+        // Determine the number of maximum number of blocks that would have been garbage collected.
+        let max_gc_blocks = u32::try_from(self.storage.max_gc_rounds())?.saturating_div(2);
         // Determine the earliest height, conservatively set to the block height minus the max GC rounds.
         // By virtue of the BFT protocol, we can guarantee that all GC range blocks will be loaded.
-        let gc_height = block_height.saturating_sub(u32::try_from(self.storage.max_gc_rounds())?);
+        let gc_height = block_height.saturating_sub(max_gc_blocks);
         // Retrieve the blocks.
         let blocks = self.ledger.get_blocks(gc_height..block_height.saturating_add(1))?;
 
@@ -270,27 +270,28 @@ impl<N: Network> Sync<N> {
         // Retrieve the latest block height.
         let mut current_height = self.ledger.latest_block_height() + 1;
 
-        // Find the sync peers.
-        let sync_peers = self.block_sync.find_sync_peers().map(|x| x.0).unwrap_or_default();
-        // Retrieve the highest block height.
-        let greatest_peer_height = sync_peers.into_values().max().unwrap_or(0u32);
+        // Retrieve the maximum block height of the peers.
+        let tip = self.block_sync.find_sync_peers().map(|(x, _)| x.into_values().max().unwrap_or(0)).unwrap_or(0);
         // Determine the number of maximum number of blocks that would have been garbage collected.
-        let maximum_gc_blocks = u32::try_from(self.storage.max_gc_rounds())?.saturating_div(2);
+        let max_gc_blocks = u32::try_from(self.storage.max_gc_rounds())?.saturating_div(2);
         // Determine the maximum height that the peer would have garbage collected.
-        let maximum_gc_height = greatest_peer_height.saturating_sub(maximum_gc_blocks);
+        let max_gc_height = tip.saturating_sub(max_gc_blocks);
 
-        // Determine if we need to sync the ledger without BFT.
-        if current_height <= maximum_gc_height {
-            // Try to advance the ledger without the BFT.
+        // Determine if we can sync the ledger without updating the BFT.
+        if current_height <= max_gc_height {
+            // Try to advance the ledger without updating the BFT.
             while let Some(block) = self.block_sync.process_next_block(current_height) {
+                // Break if the block height is greater than the maximum GC height.
+                if block.height() >= max_gc_height {
+                    break;
+                }
                 info!("Syncing the ledger to block {}...", block.height());
                 self.sync_ledger_with_block_without_bft(block).await?;
                 // Update the current height.
                 current_height += 1;
             }
-
             // Sync the storage with the ledger if we should transition to the BFT sync.
-            if current_height >= maximum_gc_height {
+            if current_height >= max_gc_height {
                 self.sync_storage_with_ledger_at_bootup().await?;
             }
         }
@@ -313,7 +314,6 @@ impl<N: Network> Sync<N> {
 
         // Check the next block.
         self.ledger.check_next_block(&block)?;
-
         // Attempt to advance to the next block.
         self.ledger.advance_to_next_block(&block)?;
 
