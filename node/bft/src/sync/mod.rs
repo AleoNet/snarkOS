@@ -268,6 +268,32 @@ impl<N: Network> Sync<N> {
     pub async fn sync_storage_with_blocks(&self) -> Result<()> {
         // Retrieve the latest block height.
         let mut current_height = self.ledger.latest_block_height() + 1;
+
+        // Find the sync peers.
+        let sync_peers = self.block_sync.find_sync_peers().map(|x| x.0).unwrap_or_default();
+        // Retrieve the highest block height.
+        let greatest_peer_height = sync_peers.into_values().max().unwrap_or(0u32);
+        // Determine the number of maximum number of blocks that would have been garbage collected.
+        let maximum_gc_blocks = u32::try_from(self.storage.max_gc_rounds())?.saturating_div(2);
+        // Determine the maximum height that the peer would have garbage collected.
+        let maximum_gc_height = greatest_peer_height.saturating_sub(maximum_gc_blocks);
+
+        // Determine if we need to sync the ledger without BFT.
+        if current_height <= maximum_gc_height {
+            // Try to advance the ledger without the BFT.
+            while let Some(block) = self.block_sync.process_next_block(current_height) {
+                info!("Syncing the ledger to block {}...", block.height());
+                self.sync_ledger_with_block_without_bft(block).await?;
+                // Update the current height.
+                current_height += 1;
+            }
+
+            // Sync the storage with the ledger if we should transition to the BFT sync.
+            if current_height >= maximum_gc_height {
+                self.sync_storage_with_ledger_at_bootup().await?;
+            }
+        }
+
         // Try to advance the ledger with sync blocks.
         while let Some(block) = self.block_sync.process_next_block(current_height) {
             info!("Syncing the BFT to block {}...", block.height());
@@ -276,6 +302,25 @@ impl<N: Network> Sync<N> {
             // Update the current height.
             current_height += 1;
         }
+        Ok(())
+    }
+
+    /// Syncs the ledger with the given block without using the BFT.
+    pub async fn sync_ledger_with_block_without_bft(&self, block: Block<N>) -> Result<()> {
+        // Acquire the sync lock.
+        let _lock = self.lock.lock().await;
+
+        // Check the next block.
+        self.ledger.check_next_block(&block)?;
+
+        // Attempt to advance to the next block.
+        self.ledger.advance_to_next_block(&block)?;
+
+        // Sync the height with the block.
+        self.storage.sync_height_with_block(block.height());
+        // Sync the round with the block.
+        self.storage.sync_round_with_block(block.round());
+
         Ok(())
     }
 
