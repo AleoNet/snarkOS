@@ -414,10 +414,9 @@ impl Start {
             println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
             // Print the node type and network.
             println!(
-                "🧭 Starting {} on {} {} at {}.\n",
+                "🧭 Starting {} on {} at {}.\n",
                 node_type.description().bold(),
                 N::NAME.bold(),
-                "Phase 3".bold(),
                 self.node.to_string().bold()
             );
 
