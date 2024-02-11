@@ -51,7 +51,7 @@ EOF
 }
 
 # Loop through aws-n nodes and start snarkOS in tmux sessions in parallel
-for NODE_ID in $(seq 0 $NUM_INSTANCES); do
+for NODE_ID in $(seq 0 $(($NUM_INSTANCES - 1))); do
   start_snarkos_in_tmux $NODE_ID "$NODE_0_IP" &
 done
 

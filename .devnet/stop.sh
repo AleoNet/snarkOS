@@ -34,7 +34,7 @@ EOF
 }
 
 # Loop through aws-n nodes and terminate tmux sessions in parallel
-for NODE_ID in $(seq 0 $NUM_INSTANCES); do
+for NODE_ID in $(seq 0 $(($NUM_INSTANCES - 1))); do
   terminate_tmux_session $NODE_ID &
 done
 

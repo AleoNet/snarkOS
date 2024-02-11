@@ -54,7 +54,7 @@ EOF
 }
 
 # Loop through aws-n nodes and run installations in parallel
-for NODE_ID in $(seq 0 $NUM_INSTANCES); do
+for NODE_ID in $(seq 0 $(($NUM_INSTANCES - 1))); do
   run_installation $NODE_ID $BRANCH &
 done
 
