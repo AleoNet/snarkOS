@@ -137,13 +137,14 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         let num_connected_provers = self.router().number_of_connected_provers();
         // Compute the number of surplus provers.
         let num_surplus_provers = num_connected_provers.saturating_sub(Self::MAXIMUM_NUMBER_OF_PROVERS);
+        // Compute the number of provers remaining connected.
+        let num_remaining_provers = num_connected_provers.saturating_sub(num_surplus_provers);
         // Obtain the number of connected peers.
         let num_connected = self.router().number_of_connected_peers();
+        // Compute the total number of surplus peers.
+        let num_surplus_peers = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
         // Compute the number of surplus clients and validators.
-        let num_surplus_clients_validators =
-            num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS).saturating_sub(num_connected_provers);
-        // Compute the number of deficit peers.
-        let num_deficient = Self::MEDIAN_NUMBER_OF_PEERS.saturating_sub(num_connected);
+        let num_surplus_clients_validators = num_surplus_peers.saturating_sub(num_remaining_provers);
 
         if num_surplus_provers > 0 || num_surplus_clients_validators > 0 {
             debug!(
@@ -200,6 +201,11 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 self.router().disconnect(peer_ip);
             }
         }
+
+        // Obtain the number of connected peers.
+        let num_connected = self.router().number_of_connected_peers();
+        // Compute the number of deficit peers.
+        let num_deficient = Self::MEDIAN_NUMBER_OF_PEERS.saturating_sub(num_connected);
 
         if num_deficient > 0 {
             // Initialize an RNG.
