@@ -290,18 +290,14 @@ impl<N: Network> Sync<N> {
         // Determine the maximum height that the peer would have garbage collected.
         let max_gc_height = tip.saturating_sub(max_gc_blocks);
 
-        // Determine if we can sync the ledger without updating the BFT.
+        // Determine if we can sync the ledger without updating the BFT first.
         if current_height <= max_gc_height {
-            // Try to advance the ledger without updating the BFT.
+            // Try to advance the ledger *to tip* without updating the BFT.
             while let Some(block) = self.block_sync.process_next_block(current_height) {
                 info!("Syncing the ledger to block {}...", block.height());
                 self.sync_ledger_with_block_without_bft(block).await?;
                 // Update the current height.
                 current_height += 1;
-                // Break if the current height exceeds the maximum GC height.
-                if current_height > max_gc_height {
-                    break;
-                }
             }
             // Sync the storage with the ledger if we should transition to the BFT sync.
             if current_height > max_gc_height {
