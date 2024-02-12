@@ -308,12 +308,13 @@ impl<N: Network> Consensus<N> {
             let num_deployments = tx_queue.deployments.len().min(capacity * CAPACITY_FOR_DEPLOYMENTS / 100);
             // Determine the number of executions to send.
             let num_executions = tx_queue.executions.len().min(capacity.saturating_sub(num_deployments));
-            // Interleave deployments and executions to prevent having too many consecutive deployments.
-            let is_deployment_iter = (0..num_deployments).map(|_| true).interleave((0..num_executions).map(|_| false));
-            // Drain the transactions from the queue.
-            is_deployment_iter
-                .filter_map(|is_deployment| {
-                    if is_deployment {
+            // Create an iterator which will select interleaved deployments and executions within the capacity.
+            // Note: interleaving ensures we will never have consecutive invalid deployments blocking the queue.
+            let selector_iter = (0..num_deployments).map(|_| true).interleave((0..num_executions).map(|_| false));
+            // Drain the transactions from the queue, interleaving deployments and executions.
+            selector_iter
+                .filter_map(|select_deployment| {
+                    if select_deployment {
                         tx_queue.deployments.pop_lru().map(|(_, tx)| tx)
                     } else {
                         tx_queue.executions.pop_lru().map(|(_, tx)| tx)
