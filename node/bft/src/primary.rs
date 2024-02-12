@@ -1316,12 +1316,14 @@ impl<N: Network> Primary<N> {
         if is_behind_schedule {
             // If the batch round is greater than the current committee round, update the committee.
             self.try_increment_to_the_next_round(batch_round).await?;
+            // Update the batch round with quorum in the round cache.
+            self.batch_round_cache.write().update_quorum_round(batch_round);
         // If our peer is far ahead, check if a quorum of peers is ahead and consider updating our committee.
         } else if is_peer_far_in_future {
             // Get the highest round seen from a quorum of the current committee
             let committee = self.ledger.get_committee_for_round(self.current_round())?;
             let round_with_quorum =
-                (*self.batch_round_cache.write()).update(batch_round, batch_header.author(), &committee)?;
+                self.batch_round_cache.write().update(batch_round, batch_header.author(), &committee)?;
             let is_quorum_far_in_future = round_with_quorum > self.current_round() + self.storage.max_gc_rounds();
             // If our primary is far behind a quorum of peers, update our committee to the round_with_quorum.
             if is_quorum_far_in_future {

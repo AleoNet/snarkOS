@@ -157,6 +157,11 @@ impl<N: Network> RoundCache<N> {
         Ok(self.last_highest_round_with_quorum)
     }
 
+    /// Update the cache based on a new round with quorum.
+    pub fn update_quorum_round(&mut self, round: u64) {
+        self.last_highest_round_with_quorum = round;
+    }
+
     /// Count the total stake backing an increase of last_highest_round_with_quorum
     fn validators_in_support(&self, committee: &Committee<N>) -> Result<HashSet<Address<N>>> {
         let mut validators_in_support = HashSet::with_capacity(committee.num_members());
