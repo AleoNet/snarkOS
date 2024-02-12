@@ -133,16 +133,17 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     /// TODO (howardwu): If the node is a validator, keep the validator.
     /// This function keeps the number of connected peers within the allowed range.
     fn handle_connected_peers(&self) {
+        // Obtain the number of connected peers.
+        let num_connected = self.router().number_of_connected_peers();
+        // Compute the total number of surplus peers.
+        let num_surplus_peers = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
+
         // Obtain the number of connected provers.
         let num_connected_provers = self.router().number_of_connected_provers();
         // Compute the number of surplus provers.
         let num_surplus_provers = num_connected_provers.saturating_sub(Self::MAXIMUM_NUMBER_OF_PROVERS);
         // Compute the number of provers remaining connected.
         let num_remaining_provers = num_connected_provers.saturating_sub(num_surplus_provers);
-        // Obtain the number of connected peers.
-        let num_connected = self.router().number_of_connected_peers();
-        // Compute the total number of surplus peers.
-        let num_surplus_peers = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
         // Compute the number of surplus clients and validators.
         let num_surplus_clients_validators = num_surplus_peers.saturating_sub(num_remaining_provers);
 
