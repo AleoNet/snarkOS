@@ -58,6 +58,27 @@ const CAPACITY_FOR_DEPLOYMENTS: usize = 20;
 /// Percentage of mempool transactions capacity reserved for executions.
 const CAPACITY_FOR_EXECUTIONS: usize = 80;
 
+/// Helper struct to track incoming transactions.
+struct TransactionsQueue<N: Network> {
+    pub deployments: LruCache<N::TransactionID, Transaction<N>>,
+    pub executions: LruCache<N::TransactionID, Transaction<N>>,
+}
+
+impl<N: Network> Default for TransactionsQueue<N> {
+    fn default() -> Self {
+        Self {
+            deployments: LruCache::new(
+                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_DEPLOYMENTS / 100)
+                    .unwrap(),
+            ),
+            executions: LruCache::new(
+                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_EXECUTIONS / 100)
+                    .unwrap(),
+            ),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Consensus<N: Network> {
     /// The ledger.
@@ -68,10 +89,8 @@ pub struct Consensus<N: Network> {
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The unconfirmed solutions queue.
     solutions_queue: Arc<Mutex<LruCache<PuzzleCommitment<N>, ProverSolution<N>>>>,
-    /// The unconfirmed deployment transactions queue.
-    deployments_queue: Arc<Mutex<LruCache<N::TransactionID, Transaction<N>>>>,
-    /// The unconfirmed execution transactions queue.
-    executions_queue: Arc<Mutex<LruCache<N::TransactionID, Transaction<N>>>>,
+    /// The unconfirmed transactions queue.
+    transactions_queue: Arc<Mutex<TransactionsQueue<N>>>,
     /// The recently-seen unconfirmed solutions.
     seen_solutions: Arc<Mutex<LruCache<PuzzleCommitment<N>, ()>>>,
     /// The recently-seen unconfirmed transactions.
@@ -108,14 +127,7 @@ impl<N: Network> Consensus<N> {
             solutions_queue: Arc::new(Mutex::new(LruCache::new(
                 NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
             ))),
-            deployments_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_DEPLOYMENTS / 100)
-                    .unwrap(),
-            ))),
-            executions_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_EXECUTIONS / 100)
-                    .unwrap(),
-            ))),
+            transactions_queue: Default::default(),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             handles: Default::default(),
@@ -273,10 +285,10 @@ impl<N: Network> Consensus<N> {
             // Add the transaction to the memory pool.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
             if transaction.is_deploy() {
-                if self.deployments_queue.lock().put(transaction_id, transaction).is_some() {
+                if self.transactions_queue.lock().deployments.put(transaction_id, transaction).is_some() {
                     bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
                 }
-            } else if self.executions_queue.lock().put(transaction_id, transaction).is_some() {
+            } else if self.transactions_queue.lock().executions.put(transaction_id, transaction).is_some() {
                 bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
             }
         }
@@ -290,20 +302,24 @@ impl<N: Network> Consensus<N> {
         let transactions = {
             // Determine the available capacity.
             let capacity = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
-            // Acquire the lock on the deployments queue.
-            let mut deployments_queue = self.deployments_queue.lock();
-            // Acquire the lock on the executions queue.
-            let mut executions_queue = self.executions_queue.lock();
+            // Acquire the lock on the transactions queue.
+            let mut tx_queue = self.transactions_queue.lock();
             // Determine the number of deployments to send.
-            let num_deployments = deployments_queue.len().min(capacity * CAPACITY_FOR_DEPLOYMENTS / 100);
+            let num_deployments = tx_queue.deployments.len().min(capacity * CAPACITY_FOR_DEPLOYMENTS / 100);
             // Determine the number of executions to send.
-            let num_executions = executions_queue.len().min(capacity.saturating_sub(num_deployments));
-            // Drain the deployments from the queue.
-            let deployments = (0..num_deployments).filter_map(|_| deployments_queue.pop_lru().map(|(_, tx)| tx));
-            // Drain the executions from the queue.
-            let executions = (0..num_executions).filter_map(|_| executions_queue.pop_lru().map(|(_, tx)| tx));
-            // Interleave the transactions to prevent having too many consecutive deployments.
-            executions.interleave(deployments).collect_vec()
+            let num_executions = tx_queue.executions.len().min(capacity.saturating_sub(num_deployments));
+            // Interleave deployments and executions to prevent having too many consecutive deployments.
+            let is_deployment_iter = (0..num_deployments).map(|_| true).interleave((0..num_executions).map(|_| false));
+            // Drain the transactions from the queue.
+            is_deployment_iter
+                .filter_map(|is_deployment| {
+                    if is_deployment {
+                        tx_queue.deployments.pop_lru().map(|(_, tx)| tx)
+                    } else {
+                        tx_queue.executions.pop_lru().map(|(_, tx)| tx)
+                    }
+                })
+                .collect_vec()
         };
         // Iterate over the transactions.
         for transaction in transactions.into_iter() {
