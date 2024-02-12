@@ -38,6 +38,8 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     const MINIMUM_NUMBER_OF_PEERS: usize = 3;
     /// The median number of peers to maintain connections with.
     const MEDIAN_NUMBER_OF_PEERS: usize = max(Self::MAXIMUM_NUMBER_OF_PEERS / 2, Self::MINIMUM_NUMBER_OF_PEERS);
+    /// The maximum number of provers to maintain connections with.
+    const MAXIMUM_NUMBER_OF_PROVERS: usize = Self::MAXIMUM_NUMBER_OF_PEERS / 4;
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
 
@@ -68,6 +70,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
         assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MEDIAN_NUMBER_OF_PEERS);
         assert!(Self::MEDIAN_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
+        assert!(Self::MAXIMUM_NUMBER_OF_PROVERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
     }
 
     /// This function logs the connected peers.
@@ -130,15 +133,22 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     /// TODO (howardwu): If the node is a validator, keep the validator.
     /// This function keeps the number of connected peers within the allowed range.
     fn handle_connected_peers(&self) {
+        // Obtain the number of connected provers.
+        let num_connected_provers = self.router().number_of_connected_provers();
+        // Compute the number of surplus provers.
+        let num_surplus_provers = num_connected_provers.saturating_sub(Self::MAXIMUM_NUMBER_OF_PROVERS);
         // Obtain the number of connected peers.
         let num_connected = self.router().number_of_connected_peers();
-        // Compute the number of surplus peers.
-        let num_surplus = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
+        // Compute the number of surplus clients and validators.
+        let num_surplus_clients_validators =
+            num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS).saturating_sub(num_connected_provers);
         // Compute the number of deficit peers.
         let num_deficient = Self::MEDIAN_NUMBER_OF_PEERS.saturating_sub(num_connected);
 
-        if num_surplus > 0 {
-            debug!("Exceeded maximum number of connected peers, disconnecting from {num_surplus} peers");
+        if num_surplus_provers > 0 || num_surplus_clients_validators > 0 {
+            debug!(
+                "Exceeded maximum number of connected peers, disconnecting from ({num_surplus_provers} + {num_surplus_clients_validators}) peers"
+            );
 
             // Retrieve the trusted peers.
             let trusted = self.router().trusted_peers();
@@ -148,18 +158,33 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             // Initialize an RNG.
             let rng = &mut OsRng;
 
-            // TODO (howardwu): As a validator, prioritize disconnecting from clients and provers.
-            //  Remove RNG, pick the `n` oldest nodes.
-            // Determine the peers to disconnect from.
-            let peer_ips_to_disconnect = self
+            // Determine the provers to disconnect from.
+            let prover_ips_to_disconnect = self
                 .router()
-                .connected_peers()
+                .connected_provers()
                 .into_iter()
                 .filter(|peer_ip| !trusted.contains(peer_ip) && !bootstrap.contains(peer_ip))
-                .choose_multiple(rng, num_surplus);
+                .choose_multiple(rng, num_surplus_provers);
+
+            // TODO (howardwu): As a validator, prioritize disconnecting from clients.
+            //  Remove RNG, pick the `n` oldest nodes.
+            // Determine the clients and validators to disconnect from.
+            let peer_ips_to_disconnect = self
+                .router()
+                .get_connected_peers()
+                .into_iter()
+                .filter_map(|peer| {
+                    let peer_ip = peer.ip();
+                    if !trusted.contains(&peer_ip) && !bootstrap.contains(&peer_ip) && !peer.is_prover() {
+                        Some(peer_ip)
+                    } else {
+                        None
+                    }
+                })
+                .choose_multiple(rng, num_surplus_clients_validators);
 
             // Proceed to send disconnect requests to these peers.
-            for peer_ip in peer_ips_to_disconnect {
+            for peer_ip in peer_ips_to_disconnect.into_iter().chain(prover_ips_to_disconnect) {
                 // TODO (howardwu): Remove this after specializing this function.
                 if self.router().node_type().is_prover() {
                     if let Some(peer) = self.router().get_connected_peer(&peer_ip) {
