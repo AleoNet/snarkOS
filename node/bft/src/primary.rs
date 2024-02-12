@@ -314,6 +314,9 @@ impl<N: Network> Primary<N> {
         // Retrieve the current round.
         let round = self.current_round();
 
+        #[cfg(feature = "metrics")]
+        metrics::gauge(metrics::bft::PROPOSAL_ROUND, round as f64);
+
         // Ensure the primary has not proposed a batch for this round before.
         if self.storage.contains_certificate_in_round_from(round, self.gateway.account().address()) {
             // If a BFT sender was provided, attempt to advance the current round.
@@ -718,23 +721,11 @@ impl<N: Network> Primary<N> {
         // Retrieve the batch certificate author.
         let author = certificate.author();
 
-        // Ensure the batch certificate is from the validator.
-        match self.gateway.resolver().get_address(peer_ip) {
-            // If the peer is a validator, then ensure the batch certificate is from the validator.
-            Some(address) => {
-                if address != author {
-                    // Proceed to disconnect the validator.
-                    self.gateway.disconnect(peer_ip);
-                    bail!("Malicious peer - batch certificate from a different validator ({author})");
-                }
-            }
-            None => bail!("Batch certificate from a disconnected validator"),
-        }
-        // Ensure the batch certificate is authored by a current committee member.
-        if !self.gateway.is_authorized_validator_address(author) {
+        // Ensure the batch certificate is from an authorized validator.
+        if !self.gateway.is_authorized_validator_ip(peer_ip) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
-            bail!("Malicious peer - Received a batch certificate from a non-committee member ({author})");
+            bail!("Malicious peer - Received a batch certificate from an unauthorized validator IP ({peer_ip})");
         }
         // Ensure the batch certificate is not from the current primary.
         if self.gateway.account().address() == author {
@@ -787,14 +778,11 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // Retrieve the batch certificate author.
-        let author = certificate.author();
-
-        // Ensure the batch certificate is authored by a current committee member.
-        if !self.gateway.is_authorized_validator_address(author) {
+        // Ensure the batch certificate is from an authorized validator.
+        if !self.gateway.is_authorized_validator_ip(peer_ip) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
-            bail!("Malicious peer - Received a batch certificate from a non-committee member ({author})");
+            bail!("Malicious peer - Received a batch certificate from an unauthorized validator IP ({peer_ip})");
         }
 
         // Store the certificate, after ensuring it is valid.
@@ -1342,11 +1330,26 @@ impl<N: Network> Primary<N> {
         }
 
         // Ensure the primary has all of the previous certificates.
-        let missing_previous_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
+        let missing_previous_certificates =
+            self.fetch_missing_previous_certificates(peer_ip, batch_header).await.map_err(|e| {
+                anyhow!("Failed to fetch missing previous certificates for round {batch_round} from '{peer_ip}' - {e}")
+            })?;
         // Ensure the primary has all of the election certificates.
-        let missing_election_certificates = self.fetch_missing_election_certificates(peer_ip, batch_header).await?;
+        let missing_election_certificates = match self.fetch_missing_election_certificates(peer_ip, batch_header).await
+        {
+            Ok(missing_election_certificates) => missing_election_certificates,
+            Err(e) => {
+                // TODO (howardwu): Change this to return early, once we have persistence on the election certificates.
+                error!("Failed to fetch missing election certificates for round {batch_round} from '{peer_ip}' - {e}");
+                // Note: We do not return early on error, because we can still proceed without the election certificates,
+                // albeit with reduced safety guarantees for commits. This is not a long-term solution.
+                Default::default()
+            }
+        };
         // Ensure the primary has all of the transmissions.
-        let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await?;
+        let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await.map_err(|e| {
+            anyhow!("Failed to fetch missing transmissions for round {batch_round} from '{peer_ip}' - {e}")
+        })?;
 
         // Iterate through the missing previous certificates.
         for batch_certificate in missing_previous_certificates {

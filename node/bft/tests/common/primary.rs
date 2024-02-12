@@ -49,16 +49,16 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
+use aleo_std::StorageMode;
+use indexmap::IndexMap;
+use itertools::Itertools;
+use parking_lot::Mutex;
 use std::{
     collections::HashMap,
     ops::RangeBounds,
     sync::{Arc, OnceLock},
     time::Duration,
 };
-
-use indexmap::IndexMap;
-use itertools::Itertools;
-use parking_lot::Mutex;
 use tokio::{task::JoinHandle, time::sleep};
 use tracing::*;
 
@@ -151,7 +151,7 @@ impl TestNetwork {
         for (id, account) in accounts.into_iter().enumerate() {
             let mut rng = TestRng::fixed(id as u64);
             let gen_ledger = genesis_ledger(gen_key, committee.clone(), balances.clone(), &mut rng);
-            let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger));
+            let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger, Default::default()));
             let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
 
             let (primary, bft) = if config.bft {
@@ -389,5 +389,5 @@ fn genesis_ledger(
         })
         .clone();
     // Initialize the ledger with the genesis block.
-    CurrentLedger::load(block, None).unwrap()
+    CurrentLedger::load(block, StorageMode::Production).unwrap()
 }

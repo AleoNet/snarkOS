@@ -24,6 +24,7 @@ use snarkvm::prelude::{
     ViewKey,
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
 
@@ -40,18 +41,30 @@ impl<N: Network> Node<N> {
     /// Initializes a new validator node.
     pub async fn new_validator(
         node_ip: SocketAddr,
-        rest_ip: Option<SocketAddr>,
         bft_ip: Option<SocketAddr>,
+        rest_ip: Option<SocketAddr>,
+        rest_rps: u32,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
-            Validator::new(node_ip, rest_ip, bft_ip, account, trusted_peers, trusted_validators, genesis, cdn, dev)
-                .await?,
+            Validator::new(
+                node_ip,
+                bft_ip,
+                rest_ip,
+                rest_rps,
+                account,
+                trusted_peers,
+                trusted_validators,
+                genesis,
+                cdn,
+                storage_mode,
+            )
+            .await?,
         )))
     }
 
@@ -61,22 +74,25 @@ impl<N: Network> Node<N> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
-        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, dev).await?)))
+        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, storage_mode).await?)))
     }
 
     /// Initializes a new client node.
     pub async fn new_client(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
+        rest_rps: u32,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
-        Ok(Self::Client(Arc::new(Client::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev).await?)))
+        Ok(Self::Client(Arc::new(
+            Client::new(node_ip, rest_ip, rest_rps, account, trusted_peers, genesis, cdn, storage_mode).await?,
+        )))
     }
 
     /// Returns the node type.

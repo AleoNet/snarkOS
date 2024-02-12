@@ -16,6 +16,7 @@
 
 #[cfg(test)]
 mod tests {
+    use aleo_std::StorageMode;
     use snarkos_node_cdn::sync_ledger_with_cdn;
     use snarkvm::prelude::{
         block::Block,
@@ -38,11 +39,12 @@ mod tests {
         // Initialize the genesis block.
         let genesis = Block::<CurrentNetwork>::read_le(CurrentNetwork::genesis_bytes()).unwrap();
         // Initialize the ledger.
-        let ledger = Ledger::<_, ConsensusMemory<_>>::load(genesis, None).unwrap();
+        let ledger = Ledger::<_, ConsensusMemory<_>>::load(genesis, StorageMode::Production).unwrap();
         // Perform the sync.
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let completed_height = sync_ledger_with_cdn(TEST_BASE_URL, ledger.clone()).await.unwrap();
+            let completed_height =
+                sync_ledger_with_cdn(TEST_BASE_URL, ledger.clone(), Default::default()).await.unwrap();
             assert_eq!(completed_height, ledger.latest_height());
         });
     }

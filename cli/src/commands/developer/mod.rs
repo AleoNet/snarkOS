@@ -81,10 +81,10 @@ impl Developer {
     }
 
     /// Parse the package from the directory.
-    fn parse_package(program_id: ProgramID<CurrentNetwork>, path: Option<String>) -> Result<Package<CurrentNetwork>> {
+    fn parse_package(program_id: ProgramID<CurrentNetwork>, path: &Option<String>) -> Result<Package<CurrentNetwork>> {
         // Instantiate a path to the directory containing the manifest file.
         let directory = match path {
-            Some(path) => PathBuf::from_str(&path)?,
+            Some(path) => PathBuf::from_str(path)?,
             None => std::env::current_dir()?,
         };
 
@@ -167,9 +167,9 @@ impl Developer {
 
     /// Determine if the transaction should be broadcast or displayed to user.
     fn handle_transaction(
-        broadcast: Option<String>,
+        broadcast: &Option<String>,
         dry_run: bool,
-        store: Option<String>,
+        store: &Option<String>,
         transaction: Transaction<CurrentNetwork>,
         operation: String,
     ) -> Result<String> {
@@ -181,7 +181,7 @@ impl Developer {
 
         // Determine if the transaction should be stored.
         if let Some(path) = store {
-            match PathBuf::from_str(&path) {
+            match PathBuf::from_str(path) {
                 Ok(file_path) => {
                     let transaction_bytes = transaction.to_bytes_le()?;
                     std::fs::write(&file_path, transaction_bytes)?;
@@ -196,7 +196,7 @@ impl Developer {
         // Determine if the transaction should be broadcast to the network.
         if let Some(endpoint) = broadcast {
             // Send the deployment request to the local development node.
-            match ureq::post(&endpoint).send_json(&transaction) {
+            match ureq::post(endpoint).send_json(&transaction) {
                 Ok(id) => {
                     // Remove the quotes from the response.
                     let response_string = id.into_string()?.trim_matches('\"').to_string();
@@ -208,14 +208,14 @@ impl Developer {
                     match transaction {
                         Transaction::Deploy(..) => {
                             println!(
-                                "✅ Successfully broadcast deployment {transaction_id} ('{}') to {}.",
+                                "⌛ Deployment {transaction_id} ('{}') has been broadcast to {}.",
                                 operation.bold(),
                                 endpoint
                             )
                         }
                         Transaction::Execute(..) => {
                             println!(
-                                "✅ Successfully broadcast execution {transaction_id} ('{}') to {}.",
+                                "⌛ Execution {transaction_id} ('{}') has been broadcast to {}.",
                                 operation.bold(),
                                 endpoint
                             )

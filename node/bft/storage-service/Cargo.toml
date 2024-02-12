@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-bft-storage-service"
-version = "2.2.5"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A storage service for the memory pool in a decentralized operating system"
 homepage = "https://aleo.org"
@@ -21,6 +21,9 @@ default = [ ]
 memory = [ "parking_lot", "tracing" ]
 persistent = [ ]
 test = [ "memory" ]
+
+[dependencies.aleo-std]
+workspace = true
 
 [dependencies.indexmap]
 version = "2.1"
