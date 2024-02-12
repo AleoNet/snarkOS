@@ -176,7 +176,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 .into_iter()
                 .filter_map(|peer| {
                     let peer_ip = peer.ip();
-                    if !trusted.contains(&peer_ip) && !bootstrap.contains(&peer_ip) && !peer.is_prover() {
+                    if !peer.is_prover() && !trusted.contains(&peer_ip) && !bootstrap.contains(&peer_ip) {
                         Some(peer_ip)
                     } else {
                         None
