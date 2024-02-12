@@ -1321,7 +1321,7 @@ impl<N: Network> Primary<N> {
         // If our peer is far ahead, check if a quorum of peers is ahead and consider updating our committee.
         } else if is_peer_far_in_future {
             // Get the highest round seen from a quorum of the current committee
-            let committee = self.ledger.get_committee_for_round(self.current_round())?;
+            let committee = self.ledger.get_previous_committee_for_round(self.current_round())?;
             let round_with_quorum =
                 self.batch_round_cache.write().update(batch_round, batch_header.author(), &committee)?;
             let is_quorum_far_in_future = round_with_quorum > self.current_round() + self.storage.max_gc_rounds();
