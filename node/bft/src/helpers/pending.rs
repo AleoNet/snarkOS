@@ -26,6 +26,8 @@ pub const NUM_REDUNDANT_REQUESTS: usize = 2;
 #[cfg(test)]
 pub const NUM_REDUNDANT_REQUESTS: usize = 10;
 
+const CALLBACK_TIMEOUT_IN_SECS: i64 = 5;
+
 #[derive(Debug)]
 pub struct Pending<T: PartialEq + Eq + Hash, V: Clone> {
     /// The map of pending `items` to `peer IPs` that have the item.
@@ -125,9 +127,6 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
 
     /// Removes the callbacks for the specified `item` that have expired.
     pub fn clear_expired_callbacks_for_item(&self, item: impl Into<T>) {
-        // Initialize the callback timeout in seconds.
-        const CALLBACK_TIMEOUT_IN_SECS: i64 = 5;
-
         // Fetch the current timestamp.
         let now = OffsetDateTime::now_utc().unix_timestamp();
 
@@ -146,6 +145,8 @@ mod tests {
         ledger::{coinbase::PuzzleCommitment, narwhal::TransmissionID},
         prelude::{Rng, TestRng},
     };
+
+    use std::{thread, time::Duration};
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
@@ -205,6 +206,55 @@ mod tests {
 
         // Check empty again.
         assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn test_expired_callbacks() {
+        let rng = &mut TestRng::default();
+
+        // Initialize the ready queue.
+        let pending = Pending::<TransmissionID<CurrentNetwork>, ()>::new();
+
+        // Check initially empty.
+        assert!(pending.is_empty());
+        assert_eq!(pending.len(), 0);
+
+        // Initialize the commitments.
+        let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+
+        // Initialize the SocketAddrs.
+        let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let addr_2 = SocketAddr::from(([127, 0, 0, 1], 2345));
+        let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
+
+        // Initialize the callbacks.
+        let (callback_sender_1, _) = oneshot::channel();
+        let (callback_sender_2, _) = oneshot::channel();
+        let (callback_sender_3, _) = oneshot::channel();
+
+        // Insert the commitments.
+        assert!(pending.insert(commitment_1, addr_1, Some(callback_sender_1)));
+        assert!(pending.insert(commitment_1, addr_2, Some(callback_sender_2)));
+
+        // Sleep for a few seconds.
+        thread::sleep(Duration::from_secs(CALLBACK_TIMEOUT_IN_SECS as u64 - 1));
+
+        assert!(pending.insert(commitment_1, addr_3, Some(callback_sender_3)));
+
+        // Check that the number of callbacks has not changed.
+        assert_eq!(pending.num_callbacks(commitment_1), 3);
+
+        // Wait for 2 seconds.
+        thread::sleep(Duration::from_secs(2));
+
+        // Ensure that the expired callbacks have been removed.
+        assert_eq!(pending.num_callbacks(commitment_1), 1);
+
+        // Wait for `CALLBACK_TIMEOUT_IN_SECS` seconds.
+        thread::sleep(Duration::from_secs(CALLBACK_TIMEOUT_IN_SECS as u64));
+
+        // Ensure that the expired callbacks have been removed.
+        assert_eq!(pending.num_callbacks(commitment_1), 0);
     }
 }
 
