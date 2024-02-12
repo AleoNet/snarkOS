@@ -14,14 +14,13 @@
 
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
-    helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
+    helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver, NUM_REDUNDANT_REQUESTS},
     ProposedBatch,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
     MAX_WORKERS,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_sync::REDUNDANCY_FACTOR;
 use snarkvm::{
     console::prelude::*,
     ledger::{
@@ -390,14 +389,14 @@ impl<N: Network> Worker<N> {
         // Determine how many requests are pending for the transmission.
         let num_pending_requests = self.pending.num_callbacks(transmission_id);
         // If the number of requests is less than or equal to the the redundancy factor, send the transmission request to the peer.
-        if num_pending_requests <= REDUNDANCY_FACTOR {
+        if num_pending_requests <= NUM_REDUNDANT_REQUESTS {
             // Send the transmission request to the peer.
             if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
                 bail!("Unable to fetch transmission - failed to send request")
             }
         } else {
             debug!(
-                "Skipped sending transmission request to {peer_ip} for {} - already pending {REDUNDANCY_FACTOR} requests",
+                "Skipped sending transmission request to {peer_ip} for {} - already pending {NUM_REDUNDANT_REQUESTS} requests",
                 fmt_id(transmission_id)
             );
         }

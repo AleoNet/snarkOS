@@ -21,6 +21,11 @@ use std::{
 use time::OffsetDateTime;
 use tokio::sync::oneshot;
 
+#[cfg(not(test))]
+pub const NUM_REDUNDANT_REQUESTS: usize = 2;
+#[cfg(test)]
+pub const NUM_REDUNDANT_REQUESTS: usize = 10;
+
 #[derive(Debug)]
 pub struct Pending<T: PartialEq + Eq + Hash, V: Clone> {
     /// The map of pending `items` to `peer IPs` that have the item.

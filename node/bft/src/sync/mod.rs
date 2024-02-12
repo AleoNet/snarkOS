@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{fmt_id, BFTSender, Pending, Storage, SyncReceiver},
+    helpers::{fmt_id, BFTSender, Pending, Storage, SyncReceiver, NUM_REDUNDANT_REQUESTS},
     Gateway,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -21,7 +21,7 @@ use crate::{
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode, REDUNDANCY_FACTOR};
+use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
@@ -415,14 +415,14 @@ impl<N: Network> Sync<N> {
             // Determine how many requests are pending for the certificate.
             let num_pending_requests = self.pending.num_callbacks(certificate_id);
             // If the number of requests is less than or equal to the redundancy factor, send the certificate request to the peer.
-            if num_pending_requests <= REDUNDANCY_FACTOR {
+            if num_pending_requests <= NUM_REDUNDANT_REQUESTS {
                 // Send the certificate request to the peer.
                 if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
                     bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
                 }
             } else {
                 debug!(
-                    "Skipped sending certificate request to {peer_ip} for {} - already pending {REDUNDANCY_FACTOR} requests",
+                    "Skipped sending certificate request to {peer_ip} for {} - already pending {NUM_REDUNDANT_REQUESTS} requests",
                     fmt_id(certificate_id)
                 );
             }
