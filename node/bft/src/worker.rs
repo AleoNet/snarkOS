@@ -14,7 +14,7 @@
 
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
-    helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
+    helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver, NUM_REDUNDANT_REQUESTS},
     ProposedBatch,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -386,9 +386,16 @@ impl<N: Network> Worker<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Insert the transmission ID into the pending queue.
         self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
-        // Send the transmission request to the peer.
-        if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
-            bail!("Unable to fetch transmission - failed to send request")
+        // Determine how many requests are pending for the transmission.
+        let num_pending_requests = self.pending.num_callbacks(transmission_id);
+        // If the number of requests is less than or equal to the the redundancy factor, send the transmission request to the peer.
+        if num_pending_requests <= NUM_REDUNDANT_REQUESTS {
+            // Send the transmission request to the peer.
+            if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
+                bail!("Unable to fetch transmission - failed to send request")
+            }
+        } else {
+            trace!("Skipped sending redundant request for transmission {} to '{peer_ip}'", fmt_id(transmission_id));
         }
         // Wait for the transmission to be fetched.
         match timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {
