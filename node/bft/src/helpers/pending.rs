@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::MAX_FETCH_TIMEOUT_IN_MS;
+
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
@@ -26,7 +28,7 @@ pub const NUM_REDUNDANT_REQUESTS: usize = 2;
 #[cfg(test)]
 pub const NUM_REDUNDANT_REQUESTS: usize = 10;
 
-const CALLBACK_TIMEOUT_IN_SECS: i64 = 5;
+const CALLBACK_TIMEOUT_IN_SECS: i64 = MAX_FETCH_TIMEOUT_IN_MS as i64 / 1000;
 
 #[derive(Debug)]
 pub struct Pending<T: PartialEq + Eq + Hash, V: Clone> {
@@ -79,7 +81,6 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         let item = item.into();
         // Clear the callbacks that have expired.
         self.clear_expired_callbacks_for_item(item);
-
         // Return the number of live callbacks.
         self.callbacks.lock().get(&item).map_or(0, |callbacks| callbacks.len())
     }
@@ -127,11 +128,10 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
 
     /// Removes the callbacks for the specified `item` that have expired.
     pub fn clear_expired_callbacks_for_item(&self, item: impl Into<T>) {
-        // Fetch the current timestamp.
-        let now = OffsetDateTime::now_utc().unix_timestamp();
-
         // Clear the callbacks that have expired.
         if let Some(callbacks) = self.callbacks.lock().get_mut(&item.into()) {
+            // Fetch the current timestamp.
+            let now = OffsetDateTime::now_utc().unix_timestamp();
             // Remove the callbacks that have expired.
             callbacks.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_TIMEOUT_IN_SECS);
         }

@@ -421,10 +421,7 @@ impl<N: Network> Sync<N> {
                     bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
                 }
             } else {
-                debug!(
-                    "Skipped sending certificate request to {peer_ip} for {} - already pending {NUM_REDUNDANT_REQUESTS} requests",
-                    fmt_id(certificate_id)
-                );
+                trace!("Skipped sending redundant request for certificate {} to '{peer_ip}'", fmt_id(certificate_id));
             }
         }
         // Wait for the certificate to be fetched.
