@@ -59,8 +59,8 @@ impl<N: Network> RoundCache<N> {
         }
     }
 
-    /// Insert a validator at a round.
-    fn insert_validator_at_round(&mut self, round: u64, validator: AddressWithCoordinate<N>) {
+    /// Insert a round seen for a validator.
+    fn insert_round_for_validator(&mut self, round: u64, validator: AddressWithCoordinate<N>) {
         match self.highest_rounds.binary_search_by_key(&round, |(r, _)| *r) {
             // Add the validator to the existing round.
             Ok(new_address_index) => self.highest_rounds[new_address_index].1.push(validator),
@@ -129,14 +129,14 @@ impl<N: Network> RoundCache<N> {
                         inserted = true;
                         self.address_rounds[address_index].1 = round;
                         self.prune_validator_from_highest_rounds(old_round, validator.x)?;
-                        self.insert_validator_at_round(round, validator);
+                        self.insert_round_for_validator(round, validator);
                     }
                 }
                 // Insert the new validator.
                 Err(address_index) => {
                     inserted = true;
                     self.address_rounds.insert(address_index, (validator, round));
-                    self.insert_validator_at_round(round, validator);
+                    self.insert_round_for_validator(round, validator);
                 }
             }
             // Prune validators if the cache exceeds the current committee size.
