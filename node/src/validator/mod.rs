@@ -138,8 +138,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             handles: Default::default(),
             shutdown,
         };
-        // Initialize the transaction pool.
-        node.initialize_transaction_pool(storage_mode)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
@@ -337,85 +335,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     //     });
     //     Ok(())
     // }
-
-    /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self, storage_mode: StorageMode) -> Result<()> {
-        use snarkvm::console::{
-            program::{Identifier, Literal, ProgramID, Value},
-            types::U64,
-        };
-        use std::str::FromStr;
-
-        // Initialize the locator.
-        let locator = (ProgramID::from_str("credits.aleo")?, Identifier::from_str("transfer_public")?);
-
-        // Determine whether to start the loop.
-        match storage_mode {
-            // If the node is running in development mode, only generate if you are allowed.
-            StorageMode::Development(id) => {
-                // If the node is not the first node, do not start the loop.
-                if id != 0 {
-                    return Ok(());
-                }
-            }
-            _ => {
-                // Retrieve the genesis committee.
-                let Ok(Some(committee)) = self.ledger.get_committee_for_round(0) else {
-                    // If the genesis committee is not available, do not start the loop.
-                    return Ok(());
-                };
-                // Retrieve the first member.
-                // Note: It is guaranteed that the committee has at least one member.
-                let first_member = committee.members().first().unwrap().0;
-                // If the node is not the first member, do not start the loop.
-                if self.address() != *first_member {
-                    return Ok(());
-                }
-            }
-        }
-
-        let self_ = self.clone();
-        self.spawn(async move {
-            tokio::time::sleep(Duration::from_secs(3)).await;
-            info!("Starting transaction pool...");
-
-            // Start the transaction loop.
-            loop {
-                tokio::time::sleep(Duration::from_millis(500)).await;
-
-                // Prepare the inputs.
-                let inputs = [Value::from(Literal::Address(self_.address())), Value::from(Literal::U64(U64::new(1)))];
-                // Execute the transaction.
-                let transaction = match self_.ledger.vm().execute(
-                    self_.private_key(),
-                    locator,
-                    inputs.into_iter(),
-                    None,
-                    10_000,
-                    None,
-                    &mut rand::thread_rng(),
-                ) {
-                    Ok(transaction) => transaction,
-                    Err(error) => {
-                        error!("Transaction pool encountered an execution error - {error}");
-                        continue;
-                    }
-                };
-                // Broadcast the transaction.
-                if self_
-                    .unconfirmed_transaction(
-                        self_.router.local_ip(),
-                        UnconfirmedTransaction::from(transaction.clone()),
-                        transaction.clone(),
-                    )
-                    .await
-                {
-                    info!("Transaction pool broadcasted the transaction");
-                }
-            }
-        });
-        Ok(())
-    }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
