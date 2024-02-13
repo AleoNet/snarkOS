@@ -23,7 +23,7 @@ use snarkvm::{
     },
     ledger::{
         block::Block,
-        committee::{Committee, MIN_VALIDATOR_STAKE},
+        committee::{Committee, MIN_DELEGATOR_STAKE, MIN_VALIDATOR_STAKE},
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
     },
     prelude::{FromBytes, ToBits, ToBytes},
@@ -36,6 +36,7 @@ use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
+use indexmap::IndexMap;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use std::{net::SocketAddr, path::PathBuf};
@@ -127,6 +128,10 @@ pub struct Start {
     /// Specify the path to a directory containing the ledger
     #[clap(long = "storage_path")]
     pub storage_path: Option<PathBuf>,
+
+    #[clap(long)]
+    /// If development mode is enabled, specify the custom bonded balances as a json object. (default: None)
+    dev_bonded_balances: Option<String>,
 }
 
 impl Start {
@@ -314,23 +319,72 @@ impl Start {
             // Initialize the development private keys.
             let development_private_keys =
                 (0..num_committee_members).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
+            // Initialize the development addresses.
+            let development_addresses =
+                development_private_keys.iter().map(Address::<N>::try_from).collect::<Result<Vec<_>>>()?;
 
-            // Construct the committee.
-            let committee = {
-                // Calculate the committee stake per member.
-                let stake_per_member =
-                    N::STARTING_SUPPLY.saturating_div(2).saturating_div(num_committee_members as u64);
-                ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
+            // Construct the committee based on the state of the bonded balances.
+            let (committee, bonded_balances) = match &self.dev_bonded_balances {
+                Some(bonded_balances) => {
+                    // Parse the bonded balances.
+                    let bonded_balances: IndexMap<Address<N>, (Address<N>, u64)> =
+                        serde_json::from_str(bonded_balances)?;
 
-                // Construct the committee members and distribute stakes evenly among committee members.
-                let members = development_private_keys
-                    .iter()
-                    .map(|private_key| Ok((Address::try_from(private_key)?, (stake_per_member, true))))
-                    .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+                    // Construct the committee members.
+                    let mut members = IndexMap::new();
+                    for (staker_address, (validator_address, amount)) in bonded_balances.iter() {
+                        // Ensure that the staking amount is sufficient.
+                        match staker_address == validator_address {
+                            true => ensure!(amount >= &MIN_VALIDATOR_STAKE, "Validator stake is too low"),
+                            false => ensure!(amount >= &MIN_DELEGATOR_STAKE, "Delegator stake is too low"),
+                        }
 
-                // Output the committee.
-                Committee::<N>::new(0u64, members)?
+                        // Ensure that the validator address is included in the list of development addresses.
+                        ensure!(
+                            development_addresses.contains(validator_address),
+                            "Validator address {validator_address} is not included in the list of development addresses"
+                        );
+
+                        // Add or update the validator entry in the list of members.
+                        members
+                            .entry(*validator_address)
+                            .and_modify(|(stake, _)| *stake += amount)
+                            .or_insert((*amount, true));
+                    }
+                    // Construct the committee.
+                    let committee = Committee::<N>::new(0u64, members)?;
+                    (committee, bonded_balances)
+                }
+                None => {
+                    // Calculate the committee stake per member.
+                    let stake_per_member =
+                        N::STARTING_SUPPLY.saturating_div(2).saturating_div(num_committee_members as u64);
+                    ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
+
+                    // Construct the committee members and distribute stakes evenly among committee members.
+                    let members = development_addresses
+                        .iter()
+                        .map(|address| (*address, (stake_per_member, true)))
+                        .collect::<IndexMap<_, _>>();
+
+                    // Construct the bonded balances.
+                    let bonded_balances = members
+                        .iter()
+                        .map(|(address, (stake, _))| (*address, (*address, *stake)))
+                        .collect::<IndexMap<_, _>>();
+                    // Construct the committee.
+                    let committee = Committee::<N>::new(0u64, members)?;
+
+                    (committee, bonded_balances)
+                }
             };
+
+            // Ensure that the number of committee members is correct.
+            ensure!(
+                committee.members().len() == num_committee_members as usize,
+                "Number of committee members {} does not match the expected number of members {num_committee_members}",
+                committee.members().len()
+            );
 
             // Calculate the public balance per validator.
             let remaining_balance = N::STARTING_SUPPLY.saturating_sub(committee.total_stake());
@@ -357,7 +411,7 @@ impl Start {
             }
 
             // Construct the genesis block.
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
+            load_or_compute_genesis(development_private_keys[0], committee, public_balances, bonded_balances, &mut rng)
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
@@ -595,10 +649,10 @@ mod tests {
 
         let config = Start::try_parse_from(["snarkos", "--peers", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
         assert!(config.parse_trusted_peers().is_ok());
-        assert_eq!(
-            config.parse_trusted_peers().unwrap(),
-            vec![SocketAddr::from_str("1.2.3.4:5").unwrap(), SocketAddr::from_str("6.7.8.9:0").unwrap()]
-        );
+        assert_eq!(config.parse_trusted_peers().unwrap(), vec![
+            SocketAddr::from_str("1.2.3.4:5").unwrap(),
+            SocketAddr::from_str("6.7.8.9:0").unwrap()
+        ]);
     }
 
     #[test]
@@ -613,10 +667,10 @@ mod tests {
 
         let config = Start::try_parse_from(["snarkos", "--validators", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
         assert!(config.parse_trusted_validators().is_ok());
-        assert_eq!(
-            config.parse_trusted_validators().unwrap(),
-            vec![SocketAddr::from_str("1.2.3.4:5").unwrap(), SocketAddr::from_str("6.7.8.9:0").unwrap()]
-        );
+        assert_eq!(config.parse_trusted_validators().unwrap(), vec![
+            SocketAddr::from_str("1.2.3.4:5").unwrap(),
+            SocketAddr::from_str("6.7.8.9:0").unwrap()
+        ]);
     }
 
     #[test]
