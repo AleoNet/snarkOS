@@ -514,6 +514,7 @@ fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
+    bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, u64)>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
@@ -523,6 +524,7 @@ fn load_or_compute_genesis<N: Network>(
     preimage.extend(genesis_private_key.to_bytes_le()?);
     preimage.extend(committee.to_bytes_le()?);
     preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
+    preimage.extend(&to_bytes_le![bonded_balances.iter().collect::<Vec<(_, _)>>()]?);
 
     // Input the parameters' metadata.
     preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
@@ -566,7 +568,7 @@ fn load_or_compute_genesis<N: Network>(
     // Initialize a new VM.
     let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(Some(0))?)?;
     // Initialize the genesis block.
-    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng)?;
+    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng)?;
     // Write the genesis block to the file.
     std::fs::write(&file_path, block.to_bytes_le()?)?;
     // Return the genesis block.
@@ -593,10 +595,10 @@ mod tests {
 
         let config = Start::try_parse_from(["snarkos", "--peers", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
         assert!(config.parse_trusted_peers().is_ok());
-        assert_eq!(config.parse_trusted_peers().unwrap(), vec![
-            SocketAddr::from_str("1.2.3.4:5").unwrap(),
-            SocketAddr::from_str("6.7.8.9:0").unwrap()
-        ]);
+        assert_eq!(
+            config.parse_trusted_peers().unwrap(),
+            vec![SocketAddr::from_str("1.2.3.4:5").unwrap(), SocketAddr::from_str("6.7.8.9:0").unwrap()]
+        );
     }
 
     #[test]
@@ -611,10 +613,10 @@ mod tests {
 
         let config = Start::try_parse_from(["snarkos", "--validators", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
         assert!(config.parse_trusted_validators().is_ok());
-        assert_eq!(config.parse_trusted_validators().unwrap(), vec![
-            SocketAddr::from_str("1.2.3.4:5").unwrap(),
-            SocketAddr::from_str("6.7.8.9:0").unwrap()
-        ]);
+        assert_eq!(
+            config.parse_trusted_validators().unwrap(),
+            vec![SocketAddr::from_str("1.2.3.4:5").unwrap(), SocketAddr::from_str("6.7.8.9:0").unwrap()]
+        );
     }
 
     #[test]
