@@ -191,7 +191,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         }
     }
 
-    // TODO (howardwu): Remove this for Phase 3.
     /// This function keeps the number of bootstrap peers within the allowed range.
     fn handle_bootstrap_peers(&self) {
         // Split the bootstrap peers into connected and candidate lists.
