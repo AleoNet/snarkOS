@@ -39,6 +39,7 @@ use core::str::FromStr;
 use indexmap::IndexMap;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
+use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
 
@@ -51,6 +52,17 @@ const RECOMMENDED_MIN_NOFILES_LIMIT: u64 = 2048;
 const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 /// The development mode number of genesis committee members.
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+struct BondedBalances(IndexMap<String, (String, u64)>);
+
+impl FromStr for BondedBalances {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s)
+    }
+}
 
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
@@ -131,7 +143,7 @@ pub struct Start {
 
     #[clap(long)]
     /// If development mode is enabled, specify the custom bonded balances as a json object. (default: None)
-    dev_bonded_balances: Option<String>,
+    dev_bonded_balances: Option<BondedBalances>,
 }
 
 impl Start {
@@ -327,8 +339,15 @@ impl Start {
             let (committee, bonded_balances) = match &self.dev_bonded_balances {
                 Some(bonded_balances) => {
                     // Parse the bonded balances.
-                    let bonded_balances: IndexMap<Address<N>, (Address<N>, u64)> =
-                        serde_json::from_str(bonded_balances)?;
+                    let bonded_balances = bonded_balances
+                        .0
+                        .iter()
+                        .map(|(staker_address, (validator_address, amount))| {
+                            let staker_addr = Address::<N>::from_str(staker_address)?;
+                            let validator_addr = Address::<N>::from_str(validator_address)?;
+                            Ok((staker_addr, (validator_addr, *amount)))
+                        })
+                        .collect::<Result<IndexMap<_, _>>>()?;
 
                     // Construct the committee members.
                     let mut members = IndexMap::new();
