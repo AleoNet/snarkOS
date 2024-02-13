@@ -125,6 +125,7 @@ pub mod prop_tests {
     use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
+    use indexmap::indexset;
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 

@@ -28,7 +28,7 @@ use snarkvm::{
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::Result,
+    prelude::{Field, Result},
 };
 
 use indexmap::IndexMap;
