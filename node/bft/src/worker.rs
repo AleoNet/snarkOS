@@ -405,7 +405,7 @@ impl<N: Network> Worker<N> {
                     // Remove the transmission ID from the pending queue.
                     self.pending.remove(transmission_id, Some(transmission));
                 }
-                Err(err) => warn!("Malicious peer ('{peer_ip}') send an invalid transmission: {err}"),
+                Err(err) => warn!("Malicious peer ('{peer_ip}') sent an invalid transmission: {err}"),
             };
         }
     }
