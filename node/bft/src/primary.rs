@@ -852,22 +852,21 @@ impl<N: Network> Primary<N> {
                     };
 
                     // Retrieve the batch certificates.
-                    // let batch_certificates = {
-                    //     // Retrieve the current round.
-                    //     let current_round = self_.current_round();
-                    //     // Retrieve the batch certificates for the current round.
-                    //     let mut current_certificates = self_.storage.get_certificates_for_round(current_round);
-                    //     // If there are no batch certificates for the current round,
-                    //     // then retrieve the batch certificates for the previous round.
-                    //     if current_certificates.is_empty() {
-                    //         // Retrieve the previous round.
-                    //         let previous_round = current_round.saturating_sub(1);
-                    //         // Retrieve the batch certificates for the previous round.
-                    //         current_certificates = self_.storage.get_certificates_for_round(previous_round);
-                    //     }
-                    //     current_certificates
-                    // };
-                    let batch_certificates = IndexSet::default();
+                    let batch_certificates = {
+                        // Retrieve the current round.
+                        let current_round = self_.current_round();
+                        // Retrieve the batch certificates for the current round.
+                        let mut current_certificates = self_.storage.get_certificates_for_round(current_round);
+                        // If there are no batch certificates for the current round,
+                        // then retrieve the batch certificates for the previous round.
+                        if current_certificates.is_empty() {
+                            // Retrieve the previous round.
+                            let previous_round = current_round.saturating_sub(1);
+                            // Retrieve the batch certificates for the previous round.
+                            current_certificates = self_.storage.get_certificates_for_round(previous_round);
+                        }
+                        current_certificates
+                    };
 
                     // Construct the primary ping.
                     let primary_ping = PrimaryPing::from((
