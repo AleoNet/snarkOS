@@ -1,3 +1,4 @@
+```yaml
 version: 2.1
 
 orbs:
@@ -5,7 +6,7 @@ orbs:
 
 commands:
   check_windows:
-    description: "Runs cargo check on Windows"
+    description: "Run cargo check on Windows"
     parameters:
       workspace_member:
         type: string
@@ -17,7 +18,7 @@ commands:
           name: "Install Rust and run cargo check"
           command: |
             $ProgressPreference = "SilentlyContinue"
-            # Remove the circleci installed rustc.
+            # Remove the CircleCI-installed rustc.
             choco uninstall rust
             # Install llvm (libclang for rocksdb).
             choco install llvm -y 
@@ -42,7 +43,7 @@ commands:
           key: cargo-cache-{{ arch }}-{{ checksum "rust-version" }}-{{ checksum "Cargo.lock" }}
 
   setup_environment:
-    description: "Setup testing environment"
+    description: "Set up testing environment"
     parameters:
       cache_key:
         type: string
@@ -86,7 +87,7 @@ commands:
             - .cargo
 
   run_serial:
-    description: "Build and run tests"
+    description: "Build and run tests serially"
     parameters:
       workspace_member:
         type: string
@@ -106,7 +107,7 @@ commands:
           cache_key: << parameters.cache_key >>
 
   run_serial_long:
-    description: "Build and run long running tests"
+    description: "Build and run long-running tests serially"
     parameters:
       workspace_member:
         type: string
@@ -126,7 +127,7 @@ commands:
           cache_key: << parameters.cache_key >>
 
   run_parallel:
-    description: "Build and run tests (in parallel)"
+    description: "Build and run tests in parallel"
     parameters:
       workspace_member:
         type: string
@@ -195,231 +196,4 @@ jobs:
           cache_key: snarkos-cli-cache
 
   display:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: display
-          cache_key: snarkos-display-cache
 
-  node:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: 2xlarge
-    steps:
-      - run_serial:
-          workspace_member: node
-          cache_key: snarkos-node-cache
-
-  node-bft:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: 2xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/bft
-          cache_key: snarkos-node-bft-cache
-
-  node-bft-events:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: 2xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/bft/events
-          cache_key: snarkos-node-bft-events-cache
-
-  node-bft-ledger-service:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/bft/ledger-service
-          cache_key: snarkos-node-bft-ledger-service-cache
-
-  node-bft-storage-service:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/bft/storage-service
-          cache_key: snarkos-node-bft-storage-service-cache
-
-  node-cdn:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/cdn
-          cache_key: snarkos-node-cdn-cache
-
-  node-consensus:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: 2xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/consensus
-          cache_key: snarkos-node-consensus-cache
-
-  node-rest:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/rest
-          cache_key: snarkos-node-rest-cache
-
-  node-router:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/router
-          cache_key: snarkos-node-router-cache
-
-  node-router-messages:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/router/messages
-          cache_key: snarkos-node-router-messages-cache
-
-  node-sync:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/sync
-          cache_key: snarkos-node-sync-cache
-
-  node-sync-communication-service:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/sync/communication-service
-          cache_key: snarkos-node-sync-communication-service-cache
-
-  node-sync-locators:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/sync/locators
-          cache_key: snarkos-node-sync-locators-cache
-
-  node-tcp:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/tcp
-          cache_key: snarkos-node-tcp-cache
-
-  check-fmt:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: xlarge
-    steps:
-      - checkout
-      - install_rust_nightly
-      - setup_environment:
-          cache_key: snarkos-fmt-cache
-      - run:
-          name: Check style
-          no_output_timeout: 35m
-          command: cargo +nightly fmt --all -- --check
-      - clear_environment:
-          cache_key: snarkos-fmt-cache
-
-  check-clippy:
-    docker:
-      - image: cimg/rust:1.74.1
-    resource_class: 2xlarge
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-clippy-cache
-      - run:
-          name: Check lint
-          no_output_timeout: 35m
-          command: |
-            cargo clippy --workspace --all-targets -- -D warnings
-            cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - clear_environment:
-          cache_key: snarkos-clippy-cache
-
-  verify-windows:
-    executor:
-      name: windows/default
-      size: xlarge
-    environment:
-      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-    parameters:
-      workspace_member:
-        type: string
-    steps:
-      - check_windows:
-          workspace_member: << parameters.workspace_member >>
-
-workflows:
-  version: 2
-
-  main-workflow:
-    jobs:
-      - snarkos
-      - account
-      - cli
-      - display
-      - node
-      - node-bft
-      - node-bft-events
-      - node-bft-ledger-service
-      - node-bft-storage-service
-      - node-cdn
-      - node-consensus
-      - node-rest
-      - node-router
-      - node-router-messages
-      - node-sync
-      - node-sync-communication-service
-      - node-sync-locators
-      - node-tcp
-      - check-fmt
-      - check-clippy
-
-  windows-workflow:
-    jobs:
-      - verify-windows:
-          matrix:
-            parameters:
-              workspace_member: [
-                account,
-                cli,
-                display,
-                node
-              ]
-
-  scheduled-workflow:
-    triggers:
-      - schedule:
-          cron: "0 0,12 * * *"
-          filters:
-            branches:
-              only:
-                - mainnet
-    jobs:
-      - integration
