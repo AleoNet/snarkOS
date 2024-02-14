@@ -251,6 +251,7 @@ impl<N: Network> BFT<N> {
             // Update to the next round in storage.
             if let Err(e) = self.storage().increment_to_next_round(current_round) {
                 warn!("BFT failed to increment to the next round from round {current_round} - {e}");
+                return false;
             }
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
