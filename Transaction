@@ -1,0 +1,36 @@
+use web3::transports::Http;
+use web3::types::{Block, Transaction, TransactionRequest};
+use web3::Web3;
+
+#[tokio::main]
+async fn main() {
+    // Replace with your Ethereum node URL
+    let http = Http::new("http://localhost:8545").expect("Failed to create HTTP transport");
+    let web3 = Web3::new(http);
+
+    // Replace with your private key and target address
+    let private_key = "your_private_key";
+    let target_address = "0xYourTargetAddress";
+
+    // Example: Create a simple transaction
+    let transaction = TransactionRequest {
+        from: None, // Sender's address will be automatically determined from the private key
+        to: Some(target_address.parse().expect("Invalid target address")),
+        gas: None,
+        gas_price: None,
+        value: Some(1000000000u128.into()), // Amount in Wei
+        data: None,
+        nonce: None,
+        condition: None,
+    };
+
+    // Sign the transaction
+    let signed_transaction = web3.accounts().sign_transaction(transaction, private_key.into()).await.expect("Failed to sign transaction");
+
+    // Send the signed transaction
+    let transaction_hash = web3.eth().send_raw_transaction(signed_transaction.raw_transaction).await.expect("Failed to send transaction");
+
+    println!("Transaction sent! Hash: {:?}", transaction_hash);
+
+    // You may want to wait for the transaction to be mined, check its status, etc.
+}
