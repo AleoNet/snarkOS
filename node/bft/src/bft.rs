@@ -476,6 +476,9 @@ impl<N: Network> BFT<N> {
                 false => None,
             })
             .collect();
+
+        info!("Authors who included the leader's certificate in the certificate round: {authors:?}");
+
         // Check if the leader is ready to be committed.
         if !committee_lookback.is_availability_threshold_reached(&authors) {
             // If the leader is not ready to be committed, return early.

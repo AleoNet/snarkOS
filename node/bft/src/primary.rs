@@ -340,6 +340,13 @@ impl<N: Network> Primary<N> {
         {
             // Retrieve the committee to check against.
             let committee_lookback = self.ledger.get_committee_lookback_for_round(round)?;
+
+            info!(
+                "round: {round}\ncurrent committee and stake: {:?}\ncurrent leader: {:?}",
+                committee_lookback.members(),
+                committee_lookback.get_leader(round)
+            );
+
             // Retrieve the connected validator addresses.
             let mut connected_validators = self.gateway.connected_addresses();
             // Append the primary to the set.
@@ -371,6 +378,11 @@ impl<N: Network> Primary<N> {
             };
             // Construct a set over the authors.
             let authors = previous_certificates.iter().map(BatchCertificate::author).collect();
+            info!(
+                "round: {round}\nprevious Round: {previous_round}\nprevious certificate authors: {authors:?}\nprevious leader {:?}",
+                previous_committee_lookback.get_leader(previous_round)
+            );
+
             // Check if the previous certificates have reached the quorum threshold.
             if previous_committee_lookback.is_quorum_threshold_reached(&authors) {
                 is_ready = true;
