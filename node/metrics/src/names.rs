@@ -14,11 +14,12 @@
 
 pub(super) const COUNTER_NAMES: [&str; 1] = [bft::LEADERS_ELECTED];
 
-pub(super) const GAUGE_NAMES: [&str; 12] = [
+pub(super) const GAUGE_NAMES: [&str; 13] = [
     bft::CONNECTED,
     bft::CONNECTING,
     bft::LAST_STORED_ROUND,
     bft::PROPOSAL_ROUND,
+    bft::CERTIFIED_BATCHES,
     blocks::HEIGHT,
     blocks::TRANSACTIONS,
     consensus::COMMITTED_CERTIFICATES,
@@ -29,7 +30,7 @@ pub(super) const GAUGE_NAMES: [&str; 12] = [
     tcp::TCP_TASKS,
 ];
 
-pub(super) const HISTOGRAM_NAMES: [&str; 7] = [
+pub(super) const HISTOGRAM_NAMES: [&str; 8] = [
     bft::COMMIT_ROUNDS_LATENCY,
     consensus::CERTIFICATE_COMMIT_LATENCY,
     consensus::BLOCK_LATENCY,
@@ -37,6 +38,7 @@ pub(super) const HISTOGRAM_NAMES: [&str; 7] = [
     tcp::NOISE_CODEC_DECRYPTION_TIME,
     tcp::NOISE_CODEC_ENCRYPTION_SIZE,
     tcp::NOISE_CODEC_DECRYPTION_SIZE,
+    tcp::TCP_GATEWAY,
 ];
 
 pub mod bft {
@@ -46,6 +48,7 @@ pub mod bft {
     pub const LAST_STORED_ROUND: &str = "snarkos_bft_last_stored_round";
     pub const LEADERS_ELECTED: &str = "snarkos_bft_leaders_elected_total";
     pub const PROPOSAL_ROUND: &str = "snarkos_bft_primary_proposal_round";
+    pub const CERTIFIED_BATCHES: &str = "snarkos_bft_primary_certified_batches";
 }
 
 pub mod blocks {
@@ -72,4 +75,5 @@ pub mod tcp {
     pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_encryption_size";
     pub const NOISE_CODEC_DECRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_decryption_size";
     pub const TCP_TASKS: &str = "snarkos_tcp_tasks_total";
+    pub const TCP_GATEWAY: &str = "snarkos_tcp_gateway_messages_received";
 }

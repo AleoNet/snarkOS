@@ -980,12 +980,83 @@
       "type": "stat"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 42
+      },
+      "id": 40,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "snarkos_bft_primary_certified_batches",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Certified Batches",
+      "type": "stat"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 50
       },
       "id": 10,
       "panels": [],
@@ -1057,7 +1128,7 @@
         "h": 8,
         "w": 9,
         "x": 0,
-        "y": 43
+        "y": 51
       },
       "id": 8,
       "options": {
@@ -1181,7 +1252,7 @@
         "h": 8,
         "w": 9,
         "x": 9,
-        "y": 43
+        "y": 51
       },
       "id": 14,
       "options": {
@@ -1274,8 +1345,7 @@
                 "value": 80
               }
             ]
-          },
-          "unit": "s"
+          }
         },
         "overrides": []
       },
@@ -1283,7 +1353,7 @@
         "h": 8,
         "w": 12,
         "x": 6,
-        "y": 51
+        "y": 59
       },
       "id": 38,
       "options": {
@@ -1325,7 +1395,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 67
       },
       "id": 4,
       "panels": [],
@@ -1396,7 +1466,7 @@
         "h": 8,
         "w": 12,
         "x": 6,
-        "y": 60
+        "y": 68
       },
       "id": 37,
       "options": {
@@ -1480,7 +1550,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1496,7 +1567,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 68
+        "y": 76
       },
       "id": 32,
       "options": {
@@ -1580,7 +1651,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1596,7 +1668,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 68
+        "y": 76
       },
       "id": 33,
       "options": {
@@ -1683,7 +1755,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1699,7 +1772,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 76
+        "y": 84
       },
       "id": 34,
       "options": {
@@ -1783,7 +1856,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1799,7 +1873,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 76
+        "y": 84
       },
       "id": 35,
       "options": {
@@ -1867,6 +1941,6 @@
   "timezone": "",
   "title": "snarkOS",
   "uid": "ahTJm4-4k",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
