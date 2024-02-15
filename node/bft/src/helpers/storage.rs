@@ -164,12 +164,20 @@ impl<N: Network> Storage<N> {
 
         // Retrieve the current committee.
         let current_committee = self.ledger.current_committee()?;
-        // Ensure the next round is at or after the current committee's starting round.
-        if next_round < current_committee.starting_round() {
-            bail!(
-                "Next round ({next_round}) is behind the current committee's starting round ({})",
-                current_committee.starting_round()
+        // Retrieve the current committee's starting round.
+        let starting_round = current_committee.starting_round();
+        // If the primary is behind the current committee's starting round, sync with the latest block.
+        if next_round < starting_round {
+            // Retrieve the latest block round.
+            let latest_block_round = self.ledger.latest_round();
+            // Log the round sync.
+            info!(
+                "Syncing primary round ({next_round}) with the current committee's starting round ({starting_round}). Syncing with the latest block round {latest_block_round}..."
             );
+            // Sync the round with the latest block.
+            self.sync_round_with_block(latest_block_round);
+            // Return the latest block round.
+            return Ok(latest_block_round);
         }
 
         // Update the storage to the next round.
