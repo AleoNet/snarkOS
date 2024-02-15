@@ -551,6 +551,37 @@ impl<N: Network> Primary<N> {
         // If the peer is ahead, use the batch header to sync up to the peer.
         let transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
 
+        // Verify the transmissions.
+        for (transmission_id, transmission) in transmissions.iter() {
+            match (transmission_id, transmission) {
+                (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+                    // Verify the transaction.
+                    if self.ledger.check_transaction_basic(*transaction_id, transaction.clone()).await.is_err() {
+                        // If the transaction is invalid, then return early.
+                        debug!(
+                            "Batch propose from '{peer_ip}' contains an invalid transaction '{}'",
+                            fmt_id(transaction_id)
+                        );
+                        return Ok(());
+                    }
+                }
+                (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
+                    // Verify the solution.
+                    if self.ledger.check_solution_basic(*solution_id, solution.clone()).await.is_err() {
+                        // If the solution is invalid, then return early.
+                        debug!("Batch propose from '{peer_ip}' contains an invalid solution '{}'", fmt_id(solution_id));
+                        return Ok(());
+                    }
+                }
+                _ => {
+                    debug!(
+                        "Batch propose from '{peer_ip}' contains a mismatching `(transmission_id, transmission)` pair"
+                    );
+                    return Ok(());
+                }
+            }
+        }
+
         // Ensure the batch is for the current round.
         // This method must be called after fetching previous certificates (above),
         // and prior to checking the batch header (below).
