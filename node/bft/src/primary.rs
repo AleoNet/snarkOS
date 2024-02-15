@@ -710,6 +710,9 @@ impl<N: Network> Primary<N> {
             self.reinsert_transmissions_into_workers(proposal)?;
             return Err(e);
         }
+
+        #[cfg(feature = "metrics")]
+        metrics::increment_gauge(metrics::bft::CERTIFIED_BATCHES, 1.0);
         Ok(())
     }
 
