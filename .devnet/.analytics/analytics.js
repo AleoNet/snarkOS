@@ -6,6 +6,44 @@ const yargs = require('yargs');
 const dimStart = "\x1b[2m";
 const dimEnd = "\x1b[0m";
 
+// Function to get the IP address of a given AWS node
+async function getIPAddress(awsNodeName) {
+    // Read the ~/.ssh/config file
+    const sshConfigFile = fs.readFileSync(`${process.env.HOME}/.ssh/config`, 'utf8');
+
+    // Use regular expressions to extract the associated IP address
+    const regex = new RegExp(`Host\\s+${awsNodeName}[\\s\\S]*?HostName\\s+(\\S+)`);
+    const match = sshConfigFile.match(regex);
+
+    if (match && match[1]) {
+        return match[1];
+    } else {
+        console.error(`No IP address found for ${awsNodeName} in ~/.ssh/config`);
+    }
+}
+
+// Function to get the count of AWS nodes based on the naming convention aws-nXX in the SSH config file
+async function getAWSNodeCount() {
+    // Read the ~/.ssh/config file
+    const sshConfigFile = fs.readFileSync(`${process.env.HOME}/.ssh/config`, 'utf8');
+
+    // Regular expression to match all aws-nXX formats
+    const regex = /Host\s+(aws-n\d+)/g;
+    let match;
+    let highestNumber = -1;
+
+    // Iterate over all matches and find the highest number
+    while ((match = regex.exec(sshConfigFile)) !== null) {
+        const nodeNumber = parseInt(match[1].replace('aws-n', ''), 10);
+        if (nodeNumber > highestNumber) {
+            highestNumber = nodeNumber;
+        }
+    }
+
+    // Return the count of nodes, adding 1 because it starts from 0
+    return highestNumber >= 0 ? highestNumber + 1 : 0;
+}
+
 // Function to fetch block data
 async function fetchBlockData(baseUrl, height) {
     try {
@@ -77,10 +115,28 @@ async function calculateRoundsInBlocks(baseUrl, latestHeight) {
     }
 }
 
+async function checkBlockHash(blockHeight) {
+    const numNodes = await getAWSNodeCount();
+    console.log(`Detected ${numNodes} AWS nodes... \n`);
+
+    for (let i = 0; i < numNodes; i++) {
+        // Define the AWS node name to search for (e.g., aws-n1)
+        const awsNodeName = `aws-n${i}`;
+        // Get the IP address of the AWS node
+        const ipAddress = await getIPAddress(awsNodeName);
+        // Define the base URL for the node
+        const baseUrl = `http://${ipAddress}:3030/mainnet/block`;
+
+        // Fetch the block data
+        const blockData = await fetchBlockData(baseUrl, blockHeight);
+        console.log(`${awsNodeName} - Block ${blockHeight} - ${blockData.block_hash}`);
+    }
+}
+
 // Main function to fetch block metrics
-async function fetchBlockMetrics(baseUrl, metricType) {
+async function fetchBlockMetrics(metricType, optionalBlockHeight) {
     // Function to get the latest block height
-    async function getLatestBlockHeight() {
+    async function getLatestBlockHeight(baseUrl) {
         try {
             const response = await axios.get(`${baseUrl}/height/latest`);
             const latestHeight = response.data;
@@ -92,7 +148,17 @@ async function fetchBlockMetrics(baseUrl, metricType) {
         }
     }
 
-    const latestHeight = await getLatestBlockHeight();
+    // Define the AWS node name to search for (e.g., aws-n1)
+    const awsNodeName = 'aws-n1';
+    // Get the IP address of the AWS node
+    const ipAddress = await getIPAddress(awsNodeName);
+    // Define the base URL for the node.
+    const baseUrl = `http://${ipAddress}:3030/mainnet/block`;
+
+    console.log(`${dimStart}IP Address: ${ipAddress}${dimEnd}`);
+    console.log(`${dimStart}Base URL: ${baseUrl}${dimEnd}`);
+
+    const latestHeight = await getLatestBlockHeight(baseUrl);
     if (latestHeight === null) {
         console.error('Unable to fetch latest block height, try again...');
         return;
@@ -104,6 +170,8 @@ async function fetchBlockMetrics(baseUrl, metricType) {
         calculateAverageBlockTime(baseUrl, latestHeight);
     } else if (metricType === 'roundsInBlocks') {
         calculateRoundsInBlocks(baseUrl, latestHeight);
+    } else if (metricType === 'checkBlockHash' && optionalBlockHeight) {
+        checkBlockHash(optionalBlockHeight);
     } else {
         console.error('Invalid metric type. Supported types: "averageBlockTime" or "roundsInBlocks".');
     }
@@ -115,35 +183,27 @@ async function main() {
         .options({
             'metric-type': {
                 alias: 'm',
-                describe: 'Metric type to fetch (averageBlockTime or roundsInBlocks)',
+                describe: 'Metric type to fetch (averageBlockTime, roundsInBlocks, or checkBlockHash)',
                 demandOption: true,
-                choices: ['averageBlockTime', 'roundsInBlocks'],
+                choices: ['averageBlockTime', 'roundsInBlocks', 'checkBlockHash'],
             },
+            'block-height': {
+                alias: 'b',
+                describe: 'Block height to examine for checkBlockHash metric',
+                type: 'number',
+            },
+        })
+        .check((argv) => {
+            // Check if metric-type is checkBlockHash and block-height is provided
+            if (argv['metric-type'] === 'checkBlockHash' && (isNaN(argv['block-height']) || argv['block-height'] == null)) {
+                throw new Error('Block height is required when metric-type is checkBlockHash');
+            }
+            return true; // Indicate that the arguments passed the check
         })
         .argv;
 
-    // Read the ~/.ssh/config file
-    const sshConfigFile = fs.readFileSync(`${process.env.HOME}/.ssh/config`, 'utf8');
-
-    // Define the AWS node name to search for (e.g., aws-n1)
-    const awsNodeName = 'aws-n1';
-
-    // Use regular expressions to extract the IP address associated with aws-n0
-    const regex = new RegExp(`Host\\s+${awsNodeName}[\\s\\S]*?HostName\\s+(\\S+)`);
-    const match = sshConfigFile.match(regex);
-
-    if (match && match[1]) {
-        const ipAddress = match[1];
-        const baseUrl = `http://${ipAddress}:3030/mainnet/block`;
-
-        console.log(`${dimStart}IP Address: ${ipAddress}${dimEnd}`);
-        console.log(`${dimStart}Base URL: ${baseUrl}${dimEnd}`);
-
-        // Fetch and output the specified block metric
-        fetchBlockMetrics(baseUrl, argv['metric-type']);
-    } else {
-        console.error(`No IP address found for ${awsNodeName} in ~/.ssh/config`);
-    }
+    // Fetch and output the specified block metric
+    fetchBlockMetrics(argv['metric-type'], argv['block-height']);
 }
 
 // Run the main function
