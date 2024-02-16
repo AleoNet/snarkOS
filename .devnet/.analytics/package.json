@@ -4,8 +4,6 @@
   "description": "",
   "main": "analytics.js",
   "scripts": {
-    "averageBlockTime": "node analytics.js --metric-type averageBlockTime",
-    "roundsInBlocks": "node analytics.js --metric-type roundsInBlocks",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "The Aleo Team",
