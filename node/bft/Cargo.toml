@@ -64,6 +64,9 @@ version = "1"
 [dependencies.serde]
 version = "1"
 
+[dependencies.serde_json]
+version = "1"
+
 [dependencies.sha2]
 version = "0.10"
 default-features = false

@@ -3262,6 +3262,7 @@ dependencies = [
  "rand_distr",
  "rayon",
  "serde",
+ "serde_json",
  "sha2",
  "snarkos-account",
  "snarkos-node-bft-events",
