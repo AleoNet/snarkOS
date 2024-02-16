@@ -30,7 +30,7 @@ use once_cell::sync::OnceCell;
 use snow::{params::NoiseParams, Builder};
 use tokio_util::codec::{Decoder, Encoder};
 
-type CurrentNetwork = snarkvm::prelude::Testnet3;
+type CurrentNetwork = snarkvm::console::network::MainnetV0;
 
 static RNG: OnceCell<Mutex<TestRng>> = OnceCell::new();
 static CODECS: OnceCell<Mutex<(NoiseCodec<CurrentNetwork>, NoiseCodec<CurrentNetwork>)>> = OnceCell::new();

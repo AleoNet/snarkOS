@@ -36,7 +36,8 @@ version = "0.8"
 path = ".."
 
 [dependencies.snarkvm]
-version = "=0.16.18"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "b396a51"
 features = [ "circuit", "console", "rocks" ]
 
 [dependencies.snow]
