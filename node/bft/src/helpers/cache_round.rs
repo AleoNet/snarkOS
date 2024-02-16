@@ -36,7 +36,7 @@ impl<N: Network> From<Address<N>> for AddressWithCoordinate<N> {
 pub struct RoundCache<N: Network> {
     /// The current highest round which has (stake-weighted) quorum
     last_highest_round_with_quorum: u64,
-    /// A list of (round, Vec<AddressWithCoordinate<N>>), indicating the last seen highest round for each address
+    /// A sorted list of (round, Vec<AddressWithCoordinate<N>>), indicating the last seen highest round for each address
     highest_rounds: Vec<(u64, Vec<AddressWithCoordinate<N>>)>,
     /// A list of (AddressWithCoordinate<N>, round) to quickly find an Address' round by their x coordinate
     address_rounds: Vec<(AddressWithCoordinate<N>, u64)>,
