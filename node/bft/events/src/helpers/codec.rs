@@ -186,7 +186,11 @@ pub struct NoiseCodec<N: Network> {
 
 impl<N: Network> NoiseCodec<N> {
     pub fn new(noise_state: NoiseState) -> Self {
-        Self { codec: LengthDelimitedCodec::new(), event_codec: EventCodec::default(), noise_state }
+        Self {
+            codec: LengthDelimitedCodec::builder().max_frame_length(MAX_EVENT_SIZE).little_endian().new_codec(),
+            event_codec: EventCodec::default(),
+            noise_state,
+        }
     }
 }
 
