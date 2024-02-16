@@ -16,16 +16,30 @@ fi
 
 # Prompt the user to select a metric type
 PS3="Select a metric type: "
-options=("Average Block Time" "Rounds in Blocks" "Quit")
+options=("Average Block Time" "Rounds in Blocks" "Check Block Hash" "Quit")
 select opt in "${options[@]}"
 do
   case $opt in
     "Average Block Time")
-      npm run averageBlockTime
+      echo ""
+      node analytics.js --metric-type averageBlockTime
       break
       ;;
     "Rounds in Blocks")
-      npm run roundsInBlocks
+      echo ""
+      node analytics.js --metric-type roundsInBlocks
+      break
+      ;;
+    "Check Block Hash")
+      echo "You selected 'Check Block Hash'. Please enter the block height:"
+      read blockHeight
+      echo ""
+      # Validate input is an integer
+      if ! [[ "$blockHeight" =~ ^[0-9]+$ ]]; then
+        echo "Error: Block height must be a positive integer."
+        exit 1
+      fi
+      node analytics.js --metric-type checkBlockHash --block-height "$blockHeight"
       break
       ;;
     "Quit")
