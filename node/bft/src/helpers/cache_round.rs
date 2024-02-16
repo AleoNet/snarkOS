@@ -118,7 +118,7 @@ impl<N: Network> RoundCache<N> {
 
         // Determine if validator was inserted into the cache.
         let mut inserted = false;
-        // Only consider updating the cache. if we see a high round.
+        // Only consider updating the cache if we see a high round.
         if round > self.last_highest_round_with_quorum {
             match self.address_rounds.binary_search_by_key(&validator.x, |&(a, _)| a.x) {
                 // Update the existing validator.
