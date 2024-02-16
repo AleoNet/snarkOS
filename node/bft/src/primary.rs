@@ -97,7 +97,7 @@ pub struct Primary<N: Network> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The lock for propose_batch.
     propose_lock: Arc<TMutex<u64>>,
-    /// A cache for which batch rounds have been seen
+    /// A cache for which batch rounds have been seen.
     batch_round_cache: Arc<RwLock<RoundCache<N>>>,
 }
 
