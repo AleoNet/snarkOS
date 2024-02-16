@@ -133,6 +133,17 @@ impl<N: Network> DAG<N> {
             }
         });
     }
+
+    /// Remove the certificates from the DAG.
+    pub fn prepare_for_bootup(&mut self, certificates: Vec<BatchCertificate<N>>) {
+        // Remove the certificate from the DAG.
+        for certificate in certificates {
+            let round = certificate.round();
+            let author = certificate.author();
+            // Remove the certificate from the DAG.
+            self.graph.entry(round).or_default().remove(&author);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -276,5 +287,47 @@ mod tests {
         assert!(!dag.is_recently_committed(2, certificate_2.id()));
         assert!(dag.is_recently_committed(3, certificate_3.id()));
         assert!(dag.is_recently_committed(4, certificate_4.id()));
+    }
+
+    #[test]
+    fn test_prepare_for_bootup() {
+        let mut dag = DAG::<MainnetV0>::new();
+
+        // Sample a certificate for round 2 to 9 with the same author.
+        let certificate_2 = sample_batch_certificate_for_round(2, &mut TestRng::fixed(123456789));
+        let certificate_3 = sample_batch_certificate_for_round(3, &mut TestRng::fixed(123456789));
+        let certificate_4 = sample_batch_certificate_for_round(4, &mut TestRng::fixed(123456789));
+        let certificate_5 = sample_batch_certificate_for_round(5, &mut TestRng::fixed(123456789));
+        let certificate_6 = sample_batch_certificate_for_round(6, &mut TestRng::fixed(123456789));
+        let certificate_7 = sample_batch_certificate_for_round(7, &mut TestRng::fixed(123456789));
+        let certificate_8 = sample_batch_certificate_for_round(8, &mut TestRng::fixed(123456789));
+        let certificate_9 = sample_batch_certificate_for_round(9, &mut TestRng::fixed(123456789));
+
+        // Insert all the certificates.
+        dag.insert(certificate_2.clone());
+        dag.insert(certificate_3.clone());
+        dag.insert(certificate_4.clone());
+        dag.insert(certificate_5.clone());
+        dag.insert(certificate_6.clone());
+        dag.insert(certificate_7.clone());
+        dag.insert(certificate_8.clone());
+        dag.insert(certificate_9.clone());
+
+        // Remove the first 4 certificates on bootup.
+        let certificates_to_remove_at_bootup =
+            vec![certificate_2.clone(), certificate_3.clone(), certificate_4.clone(), certificate_5.clone()];
+        dag.prepare_for_bootup(certificates_to_remove_at_bootup);
+
+        // Check that the first 4 certificates are not in the DAG.
+        assert!(dag.get_certificate_for_round_with_id(2, certificate_2.id()).is_none());
+        assert!(dag.get_certificate_for_round_with_id(3, certificate_3.id()).is_none());
+        assert!(dag.get_certificate_for_round_with_id(4, certificate_4.id()).is_none());
+        assert!(dag.get_certificate_for_round_with_id(5, certificate_5.id()).is_none());
+
+        // Check that the remaining certificates are in the DAG.
+        assert_eq!(dag.get_certificate_for_round_with_id(6, certificate_6.id()), Some(certificate_6));
+        assert_eq!(dag.get_certificate_for_round_with_id(7, certificate_7.id()), Some(certificate_7));
+        assert_eq!(dag.get_certificate_for_round_with_id(8, certificate_8.id()), Some(certificate_8));
+        assert_eq!(dag.get_certificate_for_round_with_id(9, certificate_9.id()), Some(certificate_9));
     }
 }
