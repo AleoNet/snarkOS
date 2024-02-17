@@ -129,7 +129,11 @@ async function checkBlockHash(blockHeight) {
 
         // Fetch the block data
         const blockData = await fetchBlockData(baseUrl, blockHeight);
-        console.log(`${awsNodeName} - Block ${blockHeight} - ${blockData.block_hash}`);
+        if (blockData && blockData.block_hash) {
+            console.log(`${awsNodeName} - Block ${blockHeight} - ${blockData.block_hash}`);
+        } else {
+            console.log(`${awsNodeName} - Block ${blockHeight} - No block hash found`);
+        }
     }
 }
 
