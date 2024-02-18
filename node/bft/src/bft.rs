@@ -809,11 +809,11 @@ impl<N: Network> BFT<N> {
             // Acquire the BFT write lock.
             let mut dag = self.dag.write();
             // Iterate over the certificates.
-            for certificate in certificates.clone() {
+            for certificate in &certificates {
                 // If the certificate is not the latest leader certificate, insert it.
                 if leader_certificate.id() != certificate.id() {
                     // Insert the certificate into the DAG.
-                    dag.insert(certificate);
+                    dag.insert(certificate.clone());
                 }
             }
 
@@ -823,7 +823,7 @@ impl<N: Network> BFT<N> {
                 dag.commit(leader_certificate, self.storage().max_gc_rounds());
             }
 
-            // Prepare the DAG for bootup and remove the certificates.
+            // Prepare the DAG by removing the batch certificates that have been committed.
             dag.prepare_for_bootup(certificates);
         }
         // Commit the latest leader certificate.

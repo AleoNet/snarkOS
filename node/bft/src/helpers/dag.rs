@@ -19,7 +19,7 @@ use snarkvm::{
 };
 
 use indexmap::IndexSet;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{btree_map::Entry, BTreeMap, HashMap};
 
 #[derive(Debug)]
 pub struct DAG<N: Network> {
@@ -134,14 +134,22 @@ impl<N: Network> DAG<N> {
         });
     }
 
-    /// Remove the certificates from the DAG.
+    /// Prepare the DAG by removing the batch certificates that have been committed.
     pub fn prepare_for_bootup(&mut self, certificates: Vec<BatchCertificate<N>>) {
         // Remove the certificate from the DAG.
         for certificate in certificates {
-            let round = certificate.round();
-            let author = certificate.author();
             // Remove the certificate from the DAG.
-            self.graph.entry(round).or_default().remove(&author);
+            match self.graph.entry(certificate.round()) {
+                Entry::Occupied(mut entry) => {
+                    // Remove the certificate from the round.
+                    entry.get_mut().remove(&certificate.author());
+                    // Remove the round, if it is now empty.
+                    if entry.get().is_empty() {
+                        entry.remove();
+                    }
+                }
+                Entry::Vacant(_) => {}
+            }
         }
     }
 }
