@@ -39,6 +39,9 @@ use snarkos_node_tcp::is_bogon_ip;
 use std::{net::SocketAddr, time::Instant};
 use tokio::task::spawn_blocking;
 
+/// The max number of peers to send in a `PeerResponse` message.
+const MAX_PEERS_TO_SEND: usize = u8::MAX as usize;
+
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// The maximum number of puzzle requests per interval.
@@ -265,9 +268,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Filter out invalid addresses.
         let peers = match self.router().is_dev() {
             // In development mode, relax the validity requirements to make operating devnets more flexible.
-            true => peers.into_iter().filter(|ip| !is_bogon_ip(ip.ip())).take(u8::MAX as usize).collect(),
+            true => peers.into_iter().filter(|ip| !is_bogon_ip(ip.ip())).take(MAX_PEERS_TO_SEND).collect(),
             // In production mode, ensure the peer IPs are valid.
-            false => peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).take(u8::MAX as usize).collect(),
+            false => {
+                peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).take(MAX_PEERS_TO_SEND).collect()
+            }
         };
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
@@ -276,6 +281,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
     /// Handles a `PeerResponse` message.
     fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
+        // Check if the number of peers received is less than MAX_PEERS_TO_SEND.
+        if peers.len() > MAX_PEERS_TO_SEND {
+            return false;
+        }
         // Filter out invalid addresses.
         let peers = match self.router().is_dev() {
             // In development mode, relax the validity requirements to make operating devnets more flexible.
