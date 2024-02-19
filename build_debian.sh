@@ -197,7 +197,7 @@ source $HOME/.cargo/env
 
 # Install snarkOS
 # cargo clean
-cargo install --path .
+cargo install --locked --path .
 
 echo "=================================================="
 echo " Attention - Please ensure ports 4133 and 3033"
@@ -210,7 +210,3 @@ echo " Home Users - Enable port forwarding or NAT rules"
 echo "              for 4133 and 3033 on your router."
 echo "=================================================="
 
-# Open ports on system
-ufw allow 5000/tcp
-ufw allow 4133/tcp
-ufw allow 3033/tcp
