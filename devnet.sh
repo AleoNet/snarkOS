@@ -8,8 +8,8 @@ total_validators=${total_validators:-4}
 read -p "Enter the total number of clients (default: 2): " total_clients
 total_clients=${total_clients:-2}
 
-# Ask the user if they want to run 'cargo install --path .' or use a pre-installed binary
-read -p "Do you want to run 'cargo install --path .' to build the binary? (y/n, default: y): " build_binary
+# Ask the user if they want to run 'cargo install --locked --path .' or use a pre-installed binary
+read -p "Do you want to run 'cargo install --locked --path .' to build the binary? (y/n, default: y): " build_binary
 build_binary=${build_binary:-y}
 
 # Ask the user whether to clear the existing ledger history
@@ -18,7 +18,7 @@ clear_ledger=${clear_ledger:-n}
 
 if [[ $build_binary == "y" ]]; then
   # Build the binary using 'cargo install --path .'
-  cargo install --path . || exit 1
+  cargo install --locked --path . || exit 1
 fi
 
 # Clear the ledger logs for each validator if the user chooses to clear ledger
@@ -26,9 +26,9 @@ if [[ $clear_ledger == "y" ]]; then
   # Create an array to store background processes
   clean_processes=()
 
-  for ((validator_index = 0; validator_index < total_validators; validator_index++)); do
-    # Run 'snarkos clean' for each validator in the background
-    snarkos clean --dev $validator_index &
+  for ((index = 0; index < $((total_validators + total_clients)); index++)); do
+    # Run 'snarkos clean' for each node in the background
+    snarkos clean --dev $index &
 
     # Store the process ID of the background task
     clean_processes+=($!)

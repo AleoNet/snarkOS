@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use super::CurrentNetwork;
-
 use snarkvm::{
     console::program::Ciphertext,
     prelude::{Record, ViewKey},

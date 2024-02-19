@@ -23,7 +23,7 @@ use snarkvm::{
     prelude::{anyhow, bail, cfg_iter, ensure, Address, Field, Network, Result},
 };
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use std::{
@@ -164,12 +164,20 @@ impl<N: Network> Storage<N> {
 
         // Retrieve the current committee.
         let current_committee = self.ledger.current_committee()?;
-        // Ensure the next round is at or after the current committee's starting round.
-        if next_round < current_committee.starting_round() {
-            bail!(
-                "Next round ({next_round}) is behind the current committee's starting round ({})",
-                current_committee.starting_round()
+        // Retrieve the current committee's starting round.
+        let starting_round = current_committee.starting_round();
+        // If the primary is behind the current committee's starting round, sync with the latest block.
+        if next_round < starting_round {
+            // Retrieve the latest block round.
+            let latest_block_round = self.ledger.latest_round();
+            // Log the round sync.
+            info!(
+                "Syncing primary round ({next_round}) with the current committee's starting round ({starting_round}). Syncing with the latest block round {latest_block_round}..."
             );
+            // Sync the round with the latest block.
+            self.sync_round_with_block(latest_block_round);
+            // Return the latest block round.
+            return Ok(latest_block_round);
         }
 
         // Update the storage to the next round.
@@ -551,21 +559,26 @@ impl<N: Network> Storage<N> {
         // Compute the author of the batch.
         let author = certificate.author();
 
+        // TODO (howardwu): We may want to use `shift_remove` below, in order to align compatibility
+        //  with tests written to for `remove_certificate`. However, this will come with performance hits.
+        //  It will be better to write tests that compare the union of the sets.
+
         // Update the round.
-        {
-            // Acquire the write lock.
-            let mut rounds = self.rounds.write();
-            // Remove the round to certificate ID entry.
-            rounds.entry(round).or_default().remove(&(certificate_id, batch_id, author));
-            // If the round is empty, remove it.
-            if rounds.get(&round).map_or(false, |entries| entries.is_empty()) {
-                rounds.remove(&round);
+        match self.rounds.write().entry(round) {
+            Entry::Occupied(mut entry) => {
+                // Remove the round to certificate ID entry.
+                entry.get_mut().swap_remove(&(certificate_id, batch_id, author));
+                // If the round is empty, remove it.
+                if entry.get().is_empty() {
+                    entry.swap_remove();
+                }
             }
+            Entry::Vacant(_) => {}
         }
         // Remove the certificate.
-        self.certificates.write().remove(&certificate_id);
+        self.certificates.write().swap_remove(&certificate_id);
         // Remove the batch ID.
-        self.batch_ids.write().remove(&batch_id);
+        self.batch_ids.write().swap_remove(&batch_id);
         // Remove the transmission entries in the certificate from storage.
         self.transmissions.remove_transmissions(&certificate_id, certificate.transmission_ids());
         // Return successfully.
@@ -612,7 +625,7 @@ impl<N: Network> Storage<N> {
         // Reconstruct the unconfirmed transactions.
         let mut unconfirmed_transactions = cfg_iter!(block.transactions())
             .filter_map(|tx| tx.to_unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok())
-            .collect::<IndexMap<_, _>>();
+            .collect::<HashMap<_, _>>();
 
         // Iterate over the transmission IDs.
         for transmission_id in certificate.transmission_ids() {

@@ -124,6 +124,8 @@ pub struct Gateway<N: Network> {
     sync_sender: Arc<OnceCell<SyncSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// The development mode.
+    dev: Option<u16>,
 }
 
 impl<N: Network> Gateway<N> {
@@ -157,6 +159,7 @@ impl<N: Network> Gateway<N> {
             worker_senders: Default::default(),
             sync_sender: Default::default(),
             handles: Default::default(),
+            dev,
         })
     }
 
@@ -683,8 +686,14 @@ impl<N: Network> Gateway<N> {
             }
             Event::ValidatorsRequest(_) => {
                 // Retrieve the connected peers.
-                let mut connected_peers: Vec<_> =
-                    self.connected_peers.read().iter().copied().filter(|ip| self.is_valid_peer_ip(*ip)).collect();
+                let mut connected_peers: Vec<_> = match self.dev.is_some() {
+                    // In development mode, relax the validity requirements to make operating devnets more flexible.
+                    true => self.connected_peers.read().iter().copied().collect(),
+                    // In production mode, ensure the peer IPs are valid.
+                    false => {
+                        self.connected_peers.read().iter().copied().filter(|ip| self.is_valid_peer_ip(*ip)).collect()
+                    }
+                };
                 // Shuffle the connected peers.
                 connected_peers.shuffle(&mut rand::thread_rng());
 
@@ -723,10 +732,18 @@ impl<N: Network> Gateway<N> {
                     let self_ = self.clone();
                     tokio::spawn(async move {
                         for (validator_ip, validator_address) in validators {
-                            // Ensure the validator IP is not this node and is well-formed.
-                            if !self_.is_valid_peer_ip(validator_ip) {
-                                continue;
+                            if self_.dev.is_some() {
+                                // Ensure the validator IP is not this node.
+                                if self_.is_local_ip(validator_ip) {
+                                    continue;
+                                }
+                            } else {
+                                // Ensure the validator IP is not this node and is well-formed.
+                                if !self_.is_valid_peer_ip(validator_ip) {
+                                    continue;
+                                }
                             }
+
                             // Ensure the validator address is not this node.
                             if self_.account.address() == validator_address {
                                 continue;

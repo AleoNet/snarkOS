@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  windows: circleci/windows@2.4.0
+  windows: circleci/windows@5.0
 
 commands:
   check_windows:
@@ -17,13 +17,17 @@ commands:
           name: "Install Rust and run cargo check"
           command: |
             $ProgressPreference = "SilentlyContinue"
+            # Remove the circleci installed rustc.
+            choco uninstall rust
+            # Install llvm (libclang for rocksdb).
+            choco install llvm -y 
+            refreshenv
+            # Install rust with rustup.
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
             & C:\rustup-init.exe -y --default-toolchain "stable-x86_64-pc-windows-msvc" --no-modify-path --profile minimal
-            choco install llvm -y
-            refreshenv
-            $env:Path += ";C:\Users\circleci\.cargo\bin"
-            rustc -Vv
-            cargo --version
+            $Env:Path += ";$Env:USERPROFILE\.cargo\bin"
+            # Verify the installation.
+            cargo --version --verbose
             rustc --version | Out-File -FilePath "rust-version"
             if (!(Test-Path "Cargo.lock" -PathType Leaf)) {
                 cargo generate-lockfile
@@ -156,7 +160,7 @@ commands:
 jobs:
   integration:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: 2xlarge
     steps:
       - run_serial_long:
@@ -165,7 +169,7 @@ jobs:
 
   snarkos:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -174,7 +178,7 @@ jobs:
 
   account:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -183,7 +187,7 @@ jobs:
 
   cli:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -192,7 +196,7 @@ jobs:
 
   display:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -201,7 +205,7 @@ jobs:
 
   node:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -210,7 +214,7 @@ jobs:
 
   node-bft:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -219,7 +223,7 @@ jobs:
 
   node-bft-events:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -228,7 +232,7 @@ jobs:
 
   node-bft-ledger-service:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -237,7 +241,7 @@ jobs:
 
   node-bft-storage-service:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -246,7 +250,7 @@ jobs:
 
   node-cdn:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -255,7 +259,7 @@ jobs:
 
   node-consensus:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -264,7 +268,7 @@ jobs:
 
   node-rest:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -273,7 +277,7 @@ jobs:
 
   node-router:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -282,7 +286,7 @@ jobs:
 
   node-router-messages:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -291,7 +295,7 @@ jobs:
 
   node-sync:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -300,7 +304,7 @@ jobs:
 
   node-sync-communication-service:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -309,7 +313,7 @@ jobs:
 
   node-sync-locators:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -318,7 +322,7 @@ jobs:
 
   node-tcp:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - run_serial:
@@ -327,7 +331,7 @@ jobs:
 
   check-fmt:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: xlarge
     steps:
       - checkout
@@ -343,7 +347,7 @@ jobs:
 
   check-clippy:
     docker:
-      - image: cimg/rust:1.72.1
+      - image: cimg/rust:1.74.1
     resource_class: 2xlarge
     steps:
       - checkout

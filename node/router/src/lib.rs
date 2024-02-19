@@ -21,13 +21,13 @@ extern crate tracing;
 
 pub use snarkos_node_router_messages as messages;
 
-mod helpers;
-pub use helpers::*;
-
 mod handshake;
 
 mod heartbeat;
 pub use heartbeat::*;
+
+mod helpers;
+pub use helpers::*;
 
 mod inbound;
 pub use inbound::*;
@@ -44,9 +44,16 @@ use snarkos_node_tcp::{is_bogon_ip, is_unspecified_or_broadcast_ip, Config, Tcp}
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
-use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, str::FromStr, sync::Arc, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    future::Future,
+    net::SocketAddr,
+    ops::Deref,
+    str::FromStr,
+    sync::Arc,
+    time::Instant,
+};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -72,18 +79,18 @@ pub struct InnerRouter<N: Network> {
     /// The resolver.
     resolver: Resolver,
     /// The set of trusted peers.
-    trusted_peers: IndexSet<SocketAddr>,
+    trusted_peers: HashSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
-    connected_peers: RwLock<IndexMap<SocketAddr, Peer<N>>>,
+    connected_peers: RwLock<HashMap<SocketAddr, Peer<N>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
     /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
     connecting_peers: Mutex<HashSet<SocketAddr>>,
     /// The set of candidate peer IPs.
-    candidate_peers: RwLock<IndexSet<SocketAddr>>,
+    candidate_peers: RwLock<HashSet<SocketAddr>>,
     /// The set of restricted peer IPs.
-    restricted_peers: RwLock<IndexMap<SocketAddr, Instant>>,
+    restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The spawned handles.
     handles: Mutex<Vec<JoinHandle<()>>>,
     /// The boolean flag for the development mode.
@@ -354,7 +361,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of candidate peers.
-    pub fn candidate_peers(&self) -> IndexSet<SocketAddr> {
+    pub fn candidate_peers(&self) -> HashSet<SocketAddr> {
         self.candidate_peers.read().clone()
     }
 
@@ -364,7 +371,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of trusted peers.
-    pub fn trusted_peers(&self) -> &IndexSet<SocketAddr> {
+    pub fn trusted_peers(&self) -> &HashSet<SocketAddr> {
         &self.trusted_peers
     }
 

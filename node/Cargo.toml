@@ -29,8 +29,7 @@ metrics = [
 ]
 
 [dependencies.aleo-std]
-version = "0.1.24"
-default-features = false
+workspace = true
 
 [dependencies.anyhow]
 version = "1.0.79"

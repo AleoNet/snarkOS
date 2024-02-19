@@ -16,20 +16,23 @@ use crate::StorageService;
 use snarkvm::{
     ledger::{
         narwhal::{BatchHeader, Transmission, TransmissionID},
-        store::helpers::{
-            rocksdb::{
-                internal::{self, BFTMap, Database, MapID},
-                DataMap,
+        store::{
+            cow_to_cloned,
+            helpers::{
+                rocksdb::{
+                    internal::{self, BFTMap, Database, MapID},
+                    DataMap,
+                },
+                Map,
+                MapRead,
             },
-            Map,
-            MapRead,
         },
     },
     prelude::{bail, Field, Network, Result},
 };
 
+use aleo_std::StorageMode;
 use indexmap::{indexset, IndexSet};
-use snarkvm::ledger::store::cow_to_cloned;
 use std::{borrow::Cow, collections::HashMap};
 use tracing::error;
 
@@ -42,8 +45,8 @@ pub struct BFTPersistentStorage<N: Network> {
 
 impl<N: Network> BFTPersistentStorage<N> {
     /// Initializes a new BFT persistent storage service.
-    pub fn open(dev: Option<u16>) -> Result<Self> {
-        Ok(Self { transmissions: internal::RocksDB::open_map(N::ID, dev, MapID::BFT(BFTMap::Transmissions))? })
+    pub fn open(storage_mode: StorageMode) -> Result<Self> {
+        Ok(Self { transmissions: internal::RocksDB::open_map(N::ID, storage_mode, MapID::BFT(BFTMap::Transmissions))? })
     }
 
     /// Initializes a new BFT persistent storage service.
@@ -162,7 +165,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                 Ok(Some(entry)) => {
                     let (transmission, mut certificate_ids) = cow_to_cloned!(entry);
                     // Insert the certificate ID into the set.
-                    certificate_ids.remove(certificate_id);
+                    certificate_ids.swap_remove(certificate_id);
                     // If there are no more certificate IDs for the transmission ID, remove the transmission.
                     if certificate_ids.is_empty() {
                         // Remove the transmission entry.
