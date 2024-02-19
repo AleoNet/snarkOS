@@ -322,6 +322,14 @@ impl<N: Network> BFT<N> {
         committee: Committee<N>,
         current_round: u64,
     ) -> bool {
+        // Retrieve the authors for the current round. 
+        let authors = certificates.into_iter().map(|c| c.author()).collect();
+        // Check if quorum threshold is reached. 
+        let is_quorum = committee.is_quorum_threshold_reached(&authors); 
+        if !is_quorum { 
+            info!("BFT failed to advance to the next round - quorum threshold not reached in even round {current_round}. ");
+            return false; 
+        }
         // If the leader certificate is set for the current even round, return 'true'.
         if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
             if leader_certificate.round() == current_round {
@@ -330,11 +338,8 @@ impl<N: Network> BFT<N> {
         }
         // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
         if self.is_timer_expired() {
-            debug!("BFT (timer expired) - Checking for quorum threshold (without the leader)");
-            // Retrieve the certificate authors.
-            let authors = certificates.into_iter().map(|c| c.author()).collect();
-            // Determine if the quorum threshold is reached.
-            return committee.is_quorum_threshold_reached(&authors);
+            debug!("BFT (timer expired) - Advancing from round {current_round} to the next round (without the leader)");
+            return true; 
         }
         // Otherwise, return 'false'.
         false
@@ -363,14 +368,6 @@ impl<N: Network> BFT<N> {
             error!("BFT does not compute stakes for the leader certificate in an even round");
             return false;
         }
-
-        // Retrieve the leader certificate.
-        let Some(leader_certificate) = self.leader_certificate.read().clone() else {
-            // If there is no leader certificate for the previous round, return 'true'.
-            return true;
-        };
-        // Retrieve the leader certificate ID.
-        let leader_certificate_id = leader_certificate.id();
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
         // Retrieve the committee lookback for the current round.
@@ -381,7 +378,21 @@ impl<N: Network> BFT<N> {
                 return false;
             }
         };
-
+        // Retrieve the authors of the current certificates. 
+        let authors = current_certificates.clone().into_iter().map(|c| c.author()).collect();
+        // Check if quorum threshold is reached. 
+        let is_quorum = previous_committee.clone().is_quorum_threshold_reached(&authors); 
+        if !is_quorum { 
+            info!("BFT failed to advance to the next round - quorum threshold not reached in odd round {current_round}. ");
+            return false; 
+        }
+        // Retrieve the leader certificate.
+        let Some(leader_certificate) = self.leader_certificate.read().clone() else {
+            // If there is no leader certificate for the previous round, return 'true'.
+            return true;
+        };
+        // Retrieve the leader certificate ID.
+        let leader_certificate_id = leader_certificate.id();
         // Compute the stake for the leader certificate.
         let (stake_with_leader, stake_without_leader) =
             self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &committee_lookback);
