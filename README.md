@@ -101,7 +101,7 @@ Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS fir
 
 Lastly, install `snarkOS`:
 ```
-cargo install --path .
+cargo install --locked --path .
 ```
 
 Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
