@@ -549,7 +549,16 @@ impl<N: Network> Primary<N> {
         }
 
         // If the peer is ahead, use the batch header to sync up to the peer.
-        let transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
+        let mut transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
+
+        // Check that the transmission ids match and are not fee transactions.
+        for (transmission_id, transmission) in transmissions.iter_mut() {
+            // If the transmission is invalid, then return early.
+            if let Err(err) = self.ledger.ensure_transmission_id_matches(*transmission_id, transmission) {
+                debug!("Batch propose from '{peer_ip}' contains an invalid transmission - {err}",);
+                return Ok(());
+            }
+        }
 
         // Ensure the batch is for the current round.
         // This method must be called after fetching previous certificates (above),
