@@ -381,10 +381,10 @@ impl<N: Network> Router<N> {
             vec![]
         } else {
             vec![
-                SocketAddr::from_str("35.224.50.150:4130").unwrap(),
-                SocketAddr::from_str("35.227.159.141:4130").unwrap(),
-                SocketAddr::from_str("34.139.203.87:4130").unwrap(),
-                SocketAddr::from_str("34.150.221.166:4130").unwrap(),
+                SocketAddr::from_str("64.23.169.88:4130").unwrap(),
+                SocketAddr::from_str("146.190.35.174:4130").unwrap(),
+                SocketAddr::from_str("45.55.201.67:4130").unwrap(),
+                SocketAddr::from_str("45.55.201.80:4130").unwrap(),
             ]
         }
     }
