@@ -329,7 +329,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         // Broadcast the transaction.
         rest.routing.propagate(message, &[]);
 
-        info!("tx_propagation_logging-after-broadcast-endpoint- Transaction broadcast successful. Transaction ID: {}", tx_id);
+        info!("tx_propagation_logging-after-broadcast-endpoint- Transaction broadcast successful. Transaction ID: \"{}\"", tx_id);
 
         Ok(ErasedJson::pretty(tx_id))
     }
