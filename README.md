@@ -96,7 +96,7 @@ Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS fir
 
 **[*Beta* - For Debian users]** 
 
-Firstly, you need to install the updated version of LLVM and Clang, run:
+Firstly, install the updated version of LLVM and Clang, run:
 ```
 ./llvm.sh
 ```
