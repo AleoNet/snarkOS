@@ -83,7 +83,7 @@ version = "1"
 version = "0.4"
 
 [dependencies.tower_governor]
-version = "0.2"
+version = "0.3"
 
 [dependencies.tower-http]
 version = "0.5"

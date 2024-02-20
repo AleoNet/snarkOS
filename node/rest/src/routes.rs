@@ -339,18 +339,18 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     ) -> Result<ErasedJson, RestError> {
         // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
         if let Some(consensus) = rest.consensus {
-            // Add the unconfirmed transaction to the memory pool.
+            // Add the unconfirmed solution to the memory pool.
             consensus.add_unconfirmed_solution(prover_solution).await?;
         }
 
         let commitment = prover_solution.commitment();
-        // Prepare the unconfirmed transaction message.
+        // Prepare the unconfirmed solution message.
         let message = Message::UnconfirmedSolution(UnconfirmedSolution {
             solution_id: commitment,
             solution: Data::Object(prover_solution),
         });
 
-        // Broadcast the transaction.
+        // Broadcast the unconfirmed solution message.
         rest.routing.propagate(message, &[]);
 
         Ok(ErasedJson::pretty(commitment))
