@@ -737,6 +737,10 @@ impl<N: Network> Primary<N> {
             return Err(e);
         }
 
+        // Concatenating all transmission IDs into a single string and logging it
+        let ids: Vec<String> = proposal.transmissions().iter().map(|(id, _)| id.to_string()).collect();
+        info!("tx_propagation_logging-in_block- Batch certified and included in block for round {}. Number of transactions: {}, Transmission IDs: [{}]", proposal.round(), proposal.transmissions().len(), ids.join(", "));
+
         #[cfg(feature = "metrics")]
         metrics::increment_gauge(metrics::bft::CERTIFIED_BATCHES, 1.0);
         Ok(())
