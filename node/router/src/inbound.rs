@@ -265,9 +265,15 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Filter out invalid addresses.
         let peers = match self.router().is_dev() {
             // In development mode, relax the validity requirements to make operating devnets more flexible.
-            true => peers.into_iter().filter(|ip| !is_bogon_ip(ip.ip())).take(u8::MAX as usize).collect(),
+            true => {
+                peers.into_iter().filter(|ip| *ip != peer_ip && !is_bogon_ip(ip.ip())).take(u8::MAX as usize).collect()
+            }
             // In production mode, ensure the peer IPs are valid.
-            false => peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).take(u8::MAX as usize).collect(),
+            false => peers
+                .into_iter()
+                .filter(|ip| *ip != peer_ip && self.router().is_valid_peer_ip(ip))
+                .take(u8::MAX as usize)
+                .collect(),
         };
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
