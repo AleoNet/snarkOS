@@ -447,6 +447,10 @@ impl<N: Network> Primary<N> {
 
         *lock_guard = round;
 
+        // Concatenating all transmission IDs into a single string and logging it
+        let ids: Vec<String> = transmissions.keys().map(|id| id.to_string()).collect(); // Assuming `id` can be directly converted to a string representation
+        info!("tx_propagation_logging-in_narwhal- Proposing batch with transmission IDs: [{}] for round {}", ids.join(", "), round);
+
         /* Proceeding to sign & propose the batch. */
         info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len());
 
