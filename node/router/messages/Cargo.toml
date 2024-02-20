@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ ]
 test = [ ]
+metrics = ["dep:metrics", "snarkvm/metrics"]
 
 [dependencies.anyhow]
 version = "1.0"
@@ -29,6 +30,12 @@ version = "1"
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../../metrics"
+version = "=2.2.7"
+optional = true
 
 [dependencies.rayon]
 version = "1"

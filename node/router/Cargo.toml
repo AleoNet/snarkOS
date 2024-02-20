@@ -18,7 +18,7 @@ edition = "2021"
 
 [features]
 test = [ ]
-metrics = [ "dep:metrics" ]
+metrics = [ "dep:metrics", "snarkos-node-router-messages/metrics" ]
 
 [dependencies.anyhow]
 version = "1.0.79"

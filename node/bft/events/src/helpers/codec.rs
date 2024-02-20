@@ -68,8 +68,19 @@ impl<N: Network> Encoder<Event<N>> for EventCodec<N> {
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "serialization error"))?;
 
         let serialized_event = dst.split_to(dst.len()).freeze();
+        #[cfg(feature = "metrics")]
+        let num_bytes = serialized_event.len() as f64;
+        
+        self.codec.encode(serialized_event, dst)?;
 
-        self.codec.encode(serialized_event, dst)
+        #[cfg(feature = "metrics")] 
+        metrics::histogram_label(
+            metrics::tcp::TCP_GATEWAY_EVENTS_OUTBOUND,
+            "event",
+            String::from(event.name().clone()),
+            num_bytes,
+        );
+        Ok(())
     }
 }
 
@@ -91,7 +102,7 @@ impl<N: Network> Decoder for EventCodec<N> {
             Ok(event) => {
                 #[cfg(feature = "metrics")]
                 metrics::histogram_label(
-                    metrics::tcp::TCP_GATEWAY,
+                    metrics::tcp::TCP_GATEWAY_EVENTS_INBOUND,
                     "event",
                     String::from(event.name().clone()),
                     num_bytes,
