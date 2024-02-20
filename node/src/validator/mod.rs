@@ -402,6 +402,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                         continue;
                     }
                 };
+
+                info!("tx_propagation_logging-val_0_after_generation- Generated val 0 transaction with hash: {}", transaction.id());
+
                 // Broadcast the transaction.
                 if self_
                     .unconfirmed_transaction(
@@ -411,6 +414,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     )
                     .await
                 {
+                    info!("tx_propagation_logging-val_0_after_broadcast- Broadcast val 0 transaction with hash: {}", transaction.id());
                     info!("Transaction pool broadcasted the transaction");
                 }
             }
