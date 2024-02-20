@@ -70,10 +70,8 @@ impl<N: Network> Encoder<Event<N>> for EventCodec<N> {
         let serialized_event = dst.split_to(dst.len()).freeze();
         #[cfg(feature = "metrics")]
         let num_bytes = serialized_event.len() as f64;
-        
         self.codec.encode(serialized_event, dst)?;
-
-        #[cfg(feature = "metrics")] 
+        #[cfg(feature = "metrics")]
         metrics::histogram_label(
             metrics::tcp::TCP_GATEWAY_EVENTS_OUTBOUND,
             "event",

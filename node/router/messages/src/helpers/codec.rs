@@ -51,7 +51,7 @@ impl<N: Network> Default for MessageCodec<N> {
 impl<N: Network> Encoder<Message<N>> for MessageCodec<N> {
     type Error = std::io::Error;
 
-    fn encode(&mut self, message: Message<N>, dst: &mut BytesMut) ->  Result<(), Self::Error> {
+    fn encode(&mut self, message: Message<N>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // Serialize the payload directly into dst.
         message
             .write_le(&mut dst.writer())
@@ -61,10 +61,8 @@ impl<N: Network> Encoder<Message<N>> for MessageCodec<N> {
         let serialized_message = dst.split_to(dst.len()).freeze();
         #[cfg(feature = "metrics")]
         let num_bytes = serialized_message.len() as f64;
-
         self.codec.encode(serialized_message, dst)?;
-
-        #[cfg(feature = "metrics")] 
+        #[cfg(feature = "metrics")]
         metrics::histogram_label(
             metrics::tcp::TCP_GATEWAY_MESSAGES_OUTBOUND,
             "message",

@@ -407,7 +407,7 @@ impl<N: Network> Consensus<N> {
             let block_latency = next_block_timestamp - current_block_timestamp;
 
             metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
-            metrics::counter(metrics::blocks::TRANSACTIONS, next_block.transactions().len() as u64);
+            metrics::gauge(metrics::blocks::TRANSACTIONS, next_block.transactions().len() as f64);
             metrics::gauge(metrics::consensus::LAST_COMMITTED_ROUND, next_block.round() as f64);
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
