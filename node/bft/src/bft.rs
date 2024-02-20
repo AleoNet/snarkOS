@@ -381,7 +381,7 @@ impl<N: Network> BFT<N> {
         // Retrieve the authors of the current certificates. 
         let authors = current_certificates.clone().into_iter().map(|c| c.author()).collect();
         // Check if quorum threshold is reached. 
-        let is_quorum = previous_committee.clone().is_quorum_threshold_reached(&authors); 
+        let is_quorum = committee_lookback.clone().is_quorum_threshold_reached(&authors); 
         if !is_quorum { 
             info!("BFT failed to advance to the next round - quorum threshold not reached in odd round {current_round}. ");
             return false; 
