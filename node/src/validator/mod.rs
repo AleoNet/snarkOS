@@ -403,7 +403,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     }
                 };
 
-                info!("tx_propagation_logging-val_0_after_generation- Generated val 0 transaction with hash: {}", transaction.id());
+                info!("tx_propagation_logging-val_0_after_generation- Generated val 0 transaction with hash: \"{}\"", transaction.id());
 
                 // Broadcast the transaction.
                 if self_

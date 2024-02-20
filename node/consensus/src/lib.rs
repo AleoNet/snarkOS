@@ -403,10 +403,21 @@ impl<N: Network> Consensus<N> {
         #[cfg(feature = "metrics")]
         let current_block_timestamp = self.ledger.latest_block().header().metadata().timestamp();
 
+        // Log transaction IDs included in the block
+        let tx_ids_for_logging: Vec<String> = transmissions.iter().filter_map(|(id, transmission)| {
+            match transmission {
+                Transmission::Transaction(_) => Some(id.to_string()),
+                _ => None,
+            }
+        }).collect();
+
         // Create the candidate next block.
-        let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
+        let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions.clone())?;
         // Check that the block is well-formed.
         self.ledger.check_next_block(&next_block)?;
+
+        info!("tx_propagation_logging-try_advance_to_next_block- Block advanced with transactions: {:?}", tx_ids_for_logging);
+
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
 
