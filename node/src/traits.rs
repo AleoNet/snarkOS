@@ -17,6 +17,8 @@ use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use once_cell::sync::OnceCell;
 use std::{
+    future::Future,
+    io,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -53,15 +55,40 @@ pub trait NodeInterface<N: Network>: Routing<N> {
 
     /// Handles OS signals for the node to intercept and perform a clean shutdown.
     /// The optional `shutdown_flag` flag can be used to cleanly terminate the syncing process.
-    /// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
     fn handle_signals(shutdown_flag: Arc<AtomicBool>) -> Arc<OnceCell<Self>> {
         // In order for the signal handler to be started as early as possible, a reference to the node needs
         // to be passed to it at a later time.
         let node: Arc<OnceCell<Self>> = Default::default();
 
+        #[cfg(target_family = "unix")]
+        fn signal_listener() -> impl Future<Output = io::Result<()>> {
+            use tokio::signal::unix::{signal, SignalKind};
+
+            // Handle SIGINT, SIGTERM, SIGQUIT, and SIGHUP.
+            let mut s_int = signal(SignalKind::interrupt()).unwrap();
+            let mut s_term = signal(SignalKind::terminate()).unwrap();
+            let mut s_quit = signal(SignalKind::quit()).unwrap();
+            let mut s_hup = signal(SignalKind::hangup()).unwrap();
+
+            // Return when any of the signals above is received.
+            async move {
+                tokio::select!(
+                    _ = s_int.recv() => (),
+                    _ = s_term.recv() => (),
+                    _ = s_quit.recv() => (),
+                    _ = s_hup.recv() => (),
+                );
+                Ok(())
+            }
+        }
+        #[cfg(not(target_family = "unix"))]
+        fn signal_listener() -> impl Future<Output = io::Result<()>> {
+            tokio::signal::ctrl_c()
+        }
+
         let node_clone = node.clone();
         tokio::task::spawn(async move {
-            match tokio::signal::ctrl_c().await {
+            match signal_listener().await {
                 Ok(()) => {
                     match node_clone.get() {
                         // If the node is already initialized, then shut it down.
