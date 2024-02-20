@@ -40,8 +40,8 @@ pub(super) const HISTOGRAM_NAMES: [&str; 11] = [
     tcp::NOISE_CODEC_DECRYPTION_SIZE,
     tcp::TCP_GATEWAY_EVENTS_OUTBOUND,
     tcp::TCP_GATEWAY_EVENTS_INBOUND,
-    tcp::TCP_GATEWAY_MESSAGES_OUTBOUND,
-    tcp::TCP_GATEWAY_MESSAGES_INBOUND,
+    tcp::TCP_ROUTER_MESSAGES_OUTBOUND,
+    tcp::TCP_ROUTER_MESSAGES_INBOUND,
 ];
 
 pub mod bft {
@@ -80,6 +80,6 @@ pub mod tcp {
     pub const TCP_TASKS: &str = "snarkos_tcp_tasks_total";
     pub const TCP_GATEWAY_EVENTS_OUTBOUND: &str = "snarkos_tcp_gateway_events_outbound";
     pub const TCP_GATEWAY_EVENTS_INBOUND: &str = "snarkos_tcp_gateway_events_inbound";
-    pub const TCP_GATEWAY_MESSAGES_OUTBOUND: &str = "snarkos_tcp_gateway_messages_outbound";
-    pub const TCP_GATEWAY_MESSAGES_INBOUND: &str = "snarkos_tcp_gateway_messages_inbound";
+    pub const TCP_ROUTER_MESSAGES_OUTBOUND: &str = "snarkos_tcp_router_messages_outbound";
+    pub const TCP_ROUTER_MESSAGES_INBOUND: &str = "snarkos_tcp_router_messages_inbound";
 }

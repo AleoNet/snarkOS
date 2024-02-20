@@ -64,7 +64,7 @@ impl<N: Network> Encoder<Message<N>> for MessageCodec<N> {
         self.codec.encode(serialized_message, dst)?;
         #[cfg(feature = "metrics")]
         metrics::histogram_label(
-            metrics::tcp::TCP_GATEWAY_MESSAGES_OUTBOUND,
+            metrics::tcp::TCP_ROUTER_MESSAGES_OUTBOUND,
             "message",
             String::from(message.name().clone()),
             num_bytes,
@@ -91,7 +91,7 @@ impl<N: Network> Decoder for MessageCodec<N> {
             Ok(message) => {
                 #[cfg(feature = "metrics")]
                 metrics::histogram_label(
-                    metrics::tcp::TCP_GATEWAY_MESSAGES_INBOUND,
+                    metrics::tcp::TCP_ROUTER_MESSAGES_INBOUND,
                     "message",
                     String::from(message.name().clone()),
                     num_bytes,
