@@ -734,6 +734,8 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the batch certificate author.
         let author = certificate.author();
+        // Retrieve the batch certificate round.
+        let certificate_round = certificate.round();
 
         // Ensure the batch certificate is from an authorized validator.
         if !self.gateway.is_authorized_validator_ip(peer_ip) {
@@ -763,14 +765,19 @@ impl<N: Network> Primary<N> {
         // Check if the certificates have reached the quorum threshold.
         let is_quorum = committee_lookback.is_quorum_threshold_reached(&authors);
 
-        // Determine if we are currently proposing a round.
+        // Determine if we are currently proposing a round that is relevant.
         // Note: This is important, because while our peers have advanced,
         // they may not be proposing yet, and thus still able to sign our proposed batch.
-        let is_proposing = self.proposed_batch.read().is_some();
+        let should_advance = match &*self.proposed_batch.read() {
+            // We advance if the proposal round is less than the current round that was just certified.
+            Some(proposal) => proposal.round() < certificate_round,
+            // If there's no proposal, we consider advancing.
+            None => true,
+        };
 
         // Determine whether to advance to the next round.
-        if is_quorum && !is_proposing {
-            // If we have reached the quorum threshold, then proceed to the next round.
+        if is_quorum && should_advance {
+            // If we have reached the quorum threshold and the round should advance, then proceed to the next round.
             self.try_increment_to_the_next_round(current_round + 1).await?;
         }
         Ok(())
