@@ -89,7 +89,7 @@ cd snarkOS
 
 Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
 
-**[*Beta* - For Debian users]** 
+**[For Debian users]** 
 
 Firstly, install the updated version of LLVM and Clang.
 Download the official install script from here (https://apt.llvm.org/llvm.sh) and then run:
