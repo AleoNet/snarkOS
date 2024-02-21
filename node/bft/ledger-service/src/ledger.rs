@@ -139,25 +139,24 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             return Ok(committee.clone());
         }
 
-        let committee = match self.ledger.get_committee_for_round(round)? {
+        match self.ledger.get_committee_for_round(round)? {
             // Return the committee if it exists.
-            Some(committee) => committee,
+            Some(committee) => {
+                // Insert the committee into the cache.
+                self.committee_cache.lock().push(round, committee.clone());
+                Ok(committee)
+            }
             // Return the current committee if the round is in the future.
             None => {
                 // Retrieve the current committee.
                 let current_committee = self.current_committee()?;
                 // Return the current committee if the round is in the future.
                 match current_committee.starting_round() <= round {
-                    true => current_committee,
+                    true => Ok(current_committee),
                     false => bail!("No committee found for round {round} in the ledger"),
                 }
             }
-        };
-
-        // Insert the committee into the cache.
-        self.committee_cache.lock().push(round, committee.clone());
-
-        Ok(committee)
+        }
     }
 
     /// Returns the committee lookback for the given round.
