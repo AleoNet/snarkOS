@@ -81,13 +81,13 @@ Next, move into the `snarkOS` directory:
 ```
 cd snarkOS
 ```
+Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
 
 **[For Ubuntu users]** A helper script to install dependencies is available. From the `snarkOS` directory, run:
 ```
 ./build_ubuntu.sh
 ```
 
-Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
 
 **[For Debian users]** 
 
@@ -101,9 +101,6 @@ A helper script to install dependencies is available. From the `snarkOS` directo
 ```
 ./build_debian.sh
 ```
-
-Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
-
 
 ## 3. Run an Aleo Node
 
