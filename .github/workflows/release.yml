@@ -2,7 +2,7 @@ name: snarkOS Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - '*'
 
 env:
   RUST_BACKTRACE: 1
