@@ -30,7 +30,7 @@ pub(super) const GAUGE_NAMES: [&str; 13] = [
     tcp::TCP_TASKS,
 ];
 
-pub(super) const HISTOGRAM_NAMES: [&str; 11] = [
+pub(super) const HISTOGRAM_NAMES: [&str; 7] = [
     bft::COMMIT_ROUNDS_LATENCY,
     consensus::CERTIFICATE_COMMIT_LATENCY,
     consensus::BLOCK_LATENCY,
@@ -38,10 +38,6 @@ pub(super) const HISTOGRAM_NAMES: [&str; 11] = [
     tcp::NOISE_CODEC_DECRYPTION_TIME,
     tcp::NOISE_CODEC_ENCRYPTION_SIZE,
     tcp::NOISE_CODEC_DECRYPTION_SIZE,
-    tcp::TCP_GATEWAY_EVENTS_OUTBOUND,
-    tcp::TCP_GATEWAY_EVENTS_INBOUND,
-    tcp::TCP_ROUTER_MESSAGES_OUTBOUND,
-    tcp::TCP_ROUTER_MESSAGES_INBOUND,
 ];
 
 pub mod bft {
@@ -78,8 +74,4 @@ pub mod tcp {
     pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_encryption_size";
     pub const NOISE_CODEC_DECRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_decryption_size";
     pub const TCP_TASKS: &str = "snarkos_tcp_tasks_total";
-    pub const TCP_GATEWAY_EVENTS_OUTBOUND: &str = "snarkos_tcp_gateway_events_outbound";
-    pub const TCP_GATEWAY_EVENTS_INBOUND: &str = "snarkos_tcp_gateway_events_inbound";
-    pub const TCP_ROUTER_MESSAGES_OUTBOUND: &str = "snarkos_tcp_router_messages_outbound";
-    pub const TCP_ROUTER_MESSAGES_INBOUND: &str = "snarkos_tcp_router_messages_inbound";
 }
