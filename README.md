@@ -87,11 +87,6 @@ cd snarkOS
 ./build_ubuntu.sh
 ```
 
-Lastly, install `snarkOS`:
-```
-cargo install --locked --path .
-```
-
 Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
 
 **[*Beta* - For Debian users]** 
@@ -105,11 +100,6 @@ Download the official install script from here (https://apt.llvm.org/llvm.sh) an
 A helper script to install dependencies is available. From the `snarkOS` directory, run:
 ```
 ./build_debian.sh
-```
-
-Lastly, install `snarkOS`:
-```
-cargo install --locked --path .
 ```
 
 Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
