@@ -16,6 +16,7 @@ sudo apt-get install -y \
 	llvm \
 	make \
 	pkg-config \
+        sudo \
 	tmux \
 	xz-utils \
 	ufw
