@@ -19,7 +19,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{Field, Network, Result},
+    prelude::{Address, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
@@ -35,6 +35,12 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
 
     /// Returns the latest block in the ledger.
     fn latest_block(&self) -> Block<N>;
+
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)>;
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, round: u64, leader: Address<N>);
 
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, height: u32) -> bool;

@@ -298,11 +298,22 @@ impl<N: Network> BFT<N> {
             }
         };
         // Determine the leader of the current round.
-        let leader = match committee_lookback.get_leader(current_round) {
-            Ok(leader) => leader,
-            Err(e) => {
-                error!("BFT failed to compute the leader for the even round {current_round} - {e}");
-                return false;
+        let leader = match self.ledger().latest_leader() {
+            Some((cached_round, cached_leader)) if cached_round == current_round => cached_leader,
+            _ => {
+                // Compute the leader for the current round.
+                let computed_leader = match committee_lookback.get_leader(current_round) {
+                    Ok(leader) => leader,
+                    Err(e) => {
+                        error!("BFT failed to compute the leader for the even round {current_round} - {e}");
+                        return false;
+                    }
+                };
+
+                // Cache the computed leader.
+                self.ledger().update_latest_leader(current_round, computed_leader);
+
+                computed_leader
             }
         };
         // Find and set the leader certificate, if the leader was present in the current even round.
@@ -453,10 +464,23 @@ impl<N: Network> BFT<N> {
         let Ok(committee_lookback) = self.ledger().get_committee_lookback_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee with lag for commit round {commit_round}");
         };
-        // Compute the leader for the commit round.
-        let Ok(leader) = committee_lookback.get_leader(commit_round) else {
-            bail!("BFT failed to compute the leader for commit round {commit_round}");
+
+        // Either retrieve the cached leader or compute it.
+        let leader = match self.ledger().latest_leader() {
+            Some((cached_round, cached_leader)) if cached_round == commit_round => cached_leader,
+            _ => {
+                // Compute the leader for the commit round.
+                let Ok(computed_leader) = committee_lookback.get_leader(commit_round) else {
+                    bail!("BFT failed to compute the leader for commit round {commit_round}");
+                };
+
+                // Cache the computed leader.
+                self.ledger().update_latest_leader(commit_round, computed_leader);
+
+                computed_leader
+            }
         };
+
         // Retrieve the leader certificate for the commit round.
         let Some(leader_certificate) = self.dag.read().get_certificate_for_round_with_author(commit_round, leader)
         else {
@@ -512,11 +536,22 @@ impl<N: Network> BFT<N> {
                         bail!("BFT failed to retrieve a previous committee lookback for the even round {round} - {e}");
                     }
                 };
-                // Compute the leader address for the leader round.
-                let leader = match previous_committee_lookback.get_leader(round) {
-                    Ok(leader) => leader,
-                    Err(e) => {
-                        bail!("BFT failed to compute the leader for the even round {round} - {e}");
+                // Either retrieve the cached leader or compute it.
+                let leader = match self.ledger().latest_leader() {
+                    Some((cached_round, cached_leader)) if cached_round == round => cached_leader,
+                    _ => {
+                        // Compute the leader for the commit round.
+                        let computed_leader = match previous_committee_lookback.get_leader(round) {
+                            Ok(leader) => leader,
+                            Err(e) => {
+                                bail!("BFT failed to compute the leader for the even round {round} - {e}");
+                            }
+                        };
+
+                        // Cache the computed leader.
+                        self.ledger().update_latest_leader(round, computed_leader);
+
+                        computed_leader
                     }
                 };
                 // Retrieve the previous leader certificate.
