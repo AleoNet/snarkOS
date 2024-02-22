@@ -14,6 +14,7 @@ sudo apt-get install -y \
 	libssl-dev \
 	make \
 	pkg-config \
+        sudo \
 	tmux \
 	xz-utils \
 	ufw
