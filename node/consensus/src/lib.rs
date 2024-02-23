@@ -402,7 +402,15 @@ impl<N: Network> Consensus<N> {
         let num_committed_certificates = subdag.values().map(|c| c.len()).sum::<usize>();
         #[cfg(feature = "metrics")]
         let current_block_timestamp = self.ledger.latest_block().header().metadata().timestamp();
-
+    
+        // Create the candidate next block.
+        let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions.clone())?;
+        // Check that the block is well-formed.
+        self.ledger.check_next_block(&next_block)?;
+    
+        // Advance to the next block.
+        self.ledger.advance_to_next_block(&next_block)?;
+    
         // Log transaction IDs included in the block
         let tx_ids_for_logging: Vec<String> = transmissions.iter().filter_map(|(id, transmission)| {
             match transmission {
@@ -410,17 +418,9 @@ impl<N: Network> Consensus<N> {
                 _ => None,
             }
         }).collect();
-
-        // Create the candidate next block.
-        let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions.clone())?;
-        // Check that the block is well-formed.
-        self.ledger.check_next_block(&next_block)?;
-
+    
         info!("tx_propagation_logging-try_advance_to_next_block- Block advanced with transactions: {:?}", tx_ids_for_logging);
-
-        // Advance to the next block.
-        self.ledger.advance_to_next_block(&next_block)?;
-
+    
         #[cfg(feature = "metrics")]
         {
             let elapsed = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - start) as u64);
@@ -441,7 +441,7 @@ impl<N: Network> Consensus<N> {
         }
         Ok(())
     }
-
+    
     /// Reinserts the given transmissions into the memory pool.
     async fn reinsert_transmissions(&self, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
         // Iterate over the transmissions.
