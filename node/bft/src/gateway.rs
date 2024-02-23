@@ -64,7 +64,14 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rand::seq::{IteratorRandom, SliceRandom};
-use std::{collections::HashSet, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    future::Future,
+    io,
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
@@ -120,7 +127,7 @@ pub struct Gateway<N: Network> {
     /// attempt to connect to each other). This set is used to prevent this from happening.
     connecting_peers: Arc<Mutex<IndexSet<SocketAddr>>>,
     /// The cached view of connected validators validators.
-    cached_validator_view: Arc<RwLock<IndexMap<SocketAddr, Address<N>>>>,
+    cached_validator_view: Arc<Mutex<HashMap<SocketAddr, Address<N>>>>,
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The worker senders.
@@ -886,8 +893,8 @@ impl<N: Network> Gateway<N> {
 
         // We reserve the write lock for the duration of validator set intersection/difference computations,
         // as this function should be called by a single `Gateway::heartbeat`- task only.
-        let mut cached_view = self.cached_validator_view.write();
-        let mut new_view = IndexMap::with_capacity(resolved_peer_ips.len());
+        let mut cached_view = self.cached_validator_view.lock();
+        let mut new_view = HashMap::with_capacity(resolved_peer_ips.len());
 
         // `resolver.get_address()` should always return address for SocketAddrs in `resolved_peer_ips`,
         // so we do `filter_map` to reduce noise inside a loop.
