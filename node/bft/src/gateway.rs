@@ -14,7 +14,7 @@
 
 use crate::{
     events::{EventCodec, PrimaryPing},
-    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
+    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender, Storage},
     spawn_blocking,
     Worker,
     CONTEXT,
@@ -88,6 +88,9 @@ const MIN_CONNECTED_VALIDATORS: usize = 175;
 /// The maximum number of validators to send in a validators response event.
 const MAX_VALIDATORS_TO_SEND: usize = 200;
 
+/// The maximum number of blocks tolerated before the primary is considered behind its peers.
+pub const MAX_BLOCKS_BEHIND: u32 = 1; // blocks
+
 /// Part of the Gateway API that deals with networking.
 /// This is a separate trait to allow for easier testing/mocking.
 #[async_trait]
@@ -100,6 +103,8 @@ pub trait Transport<N: Network>: Send + Sync {
 pub struct Gateway<N: Network> {
     /// The account of the node.
     account: Account<N>,
+    /// The storage. 
+    storage: Storage<N>, 
     /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
     /// The TCP stack.
@@ -133,6 +138,7 @@ impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
     pub fn new(
         account: Account<N>,
+        storage: Storage<N>,
         ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
@@ -149,6 +155,7 @@ impl<N: Network> Gateway<N> {
         // Return the gateway.
         Ok(Self {
             account,
+            storage,
             ledger,
             tcp,
             cache: Default::default(),
@@ -335,13 +342,38 @@ impl<N: Network> Gateway<N> {
         //  1. New validators should be able to connect immediately once bonded as a committee member.
         //  2. Existing validators must remain connected until they are no longer bonded as a committee member.
         //     (i.e. meaning they must stay online until the next block has been produced)
-        self.ledger
-            .get_committee_lookback_for_round(self.ledger.latest_round())
-            .map_or(false, |committee| committee.is_committee_member(validator_address))
-            || self
-                .ledger
-                .current_committee()
-                .map_or(false, |committee| committee.is_committee_member(validator_address))
+        
+        // Retrieve the latest ledger block height. 
+        let latest_ledger_height = self.ledger.latest_block_height(); 
+        // Retrieve the earliest block height to consider from the sync range tolerance. 
+        let earliest_sync_ledger_height = latest_ledger_height.saturating_sub(MAX_BLOCKS_BEHIND); 
+        // Initialize a flag to check if the validator is in a previous committee with lookback. 
+        let mut is_val_in_previous_committee_lookback = false; 
+
+        // Determine if the validator is in any of the previous committees with lookback up until the sync range tolerance. 
+        if let Ok(block) = self.ledger.get_block(earliest_sync_ledger_height){ 
+            // Retrieve the block round. 
+            let block_round = block.header().metadata().round();
+            for round in (block_round..self.storage.current_round()).step_by(2){
+                if let Ok(previous_committee_lookback) = self.ledger.get_committee_lookback_for_round(round) {
+                    // Determine if the validator is in the committee. 
+                    if previous_committee_lookback.is_committee_member(validator_address){
+                        // Set the tracker to 'true'. 
+                        is_val_in_previous_committee_lookback = true;
+                        break; 
+                    }
+                }
+            }
+        }
+        // Determine if the validator is in the current committee with lookback. 
+        let is_val_in_current_committee_lookback = match self.ledger.get_committee_lookback_for_round(self.storage.current_round()) {
+            Ok(current_committee_lookback) => current_committee_lookback.is_committee_member(validator_address),
+            Err(_) => false,
+        };
+        // Determine if the validator is in the latest committee on the ledger. 
+        let is_val_in_latest_committee = self.ledger.current_committee().map_or(false, |committee| committee.is_committee_member(validator_address)); 
+
+        return is_val_in_previous_committee_lookback || is_val_in_current_committee_lookback || is_val_in_latest_committee; 
     }
 
     /// Returns the maximum number of connected peers.
