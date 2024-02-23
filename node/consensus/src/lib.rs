@@ -53,10 +53,12 @@ use tokio::{
     task::JoinHandle,
 };
 
-/// Percentage of mempool transactions capacity reserved for deployments.
-const CAPACITY_FOR_DEPLOYMENTS: usize = 20;
-/// Percentage of mempool transactions capacity reserved for executions.
-const CAPACITY_FOR_EXECUTIONS: usize = 80;
+/// The capacity of the mempool reserved for deployments.
+const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 8;
+/// The capacity of the mempool reserved for executions.
+const CAPACITY_FOR_EXECUTIONS: usize = 1 << 10;
+/// The capacity of the mempool reserved for solutions.
+const CAPACITY_FOR_SOLUTIONS: usize = 1 << 10;
 
 /// Helper struct to track incoming transactions.
 struct TransactionsQueue<N: Network> {
@@ -67,14 +69,8 @@ struct TransactionsQueue<N: Network> {
 impl<N: Network> Default for TransactionsQueue<N> {
     fn default() -> Self {
         Self {
-            deployments: LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_DEPLOYMENTS / 100)
-                    .unwrap(),
-            ),
-            executions: LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_EXECUTIONS / 100)
-                    .unwrap(),
-            ),
+            deployments: LruCache::new(NonZeroUsize::new(CAPACITY_FOR_DEPLOYMENTS).unwrap()),
+            executions: LruCache::new(NonZeroUsize::new(CAPACITY_FOR_EXECUTIONS).unwrap()),
         }
     }
 }
@@ -124,9 +120,7 @@ impl<N: Network> Consensus<N> {
             ledger,
             bft,
             primary_sender: Default::default(),
-            solutions_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
-            ))),
+            solutions_queue: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(CAPACITY_FOR_SOLUTIONS).unwrap()))),
             transactions_queue: Default::default(),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
