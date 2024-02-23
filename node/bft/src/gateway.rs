@@ -919,10 +919,7 @@ impl<N: Network> Gateway<N> {
         }
 
         // Then go through remaining peers in `cached_view` to resolve the peers not in new view (= removed ones).
-        for (peer_ip, address) in cached_view.iter() {
-            if new_view.contains_key(peer_ip) {
-                continue;
-            }
+        for (peer_ip, address) in cached_view.iter().filter(|(peer_ip, _)| !new_view.contains_key(peer_ip)) {
             let removed_validator = format!("{peer_ip} - {address}").dimmed();
             debug!("  - {}", removed_validator);
         }
