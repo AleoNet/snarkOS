@@ -326,9 +326,7 @@ impl<N: Network> BFT<N> {
         let authors = certificates.into_iter().map(|c| c.author()).collect();
         // Check if quorum threshold is reached.
         if !committee.is_quorum_threshold_reached(&authors) {
-            info!(
-                "BFT failed to advance to the next round - quorum threshold not reached in even round {current_round}. "
-            );
+            debug!("BFT failed to reach quorum threshold in even round {current_round}");
             return false;
         }
         // If the leader certificate is set for the current even round, return 'true'.
@@ -383,9 +381,7 @@ impl<N: Network> BFT<N> {
         let authors = current_certificates.clone().into_iter().map(|c| c.author()).collect();
         // Check if quorum threshold is reached.
         if !committee_lookback.is_quorum_threshold_reached(&authors) {
-            info!(
-                "BFT failed to advance to the next round - quorum threshold not reached in odd round {current_round}. "
-            );
+            debug!("BFT failed reach quorum threshold in odd round {current_round}. ");
             return false;
         }
         // Retrieve the leader certificate.
