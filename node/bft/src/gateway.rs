@@ -890,7 +890,7 @@ impl<N: Network> Gateway<N> {
         let mut new_view = IndexMap::with_capacity(resolved_peer_ips.len());
 
         // `resolver.get_address()` should always return address for SocketAddrs in `resolved_peer_ips`,
-        // so we do `filter_map` to reduce a noise inside loop
+        // so we do `filter_map` to reduce noise inside a loop.
         for (peer_ip, new_address) in resolved_peer_ips
             .iter()
             .filter_map(|peer_ip| self.resolver.get_address(*peer_ip).map(|address| (peer_ip, address)))
