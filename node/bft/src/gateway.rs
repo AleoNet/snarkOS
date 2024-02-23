@@ -14,7 +14,7 @@
 
 use crate::{
     events::{EventCodec, PrimaryPing},
-    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender, Storage},
+    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, Storage, SyncSender, WorkerSender},
     spawn_blocking,
     Worker,
     CONTEXT,
@@ -39,7 +39,7 @@ use snarkos_node_bft_events::{
     ValidatorsResponse,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_sync::communication_service::CommunicationService;
+use snarkos_node_sync::{communication_service::CommunicationService, MAX_BLOCKS_BEHIND};
 use snarkos_node_tcp::{
     is_bogon_ip,
     is_unspecified_or_broadcast_ip,
@@ -88,9 +88,6 @@ const MIN_CONNECTED_VALIDATORS: usize = 175;
 /// The maximum number of validators to send in a validators response event.
 const MAX_VALIDATORS_TO_SEND: usize = 200;
 
-/// The maximum number of blocks tolerated before the primary is considered behind its peers.
-pub const MAX_BLOCKS_BEHIND: u32 = 1; // blocks
-
 /// Part of the Gateway API that deals with networking.
 /// This is a separate trait to allow for easier testing/mocking.
 #[async_trait]
@@ -103,8 +100,8 @@ pub trait Transport<N: Network>: Send + Sync {
 pub struct Gateway<N: Network> {
     /// The account of the node.
     account: Account<N>,
-    /// The storage. 
-    storage: Storage<N>, 
+    /// The storage.
+    storage: Storage<N>,
     /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
     /// The TCP stack.
@@ -337,43 +334,35 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given address is an authorized validator.
     pub fn is_authorized_validator_address(&self, validator_address: Address<N>) -> bool {
-        // Determine if the validator address is a member of the committee lookback or the current committee.
+        // Retrieve the previous block height to consider from the sync tolerance.
+        let previous_block_height = self.ledger.latest_block_height().saturating_sub(MAX_BLOCKS_BEHIND);
+        // Determine if the validator is in any of the previous committee lookbacks.
+        let exists_in_previous_committee_lookback = match self.ledger.get_block(previous_block_height) {
+            Ok(block) => (block.round()..self.storage.current_round()).step_by(2).any(|round| {
+                self.ledger
+                    .get_committee_lookback_for_round(round)
+                    .map_or(false, |committee| committee.is_committee_member(validator_address))
+            }),
+            Err(_) => false,
+        };
+
+        // Determine if the validator is in the current committee with lookback.
+        let exists_in_current_committee_lookback = self
+            .ledger
+            .get_committee_lookback_for_round(self.storage.current_round())
+            .map_or(false, |committee| committee.is_committee_member(validator_address));
+
+        // Determine if the validator is in the latest committee on the ledger.
+        let exists_in_latest_committee =
+            self.ledger.current_committee().map_or(false, |committee| committee.is_committee_member(validator_address));
+
+        // Determine if the validator address is a member of the previous committee lookbacks,
+        // the committee lookback, or the current committee.
         // We allow leniency in this validation check in order to accommodate these two scenarios:
         //  1. New validators should be able to connect immediately once bonded as a committee member.
         //  2. Existing validators must remain connected until they are no longer bonded as a committee member.
         //     (i.e. meaning they must stay online until the next block has been produced)
-        
-        // Retrieve the latest ledger block height. 
-        let latest_ledger_height = self.ledger.latest_block_height(); 
-        // Retrieve the earliest block height to consider from the sync range tolerance. 
-        let earliest_sync_ledger_height = latest_ledger_height.saturating_sub(MAX_BLOCKS_BEHIND); 
-        // Initialize a flag to check if the validator is in a previous committee with lookback. 
-        let mut is_val_in_previous_committee_lookback = false; 
-
-        // Determine if the validator is in any of the previous committees with lookback up until the sync range tolerance. 
-        if let Ok(block) = self.ledger.get_block(earliest_sync_ledger_height){ 
-            // Retrieve the block round. 
-            let block_round = block.header().metadata().round();
-            for round in (block_round..self.storage.current_round()).step_by(2){
-                if let Ok(previous_committee_lookback) = self.ledger.get_committee_lookback_for_round(round) {
-                    // Determine if the validator is in the committee. 
-                    if previous_committee_lookback.is_committee_member(validator_address){
-                        // Set the tracker to 'true'. 
-                        is_val_in_previous_committee_lookback = true;
-                        break; 
-                    }
-                }
-            }
-        }
-        // Determine if the validator is in the current committee with lookback. 
-        let is_val_in_current_committee_lookback = match self.ledger.get_committee_lookback_for_round(self.storage.current_round()) {
-            Ok(current_committee_lookback) => current_committee_lookback.is_committee_member(validator_address),
-            Err(_) => false,
-        };
-        // Determine if the validator is in the latest committee on the ledger. 
-        let is_val_in_latest_committee = self.ledger.current_committee().map_or(false, |committee| committee.is_committee_member(validator_address)); 
-
-        return is_val_in_previous_committee_lookback || is_val_in_current_committee_lookback || is_val_in_latest_committee; 
+        exists_in_previous_committee_lookback || exists_in_current_committee_lookback || exists_in_latest_committee
     }
 
     /// Returns the maximum number of connected peers.
@@ -1434,6 +1423,7 @@ mod prop_tests {
                 .prop_map(|(storage, _, private_key, address)| {
                     Gateway::new(
                         Account::try_from(private_key).unwrap(),
+                        storage.clone(),
                         storage.ledger().clone(),
                         address.ip(),
                         &[],
@@ -1482,7 +1472,9 @@ mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+        let gateway =
+            Gateway::new(account.clone(), storage.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port())
+                .unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.port().unwrap()));
@@ -1497,7 +1489,9 @@ mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+        let gateway =
+            Gateway::new(account.clone(), storage.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port())
+                .unwrap();
         let tcp_config = gateway.tcp().config();
         if let Some(socket_addr) = dev.ip() {
             assert_eq!(tcp_config.listener_ip, Some(socket_addr.ip()));
@@ -1522,7 +1516,8 @@ mod prop_tests {
         let worker_storage = storage.clone();
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account, storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+        let gateway =
+            Gateway::new(account, storage.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
 
         let (primary_sender, _) = init_primary_channels();
 
