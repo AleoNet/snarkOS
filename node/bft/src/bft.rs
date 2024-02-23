@@ -322,13 +322,14 @@ impl<N: Network> BFT<N> {
         committee: Committee<N>,
         current_round: u64,
     ) -> bool {
-        // Retrieve the authors for the current round. 
+        // Retrieve the authors for the current round.
         let authors = certificates.into_iter().map(|c| c.author()).collect();
-        // Check if quorum threshold is reached. 
-        let is_quorum = committee.is_quorum_threshold_reached(&authors); 
-        if !is_quorum { 
-            info!("BFT failed to advance to the next round - quorum threshold not reached in even round {current_round}. ");
-            return false; 
+        // Check if quorum threshold is reached.
+        if !committee.is_quorum_threshold_reached(&authors) {
+            info!(
+                "BFT failed to advance to the next round - quorum threshold not reached in even round {current_round}. "
+            );
+            return false;
         }
         // If the leader certificate is set for the current even round, return 'true'.
         if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
@@ -339,7 +340,7 @@ impl<N: Network> BFT<N> {
         // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
         if self.is_timer_expired() {
             debug!("BFT (timer expired) - Advancing from round {current_round} to the next round (without the leader)");
-            return true; 
+            return true;
         }
         // Otherwise, return 'false'.
         false
@@ -378,13 +379,14 @@ impl<N: Network> BFT<N> {
                 return false;
             }
         };
-        // Retrieve the authors of the current certificates. 
+        // Retrieve the authors of the current certificates.
         let authors = current_certificates.clone().into_iter().map(|c| c.author()).collect();
-        // Check if quorum threshold is reached. 
-        let is_quorum = committee_lookback.clone().is_quorum_threshold_reached(&authors); 
-        if !is_quorum { 
-            info!("BFT failed to advance to the next round - quorum threshold not reached in odd round {current_round}. ");
-            return false; 
+        // Check if quorum threshold is reached.
+        if !committee_lookback.is_quorum_threshold_reached(&authors) {
+            info!(
+                "BFT failed to advance to the next round - quorum threshold not reached in odd round {current_round}. "
+            );
+            return false;
         }
         // Retrieve the leader certificate.
         let Some(leader_certificate) = self.leader_certificate.read().clone() else {
