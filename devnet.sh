@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Check if using a non-installed binary via environment variable (e.g. SNARKOS_BIN=target/release/snarkos)
+executable=${SNARKOS_BIN:-"snarkos"}
+
+if [[ $executable != "snarkos" ]]; then
+    echo "Using custom executable: $executable"
+fi
+
 # Read the total number of validators from the user or use a default value of 4
 read -p "Enter the total number of validators (default: 4): " total_validators
 total_validators=${total_validators:-4}
@@ -8,9 +15,12 @@ total_validators=${total_validators:-4}
 read -p "Enter the total number of clients (default: 2): " total_clients
 total_clients=${total_clients:-2}
 
-# Ask the user if they want to run 'cargo install --locked --path .' or use a pre-installed binary
-read -p "Do you want to run 'cargo install --locked --path .' to build the binary? (y/n, default: y): " build_binary
-build_binary=${build_binary:-y}
+# If using the installed executable,
+if [[ $executable == "snarkos" ]]; then
+    # Ask the user if they want to run 'cargo install --locked --path .' or use a pre-installed binary
+    read -p "Do you want to run 'cargo install --locked --path .' to build the binary? (y/n, default: y): " build_binary
+    build_binary=${build_binary:-y}
+fi
 
 # Ask the user whether to clear the existing ledger history
 read -p "Do you want to clear the existing ledger history? (y/n, default: n): " clear_ledger
@@ -28,7 +38,7 @@ if [[ $clear_ledger == "y" ]]; then
 
   for ((index = 0; index < $((total_validators + total_clients)); index++)); do
     # Run 'snarkos clean' for each node in the background
-    snarkos clean --dev $index &
+    $executable clean --dev $index &
 
     # Store the process ID of the background task
     clean_processes+=($!)
@@ -64,12 +74,12 @@ for validator_index in "${validator_indices[@]}"; do
 
   # Send the command to start the validator to the new window and capture output to the log file
   if [ "$validator_index" -eq 0 ]; then
-    tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file --metrics" C-m
+    tmux send-keys -t "devnet:window$validator_index" "$executable start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file --metrics" C-m
   else
     # Create a new window with a unique name
     window_index=$((validator_index + index_offset))
     tmux new-window -t "devnet:$window_index" -n "window$validator_index"
-    tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
+    tmux send-keys -t "devnet:window$validator_index" "$executable start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
   fi
 done
 
@@ -87,7 +97,7 @@ for client_index in "${client_indices[@]}"; do
   tmux new-window -t "devnet:$window_index" -n "window-$window_index"
 
   # Send the command to start the validator to the new window and capture output to the log file
-  tmux send-keys -t "devnet:window-$window_index" "snarkos start --nodisplay --dev $window_index --client --logfile $log_file" C-m
+  tmux send-keys -t "devnet:window-$window_index" "$executable start --nodisplay --dev $window_index --client --logfile $log_file" C-m
 done
 
 # Attach to the tmux session to view and interact with the windows
