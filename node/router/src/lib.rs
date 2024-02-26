@@ -80,6 +80,7 @@ pub struct InnerRouter<N: Network> {
     resolver: Resolver,
     /// The set of trusted peers.
     trusted_peers: HashSet<SocketAddr>,
+    bootstrap_peers: Vec<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
     connected_peers: RwLock<HashMap<SocketAddr, Peer<N>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
@@ -119,6 +120,7 @@ impl<N: Network> Router<N> {
     ) -> Result<Self> {
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(node_ip, max_peers));
+        let bootstrap_peers = trusted_peers.to_vec();
         // Initialize the router.
         Ok(Self(Arc::new(InnerRouter {
             tcp,
@@ -127,6 +129,7 @@ impl<N: Network> Router<N> {
             cache: Default::default(),
             resolver: Default::default(),
             trusted_peers: trusted_peers.iter().copied().collect(),
+            bootstrap_peers,
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
             candidate_peers: Default::default(),
@@ -378,7 +381,8 @@ impl<N: Network> Router<N> {
     /// Returns the list of bootstrap peers.
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
         if cfg!(feature = "test") || self.is_dev {
-            vec![]
+            info!("Using the bootstrap peers from the start flag: {:?}", self.bootstrap_peers);
+            self.bootstrap_peers.clone()
         } else {
             vec![
                 SocketAddr::from_str("64.23.169.88:4130").unwrap(),
