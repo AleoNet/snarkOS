@@ -739,6 +739,8 @@ impl<N: Network> Primary<N> {
         let author = certificate.author();
         // Retrieve the batch certificate round.
         let certificate_round = certificate.round();
+        // Retrieve the batch certificate committee ID.
+        let committee_id = certificate.committee_id();
 
         // Ensure the batch certificate is from an authorized validator.
         if !self.gateway.is_authorized_validator_ip(peer_ip) {
@@ -767,6 +769,16 @@ impl<N: Network> Primary<N> {
         let authors = certificates.iter().map(BatchCertificate::author).collect();
         // Check if the certificates have reached the quorum threshold.
         let is_quorum = committee_lookback.is_quorum_threshold_reached(&authors);
+
+        // Ensure that the batch certificate's committee ID matches the expected committee ID.
+        let expected_certificate_id = committee_lookback.id();
+        if expected_certificate_id != committee_id {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!(
+                "Committee deviation detected - Batch certificate has a diverging committee ID ({expected_certificate_id} != {committee_id})"
+            );
+        }
 
         // Determine if we are currently proposing a round that is relevant.
         // Note: This is important, because while our peers have advanced,
