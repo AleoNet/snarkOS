@@ -1107,6 +1107,7 @@ pub mod prop_tests {
         selector: Selector,
     ) {
         let CommitteeContext(committee, ValidatorSet(validators)) = context;
+        let committee_id = committee.id();
 
         // Initialize the storage.
         let ledger = Arc::new(MockLedgerService::new(committee));
@@ -1128,6 +1129,7 @@ pub mod prop_tests {
             &signer.private_key,
             0,
             now(),
+            committee_id,
             transmission_map.keys().cloned().collect(),
             Default::default(),
             &mut rng,
