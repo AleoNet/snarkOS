@@ -46,7 +46,7 @@ default-features = false
 
 [workspace.dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "569cf5a"
+rev = "ee10658"
 #version = "=0.16.18"
 features = [ "circuit", "console", "rocks" ]
 
