@@ -439,10 +439,6 @@ impl Start {
             if self.dev_num_validators.is_some() {
                 eprintln!("The '--dev-num-validators' flag is ignored because '--dev' is not set");
             }
-            // If the `dev_traffic` flag is set, inform the user that it is ignored.
-            if self.dev_traffic {
-                eprintln!("The '--dev-traffic' flag is ignored because '--dev' is not set");
-            }
 
             Block::from_bytes_le(N::genesis_bytes())
         }
@@ -531,10 +527,22 @@ impl Start {
             None => StorageMode::from(self.dev),
         };
 
+        // Determine whether to generate background traffic in dev mode.
+        let dev_traffic = match self.dev {
+            Some(_) => self.dev_traffic,
+            None => {
+                // If the `dev_traffic` flag is set, inform the user that it is ignored.
+                if self.dev_traffic {
+                    eprintln!("The '--dev-traffic' flag is ignored because '--dev' is not set");
+                }
+                false
+            }
+        };
+
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev_traffic, storage_mode).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, dev_traffic, storage_mode).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }
