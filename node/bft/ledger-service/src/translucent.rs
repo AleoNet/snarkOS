@@ -82,6 +82,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.get_block_hash(height)
     }
 
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        self.inner.get_block_round(height)
+    }
+
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>> {
         self.inner.get_block(height)

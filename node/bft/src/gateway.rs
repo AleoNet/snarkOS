@@ -337,8 +337,8 @@ impl<N: Network> Gateway<N> {
         // Retrieve the previous block height to consider from the sync tolerance.
         let previous_block_height = self.ledger.latest_block_height().saturating_sub(MAX_BLOCKS_BEHIND);
         // Determine if the validator is in any of the previous committee lookbacks.
-        let exists_in_previous_committee_lookback = match self.ledger.get_block(previous_block_height) {
-            Ok(block) => (block.round()..self.storage.current_round()).step_by(2).any(|round| {
+        let exists_in_previous_committee_lookback = match self.ledger.get_block_round(previous_block_height) {
+            Ok(block_round) => (block_round..self.storage.current_round()).step_by(2).any(|round| {
                 self.ledger
                     .get_committee_lookback_for_round(round)
                     .map_or(false, |committee| committee.is_committee_member(validator_address))

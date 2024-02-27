@@ -492,6 +492,7 @@ mod tests {
             fn contains_block_height(&self, height: u32) -> bool;
             fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32>;
             fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
+            fn get_block_round(&self, height: u32) -> Result<u64>;
             fn get_block(&self, height: u32) -> Result<Block<N>>;
             fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
             fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;

@@ -32,7 +32,7 @@ use tracing::*;
 #[derive(Debug)]
 pub struct MockLedgerService<N: Network> {
     committee: Committee<N>,
-    height_to_hash: Mutex<BTreeMap<u32, N::BlockHash>>,
+    height_to_hash: Mutex<BTreeMap<u32, (u64, N::BlockHash)>>,
 }
 
 impl<N: Network> MockLedgerService<N> {
@@ -45,7 +45,7 @@ impl<N: Network> MockLedgerService<N> {
     pub fn new_at_height(committee: Committee<N>, height: u32) -> Self {
         let mut height_to_hash = BTreeMap::new();
         for i in 0..=height {
-            height_to_hash.insert(i, (Field::<N>::from_u32(i)).into());
+            height_to_hash.insert(i, (i as u64 * 2, Field::<N>::from_u32(i).into()));
         }
         Self { committee, height_to_hash: Mutex::new(height_to_hash) }
     }
@@ -75,7 +75,12 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
 
     /// Returns the canonical block height for the given block hash, if it exists.
     fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32> {
-        match self.height_to_hash.lock().iter().find_map(|(height, h)| if h == hash { Some(*height) } else { None }) {
+        match self
+            .height_to_hash
+            .lock()
+            .iter()
+            .find_map(|(height, (_, h))| if h == hash { Some(*height) } else { None })
+        {
             Some(height) => Ok(height),
             None => bail!("Missing block {hash}"),
         }
@@ -84,7 +89,20 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// Returns the canonical block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
         match self.height_to_hash.lock().get(&height).cloned() {
-            Some(hash) => Ok(hash),
+            Some((_, hash)) => Ok(hash),
+            None => bail!("Missing block {height}"),
+        }
+    }
+
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        match self
+            .height_to_hash
+            .lock()
+            .iter()
+            .find_map(|(h, (round, _))| if *h == height { Some(*round) } else { None })
+        {
+            Some(round) => Ok(round),
             None => bail!("Missing block {height}"),
         }
     }
@@ -197,7 +215,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
             block.height(),
             self.latest_block_height()
         );
-        self.height_to_hash.lock().insert(block.height(), block.hash());
+        self.height_to_hash.lock().insert(block.height(), (block.round(), block.hash()));
         Ok(())
     }
 }
