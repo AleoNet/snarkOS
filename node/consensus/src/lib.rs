@@ -54,11 +54,13 @@ use tokio::{
 };
 
 /// The capacity of the mempool reserved for deployments.
-const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 8;
+const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 5;
 /// The capacity of the mempool reserved for executions.
 const CAPACITY_FOR_EXECUTIONS: usize = 1 << 10;
 /// The capacity of the mempool reserved for solutions.
 const CAPACITY_FOR_SOLUTIONS: usize = 1 << 10;
+/// The maximum number of deployments the primary processes from the mempool at any given round.
+const CAPACITY_FOR_DEPLOYMENT_VERIFICATION: usize = 1 << 3;
 
 /// Helper struct to track incoming transactions.
 struct TransactionsQueue<N: Network> {
@@ -309,7 +311,7 @@ impl<N: Network> Consensus<N> {
             // Acquire the lock on the transactions queue.
             let mut tx_queue = self.transactions_queue.lock();
             // Determine the number of deployments to send.
-            let num_deployments = tx_queue.deployments.len().min(capacity * CAPACITY_FOR_DEPLOYMENTS / 100);
+            let num_deployments = tx_queue.deployments.len().min(CAPACITY_FOR_DEPLOYMENT_VERIFICATION);
             // Determine the number of executions to send.
             let num_executions = tx_queue.executions.len().min(capacity.saturating_sub(num_deployments));
             // Create an iterator which will select interleaved deployments and executions within the capacity.
