@@ -49,6 +49,7 @@ impl<N: Network> Node<N> {
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
+        dev_traffic: bool,
         storage_mode: StorageMode,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
@@ -62,6 +63,7 @@ impl<N: Network> Node<N> {
                 trusted_validators,
                 genesis,
                 cdn,
+                dev_traffic,
                 storage_mode,
             )
             .await?,
