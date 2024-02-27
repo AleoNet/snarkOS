@@ -87,11 +87,6 @@ cd snarkOS
 ./build_ubuntu.sh
 ```
 
-Lastly, install `snarkOS`:
-```
-cargo install --locked --path .
-```
-
 Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS firewall.
 
 ## 3. Run an Aleo Node
