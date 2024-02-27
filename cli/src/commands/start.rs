@@ -467,11 +467,8 @@ impl Start {
         let num_cores = num_cpus::get();
         // Determine the number of main cores.
         let main_cores = match num_cores {
-            // Insufficient
-            0..=3 => {
-                eprintln!("The number of cores is insufficient, at least 4 are needed.");
-                std::process::exit(1);
-            }
+            // Slow mode
+            0..=3 => 1,
             // Efficiency mode
             4..=8 => 2,
             // Standard mode
