@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{spawn_blocking, LedgerService};
+use crate::{fmt_id, spawn_blocking, LedgerService};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
@@ -26,19 +26,27 @@ use snarkvm::{
 };
 
 use indexmap::IndexMap;
-use std::{fmt, ops::Range, sync::Arc};
+use std::{
+    fmt,
+    ops::Range,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 /// A core ledger service.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
+    shutdown: Arc<AtomicBool>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
-    pub fn new(ledger: Ledger<N, C>) -> Self {
+    pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
         let coinbase_verifying_key = Arc::new(ledger.coinbase_puzzle().coinbase_verifying_key().clone());
-        Self { ledger, coinbase_verifying_key }
+        Self { ledger, coinbase_verifying_key, shutdown }
     }
 }
 
@@ -163,6 +171,60 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
     }
 
+    /// Ensures the given transmission ID matches the given transmission.
+    fn ensure_transmission_id_matches(
+        &self,
+        transmission_id: TransmissionID<N>,
+        transmission: &mut Transmission<N>,
+    ) -> Result<()> {
+        match (transmission_id, transmission) {
+            (TransmissionID::Ratification, Transmission::Ratification) => {}
+            (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction_data)) => {
+                match transaction_data.clone().deserialize_blocking() {
+                    Ok(transaction) => {
+                        if transaction.id() != expected_transaction_id {
+                            bail!(
+                                "Received mismatching transaction ID  - expected {}, found {}",
+                                fmt_id(expected_transaction_id),
+                                fmt_id(transaction.id()),
+                            );
+                        }
+
+                        // Update the transmission with the deserialized transaction.
+                        *transaction_data = Data::Object(transaction);
+                    }
+                    Err(err) => {
+                        bail!("Failed to deserialize transaction: {err}");
+                    }
+                }
+            }
+            (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution_data)) => {
+                match solution_data.clone().deserialize_blocking() {
+                    Ok(solution) => {
+                        if solution.commitment() != expected_commitment {
+                            bail!(
+                                "Received mismatching solution ID - expected {}, found {}",
+                                fmt_id(expected_commitment),
+                                fmt_id(solution.commitment()),
+                            );
+                        }
+
+                        // Update the transmission with the deserialized solution.
+                        *solution_data = Data::Object(solution);
+                    }
+                    Err(err) => {
+                        bail!("Failed to deserialize solution: {err}");
+                    }
+                }
+            }
+            _ => {
+                bail!("Mismatching `(transmission_id, transmission)` pair");
+            }
+        }
+
+        Ok(())
+    }
+
     /// Checks the given solution is well-formed.
     async fn check_solution_basic(
         &self,
@@ -208,12 +270,12 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
         // Check the transaction is well-formed.
         let ledger = self.ledger.clone();
-        spawn_blocking!(ledger.check_transaction_basic(&transaction, None))
+        spawn_blocking!(ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()))
     }
 
     /// Checks the given block is valid next block.
     fn check_next_block(&self, block: &Block<N>) -> Result<()> {
-        self.ledger.check_next_block(block)
+        self.ledger.check_next_block(block, &mut rand::thread_rng())
     }
 
     /// Returns a candidate for the next block in the ledger, using a committed subdag and its transmissions.
@@ -229,6 +291,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Adds the given block as the next block in the ledger.
     #[cfg(feature = "ledger-write")]
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
+        // If the Ctrl-C handler registered the signal, then skip advancing to the next block.
+        if self.shutdown.load(Ordering::Relaxed) {
+            bail!("Skipping advancing to block {} - The node is shutting down", block.height());
+        }
+        // Advance to the next block.
         self.ledger.advance_to_next_block(block)?;
         tracing::info!("\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());
         Ok(())

@@ -44,7 +44,7 @@ use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{
     is_bogon_ip,
-    is_unspecified_ip,
+    is_unspecified_or_broadcast_ip,
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
     Connection,
@@ -124,6 +124,8 @@ pub struct Gateway<N: Network> {
     sync_sender: Arc<OnceCell<SyncSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// The development mode.
+    dev: Option<u16>,
 }
 
 impl<N: Network> Gateway<N> {
@@ -157,6 +159,7 @@ impl<N: Network> Gateway<N> {
             worker_senders: Default::default(),
             sync_sender: Default::default(),
             handles: Default::default(),
+            dev,
         })
     }
 
@@ -198,14 +201,14 @@ impl<N: Network> Gateway<N> {
 
 // Dynamic rate limiting.
 impl<N: Network> Gateway<N> {
-    /// The current maxiumum committee size.
+    /// The current maximum committee size.
     fn max_committee_size(&self) -> usize {
         self.ledger
             .current_committee()
             .map_or_else(|_e| Committee::<N>::MAX_COMMITTEE_SIZE as usize, |committee| committee.num_members())
     }
 
-    /// The maxixmum number of events to cache.
+    /// The maximum number of events to cache.
     fn max_cache_events(&self) -> usize {
         self.max_cache_transmissions()
     }
@@ -215,7 +218,7 @@ impl<N: Network> Gateway<N> {
         2 * MAX_GC_ROUNDS as usize * self.max_committee_size()
     }
 
-    /// Thne maximum number of transmission requests to cache.
+    /// The maximum number of transmission requests to cache.
     fn max_cache_transmissions(&self) -> usize {
         self.max_cache_certificates() * MAX_TRANSMISSIONS_PER_BATCH
     }
@@ -266,7 +269,7 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
     pub fn is_valid_peer_ip(&self, ip: SocketAddr) -> bool {
-        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_ip(ip.ip())
+        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_or_broadcast_ip(ip.ip())
     }
 
     /// Returns the resolver.
@@ -426,13 +429,21 @@ impl<N: Network> Gateway<N> {
         Ok(())
     }
 
+    #[cfg(feature = "metrics")]
+    fn update_metrics(&self) {
+        metrics::gauge(metrics::bft::CONNECTED, self.connected_peers.read().len() as f64);
+        metrics::gauge(metrics::bft::CONNECTING, self.connecting_peers.lock().len() as f64);
+    }
+
     /// Inserts the given peer into the connected peers.
     #[cfg(not(test))]
     fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr, address);
-        // Add an transmission for this peer in the connected peers.
+        // Add a transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Inserts the given peer into the connected peers.
@@ -441,7 +452,7 @@ impl<N: Network> Gateway<N> {
     pub fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr, address);
-        // Add an transmission for this peer in the connected peers.
+        // Add a transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
     }
 
@@ -460,6 +471,8 @@ impl<N: Network> Gateway<N> {
         self.resolver.remove_peer(peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().shift_remove(&peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Sends the given event to specified peer.
@@ -522,7 +535,7 @@ impl<N: Network> Gateway<N> {
                 Event::TransmissionResponse(TransmissionResponse { transmission_id, .. }) => *transmission_id,
                 _ => unreachable!(),
             };
-            // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
+            // Skip processing this certificate if the rate limit was exceeded (i.e. someone is spamming a specific certificate).
             let num_events = self.cache.insert_inbound_transmission(transmission_id, CACHE_REQUESTS_INTERVAL);
             if num_events >= self.max_cache_duplicates() {
                 return Ok(());
@@ -673,8 +686,14 @@ impl<N: Network> Gateway<N> {
             }
             Event::ValidatorsRequest(_) => {
                 // Retrieve the connected peers.
-                let mut connected_peers: Vec<_> =
-                    self.connected_peers.read().iter().copied().filter(|ip| self.is_valid_peer_ip(*ip)).collect();
+                let mut connected_peers: Vec<_> = match self.dev.is_some() {
+                    // In development mode, relax the validity requirements to make operating devnets more flexible.
+                    true => self.connected_peers.read().iter().copied().collect(),
+                    // In production mode, ensure the peer IPs are valid.
+                    false => {
+                        self.connected_peers.read().iter().copied().filter(|ip| self.is_valid_peer_ip(*ip)).collect()
+                    }
+                };
                 // Shuffle the connected peers.
                 connected_peers.shuffle(&mut rand::thread_rng());
 
@@ -713,10 +732,18 @@ impl<N: Network> Gateway<N> {
                     let self_ = self.clone();
                     tokio::spawn(async move {
                         for (validator_ip, validator_address) in validators {
-                            // Ensure the validator IP is not this node and is well-formed.
-                            if !self_.is_valid_peer_ip(validator_ip) {
-                                continue;
+                            if self_.dev.is_some() {
+                                // Ensure the validator IP is not this node.
+                                if self_.is_local_ip(validator_ip) {
+                                    continue;
+                                }
+                            } else {
+                                // Ensure the validator IP is not this node and is well-formed.
+                                if !self_.is_valid_peer_ip(validator_ip) {
+                                    continue;
+                                }
                             }
+
                             // Ensure the validator address is not this node.
                             if self_.account.address() == validator_address {
                                 continue;
