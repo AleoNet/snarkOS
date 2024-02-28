@@ -32,13 +32,13 @@ use tracing::*;
 #[derive(Debug)]
 pub struct MockLedgerService<N: Network> {
     committee: Committee<N>,
-    height_to_hash: Mutex<BTreeMap<u32, (u64, N::BlockHash)>>,
+    height_to_round_and_hash: Mutex<BTreeMap<u32, (u64, N::BlockHash)>>,
 }
 
 impl<N: Network> MockLedgerService<N> {
     /// Initializes a new mock ledger service.
     pub fn new(committee: Committee<N>) -> Self {
-        Self { committee, height_to_hash: Default::default() }
+        Self { committee, height_to_round_and_hash: Default::default() }
     }
 
     /// Initializes a new mock ledger service at the specified height.
@@ -47,7 +47,7 @@ impl<N: Network> MockLedgerService<N> {
         for i in 0..=height {
             height_to_hash.insert(i, (i as u64 * 2, Field::<N>::from_u32(i).into()));
         }
-        Self { committee, height_to_hash: Mutex::new(height_to_hash) }
+        Self { committee, height_to_round_and_hash: Mutex::new(height_to_hash) }
     }
 }
 
@@ -55,12 +55,12 @@ impl<N: Network> MockLedgerService<N> {
 impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// Returns the latest round in the ledger.
     fn latest_round(&self) -> u64 {
-        *self.height_to_hash.lock().keys().last().unwrap_or(&0) as u64
+        *self.height_to_round_and_hash.lock().keys().last().unwrap_or(&0) as u64
     }
 
     /// Returns the latest block height in the canonical ledger.
     fn latest_block_height(&self) -> u32 {
-        self.height_to_hash.lock().last_key_value().map(|(height, _)| *height).unwrap_or(0)
+        self.height_to_round_and_hash.lock().last_key_value().map(|(height, _)| *height).unwrap_or(0)
     }
 
     /// Returns the latest block in the ledger.
@@ -70,13 +70,13 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
 
     /// Returns `true` if the given block height exists in the canonical ledger.
     fn contains_block_height(&self, height: u32) -> bool {
-        self.height_to_hash.lock().contains_key(&height)
+        self.height_to_round_and_hash.lock().contains_key(&height)
     }
 
     /// Returns the canonical block height for the given block hash, if it exists.
     fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32> {
         match self
-            .height_to_hash
+            .height_to_round_and_hash
             .lock()
             .iter()
             .find_map(|(height, (_, h))| if h == hash { Some(*height) } else { None })
@@ -88,7 +88,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
 
     /// Returns the canonical block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
-        match self.height_to_hash.lock().get(&height).cloned() {
+        match self.height_to_round_and_hash.lock().get(&height).cloned() {
             Some((_, hash)) => Ok(hash),
             None => bail!("Missing block {height}"),
         }
@@ -97,7 +97,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// Returns the block round for the given block height, if it exists.
     fn get_block_round(&self, height: u32) -> Result<u64> {
         match self
-            .height_to_hash
+            .height_to_round_and_hash
             .lock()
             .iter()
             .find_map(|(h, (round, _))| if *h == height { Some(*round) } else { None })
@@ -215,7 +215,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
             block.height(),
             self.latest_block_height()
         );
-        self.height_to_hash.lock().insert(block.height(), (block.round(), block.hash()));
+        self.height_to_round_and_hash.lock().insert(block.height(), (block.round(), block.hash()));
         Ok(())
     }
 }
