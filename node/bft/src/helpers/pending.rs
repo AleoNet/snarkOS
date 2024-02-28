@@ -130,12 +130,28 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
 
     /// Removes the callbacks for the specified `item` that have expired.
     pub fn clear_expired_callbacks_for_item(&self, item: impl Into<T>) {
+        let item = item.into();
         // Clear the callbacks that have expired.
-        if let Some(callbacks) = self.callbacks.lock().get_mut(&item.into()) {
+        if let Some(callbacks) = self.callbacks.lock().get_mut(&item) {
             // Fetch the current timestamp.
             let now = OffsetDateTime::now_utc().unix_timestamp();
             // Remove the callbacks that have expired.
             callbacks.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_EXPIRATION_IN_SECS);
+        }
+
+        // If there are no callbacks for the item, remove the item from the pending queue.
+        let mut callbacks = self.callbacks.lock();
+        if callbacks.get(&item).map_or(true, |callbacks| callbacks.is_empty()) {
+            callbacks.remove(&item);
+            self.pending.write().remove(&item);
+        }
+    }
+
+    /// Removes the callbacks for all items have that expired.
+    pub fn clear_expired_callbacks(&self) {
+        let items = self.pending.read().keys().copied().collect::<Vec<T>>();
+        for item in items.into_iter() {
+            self.clear_expired_callbacks_for_item(item);
         }
     }
 }
@@ -257,6 +273,53 @@ mod tests {
 
         // Ensure that the expired callbacks have been removed.
         assert_eq!(pending.num_callbacks(commitment_1), 0);
+    }
+
+    #[test]
+    fn test_expired_items() {
+        let rng = &mut TestRng::default();
+
+        // Initialize the ready queue.
+        let pending = Pending::<TransmissionID<CurrentNetwork>, ()>::new();
+
+        // Check initially empty.
+        assert!(pending.is_empty());
+        assert_eq!(pending.len(), 0);
+
+        // Initialize the commitments.
+        let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        let commitment_2 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+
+        // Initialize the SocketAddrs.
+        let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let addr_2 = SocketAddr::from(([127, 0, 0, 1], 2345));
+        let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
+
+        // Initialize the callbacks.
+        let (callback_sender_1, _) = oneshot::channel();
+        let (callback_sender_2, _) = oneshot::channel();
+        let (callback_sender_3, _) = oneshot::channel();
+
+        // Insert the commitments.
+        assert!(pending.insert(commitment_1, addr_1, Some(callback_sender_1)));
+        assert!(pending.insert(commitment_1, addr_2, Some(callback_sender_2)));
+        assert!(pending.insert(commitment_2, addr_3, Some(callback_sender_3)));
+
+        // Ensure that the items have not been expired yet.
+        assert_eq!(pending.num_callbacks(commitment_1), 2);
+        assert_eq!(pending.num_callbacks(commitment_2), 1);
+        assert_eq!(pending.len(), 1);
+
+        // Wait for ` CALLBACK_EXPIRATION_IN_SECS + 1` seconds.
+        thread::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64 + 1));
+
+        // Expire the pending callbacks.
+        pending.clear_expired_callbacks();
+
+        // Ensure that the items have been expired.
+        assert_eq!(pending.num_callbacks(commitment_1), 0);
+        assert_eq!(pending.num_callbacks(commitment_2), 0);
+        assert_eq!(pending.len(), 0);
     }
 }
 
