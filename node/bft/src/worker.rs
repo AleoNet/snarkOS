@@ -350,6 +350,18 @@ impl<N: Network> Worker<N> {
     fn start_handlers(&self, receiver: WorkerReceiver<N>) {
         let WorkerReceiver { mut rx_worker_ping, mut rx_transmission_request, mut rx_transmission_response } = receiver;
 
+        // Start the pending queue expiration loop.
+        let self_ = self.clone();
+        self.spawn(async move {
+            loop {
+                // Sleep briefly.
+                tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
+
+                // Remove the expired pending certificate requests.
+                self_.pending.clear_expired_callbacks();
+            }
+        });
+
         // Process the ping events.
         let self_ = self.clone();
         self.spawn(async move {
