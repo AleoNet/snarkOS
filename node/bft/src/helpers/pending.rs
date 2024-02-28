@@ -28,7 +28,9 @@ pub const NUM_REDUNDANT_REQUESTS: usize = 2;
 #[cfg(test)]
 pub const NUM_REDUNDANT_REQUESTS: usize = 10;
 
-const CALLBACK_TIMEOUT_IN_SECS: i64 = MAX_FETCH_TIMEOUT_IN_MS as i64 / 1000;
+/// The maximum number of seconds to wait before expiring a callback.
+/// We ensure that we don't truncate `MAX_FETCH_TIMEOUT_IN_MS` when converting to seconds.
+const CALLBACK_EXPIRATION_IN_SECS: i64 = (MAX_FETCH_TIMEOUT_IN_MS as i64 + (1000 - 1)) / 1000;
 
 #[derive(Debug)]
 pub struct Pending<T: PartialEq + Eq + Hash, V: Clone> {
@@ -133,7 +135,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
             // Fetch the current timestamp.
             let now = OffsetDateTime::now_utc().unix_timestamp();
             // Remove the callbacks that have expired.
-            callbacks.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_TIMEOUT_IN_SECS);
+            callbacks.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_EXPIRATION_IN_SECS);
         }
     }
 }
@@ -237,7 +239,7 @@ mod tests {
         assert!(pending.insert(commitment_1, addr_2, Some(callback_sender_2)));
 
         // Sleep for a few seconds.
-        thread::sleep(Duration::from_secs(CALLBACK_TIMEOUT_IN_SECS as u64 - 1));
+        thread::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64 - 1));
 
         assert!(pending.insert(commitment_1, addr_3, Some(callback_sender_3)));
 
@@ -250,8 +252,8 @@ mod tests {
         // Ensure that the expired callbacks have been removed.
         assert_eq!(pending.num_callbacks(commitment_1), 1);
 
-        // Wait for `CALLBACK_TIMEOUT_IN_SECS` seconds.
-        thread::sleep(Duration::from_secs(CALLBACK_TIMEOUT_IN_SECS as u64));
+        // Wait for ` CALLBACK_EXPIRATION_IN_SECS` seconds.
+        thread::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64));
 
         // Ensure that the expired callbacks have been removed.
         assert_eq!(pending.num_callbacks(commitment_1), 0);
