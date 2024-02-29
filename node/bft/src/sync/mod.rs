@@ -120,14 +120,12 @@ impl<N: Network> Sync<N> {
                     .get_committee_lookback_for_round(self_.storage.current_round())
                     .map_or(Committee::<N>::MAX_COMMITTEE_SIZE as u64, |committee| committee.num_members() as u64);
                 let timeout_in_ms = max_fetch_timeout_in_ms(num_validators);
-                // Calculate the custom callback expiration in seconds.
-                let expiration_in_secs = timeout_in_ms.div_ceil(1000) as i64;
 
                 // Sleep briefly.
                 tokio::time::sleep(Duration::from_millis(timeout_in_ms)).await;
 
                 // Remove the expired pending transmission requests.
-                self_.pending.clear_expired_callbacks(Some(expiration_in_secs));
+                self_.pending.clear_expired_callbacks(Some(timeout_in_ms));
             }
         });
 

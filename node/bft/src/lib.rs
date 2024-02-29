@@ -75,7 +75,17 @@ macro_rules! spawn_blocking {
 }
 
 /// Returns the maximum fetch timeout in ms as a factor of the number of validators.
-/// The value is set to `BASE_FETCH_TIMEOUT_IN_MS` + 100ms per validator in the committee.
+/// The value is set to `BASE_FETCH_TIMEOUT_IN_MS` + 200ms per validator in the committee
+/// with a maximum of 30000ms.
 pub const fn max_fetch_timeout_in_ms(num_validators: u64) -> u64 {
-    100 * num_validators + BASE_FETCH_TIMEOUT_IN_MS
+    const MAX_FETCH_TIMEOUT_IN_MS: u64 = 30000; // 30 seconds
+
+    // Calculate the timeout.
+    let timeout = BASE_FETCH_TIMEOUT_IN_MS + 200 * num_validators;
+
+    // Bound the timeout to the maximum allowed fetch timeout.
+    match timeout > MAX_FETCH_TIMEOUT_IN_MS {
+        true => MAX_FETCH_TIMEOUT_IN_MS,
+        false => timeout,
+    }
 }
