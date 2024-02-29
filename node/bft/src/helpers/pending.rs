@@ -97,13 +97,14 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         // Insert the peer IP into the pending queue.
         let result = self.pending.write().entry(item).or_default().insert(peer_ip);
 
-        // Clear the callbacks that have expired.
-        self.clear_expired_callbacks_for_item(item);
-
         // If a callback is provided, insert it into the callback queue.
         if let Some(callback) = callback {
             self.callbacks.lock().entry(item).or_default().push((callback, OffsetDateTime::now_utc().unix_timestamp()));
         }
+
+        // Clear the callbacks that have expired.
+        self.clear_expired_callbacks_for_item(item);
+
         // Return the result.
         result
     }
@@ -139,9 +140,10 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
             callbacks.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_EXPIRATION_IN_SECS);
         }
 
-        // If there are no callbacks for the item, remove the item from the pending queue.
+        // If there are no more remaining callbacks for the item, remove the item from the pending queue.
+        // If the item was added to the pending queue without a callback, do not remove the item.
         let mut callbacks = self.callbacks.lock();
-        if callbacks.get(&item).map_or(true, |callbacks| callbacks.is_empty()) {
+        if callbacks.get(&item).map_or(false, |callback_values| callback_values.is_empty()) {
             callbacks.remove(&item);
             self.pending.write().remove(&item);
         }
