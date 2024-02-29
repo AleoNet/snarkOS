@@ -132,20 +132,20 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     /// Removes the callbacks for the specified `item` that have expired.
     pub fn clear_expired_callbacks_for_item(&self, item: impl Into<T>) {
         let item = item.into();
+        // Acquire the callbacks lock.
+        let mut callbacks = self.callbacks.lock();
         // Clear the callbacks that have expired.
-        if let Some(callbacks) = self.callbacks.lock().get_mut(&item) {
+        if let Some(callback_values) = callbacks.get_mut(&item) {
             // Fetch the current timestamp.
             let now = OffsetDateTime::now_utc().unix_timestamp();
             // Remove the callbacks that have expired.
-            callbacks.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_EXPIRATION_IN_SECS);
-        }
+            callback_values.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_EXPIRATION_IN_SECS);
 
-        // If there are no more remaining callbacks for the item, remove the item from the pending queue.
-        // If the item was added to the pending queue without a callback, do not remove the item.
-        let mut callbacks = self.callbacks.lock();
-        if callbacks.get(&item).map_or(false, |callback_values| callback_values.is_empty()) {
-            callbacks.remove(&item);
-            self.pending.write().remove(&item);
+            // If there are no more remaining callbacks for the item, remove the item from the pending queue.
+            if callback_values.is_empty() {
+                callbacks.remove(&item);
+                self.pending.write().remove(&item);
+            }
         }
     }
 
@@ -310,7 +310,7 @@ mod tests {
         // Ensure that the items have not been expired yet.
         assert_eq!(pending.num_callbacks(commitment_1), 2);
         assert_eq!(pending.num_callbacks(commitment_2), 1);
-        assert_eq!(pending.len(), 1);
+        assert_eq!(pending.len(), 2);
 
         // Wait for ` CALLBACK_EXPIRATION_IN_SECS + 1` seconds.
         thread::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64 + 1));
