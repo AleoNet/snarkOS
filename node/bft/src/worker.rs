@@ -15,9 +15,9 @@
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver, NUM_REDUNDANT_REQUESTS},
+    max_fetch_timeout_in_ms,
     ProposedBatch,
     Transport,
-    MAX_FETCH_TIMEOUT_IN_MS,
     MAX_WORKERS,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -28,6 +28,7 @@ use snarkvm::{
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchHeader, Data, Transmission, TransmissionID},
     },
+    prelude::committee::Committee,
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -354,11 +355,20 @@ impl<N: Network> Worker<N> {
         let self_ = self.clone();
         self.spawn(async move {
             loop {
+                // Calculate the dynamic fetch timeout in milliseconds.
+                let num_validators = self_
+                    .ledger
+                    .get_committee_lookback_for_round(self_.storage.current_round())
+                    .map_or(Committee::<N>::MAX_COMMITTEE_SIZE as u64, |committee| committee.num_members() as u64);
+                let timeout_in_ms = max_fetch_timeout_in_ms(num_validators);
+                // Calculate the custom callback expiration in seconds.
+                let expiration_in_secs = timeout_in_ms.div_ceil(1000) as i64;
+
                 // Sleep briefly.
-                tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
+                tokio::time::sleep(Duration::from_millis(timeout_in_ms)).await;
 
                 // Remove the expired pending certificate requests.
-                self_.pending.clear_expired_callbacks();
+                self_.pending.clear_expired_callbacks(Some(expiration_in_secs));
             }
         });
 
@@ -409,8 +419,14 @@ impl<N: Network> Worker<N> {
         } else {
             trace!("Skipped sending redundant request for transmission {} to '{peer_ip}'", fmt_id(transmission_id));
         }
+        // Calculate the dynamic fetch timeout in milliseconds.
+        let num_validators = self
+            .ledger
+            .get_committee_lookback_for_round(self.storage.current_round())
+            .map_or(Committee::<N>::MAX_COMMITTEE_SIZE as u64, |committee| committee.num_members() as u64);
+        let timeout_in_ms = max_fetch_timeout_in_ms(num_validators);
         // Wait for the transmission to be fetched.
-        match timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {
+        match timeout(Duration::from_millis(timeout_in_ms), callback_receiver).await {
             // If the transmission was fetched, return it.
             Ok(result) => Ok((transmission_id, result?)),
             // If the transmission was not fetched, return an error.

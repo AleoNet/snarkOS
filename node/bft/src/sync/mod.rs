@@ -14,9 +14,9 @@
 
 use crate::{
     helpers::{fmt_id, BFTSender, Pending, Storage, SyncReceiver, NUM_REDUNDANT_REQUESTS},
+    max_fetch_timeout_in_ms,
     Gateway,
     Transport,
-    MAX_FETCH_TIMEOUT_IN_MS,
     PRIMARY_PING_IN_MS,
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
@@ -25,7 +25,7 @@ use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
-    prelude::{cfg_into_iter, cfg_iter},
+    prelude::{cfg_into_iter, cfg_iter, committee::Committee},
 };
 
 use anyhow::{bail, Result};
@@ -114,11 +114,20 @@ impl<N: Network> Sync<N> {
         let self_ = self.clone();
         self.spawn(async move {
             loop {
+                // Calculate the dynamic fetch timeout in milliseconds.
+                let num_validators = self_
+                    .ledger
+                    .get_committee_lookback_for_round(self_.storage.current_round())
+                    .map_or(Committee::<N>::MAX_COMMITTEE_SIZE as u64, |committee| committee.num_members() as u64);
+                let timeout_in_ms = max_fetch_timeout_in_ms(num_validators);
+                // Calculate the custom callback expiration in seconds.
+                let expiration_in_secs = timeout_in_ms.div_ceil(1000) as i64;
+
                 // Sleep briefly.
-                tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
+                tokio::time::sleep(Duration::from_millis(timeout_in_ms)).await;
 
                 // Remove the expired pending transmission requests.
-                self_.pending.clear_expired_callbacks();
+                self_.pending.clear_expired_callbacks(Some(expiration_in_secs));
             }
         });
 
@@ -436,8 +445,14 @@ impl<N: Network> Sync<N> {
                 trace!("Skipped sending redundant request for certificate {} to '{peer_ip}'", fmt_id(certificate_id));
             }
         }
+        // Calculate the dynamic fetch timeout in milliseconds.
+        let num_validators = self
+            .ledger
+            .get_committee_lookback_for_round(self.storage.current_round())
+            .map_or(Committee::<N>::MAX_COMMITTEE_SIZE as u64, |committee| committee.num_members() as u64);
+        let timeout_in_ms = max_fetch_timeout_in_ms(num_validators);
         // Wait for the certificate to be fetched.
-        match tokio::time::timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {
+        match tokio::time::timeout(Duration::from_millis(timeout_in_ms), callback_receiver).await {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
