@@ -321,8 +321,8 @@ mod tests {
         assert_eq!(pending.num_callbacks(commitment_2), 1);
         assert_eq!(pending.len(), 2);
 
-        // Wait for ` CALLBACK_EXPIRATION_IN_MS + 1` milliseconds.
-        thread::sleep(Duration::from_millis(CALLBACK_EXPIRATION_IN_MS + 1));
+        // Wait for ` CALLBACK_EXPIRATION_IN_MS + 1000` milliseconds.
+        thread::sleep(Duration::from_millis(CALLBACK_EXPIRATION_IN_MS + 1000));
 
         // Expire the pending callbacks.
         pending.clear_expired_callbacks(None);
