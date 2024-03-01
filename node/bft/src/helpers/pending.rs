@@ -24,7 +24,7 @@ use time::OffsetDateTime;
 use tokio::sync::oneshot;
 
 #[cfg(not(test))]
-pub const NUM_REDUNDANT_REQUESTS: usize = 2;
+pub const NUM_REDUNDANT_REQUESTS: usize = 20;
 #[cfg(test)]
 pub const NUM_REDUNDANT_REQUESTS: usize = 10;
 
