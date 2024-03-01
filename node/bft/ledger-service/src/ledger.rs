@@ -26,6 +26,8 @@ use snarkvm::{
 };
 
 use indexmap::IndexMap;
+use lru::LruCache;
+use parking_lot::Mutex;
 use parking_lot::RwLock;
 use std::{
     fmt,
@@ -38,19 +40,24 @@ use std::{
 
 type LatestLeader<N> = (u64, Address<N>);
 
+/// The capacity of the LRU holiding the recently queried committees.
+const COMMITTEE_CACHE_SIZE: usize = 16;
+
 /// A core ledger service.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
     shutdown: Arc<AtomicBool>,
     latest_leader: Arc<RwLock<Option<LatestLeader<N>>>>,
+    committee_cache: Arc<Mutex<LruCache<u64, Committee<N>>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
     pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
         let coinbase_verifying_key = Arc::new(ledger.coinbase_puzzle().coinbase_verifying_key().clone());
-        Self { ledger, coinbase_verifying_key, shutdown, latest_leader: Default::default() }
+        let committee_cache = Arc::new(Mutex::new(LruCache::new(COMMITTEE_CACHE_SIZE.try_into().unwrap())));
+        Self { ledger, coinbase_verifying_key, shutdown, latest_leader: Default::default(), committee_cache }
     }
 }
 
@@ -141,9 +148,18 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Returns the committee for the given round.
     /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
+        // Check if the committee is already in the cache.
+        if let Some(committee) = self.committee_cache.lock().get(&round) {
+            return Ok(committee.clone());
+        }
+
         match self.ledger.get_committee_for_round(round)? {
             // Return the committee if it exists.
-            Some(committee) => Ok(committee),
+            Some(committee) => {
+                // Insert the committee into the cache.
+                self.committee_cache.lock().push(round, committee.clone());
+                Ok(committee)
+            }
             // Return the current committee if the round is in the future.
             None => {
                 // Retrieve the current committee.
