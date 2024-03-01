@@ -14,7 +14,7 @@
 
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
-    helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver, NUM_REDUNDANT_REQUESTS},
+    helpers::{fmt_id, max_redundant_requests, Pending, Ready, Storage, WorkerReceiver},
     ProposedBatch,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -28,6 +28,7 @@ use snarkvm::{
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchHeader, Data, Transmission, TransmissionID},
     },
+    prelude::committee::Committee,
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -386,16 +387,27 @@ impl<N: Network> Worker<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Insert the transmission ID into the pending queue.
         self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
-        // Determine how many requests are pending for the transmission.
-        let num_pending_requests = self.pending.num_callbacks(transmission_id);
+        // Determine how many pending peers have the transmission as been requested from.
+        let num_pending_requests = self.pending.num_pending_peers(transmission_id);
+
+        // Calculate the max number of redundant requests.
+        let num_validators = self
+            .ledger
+            .get_committee_lookback_for_round(self.storage.current_round())
+            .map_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize, |committee| committee.num_members());
+        let num_redundant_requests = max_redundant_requests(num_validators);
+
         // If the number of requests is less than or equal to the the redundancy factor, send the transmission request to the peer.
-        if num_pending_requests <= NUM_REDUNDANT_REQUESTS {
+        if num_pending_requests <= num_redundant_requests {
             // Send the transmission request to the peer.
             if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
                 bail!("Unable to fetch transmission - failed to send request")
             }
         } else {
-            trace!("Skipped sending redundant request for transmission {} to '{peer_ip}'", fmt_id(transmission_id));
+            debug!(
+                "Skipped sending redundant request for transmission {} to '{peer_ip}' ({num_pending_requests} > {num_redundant_requests})",
+                fmt_id(transmission_id)
+            );
         }
         // Wait for the transmission to be fetched.
         match timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {

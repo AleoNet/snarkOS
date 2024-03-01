@@ -23,10 +23,10 @@ use std::{
 use time::OffsetDateTime;
 use tokio::sync::oneshot;
 
-#[cfg(not(test))]
-pub const NUM_REDUNDANT_REQUESTS: usize = 2;
-#[cfg(test)]
-pub const NUM_REDUNDANT_REQUESTS: usize = 10;
+/// Returns the maximum number of redundant requests for the specified number of validators.
+pub const fn max_redundant_requests(num_validators: usize) -> usize {
+    num_validators.saturating_div(2)
+}
 
 const CALLBACK_TIMEOUT_IN_SECS: i64 = MAX_FETCH_TIMEOUT_IN_MS as i64 / 1000;
 
@@ -74,6 +74,11 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     /// Returns the peer IPs for the specified `item`.
     pub fn get(&self, item: impl Into<T>) -> Option<HashSet<SocketAddr>> {
         self.pending.read().get(&item.into()).cloned()
+    }
+
+    /// Returns the number of pending peer IPs for the specified `item`.
+    pub fn num_pending_peers(&self, item: impl Into<T>) -> usize {
+        self.pending.read().get(&item.into()).map_or(0, |peer_ips| peer_ips.len())
     }
 
     /// Returns the number of pending callbacks for the specified `item`.
