@@ -544,10 +544,12 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let gateway = MockGateway::default();
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -577,6 +579,7 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -585,6 +588,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_ensure_transmission_id_matches().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
@@ -612,6 +616,7 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -620,6 +625,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -650,6 +656,7 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -658,6 +665,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -688,6 +696,7 @@ mod tests {
         let mut rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -696,6 +705,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -726,6 +736,7 @@ mod tests {
         let mut rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -734,6 +745,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
