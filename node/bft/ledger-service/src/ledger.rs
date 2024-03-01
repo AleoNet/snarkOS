@@ -22,10 +22,11 @@ use snarkvm::{
         store::ConsensusStorage,
         Ledger,
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, Address, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
+use parking_lot::RwLock;
 use std::{
     fmt,
     ops::Range,
@@ -35,18 +36,21 @@ use std::{
     },
 };
 
+type LatestLeader<N> = (u64, Address<N>);
+
 /// A core ledger service.
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
     shutdown: Arc<AtomicBool>,
+    latest_leader: Arc<RwLock<Option<LatestLeader<N>>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
     pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
         let coinbase_verifying_key = Arc::new(ledger.coinbase_puzzle().coinbase_verifying_key().clone());
-        Self { ledger, coinbase_verifying_key, shutdown }
+        Self { ledger, coinbase_verifying_key, shutdown, latest_leader: Default::default() }
     }
 }
 
@@ -72,6 +76,16 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Returns the latest block in the ledger.
     fn latest_block(&self) -> Block<N> {
         self.ledger.latest_block()
+    }
+
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        *self.latest_leader.read()
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, round: u64, leader: Address<N>) {
+        *self.latest_leader.write() = Some((round, leader));
     }
 
     /// Returns `true` if the given block height exists in the ledger.
