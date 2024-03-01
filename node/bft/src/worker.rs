@@ -395,7 +395,10 @@ impl<N: Network> Worker<N> {
                 bail!("Unable to fetch transmission - failed to send request")
             }
         } else {
-            trace!("Skipped sending redundant request for transmission {} to '{peer_ip}'", fmt_id(transmission_id));
+            debug!(
+                "Skipped sending redundant request for transmission {} to '{peer_ip}'. (num_pending_requests: {num_pending_requests})",
+                fmt_id(transmission_id)
+            );
         }
         // Wait for the transmission to be fetched.
         match timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {
