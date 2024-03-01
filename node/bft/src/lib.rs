@@ -48,14 +48,14 @@ pub const MEMORY_POOL_PORT: u16 = 5000; // port
 
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
-/// The maximum number of milliseconds to wait before timing out on a fetch.
-pub const MAX_FETCH_TIMEOUT_IN_MS: u64 = 3 * MAX_BATCH_DELAY_IN_MS; // ms
 /// The maximum number of seconds allowed for the leader to send their certificate.
 pub const MAX_LEADER_CERTIFICATE_DELAY_IN_SECS: i64 = 2 * MAX_BATCH_DELAY_IN_MS as i64 / 1000; // seconds
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of workers that can be spawned.
 pub const MAX_WORKERS: u8 = 1; // worker(s)
+/// The base number of milliseconds to wait before timing out on a fetch.
+pub const BASE_FETCH_TIMEOUT_IN_MS: u64 = 3 * MAX_BATCH_DELAY_IN_MS; // ms
 
 /// The frequency at which each primary broadcasts a ping to every other node.
 /// Note: If this is updated, be sure to update `MAX_BLOCKS_BEHIND` to correspond properly.
@@ -72,4 +72,20 @@ macro_rules! spawn_blocking {
             Err(error) => Err(anyhow::anyhow!("[tokio::spawn_blocking] {error}")),
         }
     };
+}
+
+/// Returns the maximum fetch timeout in ms as a factor of the number of validators.
+/// The value is set to `BASE_FETCH_TIMEOUT_IN_MS` + 200ms per validator in the committee
+/// with a maximum of 30000ms.
+pub const fn max_fetch_timeout_in_ms(num_validators: u64) -> u64 {
+    const MAX_FETCH_TIMEOUT_IN_MS: u64 = 30000; // 30 seconds
+
+    // Calculate the timeout.
+    let timeout = BASE_FETCH_TIMEOUT_IN_MS + 200 * num_validators;
+
+    // Bound the timeout to the maximum allowed fetch timeout.
+    match timeout > MAX_FETCH_TIMEOUT_IN_MS {
+        true => MAX_FETCH_TIMEOUT_IN_MS,
+        false => timeout,
+    }
 }

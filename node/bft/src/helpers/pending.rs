@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::MAX_FETCH_TIMEOUT_IN_MS;
+use crate::max_fetch_timeout_in_ms;
 
 use parking_lot::{Mutex, RwLock};
 use std::{
@@ -29,8 +29,11 @@ pub const NUM_REDUNDANT_REQUESTS: usize = 2;
 pub const NUM_REDUNDANT_REQUESTS: usize = 10;
 
 /// The maximum number of seconds to wait before expiring a callback.
-/// We ensure that we don't truncate `MAX_FETCH_TIMEOUT_IN_MS` when converting to seconds.
-const CALLBACK_EXPIRATION_IN_SECS: i64 = (MAX_FETCH_TIMEOUT_IN_MS as i64 + (1000 - 1)) / 1000;
+/// The default value is set to the maximum fetch timeout assuming 200 validators.
+#[cfg(not(test))]
+const CALLBACK_EXPIRATION_IN_MS: u64 = max_fetch_timeout_in_ms(200);
+#[cfg(test)]
+const CALLBACK_EXPIRATION_IN_MS: u64 = max_fetch_timeout_in_ms(10);
 
 #[derive(Debug)]
 pub struct Pending<T: PartialEq + Eq + Hash, V: Clone> {
@@ -82,7 +85,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     pub fn num_callbacks(&self, item: impl Into<T>) -> usize {
         let item = item.into();
         // Clear the callbacks that have expired.
-        self.clear_expired_callbacks_for_item(item);
+        self.clear_expired_callbacks_for_item(item, None);
         // Return the number of live callbacks.
         self.callbacks.lock().get(&item).map_or(0, |callbacks| callbacks.len())
     }
@@ -103,7 +106,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         }
 
         // Clear the callbacks that have expired.
-        self.clear_expired_callbacks_for_item(item);
+        self.clear_expired_callbacks_for_item(item, None);
 
         // Return the result.
         result
@@ -130,8 +133,14 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     }
 
     /// Removes the callbacks for the specified `item` that have expired.
-    pub fn clear_expired_callbacks_for_item(&self, item: impl Into<T>) {
+    pub fn clear_expired_callbacks_for_item(&self, item: impl Into<T>, custom_expiration_time_in_ms: Option<u64>) {
         let item = item.into();
+
+        // Set the custom expiration time in milliseconds.
+        let expiration_time_in_ms = custom_expiration_time_in_ms.unwrap_or(CALLBACK_EXPIRATION_IN_MS);
+        // Calculate the expiration time in seconds.
+        let expiration_time_in_secs = expiration_time_in_ms.div_ceil(1000) as i64;
+
         // Acquire the callbacks lock.
         let mut callbacks = self.callbacks.lock();
         // Clear the callbacks that have expired.
@@ -139,7 +148,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
             // Fetch the current timestamp.
             let now = OffsetDateTime::now_utc().unix_timestamp();
             // Remove the callbacks that have expired.
-            callback_values.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_EXPIRATION_IN_SECS);
+            callback_values.retain(|(_, timestamp)| now - *timestamp <= expiration_time_in_secs);
 
             // If there are no more remaining callbacks for the item, remove the item from the pending queue.
             if callback_values.is_empty() {
@@ -150,10 +159,10 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     }
 
     /// Removes the callbacks for all items have that expired.
-    pub fn clear_expired_callbacks(&self) {
+    pub fn clear_expired_callbacks(&self, custom_expiration_time_in_ms: Option<u64>) {
         let items = self.pending.read().keys().copied().collect::<Vec<T>>();
         for item in items.into_iter() {
-            self.clear_expired_callbacks_for_item(item);
+            self.clear_expired_callbacks_for_item(item, custom_expiration_time_in_ms);
         }
     }
 }
@@ -256,8 +265,8 @@ mod tests {
         assert!(pending.insert(commitment_1, addr_1, Some(callback_sender_1)));
         assert!(pending.insert(commitment_1, addr_2, Some(callback_sender_2)));
 
-        // Sleep for a few seconds.
-        thread::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64 - 1));
+        // Sleep for a few milliseconds.
+        thread::sleep(Duration::from_millis(CALLBACK_EXPIRATION_IN_MS - 1));
 
         assert!(pending.insert(commitment_1, addr_3, Some(callback_sender_3)));
 
@@ -270,8 +279,8 @@ mod tests {
         // Ensure that the expired callbacks have been removed.
         assert_eq!(pending.num_callbacks(commitment_1), 1);
 
-        // Wait for ` CALLBACK_EXPIRATION_IN_SECS` seconds.
-        thread::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64));
+        // Wait for ` CALLBACK_EXPIRATION_IN_MS` milliseconds.
+        thread::sleep(Duration::from_millis(CALLBACK_EXPIRATION_IN_MS));
 
         // Ensure that the expired callbacks have been removed.
         assert_eq!(pending.num_callbacks(commitment_1), 0);
@@ -312,11 +321,11 @@ mod tests {
         assert_eq!(pending.num_callbacks(commitment_2), 1);
         assert_eq!(pending.len(), 2);
 
-        // Wait for ` CALLBACK_EXPIRATION_IN_SECS + 1` seconds.
-        thread::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64 + 1));
+        // Wait for ` CALLBACK_EXPIRATION_IN_MS + 1000` milliseconds.
+        thread::sleep(Duration::from_millis(CALLBACK_EXPIRATION_IN_MS + 1000));
 
         // Expire the pending callbacks.
-        pending.clear_expired_callbacks();
+        pending.clear_expired_callbacks(None);
 
         // Ensure that the items have been expired.
         assert_eq!(pending.num_callbacks(commitment_1), 0);
