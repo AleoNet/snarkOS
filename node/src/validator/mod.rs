@@ -16,7 +16,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
+use snarkos_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService, spawn_blocking};
 use snarkos_node_consensus::Consensus;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
@@ -386,15 +386,16 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 // Prepare the inputs.
                 let inputs = [Value::from(Literal::Address(self_.address())), Value::from(Literal::U64(U64::new(1)))];
                 // Execute the transaction.
-                let transaction = match self_.ledger.vm().execute(
-                    self_.private_key(),
+                let self__ = self_.clone();
+                let transaction = match spawn_blocking!(self__.ledger.vm().execute(
+                    self__.private_key(),
                     locator,
                     inputs.into_iter(),
                     None,
                     10_000,
                     None,
                     &mut rand::thread_rng(),
-                ) {
+                )) {
                     Ok(transaction) => transaction,
                     Err(error) => {
                         error!("Transaction pool encountered an execution error - {error}");
