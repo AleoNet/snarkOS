@@ -905,6 +905,12 @@ impl<N: Network> Primary<N> {
                     debug!("Skipping batch proposal {}", "(node is syncing)".dimmed());
                     continue;
                 }
+                // A best-effort attempt to skip the scheduled batch proposal if
+                // round progression already triggered one.
+                if self_.propose_lock.try_lock().is_err() {
+                    trace!("Skipping batch proposal {}", "(node is already proposing)".dimmed());
+                    continue;
+                };
                 // If there is no proposed batch, attempt to propose a batch.
                 // Note: Do NOT spawn a task around this function call. Proposing a batch is a critical path,
                 // and only one batch needs be proposed at a time.
