@@ -415,29 +415,30 @@ impl<N: Network> Sync<N> {
     ) -> Result<BatchCertificate<N>> {
         // Initialize a oneshot channel.
         let (callback_sender, callback_receiver) = oneshot::channel();
+        // Determine how many sent requests are pending.
+        let num_sent_requests = self.pending.num_sent_requests(certificate_id);
+        // Calculate the max number of redundant requests.
+        let num_validators = self
+            .num_validators_in_committee_lookback(self.storage.current_round())
+            .unwrap_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize);
+        let num_redundant_requests = max_redundant_requests(num_validators);
+        // Determine if we should send a certificate request to the peer.
+        let should_send_request = num_sent_requests < num_redundant_requests;
+
         // Insert the certificate ID into the pending queue.
-        if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
-            // Determine how many pending peers have the certificate as been requested from.
-            let num_pending_requests = self.pending.num_pending_peers(certificate_id);
+        self.pending.insert(certificate_id, peer_ip, Some((callback_sender, should_send_request)));
 
-            // Calculate the max number of redundant requests.
-            let num_validators = self
-                .num_validators_in_committee_lookback(self.storage.current_round())
-                .unwrap_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize);
-            let num_redundant_requests = max_redundant_requests(num_validators);
-
-            // If the number of requests is less than or equal to the redundancy factor, send the certificate request to the peer.
-            if num_pending_requests <= num_redundant_requests {
-                // Send the certificate request to the peer.
-                if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
-                    bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
-                }
-            } else {
-                debug!(
-                    "Skipped sending redundant request for certificate {} to '{peer_ip}' ({num_pending_requests} > {num_redundant_requests})",
-                    fmt_id(certificate_id)
-                );
+        // If the number of requests is less than or equal to the redundancy factor, send the certificate request to the peer.
+        if should_send_request {
+            // Send the certificate request to the peer.
+            if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
+                bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
             }
+        } else {
+            debug!(
+                "Skipped sending redundant request for certificate {} to '{peer_ip}' (Already pending {num_sent_requests} requests)",
+                fmt_id(certificate_id)
+            );
         }
         // Wait for the certificate to be fetched.
         match tokio::time::timeout(core::time::Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await

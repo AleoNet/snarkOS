@@ -390,26 +390,28 @@ impl<N: Network> Worker<N> {
     ) -> Result<(TransmissionID<N>, Transmission<N>)> {
         // Initialize a oneshot channel.
         let (callback_sender, callback_receiver) = oneshot::channel();
-        // Insert the transmission ID into the pending queue.
-        self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
-        // Determine how many pending peers have the transmission as been requested from.
-        let num_pending_requests = self.pending.num_pending_peers(transmission_id);
-
+        // Determine how many sent requests are pending.
+        let num_sent_requests = self.pending.num_sent_requests(transmission_id);
         // Calculate the max number of redundant requests.
         let num_validators = self
             .num_validators_in_committee_lookback(self.storage.current_round())
             .unwrap_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize);
         let num_redundant_requests = max_redundant_requests(num_validators);
+        // Determine if we should send a transmission request to the peer.
+        let should_send_request = num_sent_requests < num_redundant_requests;
+
+        // Insert the transmission ID into the pending queue.
+        self.pending.insert(transmission_id, peer_ip, Some((callback_sender, should_send_request)));
 
         // If the number of requests is less than or equal to the the redundancy factor, send the transmission request to the peer.
-        if num_pending_requests <= num_redundant_requests {
+        if should_send_request {
             // Send the transmission request to the peer.
             if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
                 bail!("Unable to fetch transmission - failed to send request")
             }
         } else {
             debug!(
-                "Skipped sending redundant request for transmission {} to '{peer_ip}' ({num_pending_requests} > {num_redundant_requests})",
+                "Skipped sending redundant request for transmission {} to '{peer_ip}' (Already pending {num_sent_requests} requests)",
                 fmt_id(transmission_id)
             );
         }
