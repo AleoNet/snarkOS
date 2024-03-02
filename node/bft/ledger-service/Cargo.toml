@@ -18,9 +18,9 @@ edition = "2021"
 
 [features]
 default = [ ]
-ledger = [ "rand", "tokio", "tracing" ]
+ledger = [ "parking_lot", "rand", "tokio", "tracing" ]
 ledger-write = [ ]
-mock = [ "tracing" ]
+mock = [ "parking_lot", "tracing" ]
 prover = [ ]
 test = [ "mock", "translucent" ]
 translucent = [ "ledger" ]
@@ -37,6 +37,7 @@ version = "0.12"
 
 [dependencies.parking_lot]
 version = "0.12"
+optional = true
 
 [dependencies.rand]
 version = "0.8"
