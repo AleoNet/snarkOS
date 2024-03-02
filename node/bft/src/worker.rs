@@ -14,7 +14,7 @@
 
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
-    helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver, NUM_REDUNDANT_REQUESTS},
+    helpers::{fmt_id, max_redundant_requests, Pending, Ready, Storage, WorkerReceiver},
     ProposedBatch,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -28,6 +28,7 @@ use snarkvm::{
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchHeader, Data, Transmission, TransmissionID},
     },
+    prelude::committee::Committee,
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -141,6 +142,11 @@ impl<N: Network> Worker<N> {
     /// Returns the transactions in the ready queue.
     pub fn transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
         self.ready.transactions()
+    }
+
+    /// Returns the number of validators in the committee lookback for the given round.
+    pub fn num_validators_in_committee_lookback(&self, round: u64) -> Option<usize> {
+        self.ledger.get_committee_lookback_for_round(round).map(|committee| committee.num_members()).ok()
     }
 }
 
@@ -384,18 +390,30 @@ impl<N: Network> Worker<N> {
     ) -> Result<(TransmissionID<N>, Transmission<N>)> {
         // Initialize a oneshot channel.
         let (callback_sender, callback_receiver) = oneshot::channel();
+        // Determine how many sent requests are pending.
+        let num_sent_requests = self.pending.num_sent_requests(transmission_id);
+        // Calculate the max number of redundant requests.
+        let num_validators = self
+            .num_validators_in_committee_lookback(self.storage.current_round())
+            .unwrap_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize);
+        let num_redundant_requests = max_redundant_requests(num_validators);
+        // Determine if we should send a transmission request to the peer.
+        let should_send_request = num_sent_requests < num_redundant_requests;
+
         // Insert the transmission ID into the pending queue.
-        self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
-        // Determine how many requests are pending for the transmission.
-        let num_pending_requests = self.pending.num_callbacks(transmission_id);
+        self.pending.insert(transmission_id, peer_ip, Some((callback_sender, should_send_request)));
+
         // If the number of requests is less than or equal to the the redundancy factor, send the transmission request to the peer.
-        if num_pending_requests <= NUM_REDUNDANT_REQUESTS {
+        if should_send_request {
             // Send the transmission request to the peer.
             if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
                 bail!("Unable to fetch transmission - failed to send request")
             }
         } else {
-            trace!("Skipped sending redundant request for transmission {} to '{peer_ip}'", fmt_id(transmission_id));
+            debug!(
+                "Skipped sending redundant request for transmission {} to '{peer_ip}' (Already pending {num_sent_requests} requests)",
+                fmt_id(transmission_id)
+            );
         }
         // Wait for the transmission to be fetched.
         match timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {
@@ -535,10 +553,12 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let gateway = MockGateway::default();
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -568,6 +588,7 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -576,6 +597,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_ensure_transmission_id_matches().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
@@ -603,6 +625,7 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -611,6 +634,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -641,6 +665,7 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -649,6 +674,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -679,6 +705,7 @@ mod tests {
         let mut rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -687,6 +714,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -717,6 +745,7 @@ mod tests {
         let mut rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -725,6 +754,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);

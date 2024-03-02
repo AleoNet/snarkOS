@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{fmt_id, BFTSender, Pending, Storage, SyncReceiver, NUM_REDUNDANT_REQUESTS},
+    helpers::{fmt_id, max_redundant_requests, BFTSender, Pending, Storage, SyncReceiver},
     Gateway,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -25,7 +25,7 @@ use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
-    prelude::{cfg_into_iter, cfg_iter},
+    prelude::{cfg_into_iter, cfg_iter, committee::Committee},
 };
 
 use anyhow::{bail, Result};
@@ -398,6 +398,11 @@ impl<N: Network> Sync<N> {
     pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
         self.block_sync.get_block_locators()
     }
+
+    /// Returns the number of validators in the committee lookback for the given round.
+    pub fn num_validators_in_committee_lookback(&self, round: u64) -> Option<usize> {
+        self.ledger.get_committee_lookback_for_round(round).map(|committee| committee.num_members()).ok()
+    }
 }
 
 // Methods to assist with fetching batch certificates from peers.
@@ -410,19 +415,30 @@ impl<N: Network> Sync<N> {
     ) -> Result<BatchCertificate<N>> {
         // Initialize a oneshot channel.
         let (callback_sender, callback_receiver) = oneshot::channel();
+        // Determine how many sent requests are pending.
+        let num_sent_requests = self.pending.num_sent_requests(certificate_id);
+        // Calculate the max number of redundant requests.
+        let num_validators = self
+            .num_validators_in_committee_lookback(self.storage.current_round())
+            .unwrap_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize);
+        let num_redundant_requests = max_redundant_requests(num_validators);
+        // Determine if we should send a certificate request to the peer.
+        let should_send_request = num_sent_requests < num_redundant_requests;
+
         // Insert the certificate ID into the pending queue.
-        if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
-            // Determine how many requests are pending for the certificate.
-            let num_pending_requests = self.pending.num_callbacks(certificate_id);
-            // If the number of requests is less than or equal to the redundancy factor, send the certificate request to the peer.
-            if num_pending_requests <= NUM_REDUNDANT_REQUESTS {
-                // Send the certificate request to the peer.
-                if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
-                    bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
-                }
-            } else {
-                trace!("Skipped sending redundant request for certificate {} to '{peer_ip}'", fmt_id(certificate_id));
+        self.pending.insert(certificate_id, peer_ip, Some((callback_sender, should_send_request)));
+
+        // If the number of requests is less than or equal to the redundancy factor, send the certificate request to the peer.
+        if should_send_request {
+            // Send the certificate request to the peer.
+            if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
+                bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
             }
+        } else {
+            debug!(
+                "Skipped sending redundant request for certificate {} to '{peer_ip}' (Already pending {num_sent_requests} requests)",
+                fmt_id(certificate_id)
+            );
         }
         // Wait for the certificate to be fetched.
         match tokio::time::timeout(core::time::Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await
