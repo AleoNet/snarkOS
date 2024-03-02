@@ -44,8 +44,8 @@ const COMMITTEE_CACHE_SIZE: usize = 16;
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
-    shutdown: Arc<AtomicBool>,
     committee_cache: Arc<Mutex<LruCache<u64, Committee<N>>>>,
+    shutdown: Arc<AtomicBool>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
@@ -53,7 +53,7 @@ impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
         let coinbase_verifying_key = Arc::new(ledger.coinbase_puzzle().coinbase_verifying_key().clone());
         let committee_cache = Arc::new(Mutex::new(LruCache::new(COMMITTEE_CACHE_SIZE.try_into().unwrap())));
-        Self { ledger, coinbase_verifying_key, shutdown, committee_cache }
+        Self { ledger, coinbase_verifying_key, committee_cache, shutdown }
     }
 }
 
@@ -144,6 +144,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             Some(committee) => {
                 // Insert the committee into the cache.
                 self.committee_cache.lock().push(round, committee.clone());
+                // Return the committee.
                 Ok(committee)
             }
             // Return the current committee if the round is in the future.
