@@ -981,6 +981,7 @@ impl<N: Network> Primary<N> {
                 // A best-effort attempt to skip the scheduled batch proposal if
                 // round progression already triggered one.
                 if self_.propose_lock.try_lock().is_err() {
+                    trace!("Skipping batch proposal {}", "(node is already proposing)".dimmed());
                     continue;
                 };
                 // If there is no proposed batch, attempt to propose a batch.
