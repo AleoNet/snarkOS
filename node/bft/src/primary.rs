@@ -336,10 +336,10 @@ impl<N: Network> Primary<N> {
             bail!("Primary is safely skipping {}", format!("(round {round} was already certified)").dimmed());
         }
 
+        // Retrieve the committee to check against.
+        let committee_lookback = self.ledger.get_committee_lookback_for_round(round)?;
         // Check if the primary is connected to enough validators to reach quorum threshold.
         {
-            // Retrieve the committee to check against.
-            let committee_lookback = self.ledger.get_committee_lookback_for_round(round)?;
             // Retrieve the connected validator addresses.
             let mut connected_validators = self.gateway.connected_addresses();
             // Append the primary to the set.
@@ -451,6 +451,8 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the private key.
         let private_key = *self.gateway.account().private_key();
+        // Retrieve the committee ID.
+        let committee_id = committee_lookback.id();
         // Prepare the transmission IDs.
         let transmission_ids = transmissions.keys().copied().collect();
         // Prepare the previous batch certificate IDs.
@@ -460,13 +462,13 @@ impl<N: Network> Primary<N> {
             &private_key,
             round,
             now(),
+            committee_id,
             transmission_ids,
             previous_certificate_ids,
             &mut rand::thread_rng()
         ))?;
         // Construct the proposal.
-        let proposal =
-            Proposal::new(self.ledger.get_committee_lookback_for_round(round)?, batch_header.clone(), transmissions)?;
+        let proposal = Proposal::new(committee_lookback, batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
@@ -519,6 +521,17 @@ impl<N: Network> Primary<N> {
         // Ensure the batch proposal is not from the current primary.
         if self.gateway.account().address() == batch_author {
             bail!("Invalid peer - proposed batch from myself ({batch_author})");
+        }
+
+        // Ensure that the batch proposal's committee ID matches the expected committee ID.
+        let expected_committee_id = self.ledger.get_committee_lookback_for_round(batch_round)?.id();
+        if expected_committee_id != batch_header.committee_id() {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!(
+                "Malicious peer - proposed batch has a different committee ID ({expected_committee_id} != {})",
+                batch_header.committee_id()
+            );
         }
 
         // Retrieve the cached round and batch ID for this validator.
@@ -728,6 +741,8 @@ impl<N: Network> Primary<N> {
         let author = certificate.author();
         // Retrieve the batch certificate round.
         let certificate_round = certificate.round();
+        // Retrieve the batch certificate committee ID.
+        let committee_id = certificate.committee_id();
 
         // Ensure the batch certificate is from an authorized validator.
         if !self.gateway.is_authorized_validator_ip(peer_ip) {
@@ -756,6 +771,14 @@ impl<N: Network> Primary<N> {
         let authors = certificates.iter().map(BatchCertificate::author).collect();
         // Check if the certificates have reached the quorum threshold.
         let is_quorum = committee_lookback.is_quorum_threshold_reached(&authors);
+
+        // Ensure that the batch certificate's committee ID matches the expected committee ID.
+        let expected_committee_id = committee_lookback.id();
+        if expected_committee_id != committee_id {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!("Batch certificate has a different committee ID ({expected_committee_id} != {committee_id})");
+        }
 
         // Determine if we are currently proposing a round that is relevant.
         // Note: This is important, because while our peers have advanced,
@@ -1536,8 +1559,16 @@ mod tests {
         ]
         .into();
         // Sign the batch header.
-        let batch_header =
-            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
+        let batch_header = BatchHeader::new(
+            private_key,
+            round,
+            timestamp,
+            committee.id(),
+            transmission_ids,
+            previous_certificate_ids,
+            rng,
+        )
+        .unwrap();
         // Construct the proposal.
         Proposal::new(committee, batch_header, transmissions).unwrap()
     }
@@ -1595,6 +1626,7 @@ mod tests {
             accounts.iter().find(|&(_, acct)| acct.address() == primary_address).map(|(_, acct)| acct.clone()).unwrap();
         let private_key = author.private_key();
 
+        let committee_id = Field::rand(rng);
         let (solution_commitment, solution) = sample_unconfirmed_solution(rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
         let transmission_ids = [solution_commitment.into(), (&transaction_id).into()].into();
@@ -1604,8 +1636,16 @@ mod tests {
         ]
         .into();
 
-        let batch_header =
-            BatchHeader::new(private_key, round, timestamp, transmission_ids, previous_certificate_ids, rng).unwrap();
+        let batch_header = BatchHeader::new(
+            private_key,
+            round,
+            timestamp,
+            committee_id,
+            transmission_ids,
+            previous_certificate_ids,
+            rng,
+        )
+        .unwrap();
         let signatures = peer_signatures_for_batch(primary_address, accounts, batch_header.batch_id(), rng);
         let certificate = BatchCertificate::<CurrentNetwork>::from(batch_header, signatures).unwrap();
         (certificate, transmissions)
