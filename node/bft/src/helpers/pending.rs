@@ -27,7 +27,10 @@ const CALLBACK_TIMEOUT_IN_SECS: i64 = MAX_FETCH_TIMEOUT_IN_MS as i64 / 1000;
 
 /// Returns the maximum number of redundant requests for the specified number of validators.
 pub const fn max_redundant_requests(num_validators: usize) -> usize {
-    num_validators.saturating_div(2)
+    // Note: It is adequate to set this value to the availability threshold,
+    // as with high probability one will respond honestly (in the best and worst case
+    // with stake spread across the validators evenly and unevenly, respectively).
+    1 + num_validators.saturating_div(3)
 }
 
 #[derive(Debug)]
