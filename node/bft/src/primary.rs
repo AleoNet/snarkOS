@@ -562,8 +562,8 @@ impl<N: Network> Primary<N> {
 
         // Check that the transmission ids match and are not fee transactions.
         for (transmission_id, transmission) in transmissions.iter_mut() {
-            // If the transmission is invalid, then return early.
-            if let Err(err) = self.ledger.ensure_transmission_id_matches(*transmission_id, transmission) {
+            // If the transmission is not well-formed, then return early.
+            if let Err(err) = self.ledger.ensure_transmission_is_well_formed(*transmission_id, transmission) {
                 debug!("Batch propose from '{peer_ip}' contains an invalid transmission - {err}",);
                 return Ok(());
             }

@@ -3318,6 +3318,7 @@ version = "2.2.7"
 dependencies = [
  "async-trait",
  "indexmap 2.2.2",
+ "lru",
  "parking_lot",
  "rand",
  "snarkvm",
