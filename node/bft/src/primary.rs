@@ -538,6 +538,13 @@ impl<N: Network> Primary<N> {
         if let Some((signed_round, signed_batch_id, signature)) =
             self.signed_proposals.read().get(&batch_author).copied()
         {
+            // If the signed round is ahead of the peer's batch round, then the validator is malicious.
+            if signed_round > batch_header.round() {
+                // Proceed to disconnect the validator.
+                self.gateway.disconnect(peer_ip);
+                bail!("Malicious peer - proposed a batch for a previous round ({})", batch_header.round());
+            }
+
             // If the round matches and the batch ID differs, then the validator is malicious.
             if signed_round == batch_header.round() && signed_batch_id != batch_header.batch_id() {
                 // Proceed to disconnect the validator.
