@@ -336,10 +336,10 @@ impl<N: Network> Primary<N> {
             bail!("Primary is safely skipping {}", format!("(round {round} was already certified)").dimmed());
         }
 
+        // Retrieve the committee to check against.
+        let committee_lookback = self.ledger.get_committee_lookback_for_round(round)?;
         // Check if the primary is connected to enough validators to reach quorum threshold.
-        let committee_lookback = {
-            // Retrieve the committee to check against.
-            let committee_lookback = self.ledger.get_committee_lookback_for_round(round)?;
+        {
             // Retrieve the connected validator addresses.
             let mut connected_validators = self.gateway.connected_addresses();
             // Append the primary to the set.
@@ -353,9 +353,7 @@ impl<N: Network> Primary<N> {
                 trace!("Primary is connected to {} validators", connected_validators.len() - 1);
                 return Ok(());
             }
-
-            committee_lookback
-        };
+        }
 
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
@@ -453,7 +451,7 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the private key.
         let private_key = *self.gateway.account().private_key();
-        // Retrieve the committee id.
+        // Retrieve the committee ID.
         let committee_id = committee_lookback.id();
         // Prepare the transmission IDs.
         let transmission_ids = transmissions.keys().copied().collect();
@@ -531,7 +529,7 @@ impl<N: Network> Primary<N> {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
             bail!(
-                "Malicious peer - proposed batch has an incorrect committee ID ({expected_committee_id} != {})",
+                "Malicious peer - proposed batch has a different committee ID ({expected_committee_id} != {})",
                 batch_header.committee_id()
             );
         }
@@ -775,13 +773,11 @@ impl<N: Network> Primary<N> {
         let is_quorum = committee_lookback.is_quorum_threshold_reached(&authors);
 
         // Ensure that the batch certificate's committee ID matches the expected committee ID.
-        let expected_certificate_id = committee_lookback.id();
-        if expected_certificate_id != committee_id {
+        let expected_committee_id = committee_lookback.id();
+        if expected_committee_id != committee_id {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
-            bail!(
-                "Committee deviation detected - Batch certificate has a diverging committee ID ({expected_certificate_id} != {committee_id})"
-            );
+            bail!("Batch certificate has a different committee ID ({expected_committee_id} != {committee_id})");
         }
 
         // Determine if we are currently proposing a round that is relevant.
