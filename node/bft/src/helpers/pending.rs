@@ -185,6 +185,8 @@ mod tests {
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
+    const ITERATIONS: usize = 100;
+
     #[test]
     fn test_pending() {
         let rng = &mut TestRng::default();
@@ -290,6 +292,37 @@ mod tests {
 
         // Ensure that the expired callbacks have been removed.
         assert_eq!(pending.num_callbacks(commitment_1), 0);
+    }
+
+    #[test]
+    fn test_num_sent_requests() {
+        let rng = &mut TestRng::default();
+
+        // Initialize the ready queue.
+        let pending = Pending::<TransmissionID<CurrentNetwork>, ()>::new();
+
+        for _ in 0..ITERATIONS {
+            // Generate a commitment.
+            let commitment = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+            // Check if the number of sent requests is correct.
+            let mut expected_num_sent_requests = 0;
+            for i in 0..ITERATIONS {
+                // Generate a peer address.
+                let addr = SocketAddr::from(([127, 0, 0, 1], i as u16));
+                // Initialize a callback.
+                let (callback_sender, _) = oneshot::channel();
+                // Randomly determine if the callback is associated with a sent request.
+                let is_sent_request = rng.gen();
+                // Increment the expected number of sent requests.
+                if is_sent_request {
+                    expected_num_sent_requests += 1;
+                }
+                // Insert the commitment.
+                assert!(pending.insert(commitment, addr, Some((callback_sender, is_sent_request))));
+            }
+            // Ensure that the number of sent requests is correct.
+            assert_eq!(pending.num_sent_requests(commitment), expected_num_sent_requests);
+        }
     }
 }
 
