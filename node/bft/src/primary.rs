@@ -746,15 +746,13 @@ impl<N: Network> Primary<N> {
         // Store the certificate, after ensuring it is valid.
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
 
-        // If there are enough certificates to reach quorum threshold for the current round,
+        // If there are enough certificates to reach quorum threshold for the certificate round,
         // then proceed to advance to the next round.
 
-        // Retrieve the current round.
-        let current_round = self.current_round();
         // Retrieve the committee lookback.
-        let committee_lookback = self.ledger.get_committee_lookback_for_round(current_round)?;
+        let committee_lookback = self.ledger.get_committee_lookback_for_round(certificate_round)?;
         // Retrieve the certificates.
-        let certificates = self.storage.get_certificates_for_round(current_round);
+        let certificates = self.storage.get_certificates_for_round(certificate_round);
         // Construct a set over the authors.
         let authors = certificates.iter().map(BatchCertificate::author).collect();
         // Check if the certificates have reached the quorum threshold.
@@ -770,8 +768,11 @@ impl<N: Network> Primary<N> {
             None => true,
         };
 
+        // Retrieve the current round.
+        let current_round = self.current_round();
+
         // Determine whether to advance to the next round.
-        if is_quorum && should_advance {
+        if is_quorum && should_advance && certificate_round >= current_round {
             // If we have reached the quorum threshold and the round should advance, then proceed to the next round.
             self.try_increment_to_the_next_round(current_round + 1).await?;
         }
