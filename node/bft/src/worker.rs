@@ -90,6 +90,11 @@ impl<N: Network> Worker<N> {
     pub const fn id(&self) -> u8 {
         self.id
     }
+
+    /// Returns a reference to the pending transmissions queue.
+    pub fn pending(&self) -> &Arc<Pending<TransmissionID<N>, Transmission<N>>> {
+        &self.pending
+    }
 }
 
 impl<N: Network> Worker<N> {
@@ -387,7 +392,7 @@ impl<N: Network> Worker<N> {
         // Determine how many sent requests are pending.
         let num_sent_requests = self.pending.num_sent_requests(transmission_id);
         // Determine the maximum number of redundant requests.
-        let num_redundant_requests = max_redundant_requests(&self.ledger, self.storage.current_round());
+        let num_redundant_requests = max_redundant_requests(self.ledger.clone(), self.storage.current_round());
         // Determine if we should send a transmission request to the peer.
         let should_send_request = num_sent_requests < num_redundant_requests;
 
@@ -537,6 +542,24 @@ mod tests {
             ) -> Result<Block<N>>;
             fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
         }
+    }
+
+    #[tokio::test]
+    async fn test_max_redundant_requests() {
+        let rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_size(0, 100, rng);
+        let committee_clone = committee.clone();
+        // Setup the mock ledger.
+        let mut mock_ledger = MockLedger::default();
+        mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
+        mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
+        mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
+
+        // Ensure the maximum number of redundant requests is correct and consistent across iterations.
+        assert_eq!(max_redundant_requests(ledger, 0), 34, "Update me if the formula changes");
     }
 
     #[tokio::test]
@@ -799,7 +822,7 @@ mod tests {
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
 
         // Determine the number of redundant requests are sent.
-        let num_redundant_requests = max_redundant_requests(&worker.ledger, worker.storage.current_round());
+        let num_redundant_requests = max_redundant_requests(worker.ledger.clone(), worker.storage.current_round());
         let num_flood_requests = num_redundant_requests * 10;
         // Flood the pending queue with transmission requests.
         for i in 1..=num_flood_requests {
