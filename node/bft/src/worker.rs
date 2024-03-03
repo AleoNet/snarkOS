@@ -28,7 +28,6 @@ use snarkvm::{
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchHeader, Data, Transmission, TransmissionID},
     },
-    prelude::committee::Committee,
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -142,11 +141,6 @@ impl<N: Network> Worker<N> {
     /// Returns the transactions in the ready queue.
     pub fn transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
         self.ready.transactions()
-    }
-
-    /// Returns the number of validators in the committee lookback for the given round.
-    pub fn num_validators_in_committee_lookback(&self, round: u64) -> Option<usize> {
-        self.ledger.get_committee_lookback_for_round(round).map(|committee| committee.num_members()).ok()
     }
 }
 
@@ -392,11 +386,8 @@ impl<N: Network> Worker<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Determine how many sent requests are pending.
         let num_sent_requests = self.pending.num_sent_requests(transmission_id);
-        // Calculate the max number of redundant requests.
-        let num_validators = self
-            .num_validators_in_committee_lookback(self.storage.current_round())
-            .unwrap_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize);
-        let num_redundant_requests = max_redundant_requests(num_validators);
+        // Determine the maximum number of redundant requests.
+        let num_redundant_requests = max_redundant_requests(&self.ledger, self.storage.current_round());
         // Determine if we should send a transmission request to the peer.
         let should_send_request = num_sent_requests < num_redundant_requests;
 

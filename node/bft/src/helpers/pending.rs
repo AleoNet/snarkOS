@@ -13,20 +13,30 @@
 // limitations under the License.
 
 use crate::MAX_FETCH_TIMEOUT_IN_MS;
+use snarkos_node_bft_ledger_service::LedgerService;
+use snarkvm::{console::network::Network, ledger::committee::Committee};
 
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
     net::SocketAddr,
+    sync::Arc,
 };
 use time::OffsetDateTime;
 use tokio::sync::oneshot;
 
 const CALLBACK_TIMEOUT_IN_SECS: i64 = MAX_FETCH_TIMEOUT_IN_MS as i64 / 1000;
 
-/// Returns the maximum number of redundant requests for the specified number of validators.
-pub const fn max_redundant_requests(num_validators: usize) -> usize {
+/// Returns the maximum number of redundant requests for the number of validators in the specified round.
+pub fn max_redundant_requests<N: Network>(ledger: &Arc<dyn LedgerService<N>>, round: u64) -> usize {
+    // Determine the number of validators in the committee lookback for the given round.
+    let num_validators = ledger
+        .get_committee_lookback_for_round(round)
+        .map(|committee| committee.num_members())
+        .ok()
+        .unwrap_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize);
+
     // Note: It is adequate to set this value to the availability threshold,
     // as with high probability one will respond honestly (in the best and worst case
     // with stake spread across the validators evenly and unevenly, respectively).
