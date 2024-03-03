@@ -138,7 +138,7 @@ pub struct Start {
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
     /// If developtment mode is enabled, specify whether node 0 should generate traffic to drive the network
-    #[clap(long = "dev-traffic")]
+    #[clap(default_value = "false", long = "dev-traffic")]
     pub dev_traffic: bool,
     /// Specify the path to a directory containing the ledger
     #[clap(long = "storage_path")]
