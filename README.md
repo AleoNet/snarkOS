@@ -210,7 +210,7 @@ OPTIONS:
 
 In the first terminal, start the first validator by running:
 ```
-cargo run --release -- start --nodisplay --dev 0 --validator
+cargo run --release -- start --nodisplay --dev 0 --validator --dev-traffic
 ```
 In the second terminal, start the second validator by running:
 ```
