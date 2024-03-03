@@ -542,7 +542,7 @@ impl Start {
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, dev_traffic, storage_mode).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, dev_traffic).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }

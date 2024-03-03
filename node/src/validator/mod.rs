@@ -82,8 +82,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev_traffic: bool,
         storage_mode: StorageMode,
+        dev_traffic: bool,
     ) -> Result<Self> {
         // Prepare the shutdown flag.
         let shutdown: Arc<AtomicBool> = Default::default();
@@ -496,8 +496,8 @@ mod tests {
             &[],
             genesis,
             None,
-            dev_traffic,
             storage_mode,
+            dev_traffic,
         )
         .await
         .unwrap();
