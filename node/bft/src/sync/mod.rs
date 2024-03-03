@@ -428,7 +428,7 @@ impl<N: Network> Sync<N> {
             }
         } else {
             debug!(
-                "Skipped sending redundant request for certificate {} to '{peer_ip}' (Already pending {num_sent_requests} requests)",
+                "Skipped sending request for certificate {} to '{peer_ip}' ({num_sent_requests} redundant requests)",
                 fmt_id(certificate_id)
             );
         }
