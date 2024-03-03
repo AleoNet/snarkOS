@@ -411,7 +411,7 @@ impl<N: Network> Worker<N> {
             }
         } else {
             debug!(
-                "Skipped sending redundant request for transmission {} to '{peer_ip}' (Already pending {num_sent_requests} requests)",
+                "Skipped sending request for transmission {} to '{peer_ip}' ({num_sent_requests} redundant requests)",
                 fmt_id(transmission_id)
             );
         }
