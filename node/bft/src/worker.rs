@@ -797,34 +797,40 @@ mod tests {
 
         // Determine the number of redundant requests are sent.
         let num_redundant_requests = max_redundant_requests(&worker.ledger, worker.storage.current_round());
+        let num_flood_requests = num_redundant_requests * 10;
         // Flood the pending queue with transmission requests.
-        for _ in 0..(num_redundant_requests * 10) {
+        for i in 1..=num_flood_requests {
             let worker_ = worker.clone();
             tokio::spawn(async move {
                 let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
             });
+            tokio::time::sleep(Duration::from_millis(10)).await;
             // Check that the number of sent requests does not exceed the maximum number of redundant requests.
             assert!(worker.pending.num_sent_requests(transmission_id) <= num_redundant_requests);
-            tokio::time::sleep(Duration::from_millis(10)).await;
+            assert_eq!(worker.pending.num_callbacks(transmission_id), i);
         }
         // Check that the number of sent requests does not exceed the maximum number of redundant requests.
         assert_eq!(worker.pending.num_sent_requests(transmission_id), num_redundant_requests);
+        assert_eq!(worker.pending.num_callbacks(transmission_id), num_flood_requests);
 
         // Let all the requests expire.
-        tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
+        tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS + 1000)).await;
         assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
+        assert_eq!(worker.pending.num_callbacks(transmission_id), 0);
 
         // Flood the pending queue with transmission requests again.
-        for _ in 0..(num_redundant_requests * 10) {
+        for i in 1..=num_flood_requests {
             let worker_ = worker.clone();
             tokio::spawn(async move {
                 let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
             });
-            assert!(worker.pending.num_sent_requests(transmission_id) <= num_redundant_requests);
             tokio::time::sleep(Duration::from_millis(10)).await;
+            assert!(worker.pending.num_sent_requests(transmission_id) <= num_redundant_requests);
+            assert_eq!(worker.pending.num_callbacks(transmission_id), i);
         }
         // Check that the number of sent requests does not exceed the maximum number of redundant requests.
         assert_eq!(worker.pending.num_sent_requests(transmission_id), num_redundant_requests);
+        assert_eq!(worker.pending.num_callbacks(transmission_id), num_flood_requests);
 
         // Check that fulfilling a transmission request clears the pending queue.
         let result = worker
@@ -835,6 +841,7 @@ mod tests {
             .await;
         assert!(result.is_ok());
         assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
+        assert_eq!(worker.pending.num_callbacks(transmission_id), 0);
         assert!(!worker.pending.contains(transmission_id));
         assert!(worker.ready.contains(transmission_id));
     }
