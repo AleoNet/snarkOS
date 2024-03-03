@@ -770,6 +770,77 @@ mod tests {
         assert!(!worker.pending.contains(transmission_id));
         assert!(!worker.ready.contains(transmission_id));
     }
+
+    #[tokio::test]
+    async fn test_flood_transmission_requests() {
+        let mut rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
+        // Setup the mock gateway and ledger.
+        let mut gateway = MockGateway::default();
+        gateway.expect_send().returning(|_, _| {
+            let (_tx, rx) = oneshot::channel();
+            Some(rx)
+        });
+        let mut mock_ledger = MockLedger::default();
+        mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
+        mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
+        mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
+
+        // Create the Worker.
+        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
+        let transmission_id = TransmissionID::Transaction(transaction_id);
+        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+
+        // Determine the number of redundant requests are sent.
+        let num_redundant_requests = max_redundant_requests(&worker.ledger, worker.storage.current_round());
+        // Flood the pending queue with transmission requests.
+        for _ in 0..(num_redundant_requests * 10) {
+            let worker_ = worker.clone();
+            tokio::spawn(async move {
+                let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+            });
+            // Check that the number of sent requests does not exceed the maximum number of redundant requests.
+            assert!(worker.pending.num_sent_requests(transmission_id) <= num_redundant_requests);
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // Check that the number of sent requests does not exceed the maximum number of redundant requests.
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), num_redundant_requests);
+
+        // Let all the requests expire.
+        tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
+
+        // Flood the pending queue with transmission requests again.
+        for _ in 0..(num_redundant_requests * 10) {
+            let worker_ = worker.clone();
+            tokio::spawn(async move {
+                let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+            });
+            assert!(worker.pending.num_sent_requests(transmission_id) <= num_redundant_requests);
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // Check that the number of sent requests does not exceed the maximum number of redundant requests.
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), num_redundant_requests);
+
+        // Check that fulfilling a transmission request clears the pending queue.
+        let result = worker
+            .process_unconfirmed_transaction(
+                transaction_id,
+                Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>())),
+            )
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
+        assert!(!worker.pending.contains(transmission_id));
+        assert!(worker.ready.contains(transmission_id));
+    }
 }
 
 #[cfg(test)]
