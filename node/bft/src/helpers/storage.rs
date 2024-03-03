@@ -203,7 +203,10 @@ impl<N: Network> Storage<N> {
     fn update_current_round(&self, next_round: u64) {
         // Update the current round.
         self.current_round.store(next_round, Ordering::SeqCst);
+    }
 
+    /// Update the storage by performing garbage collection based on the next round.
+    pub(crate) fn garbage_collect_certificates(&self, next_round: u64) {
         // Fetch the current GC round.
         let current_gc_round = self.gc_round();
         // Compute the next GC round.
