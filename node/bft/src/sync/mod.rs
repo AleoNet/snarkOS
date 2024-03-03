@@ -25,7 +25,7 @@ use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
-    prelude::{cfg_into_iter, cfg_iter, committee::Committee},
+    prelude::{cfg_into_iter, cfg_iter},
 };
 
 use anyhow::{bail, Result};
@@ -398,11 +398,6 @@ impl<N: Network> Sync<N> {
     pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
         self.block_sync.get_block_locators()
     }
-
-    /// Returns the number of validators in the committee lookback for the given round.
-    pub fn num_validators_in_committee_lookback(&self, round: u64) -> Option<usize> {
-        self.ledger.get_committee_lookback_for_round(round).map(|committee| committee.num_members()).ok()
-    }
 }
 
 // Methods to assist with fetching batch certificates from peers.
@@ -417,11 +412,8 @@ impl<N: Network> Sync<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Determine how many sent requests are pending.
         let num_sent_requests = self.pending.num_sent_requests(certificate_id);
-        // Calculate the max number of redundant requests.
-        let num_validators = self
-            .num_validators_in_committee_lookback(self.storage.current_round())
-            .unwrap_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize);
-        let num_redundant_requests = max_redundant_requests(num_validators);
+        // Determine the maximum number of redundant requests.
+        let num_redundant_requests = max_redundant_requests(&self.ledger, self.storage.current_round());
         // Determine if we should send a certificate request to the peer.
         let should_send_request = num_sent_requests < num_redundant_requests;
 
