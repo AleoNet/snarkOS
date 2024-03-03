@@ -324,7 +324,7 @@ impl TestNetwork {
 }
 
 // Initializes a new test committee.
-fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
+pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
     let mut accounts = Vec::with_capacity(n as usize);
     let mut members = IndexMap::with_capacity(n as usize);
     for i in 0..n {
@@ -346,7 +346,7 @@ fn genesis_cache() -> &'static Mutex<HashMap<Vec<u8>, Block<CurrentNetwork>>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn genesis_block(
+pub fn genesis_block(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
@@ -361,7 +361,7 @@ fn genesis_block(
     vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng).unwrap()
 }
 
-fn genesis_ledger(
+pub fn genesis_ledger(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
