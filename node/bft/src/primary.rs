@@ -394,6 +394,11 @@ impl<N: Network> Primary<N> {
         // Take the transmissions from the workers.
         for worker in self.workers.iter() {
             for (id, transmission) in worker.drain(num_transmissions_per_worker) {
+                // Check if the transmission has been stored already.
+                if self.storage.contains_transmission(id) {
+                    trace!("Proposing - Skipping transmission '{}' - Already in a certificate", fmt_id(id));
+                    continue;
+                }
                 // Check if the ledger already contains the transmission.
                 if self.ledger.contains_transmission(&id).unwrap_or(true) {
                     trace!("Proposing - Skipping transmission '{}' - Already in ledger", fmt_id(id));
