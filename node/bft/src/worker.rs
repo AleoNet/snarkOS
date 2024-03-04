@@ -486,6 +486,8 @@ mod tests {
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
+    const ITERATIONS: usize = 100;
+
     mock! {
         Gateway<N: Network> {}
         #[async_trait]
@@ -867,6 +869,34 @@ mod tests {
         assert_eq!(worker.pending.num_callbacks(transmission_id), 0);
         assert!(!worker.pending.contains(transmission_id));
         assert!(worker.ready.contains(transmission_id));
+    }
+
+    #[tokio::test]
+    async fn test_storage_gc_on_initialization() {
+        let rng = &mut TestRng::default();
+
+        for _ in 0..ITERATIONS {
+            // Mock the ledger round.
+            let max_gc_rounds = rng.gen_range(50..=100);
+            let latest_ledger_round = rng.gen_range((max_gc_rounds + 1)..1000);
+            let expected_gc_round = latest_ledger_round - max_gc_rounds;
+
+            // Sample a committee.
+            let committee =
+                snarkvm::ledger::committee::test_helpers::sample_committee_for_round(latest_ledger_round, rng);
+
+            // Setup the mock gateway and ledger.
+            let mut mock_ledger = MockLedger::default();
+            mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+
+            let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
+            // Initialize the storage.
+            let storage =
+                Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+
+            // Ensure that the storage GC round is correct.
+            assert_eq!(storage.gc_round(), expected_gc_round);
+        }
     }
 }
 
