@@ -58,6 +58,7 @@ use colored::Colorize;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
@@ -572,12 +573,12 @@ impl<N: Network> Primary<N> {
         let mut transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
 
         // Check that the transmission ids match and are not fee transactions.
-        for (transmission_id, transmission) in transmissions.iter_mut() {
+        if let Err(err) = transmissions.par_iter_mut().try_for_each(|(transmission_id, transmission)| {
             // If the transmission is not well-formed, then return early.
-            if let Err(err) = self.ledger.ensure_transmission_is_well_formed(*transmission_id, transmission) {
-                debug!("Batch propose from '{peer_ip}' contains an invalid transmission - {err}",);
-                return Ok(());
-            }
+            self.ledger.ensure_transmission_is_well_formed(*transmission_id, transmission)
+        }) {
+            debug!("Batch propose from '{peer_ip}' contains an invalid transmission - {err}",);
+            return Ok(());
         }
 
         // Ensure the batch is for the current round.
