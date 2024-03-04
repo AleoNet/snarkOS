@@ -94,6 +94,21 @@ cargo install --locked --path .
 
 Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS firewall.
 
+### 2.3 Windows clients
+
+To run snarkOS on windows, follow the following steps:
+
+- Install Git from https://git-scm.com/download/win
+- Install LLVM from github releases https://github.com/llvm/llvm-project/releases (e.g. LLVM-17.0.6-win64.exe)
+-- Choose 'Add LLVM to the system PATH for all users'
+- Install rust using the windows installer (`rustup-init.exe`). Choose option 1 to install visual studio and the msvc toolchain. Don't uncheck the windows SDK option!
+- Open Git Bash
+- `git clone https://github.com/AleoHQ/snarkOS.git --depth 1`
+- `cd snarkOS`
+- `cargo install --locked --path .`
+
+Note that on windows you _must_ use `--nodisplay`
+
 ## 3. Run an Aleo Node
 
 ## 3.1 Run an Aleo Client
