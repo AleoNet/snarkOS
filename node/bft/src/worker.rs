@@ -428,8 +428,8 @@ impl<N: Network> Worker<N> {
         let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
-            // Ensure the transmission ID matches the transmission.
-            match self.ledger.ensure_transmission_id_matches(transmission_id, &mut transmission) {
+            // Ensure the transmission is not a fee and matches the transmission ID.
+            match self.ledger.ensure_transmission_is_well_formed(transmission_id, &mut transmission) {
                 Ok(()) => {
                     // Remove the transmission ID from the pending queue.
                     self.pending.remove(transmission_id, Some(transmission));
@@ -516,7 +516,7 @@ mod tests {
             fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
             fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
-            fn ensure_transmission_id_matches(
+            fn ensure_transmission_is_well_formed(
                 &self,
                 transmission_id: TransmissionID<N>,
                 transmission: &mut Transmission<N>,
@@ -609,7 +609,7 @@ mod tests {
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
         mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
-        mock_ledger.expect_ensure_transmission_id_matches().returning(|_, _| Ok(()));
+        mock_ledger.expect_ensure_transmission_is_well_formed().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);

@@ -135,7 +135,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Always succeeds.
-    fn ensure_transmission_id_matches(
+    fn ensure_transmission_is_well_formed(
         &self,
         _transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,
