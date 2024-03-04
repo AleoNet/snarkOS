@@ -30,7 +30,7 @@ pub(super) const GAUGE_NAMES: [&str; 13] = [
     tcp::TCP_TASKS,
 ];
 
-pub(super) const HISTOGRAM_NAMES: [&str; 8] = [
+pub(super) const HISTOGRAM_NAMES: [&str; 7] = [
     bft::COMMIT_ROUNDS_LATENCY,
     consensus::CERTIFICATE_COMMIT_LATENCY,
     consensus::BLOCK_LATENCY,
@@ -38,7 +38,6 @@ pub(super) const HISTOGRAM_NAMES: [&str; 8] = [
     tcp::NOISE_CODEC_DECRYPTION_TIME,
     tcp::NOISE_CODEC_ENCRYPTION_SIZE,
     tcp::NOISE_CODEC_DECRYPTION_SIZE,
-    tcp::TCP_GATEWAY,
 ];
 
 pub mod bft {
@@ -75,5 +74,4 @@ pub mod tcp {
     pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_encryption_size";
     pub const NOISE_CODEC_DECRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_decryption_size";
     pub const TCP_TASKS: &str = "snarkos_tcp_tasks_total";
-    pub const TCP_GATEWAY: &str = "snarkos_tcp_gateway_messages_received";
 }
