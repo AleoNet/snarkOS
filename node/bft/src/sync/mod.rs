@@ -212,6 +212,8 @@ impl<N: Network> Sync<N> {
         self.storage.sync_height_with_block(latest_block.height());
         // Sync the round with the block.
         self.storage.sync_round_with_block(latest_block.round());
+        // Perform GC on the latest block round.
+        self.storage.garbage_collect_certificates(latest_block.round());
         // Iterate over the blocks.
         for block in &blocks {
             // If the block authority is a subdag, then sync the batch certificates with the block.

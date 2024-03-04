@@ -114,6 +114,8 @@ impl<N: Network> Storage<N> {
         }));
         // Update the storage to the current round.
         storage.update_current_round(current_round);
+        // Perform GC on the current round.
+        storage.garbage_collect_certificates(current_round);
         // Return the storage.
         storage
     }
