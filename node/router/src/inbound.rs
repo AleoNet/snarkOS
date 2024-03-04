@@ -207,7 +207,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 let seen_before = self.router().cache.insert_inbound_solution(peer_ip, message.solution_id).is_some();
                 // Determine whether to propagate the solution.
                 if seen_before {
-                    bail!("Skipping 'UnconfirmedSolution' from '{peer_ip}'")
+                    trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
+                    return Ok(());
                 }
                 // Perform the deferred non-blocking deserialization of the solution.
                 let solution = match message.solution.deserialize().await {
@@ -232,7 +233,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     self.router().cache.insert_inbound_transaction(peer_ip, message.transaction_id).is_some();
                 // Determine whether to propagate the transaction.
                 if seen_before {
-                    bail!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'")
+                    trace!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'");
+                    return Ok(());
                 }
                 // Perform the deferred non-blocking deserialization of the transaction.
                 let transaction = match message.transaction.deserialize().await {
