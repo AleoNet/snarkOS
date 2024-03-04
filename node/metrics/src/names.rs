@@ -26,9 +26,9 @@ pub(super) const GAUGE_NAMES: [&str; 18] = [
     blocks::TRANSMISSIONS,
     consensus::COMMITTED_CERTIFICATES,
     consensus::LAST_COMMITTED_ROUND,
-    consensus::SOLUTIONS,
-    consensus::TRANSACTIONS,
-    consensus::TRANSMISSIONS,
+    consensus::UNCONFIRMED_SOLUTIONS,
+    consensus::UNCONFIRMED_TRANSACTIONS,
+    consensus::UNCONFIRMED_TRANSMISSIONS,
     router::CONNECTED,
     router::CANDIDATE,
     router::RESTRICTED,
@@ -67,9 +67,9 @@ pub mod consensus {
     pub const COMMITTED_CERTIFICATES: &str = "snarkos_consensus_committed_certificates_total";
     pub const LAST_COMMITTED_ROUND: &str = "snarkos_consensus_last_committed_round";
     pub const BLOCK_LATENCY: &str = "snarkos_consensus_block_latency_secs";
-    pub const TRANSACTIONS: &str = "snarkos_consensus_transactions_total";
-    pub const TRANSMISSIONS: &str = "snarkos_consensus_transmissions_total";
-    pub const SOLUTIONS: &str = "snarkos_consensus_solutions_total";
+    pub const UNCONFIRMED_TRANSACTIONS: &str = "snarkos_consensus_unconfirmed_transactions_total";
+    pub const UNCONFIRMED_TRANSMISSIONS: &str = "snarkos_consensus_unconfirmed_transmissions_total";
+    pub const UNCONFIRMED_SOLUTIONS: &str = "snarkos_consensus_unconfirmed_solutions_total";
 }
 
 pub mod router {

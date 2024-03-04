@@ -1556,7 +1556,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "snarkos_consensus_transactions_total",
+          "expr": "snarkos_consensus_unconfirmed_transactions_total",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -1566,7 +1566,7 @@
           "useBackend": false
         }
       ],
-      "title": "Total Transactions",
+      "title": "Total Unconfirmed Transactions",
       "type": "timeseries"
     },
     {
@@ -1652,7 +1652,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "snarkos_consensus_solutions_total",
+          "expr": "snarkos_consensus_unconfirmed_solutions_total",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -1662,7 +1662,7 @@
           "useBackend": false
         }
       ],
-      "title": "Total Solutions",
+      "title": "Total Unconfirmed Solutions",
       "type": "timeseries"
     },
     {
@@ -1748,7 +1748,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "snarkos_consensus_transmissions_total",
+          "expr": "snarkos_consensus_unconfirmed_transmissions_total",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -1758,7 +1758,7 @@
           "useBackend": false
         }
       ],
-      "title": "Total Transmissions",
+      "title": "Total Unconfirmed Transmissions",
       "type": "timeseries"
     },
     {

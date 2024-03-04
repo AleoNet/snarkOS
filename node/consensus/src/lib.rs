@@ -214,8 +214,8 @@ impl<N: Network> Consensus<N> {
     pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
         #[cfg(feature = "metrics")]
         {
-            metrics::increment_gauge(metrics::consensus::SOLUTIONS, 1f64);
-            metrics::increment_gauge(metrics::consensus::TRANSMISSIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
         }
         // Process the unconfirmed solution.
         {
@@ -272,8 +272,8 @@ impl<N: Network> Consensus<N> {
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
         #[cfg(feature = "metrics")]
         {
-            metrics::increment_gauge(metrics::consensus::TRANSACTIONS, 1f64);
-            metrics::increment_gauge(metrics::consensus::TRANSMISSIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
         }
         // Process the unconfirmed transaction.
         {
