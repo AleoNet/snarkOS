@@ -624,8 +624,10 @@ impl<N: Network> BFT<N> {
             }
         }
 
-        // Perform garbage collection based on the latest committed leader round.
-        self.storage().garbage_collect_certificates(latest_leader_round);
+        // Perform garbage collection based on the latest committed leader round if the node is not syncing.
+        if !IS_SYNCING {
+            self.storage().garbage_collect_certificates(latest_leader_round);
+        }
 
         Ok(())
     }
