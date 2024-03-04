@@ -53,14 +53,18 @@ use tokio::{
     task::JoinHandle,
 };
 
-/// The capacity of the mempool reserved for deployments.
-const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 5;
-/// The capacity of the mempool reserved for executions.
+/// The capacity of the queue reserved for deployments.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 4;
+/// The capacity of the queue reserved for executions.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
 const CAPACITY_FOR_EXECUTIONS: usize = 1 << 10;
-/// The capacity of the mempool reserved for solutions.
+/// The capacity of the queue reserved for solutions.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
 const CAPACITY_FOR_SOLUTIONS: usize = 1 << 10;
-/// The percentage of the transmissions being processed that are deployments.
-const DEPLOYMENT_VERIFICATION_RATE: usize = 15;
+/// The **suggested** maximum number of deployments in each interval.
+/// Note: This is an inbound queue limit, not a Narwhal-enforced limit.
+const MAX_DEPLOYMENTS_PER_INTERVAL: usize = 1;
 
 /// Helper struct to track incoming transactions.
 struct TransactionsQueue<N: Network> {
@@ -311,7 +315,7 @@ impl<N: Network> Consensus<N> {
             // Acquire the lock on the transactions queue.
             let mut tx_queue = self.transactions_queue.lock();
             // Determine the number of deployments to send.
-            let num_deployments = tx_queue.deployments.len().min(capacity * DEPLOYMENT_VERIFICATION_RATE / 100);
+            let num_deployments = tx_queue.deployments.len().min(capacity).min(MAX_DEPLOYMENTS_PER_INTERVAL);
             // Determine the number of executions to send.
             let num_executions = tx_queue.executions.len().min(capacity.saturating_sub(num_deployments));
             // Create an iterator which will select interleaved deployments and executions within the capacity.
