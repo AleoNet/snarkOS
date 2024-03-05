@@ -661,6 +661,14 @@ impl<N: Network> BFT<N> {
                 if already_ordered.contains(previous_certificate_id) {
                     continue;
                 }
+                // If the previous certificate already exists in the ledger, continue.
+                if ALLOW_LEDGER_ACCESS && self.ledger().contains_certificate(previous_certificate_id).unwrap_or(false) {
+                    info!(
+                        "\n\n SHOULD SKIP ORDERING CERTIFICATE ALREADY INCLUDED IN LEDGER: {}\n\n",
+                        fmt_id(previous_certificate_id)
+                    );
+                    // continue;
+                }
                 // If the previous certificate was recently committed, continue.
                 if self.dag.read().is_recently_committed(previous_round, *previous_certificate_id) {
                     continue;
@@ -800,7 +808,7 @@ impl<N: Network> BFT<N> {
         certificates: Vec<BatchCertificate<N>>,
     ) {
         // Split the leader certificates into past leader certificates and the latest leader certificate.
-        let (past_leader_certificates, leader_certificate) = {
+        let (_, leader_certificate) = {
             // Compute the penultimate index.
             let index = leader_certificates.len().saturating_sub(1);
             // Split the leader certificates.
@@ -817,7 +825,7 @@ impl<N: Network> BFT<N> {
             // Acquire the BFT write lock.
             let mut dag = self.dag.write();
             // Iterate over the certificates.
-            for certificate in certificates {
+            for certificate in certificates.clone() {
                 // If the certificate is not the latest leader certificate, insert it.
                 if leader_certificate.id() != certificate.id() {
                     // Insert the certificate into the DAG.
@@ -825,10 +833,22 @@ impl<N: Network> BFT<N> {
                 }
             }
 
-            // Iterate over the leader certificates.
-            for leader_certificate in past_leader_certificates {
-                // Commit the leader certificate.
-                dag.commit(leader_certificate, self.storage().max_gc_rounds());
+            // // Iterate over the leader certificates.
+            // for leader_certificate in past_leader_certificates {
+            //     // Commit the leader certificate.
+            //     dag.commit(leader_certificate, self.storage().max_gc_rounds());
+            // }
+
+            // In normal commit operations, we call `DAG::commit` all the certificates in every subdag. Here,
+            // we were only calling `DAG::commit` on the old leaders.
+
+            // Commit all the certificates excluding the latest leader certificate.
+            for certificate in certificates {
+                // If the certificate is not the latest leader certificate, insert it.
+                if leader_certificate.id() != certificate.id() {
+                    // Commit the certificate.
+                    dag.commit(&certificate, self.storage().max_gc_rounds());
+                }
             }
         }
         // Commit the latest leader certificate.
