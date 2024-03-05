@@ -212,6 +212,11 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
+        #[cfg(feature = "metrics")]
+        {
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+        }
         // Process the unconfirmed solution.
         {
             let solution_id = solution.commitment();
@@ -265,6 +270,11 @@ impl<N: Network> Consensus<N> {
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        #[cfg(feature = "metrics")]
+        {
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+        }
         // Process the unconfirmed transaction.
         {
             let transaction_id = transaction.id();
@@ -405,9 +415,14 @@ impl<N: Network> Consensus<N> {
             let elapsed = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - start) as u64);
             let next_block_timestamp = next_block.header().metadata().timestamp();
             let block_latency = next_block_timestamp - current_block_timestamp;
+            let num_sol = next_block.solutions().len();
+            let num_tx = next_block.transactions().len();
+            let num_transmissions = num_tx + num_sol;
 
             metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
-            metrics::increment_gauge(metrics::blocks::TRANSACTIONS, next_block.transactions().len() as f64);
+            metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
+            metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
+            metrics::increment_gauge(metrics::blocks::TRANSMISSIONS, num_transmissions as f64);
             metrics::gauge(metrics::consensus::LAST_COMMITTED_ROUND, next_block.round() as f64);
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
