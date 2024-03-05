@@ -17,10 +17,10 @@ use snarkos_cli::{commands::CLI, helpers::Updater};
 use clap::Parser;
 use std::process::exit;
 
-#[cfg(feature = "jemalloc")]
+#[cfg(target_os = "linux")]
 use tikv_jemallocator::Jemalloc;
 
-#[cfg(feature = "jemalloc")]
+#[cfg(target_os = "linux")]
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
