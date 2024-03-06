@@ -665,6 +665,11 @@ impl<N: Network> BFT<N> {
                 if self.dag.read().is_recently_committed(previous_round, *previous_certificate_id) {
                     continue;
                 }
+                // If the previous certificate already exists in the ledger, continue.
+                if ALLOW_LEDGER_ACCESS && self.ledger().contains_certificate(previous_certificate_id).unwrap_or(false) {
+                    continue;
+                }
+
                 // Retrieve the previous certificate.
                 let previous_certificate = {
                     // Start by retrieving the previous certificate from the DAG.
@@ -675,28 +680,11 @@ impl<N: Network> BFT<N> {
                         None => match self.storage().get_certificate(*previous_certificate_id) {
                             // If the previous certificate is found, return it.
                             Some(previous_certificate) => previous_certificate,
-                            // Otherwise, retrieve the previous certificate from the ledger.
-                            None => {
-                                if ALLOW_LEDGER_ACCESS {
-                                    match self.ledger().get_batch_certificate(previous_certificate_id) {
-                                        // If the previous certificate is found, return it.
-                                        Ok(previous_certificate) => previous_certificate,
-                                        // Otherwise, the previous certificate is missing, and throw an error.
-                                        Err(e) => {
-                                            bail!(
-                                                "Missing previous certificate {} for round {previous_round} - {e}",
-                                                fmt_id(previous_certificate_id)
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    // Otherwise, the previous certificate is missing, and throw an error.
-                                    bail!(
-                                        "Missing previous certificate {} for round {previous_round}",
-                                        fmt_id(previous_certificate_id)
-                                    )
-                                }
-                            }
+                            // Otherwise, the previous certificate is missing, and throw an error.
+                            None => bail!(
+                                "Missing previous certificate {} for round {previous_round}",
+                                fmt_id(previous_certificate_id)
+                            ),
                         },
                     }
                 };
