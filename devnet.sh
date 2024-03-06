@@ -26,6 +26,11 @@ fi
 read -p "Do you want to clear the existing ledger history? (y/n, default: n): " clear_ledger
 clear_ledger=${clear_ledger:-n}
 
+# Read the automatic restart delay in seconds
+read -p "Enter the automatic validator restart delay in seconds, 0 to disable (default: 0): " restart_delay
+restart_delay=${restart_delay:-0}
+
+
 if [[ $build_binary == "y" ]]; then
   # Build the binary using 'cargo install --path .'
   cargo install --locked --path . || exit 1
@@ -74,12 +79,22 @@ for validator_index in "${validator_indices[@]}"; do
 
   # Send the command to start the validator to the new window and capture output to the log file
   if [ "$validator_index" -eq 0 ]; then
-    tmux send-keys -t "devnet:window$validator_index" "$executable start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file --metrics" C-m
+    if [ "$restart_delay" -gt 0 ]; then
+      tmux send-keys -t "devnet:window$validator_index" "while true; do $executable start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file --metrics; echo '--- Restarting in $restart_delay seconds ---'; sleep $restart_delay; done" C-m
+    else
+      tmux send-keys -t "devnet:window$validator_index" "$executable start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file --metrics" C-m
+    fi
+
   else
     # Create a new window with a unique name
     window_index=$((validator_index + index_offset))
     tmux new-window -t "devnet:$window_index" -n "window$validator_index"
-    tmux send-keys -t "devnet:window$validator_index" "$executable start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
+
+    if [ "$restart_delay" -gt 0 ]; then
+      tmux send-keys -t "devnet:window$validator_index" "while true; do $executable start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file; echo '--- Restarting in $restart_delay seconds ---'; sleep $restart_delay; done" C-m
+    else
+      tmux send-keys -t "devnet:window$validator_index" "$executable start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
+    fi
   fi
 done
 
