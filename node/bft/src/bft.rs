@@ -1262,4 +1262,93 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_sync_bft_dag_at_bootup() -> Result<()> {
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters.
+        let max_gc_rounds = 1;
+        let committee_round = 0;
+        let commit_round = 2;
+        let current_round = commit_round + 1;
+
+        // Sample the current certificate and previous certificates.
+        let (_, certificates) = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_with_previous_certificates(
+            current_round,
+            rng,
+        );
+
+        // Initialize the committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+            committee_round,
+            vec![
+                certificates[0].author(),
+                certificates[1].author(),
+                certificates[2].author(),
+                certificates[3].author(),
+            ],
+            rng,
+        );
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Insert the certificates into the storage.
+        for certificate in certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+
+        // Get the leader certificate.
+        let leader = committee.get_leader(commit_round).unwrap();
+        let leader_certificate = storage.get_certificate_for_round_with_author(commit_round, leader).unwrap();
+
+        // Initialize the BFT.
+        let account = Account::new(rng)?;
+        let bft = BFT::new(account.clone(), storage, ledger.clone(), None, &[], None)?;
+
+        // Insert a mock DAG in the BFT.
+        *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(commit_round);
+
+        // Insert the previous certificates into the BFT.
+        for certificate in certificates.clone() {
+            assert!(bft.update_dag::<false>(certificate).await.is_ok());
+        }
+
+        // Commit the leader certificate.
+        bft.commit_leader_certificate::<false>(leader_certificate.clone()).await.unwrap();
+
+        // Simulate a bootup of the BFT.
+
+        // Initialize a new instance of storage.
+        let storage_2 = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Initialize a new instance of BFT.
+        let bootup_bft = BFT::new(account, storage_2, ledger, None, &[], None)?;
+
+        // Sync the BFT DAG at bootup.
+        bootup_bft.sync_bft_dag_at_bootup(certificates.clone()).await;
+
+        // Check that the BFT starts from the same last committed round.
+        assert_eq!(bft.dag.read().last_committed_round(), bootup_bft.dag.read().last_committed_round());
+
+        // Ensure that both BFTs have committed the leader certificate.
+        assert!(bft.dag.read().is_recently_committed(leader_certificate.round(), leader_certificate.id()));
+        assert!(bootup_bft.dag.read().is_recently_committed(leader_certificate.round(), leader_certificate.id()));
+
+        // Check the state of the bootup BFT.
+        for certificate in certificates {
+            let certificate_round = certificate.round();
+            let certificate_id = certificate.id();
+            // Check that the bootup BFT has committed the certificates.
+            assert!(bootup_bft.dag.read().is_recently_committed(certificate_round, certificate_id));
+            // Check that the bootup BFT does not contain the certificates in its graph, because
+            // it should not need to order them again in subsequent subdags.
+            assert!(!bootup_bft.dag.read().contains_certificate_in_round(certificate_round, certificate_id));
+        }
+
+        Ok(())
+    }
 }
