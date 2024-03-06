@@ -573,7 +573,7 @@ impl<N: Network> Primary<N> {
         let mut transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
 
         // Check that the transmission ids match and are not fee transactions.
-        if let Err(err) = transmissions.par_iter_mut().try_for_each(|(transmission_id, transmission)| {
+        if let Err(err) = cfg_iter_mut!(transmissions).try_for_each(|(transmission_id, transmission)| {
             // If the transmission is not well-formed, then return early.
             self.ledger.ensure_transmission_is_well_formed(*transmission_id, transmission)
         }) {
