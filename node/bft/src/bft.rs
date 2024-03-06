@@ -773,8 +773,8 @@ impl<N: Network> BFT<N> {
         // Process the request to sync the BFT DAG at bootup.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((leader_certificates, certificates)) = rx_sync_bft_dag_at_bootup.recv().await {
-                self_.sync_bft_dag_at_bootup(leader_certificates, certificates).await;
+            while let Some(certificates) = rx_sync_bft_dag_at_bootup.recv().await {
+                self_.sync_bft_dag_at_bootup(certificates).await;
             }
         });
 
@@ -798,11 +798,7 @@ impl<N: Network> BFT<N> {
     /// Note that there is no need to insert the certificates into the DAG, because these certificates
     /// already exist in the ledger and therefor do not need to be re-ordered into future
     /// committed subdags.
-    async fn sync_bft_dag_at_bootup(
-        &self,
-        _leader_certificates: Vec<(BatchCertificate<N>, IndexSet<Field<N>>)>,
-        certificates: Vec<BatchCertificate<N>>,
-    ) {
+    async fn sync_bft_dag_at_bootup(&self, certificates: Vec<BatchCertificate<N>>) {
         // Acquire the BFT write lock.
         let mut dag = self.dag.write();
 
