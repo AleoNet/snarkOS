@@ -489,11 +489,11 @@ impl<N: Network> BFT<N> {
         // Prepare the election certificate IDs.
         let election_certificate_ids = certificates.values().map(|c| c.id()).collect::<IndexSet<_>>();
         // Commit the leader certificate, and all previous leader certificates since the last committed round.
-        self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, false>(leader_certificate, election_certificate_ids).await
+        self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS>(leader_certificate, election_certificate_ids).await
     }
 
     /// Commits the leader certificate, and all previous leader certificates since the last committed round.
-    async fn commit_leader_certificate<const ALLOW_LEDGER_ACCESS: bool, const IS_SYNCING: bool>(
+    async fn commit_leader_certificate<const ALLOW_LEDGER_ACCESS: bool>(
         &self,
         leader_certificate: BatchCertificate<N>,
         election_certificate_ids: IndexSet<Field<N>>,
@@ -550,10 +550,6 @@ impl<N: Network> BFT<N> {
             let mut transmissions = IndexMap::new();
             // Start from the oldest leader certificate.
             for certificate in commit_subdag.values().flatten() {
-                // Update the DAG.
-                if IS_SYNCING {
-                    self.dag.write().commit(certificate, self.storage().max_gc_rounds());
-                }
                 // Retrieve the transmissions.
                 for transmission_id in certificate.transmission_ids() {
                     // If the transmission already exists in the map, skip it.
@@ -577,51 +573,49 @@ impl<N: Network> BFT<N> {
                     transmissions.insert(*transmission_id, transmission);
                 }
             }
-            // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
-            if !IS_SYNCING {
-                // Construct the subdag.
-                let subdag = Subdag::from(commit_subdag.clone(), election_certificate_ids.clone())?;
-                // Retrieve the anchor round.
-                let anchor_round = subdag.anchor_round();
-                // Retrieve the number of transmissions.
-                let num_transmissions = transmissions.len();
-                // Retrieve metadata about the subdag.
-                let subdag_metadata = subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
+            // Trigger consensus, as this will build a new block for the ledger.
+            // Construct the subdag.
+            let subdag = Subdag::from(commit_subdag.clone(), election_certificate_ids.clone())?;
+            // Retrieve the anchor round.
+            let anchor_round = subdag.anchor_round();
+            // Retrieve the number of transmissions.
+            let num_transmissions = transmissions.len();
+            // Retrieve metadata about the subdag.
+            let subdag_metadata = subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
 
-                // Ensure the subdag anchor round matches the leader round.
-                ensure!(
-                    anchor_round == leader_round,
-                    "BFT failed to commit - the subdag anchor round {anchor_round} does not match the leader round {leader_round}",
-                );
+            // Ensure the subdag anchor round matches the leader round.
+            ensure!(
+                anchor_round == leader_round,
+                "BFT failed to commit - the subdag anchor round {anchor_round} does not match the leader round {leader_round}",
+            );
 
-                // Trigger consensus.
-                if let Some(consensus_sender) = self.consensus_sender.get() {
-                    // Initialize a callback sender and receiver.
-                    let (callback_sender, callback_receiver) = oneshot::channel();
-                    // Send the subdag and transmissions to consensus.
-                    consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
-                    // Await the callback to continue.
-                    match callback_receiver.await {
-                        Ok(Ok(())) => (), // continue
-                        Ok(Err(e)) => {
-                            error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
-                            return Ok(());
-                        }
-                        Err(e) => {
-                            error!("BFT failed to receive the callback for round {anchor_round} - {e}");
-                            return Ok(());
-                        }
+            // Trigger consensus.
+            if let Some(consensus_sender) = self.consensus_sender.get() {
+                // Initialize a callback sender and receiver.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Send the subdag and transmissions to consensus.
+                consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
+                // Await the callback to continue.
+                match callback_receiver.await {
+                    Ok(Ok(())) => (), // continue
+                    Ok(Err(e)) => {
+                        error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        error!("BFT failed to receive the callback for round {anchor_round} - {e}");
+                        return Ok(());
                     }
                 }
+            }
 
-                info!(
-                    "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
-                );
-                // Update the DAG, as the subdag was successfully included into a block.
-                let mut dag_write = self.dag.write();
-                for certificate in commit_subdag.values().flatten() {
-                    dag_write.commit(certificate, self.storage().max_gc_rounds());
-                }
+            info!(
+                "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
+            );
+            // Update the DAG, as the subdag was successfully included into a block.
+            let mut dag_write = self.dag.write();
+            for certificate in commit_subdag.values().flatten() {
+                dag_write.commit(certificate, self.storage().max_gc_rounds());
             }
             // Update the last election certificate IDs.
             // TODO (howardwu): This is currently writing the *latest* election certificate IDs,
@@ -633,6 +627,10 @@ impl<N: Network> BFT<N> {
                 *last_election_certificate_ids = election_certificate_ids.clone();
             }
         }
+
+        // Perform garbage collection based on the latest committed leader round.
+        // self.storage().garbage_collect_certificates(latest_leader_round);
+
         Ok(())
     }
 
@@ -1195,6 +1193,73 @@ mod tests {
         let result = bft.order_dag_with_dfs::<false>(certificate);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), error_msg);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_bft_gc_on_commit() -> Result<()> {
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters.
+        let max_gc_rounds = 1;
+        let committee_round = 0;
+        let commit_round = 2;
+        let current_round = commit_round + 1;
+
+        // Sample the certificates.
+        let (_, certificates) = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_with_previous_certificates(
+            current_round,
+            rng,
+        );
+
+        // Initialize the committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+            committee_round,
+            vec![
+                certificates[0].author(),
+                certificates[1].author(),
+                certificates[2].author(),
+                certificates[3].author(),
+            ],
+            rng,
+        );
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+
+        // Initialize the storage.
+        let transmissions = Arc::new(BFTMemoryService::new());
+        let storage = Storage::new(ledger.clone(), transmissions, max_gc_rounds);
+        // Insert the certificates into the storage.
+        for certificate in certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+
+        // Get the leader certificate.
+        let leader = committee.get_leader(commit_round).unwrap();
+        let leader_certificate = storage.get_certificate_for_round_with_author(commit_round, leader).unwrap();
+
+        // Initialize the BFT.
+        let account = Account::new(rng)?;
+        let bft = BFT::new(account, storage.clone(), ledger, None, &[], None)?;
+        // Insert a mock DAG in the BFT.
+        *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(commit_round);
+
+        // Ensure that the `gc_round` has not been updated yet.
+        assert_eq!(bft.storage().gc_round(), committee_round.saturating_sub(max_gc_rounds));
+
+        // Insert the certificates into the BFT.
+        for certificate in certificates {
+            assert!(bft.update_dag::<false>(certificate).await.is_ok());
+        }
+
+        // Commit the leader certificate.
+        bft.commit_leader_certificate::<false>(leader_certificate, Default::default()).await.unwrap();
+
+        // Ensure that the `gc_round` has been updated.
+        assert_eq!(bft.storage().gc_round(), commit_round - max_gc_rounds);
+
         Ok(())
     }
 }
