@@ -144,6 +144,10 @@ pub struct Start {
     #[clap(long)]
     /// If development mode is enabled, specify the custom bonded balances as a json object. (default: None)
     dev_bonded_balances: Option<BondedBalances>,
+
+    #[clap(long = "allow-outside-peers")]
+    /// If the flag is set, the validator will allow untrusted peers to connect
+    allow_outside_peers: bool,
 }
 
 impl Start {
@@ -527,7 +531,7 @@ impl Start {
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_outside_peers).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }

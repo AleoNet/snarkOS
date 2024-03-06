@@ -95,6 +95,8 @@ pub struct InnerRouter<N: Network> {
     handles: Mutex<Vec<JoinHandle<()>>>,
     /// The boolean flag for the development mode.
     is_dev: bool,
+    /// If the flag is set, the node will not engage in P2P gossip to request more peers.
+    allow_outside_peers: bool,
 }
 
 impl<N: Network> Router<N> {
@@ -116,6 +118,7 @@ impl<N: Network> Router<N> {
         trusted_peers: &[SocketAddr],
         max_peers: u16,
         is_dev: bool,
+        allow_outside_peers: bool,
     ) -> Result<Self> {
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(node_ip, max_peers));
@@ -133,6 +136,7 @@ impl<N: Network> Router<N> {
             restricted_peers: Default::default(),
             handles: Default::default(),
             is_dev,
+            allow_outside_peers,
         })))
     }
 }
@@ -251,6 +255,11 @@ impl<N: Network> Router<N> {
         self.is_dev
     }
 
+    /// Returns `true` if the node is not engaging in P2P gossip to request more peers.
+    pub fn allow_outside_peers(&self) -> bool {
+        self.allow_outside_peers
+    }
+
     /// Returns the listener IP address from the (ambiguous) peer address.
     pub fn resolve_to_listener(&self, peer_addr: &SocketAddr) -> Option<SocketAddr> {
         self.resolver.get_listener(peer_addr)
@@ -293,6 +302,11 @@ impl<N: Network> Router<N> {
             .get(ip)
             .map(|time| time.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS)
             .unwrap_or(false)
+    }
+
+    /// Returns `true` if the given IP is trusted.
+    pub fn is_trusted(&self, ip: &SocketAddr) -> bool {
+        self.trusted_peers.contains(ip)
     }
 
     /// Returns the maximum number of connected peers.

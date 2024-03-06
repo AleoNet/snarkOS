@@ -107,6 +107,12 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             return;
         }
 
+        let is_validator = self.router().node_type().is_validator();
+        // Skip if the node is not requesting peers.
+        if is_validator && !self.router().allow_outside_peers() {
+            return;
+        }
+
         // Retrieve the trusted peers.
         let trusted = self.router().trusted_peers();
         // Retrieve the bootstrap peers.
@@ -216,9 +222,12 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             for peer_ip in self.router().candidate_peers().into_iter().choose_multiple(rng, num_deficient) {
                 self.router().connect(peer_ip);
             }
-            // Request more peers from the connected peers.
-            for peer_ip in self.router().connected_peers().into_iter().choose_multiple(rng, 3) {
-                self.send(peer_ip, Message::PeerRequest(PeerRequest));
+            let is_validator = self.router().node_type().is_validator();
+            if !is_validator || self.router().allow_outside_peers() {
+                // Request more peers from the connected peers.
+                for peer_ip in self.router().connected_peers().into_iter().choose_multiple(rng, 3) {
+                    self.send(peer_ip, Message::PeerRequest(PeerRequest));
+                }
             }
         }
     }
