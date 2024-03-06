@@ -789,51 +789,24 @@ impl<N: Network> BFT<N> {
         });
     }
 
-    /// Syncs the BFT DAG with the given leader certificates and batch certificates.
+    /// Syncs the BFT DAG with the given batch certificates. These batch certificates **must**
+    /// already exist in the ledger.
     ///
-    /// This method starts by inserting all certificates (except the latest leader certificate)
-    /// into the DAG. Then, it commits all leader certificates (except the latest leader certificate).
-    /// Finally, it updates the DAG with the latest leader certificate.
+    /// This method commits all the certificates into the dag.
+    /// Note that there is no need to insert the certificates into the DAG, because these certificates
+    /// already exist in the ledger and therefor do not need to be re-ordered into future
+    /// committed subdags.
     async fn sync_bft_dag_at_bootup(
         &self,
-        leader_certificates: Vec<BatchCertificate<N>>,
+        _leader_certificates: Vec<BatchCertificate<N>>,
         certificates: Vec<BatchCertificate<N>>,
     ) {
-        // Split the leader certificates into past leader certificates and the latest leader certificate.
-        let (past_leader_certificates, leader_certificate) = {
-            // Compute the penultimate index.
-            let index = leader_certificates.len().saturating_sub(1);
-            // Split the leader certificates.
-            let (past, latest) = leader_certificates.split_at(index);
-            debug_assert!(latest.len() == 1, "There should only be one latest leader certificate");
-            // Retrieve the latest leader certificate.
-            match latest.first() {
-                Some(leader_certificate) => (past, leader_certificate.clone()),
-                // If there is no latest leader certificate, return early.
-                None => return,
-            }
-        };
-        {
-            // Acquire the BFT write lock.
-            let mut dag = self.dag.write();
-            // Iterate over the certificates.
-            for certificate in certificates {
-                // If the certificate is not the latest leader certificate, insert it.
-                if leader_certificate.id() != certificate.id() {
-                    // Insert the certificate into the DAG.
-                    dag.insert(certificate);
-                }
-            }
+        // Acquire the BFT write lock.
+        let mut dag = self.dag.write();
 
-            // Iterate over the leader certificates.
-            for leader_certificate in past_leader_certificates {
-                // Commit the leader certificate.
-                dag.commit(leader_certificate, self.storage().max_gc_rounds());
-            }
-        }
-        // Commit the latest leader certificate.
-        if let Err(e) = self.commit_leader_certificate::<true, true>(leader_certificate).await {
-            error!("BFT failed to update the DAG with the latest leader certificate - {e}");
+        // Commit all the certificates excluding the latest leader certificate.
+        for certificate in certificates {
+            dag.commit(&certificate, self.storage().max_gc_rounds());
         }
     }
 
