@@ -813,6 +813,7 @@ mod tests {
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
+        console::account::{Address, PrivateKey},
         ledger::{
             committee::Committee,
             narwhal::batch_certificate::test_helpers::{sample_batch_certificate, sample_batch_certificate_for_round},
@@ -821,7 +822,7 @@ mod tests {
     };
 
     use anyhow::Result;
-    use indexmap::IndexSet;
+    use indexmap::{IndexMap, IndexSet};
     use std::sync::{atomic::Ordering, Arc};
 
     type CurrentNetwork = snarkvm::console::network::MainnetV0;
@@ -1341,9 +1342,7 @@ mod tests {
         2. Run a separate bootup BFT that syncs with a set of pre shutdown certificates, and then commits a second leader normally over a set of post shutdown certificates.
         3. Observe that the uninterrupted BFT and the bootup BFT end in the same state.
         */
-
         use indexmap::{IndexMap, IndexSet};
-        use snarkvm::console::account::{Address, PrivateKey};
 
         let rng = &mut TestRng::default();
 
@@ -1562,9 +1561,6 @@ mod tests {
         2. Add post shutdown certificates to the bootup BFT.
         2. Observe that in the commit subdag of the second leader certificate, there are no repeated vertices from the pre shutdown certificates.
         */
-
-        use indexmap::{IndexMap, IndexSet};
-        use snarkvm::console::account::{Address, PrivateKey};
 
         let rng = &mut TestRng::default();
 
