@@ -1555,4 +1555,145 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_sync_bft_dag_at_bootup_dfs() -> Result<()> {
+
+        /* 
+        BFT bootup unit test - 
+        1. Run a bootup BFT that syncs with a set of pre shutdown certificates. 
+        2. Add post shutdown certificates to the bootup BFT. 
+        2. Observe that in the commit subdag of the second leader certificate, there are no repeated vertices from the pre shutdown certificates. 
+        */
+
+        use snarkvm::console::{
+            account::PrivateKey,
+            account::Address, 
+        };
+        use indexmap::{IndexMap, IndexSet};
+
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters.
+        let max_gc_rounds = snarkvm::ledger::narwhal::BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64; 
+        let committee_round = 0;
+        let commit_round = 2;
+        let current_round = commit_round + 1;
+        let next_round = current_round + 1; 
+
+        // Sample 5 rounds of batch certificates starting at the genesis round from a static set of 4 authors.  
+        let (round_to_certificates_map, committee) = {
+            let private_keys = vec![
+                PrivateKey::new(rng).unwrap(), 
+                PrivateKey::new(rng).unwrap(), 
+                PrivateKey::new(rng).unwrap(), 
+                PrivateKey::new(rng).unwrap()
+            ]; 
+            let addresses = vec![
+                Address::try_from(private_keys[0])?, 
+                Address::try_from(private_keys[1])?,
+                Address::try_from(private_keys[2])?,
+                Address::try_from(private_keys[3])?,
+            ]; 
+            let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+                committee_round,
+                addresses, 
+                rng,
+            );
+            // Initialize a mapping from the round number to the set of batch certificates in the round. 
+            let mut round_to_certificates_map: IndexMap<u64, IndexSet<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>>> = IndexMap::new();
+            let mut previous_certificates = IndexSet::with_capacity(4);
+            // Initialize the genesis batch certificates. 
+            for _ in 0..4 {
+                previous_certificates.insert(sample_batch_certificate(rng));
+            }
+            for round in 0..=commit_round+2 { 
+                let mut current_certificates = IndexSet::new(); 
+                let previous_certificate_ids: IndexSet<_> = if round == 0 || round == 1 {
+                    IndexSet::new() 
+                } else {
+                    previous_certificates.iter().map(|c| c.id()).collect()
+                };
+                let transmission_ids = snarkvm::ledger::narwhal::transmission_id::test_helpers::sample_transmission_ids(rng).into_iter().collect::<IndexSet<_>>();
+                let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+                let committee_id = committee.id(); 
+                for i in 0..4 { 
+                    let batch_header = snarkvm::ledger::narwhal::BatchHeader::new(&private_keys[i], round, timestamp, committee_id, transmission_ids.clone(), previous_certificate_ids.clone(), rng).unwrap(); 
+                    let mut signatures = IndexSet::with_capacity(4);
+                    for j in 0..4 {
+                        if i != j {
+                            signatures.insert(private_keys[j].sign(&[batch_header.batch_id()], rng).unwrap());
+                        }
+                    }
+                    let certificate = snarkvm::ledger::narwhal::BatchCertificate::from(batch_header, signatures).unwrap(); 
+                    current_certificates.insert(certificate); 
+                }
+                // Update the mapping. 
+                round_to_certificates_map.insert(round, current_certificates.clone()); 
+                previous_certificates = current_certificates.clone(); 
+            }
+            (round_to_certificates_map, committee)
+        };
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Get the leaders for the next 2 commit rounds. 
+        let leader = committee.get_leader(commit_round).unwrap(); 
+        let next_leader = committee.get_leader(next_round).unwrap(); 
+        // Insert the pre shutdown certificates into the storage. 
+        let mut pre_shutdown_certificates: Vec<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>> = Vec::new();
+        for i in 1..=commit_round { 
+            let certificates = (*round_to_certificates_map.get(&i).unwrap()).clone(); 
+            if i == commit_round { // Only insert the leader certificate for the commit round. 
+                let leader_certificate = certificates.iter().find(|certificate| certificate.author() == leader).clone();
+                if let Some(c) = leader_certificate{ 
+                    pre_shutdown_certificates.push(c.clone()); 
+                }
+                continue; 
+            }
+            pre_shutdown_certificates.extend(certificates); 
+        }
+        for certificate in pre_shutdown_certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+        // Initialize the bootup BFT. 
+        let account = Account::new(rng)?;
+        let bootup_bft = BFT::new(account.clone(), storage.clone(), ledger.clone(), None, &[], None)?;
+        // Insert a mock DAG in the BFT without bootup.
+        *bootup_bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(0);
+        // Sync the BFT DAG at bootup. 
+        bootup_bft.sync_bft_dag_at_bootup(pre_shutdown_certificates.clone()).await;
+
+        // Insert the post shutdown certificates into the storage. 
+        let mut post_shutdown_certificates: Vec<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>> = Vec::new();
+        for j in commit_round..=commit_round+2 { 
+            let certificate = (*round_to_certificates_map.get(&j).unwrap()).clone(); 
+            post_shutdown_certificates.extend(certificate); 
+        }
+        for certificate in post_shutdown_certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+
+        // Insert the post shutdown certificates into the DAG. 
+        for certificate in post_shutdown_certificates.clone() {
+            assert!(bootup_bft.update_dag::<false>(certificate).await.is_ok());
+        }
+        
+        // Get the next leader certificate to commit. 
+        let next_leader_certificate = storage.get_certificate_for_round_with_author(next_round, next_leader).unwrap();
+        let commit_subdag = bootup_bft.order_dag_with_dfs::<false>(next_leader_certificate).unwrap();
+        let committed_certificates = commit_subdag.values().flatten();
+
+        // Check that none of the certificates synced from the bootup appear in the subdag for the next commit round.
+        for pre_shutdown_certificate in pre_shutdown_certificates.clone() { 
+            for committed_certificate in committed_certificates.clone(){ 
+                assert_ne!(pre_shutdown_certificate.id(), committed_certificate.id());
+            }
+        }
+        Ok(())
+
+    }
 }
