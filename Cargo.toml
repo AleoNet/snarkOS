@@ -119,7 +119,7 @@ version = "=2.2.7"
 path = "./node/tcp"
 version = "=2.2.7"
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"
 
 [dev-dependencies.rusty-hook]
