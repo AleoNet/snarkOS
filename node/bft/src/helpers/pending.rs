@@ -13,12 +13,15 @@
 // limitations under the License.
 
 use crate::MAX_FETCH_TIMEOUT_IN_MS;
+use snarkos_node_bft_ledger_service::LedgerService;
+use snarkvm::{console::network::Network, ledger::committee::Committee};
 
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
     net::SocketAddr,
+    sync::Arc,
 };
 use time::OffsetDateTime;
 use tokio::sync::oneshot;
@@ -32,12 +35,28 @@ pub const NUM_REDUNDANT_REQUESTS: usize = 10;
 /// We ensure that we don't truncate `MAX_FETCH_TIMEOUT_IN_MS` when converting to seconds.
 const CALLBACK_EXPIRATION_IN_SECS: i64 = (MAX_FETCH_TIMEOUT_IN_MS as i64 + (1000 - 1)) / 1000;
 
+/// Returns the maximum number of redundant requests for the number of validators in the specified round.
+pub fn max_redundant_requests<N: Network>(ledger: Arc<dyn LedgerService<N>>, round: u64) -> usize {
+    // Determine the number of validators in the committee lookback for the given round.
+    let num_validators = ledger
+        .get_committee_lookback_for_round(round)
+        .map(|committee| committee.num_members())
+        .ok()
+        .unwrap_or(Committee::<N>::MAX_COMMITTEE_SIZE as usize);
+
+    // Note: It is adequate to set this value to the availability threshold,
+    // as with high probability one will respond honestly (in the best and worst case
+    // with stake spread across the validators evenly and unevenly, respectively).
+    1 + num_validators.saturating_div(3)
+}
+
 #[derive(Debug)]
 pub struct Pending<T: PartialEq + Eq + Hash, V: Clone> {
     /// The map of pending `items` to `peer IPs` that have the item.
     pending: RwLock<HashMap<T, HashSet<SocketAddr>>>,
     /// The optional callback queue.
-    callbacks: Mutex<HashMap<T, Vec<(oneshot::Sender<V>, i64)>>>,
+    /// Each callback has a timeout and a flag indicating if it is associated with a sent request.
+    callbacks: Mutex<HashMap<T, Vec<(oneshot::Sender<V>, i64, bool)>>>,
 }
 
 impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Default for Pending<T, V> {
@@ -87,19 +106,40 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         self.callbacks.lock().get(&item).map_or(0, |callbacks| callbacks.len())
     }
 
+    /// Returns the number of pending sent requests for the specified `item`.
+    pub fn num_sent_requests(&self, item: impl Into<T>) -> usize {
+        let item = item.into();
+        // Clear the callbacks that have expired.
+        self.clear_expired_callbacks_for_item(item);
+        // Return the number of live callbacks.
+        self.callbacks
+            .lock()
+            .get(&item)
+            .map_or(0, |callbacks| callbacks.iter().filter(|(_, _, request_sent)| *request_sent).count())
+    }
+
     /// Inserts the specified `item` and `peer IP` to the pending queue,
     /// returning `true` if the `peer IP` was newly-inserted into the entry for the `item`.
     ///
     /// In addition, an optional `callback` may be provided, that is triggered upon removal.
     /// Note: The callback, if provided, is **always** inserted into the callback queue.
-    pub fn insert(&self, item: impl Into<T>, peer_ip: SocketAddr, callback: Option<oneshot::Sender<V>>) -> bool {
+    pub fn insert(
+        &self,
+        item: impl Into<T>,
+        peer_ip: SocketAddr,
+        callback: Option<(oneshot::Sender<V>, bool)>,
+    ) -> bool {
         let item = item.into();
         // Insert the peer IP into the pending queue.
         let result = self.pending.write().entry(item).or_default().insert(peer_ip);
 
         // If a callback is provided, insert it into the callback queue.
-        if let Some(callback) = callback {
-            self.callbacks.lock().entry(item).or_default().push((callback, OffsetDateTime::now_utc().unix_timestamp()));
+        if let Some((callback, request_sent)) = callback {
+            self.callbacks.lock().entry(item).or_default().push((
+                callback,
+                OffsetDateTime::now_utc().unix_timestamp(),
+                request_sent,
+            ));
         }
 
         // Clear the callbacks that have expired.
@@ -120,7 +160,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         if let Some(callbacks) = self.callbacks.lock().remove(&item) {
             if let Some(callback_value) = callback_value {
                 // Send a notification to the callback.
-                for (callback, _) in callbacks {
+                for (callback, _, _) in callbacks {
                     callback.send(callback_value.clone()).ok();
                 }
             }
@@ -139,7 +179,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
             // Fetch the current timestamp.
             let now = OffsetDateTime::now_utc().unix_timestamp();
             // Remove the callbacks that have expired.
-            callback_values.retain(|(_, timestamp)| now - *timestamp <= CALLBACK_EXPIRATION_IN_SECS);
+            callback_values.retain(|(_, timestamp, _)| now - *timestamp <= CALLBACK_EXPIRATION_IN_SECS);
 
             // If there are no more remaining callbacks for the item, remove the item from the pending queue.
             if callback_values.is_empty() {
@@ -169,6 +209,8 @@ mod tests {
     use std::{thread, time::Duration};
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
+
+    const ITERATIONS: usize = 100;
 
     #[test]
     fn test_pending() {
@@ -253,13 +295,13 @@ mod tests {
         let (callback_sender_3, _) = oneshot::channel();
 
         // Insert the commitments.
-        assert!(pending.insert(commitment_1, addr_1, Some(callback_sender_1)));
-        assert!(pending.insert(commitment_1, addr_2, Some(callback_sender_2)));
+        assert!(pending.insert(commitment_1, addr_1, Some((callback_sender_1, true))));
+        assert!(pending.insert(commitment_1, addr_2, Some((callback_sender_2, true))));
 
         // Sleep for a few seconds.
         thread::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64 - 1));
 
-        assert!(pending.insert(commitment_1, addr_3, Some(callback_sender_3)));
+        assert!(pending.insert(commitment_1, addr_3, Some((callback_sender_3, true))));
 
         // Check that the number of callbacks has not changed.
         assert_eq!(pending.num_callbacks(commitment_1), 3);
@@ -275,6 +317,37 @@ mod tests {
 
         // Ensure that the expired callbacks have been removed.
         assert_eq!(pending.num_callbacks(commitment_1), 0);
+    }
+
+    #[test]
+    fn test_num_sent_requests() {
+        let rng = &mut TestRng::default();
+
+        // Initialize the ready queue.
+        let pending = Pending::<TransmissionID<CurrentNetwork>, ()>::new();
+
+        for _ in 0..ITERATIONS {
+            // Generate a commitment.
+            let commitment = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+            // Check if the number of sent requests is correct.
+            let mut expected_num_sent_requests = 0;
+            for i in 0..ITERATIONS {
+                // Generate a peer address.
+                let addr = SocketAddr::from(([127, 0, 0, 1], i as u16));
+                // Initialize a callback.
+                let (callback_sender, _) = oneshot::channel();
+                // Randomly determine if the callback is associated with a sent request.
+                let is_sent_request = rng.gen();
+                // Increment the expected number of sent requests.
+                if is_sent_request {
+                    expected_num_sent_requests += 1;
+                }
+                // Insert the commitment.
+                assert!(pending.insert(commitment, addr, Some((callback_sender, is_sent_request))));
+            }
+            // Ensure that the number of sent requests is correct.
+            assert_eq!(pending.num_sent_requests(commitment), expected_num_sent_requests);
+        }
     }
 
     #[test]
@@ -303,9 +376,9 @@ mod tests {
         let (callback_sender_3, _) = oneshot::channel();
 
         // Insert the commitments.
-        assert!(pending.insert(commitment_1, addr_1, Some(callback_sender_1)));
-        assert!(pending.insert(commitment_1, addr_2, Some(callback_sender_2)));
-        assert!(pending.insert(commitment_2, addr_3, Some(callback_sender_3)));
+        assert!(pending.insert(commitment_1, addr_1, Some((callback_sender_1, true))));
+        assert!(pending.insert(commitment_1, addr_2, Some((callback_sender_2, true))));
+        assert!(pending.insert(commitment_2, addr_3, Some((callback_sender_3, true))));
 
         // Ensure that the items have not been expired yet.
         assert_eq!(pending.num_callbacks(commitment_1), 2);

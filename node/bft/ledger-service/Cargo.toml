@@ -18,7 +18,7 @@ edition = "2021"
 
 [features]
 default = [ ]
-ledger = [ "rand", "tokio", "tracing" ]
+ledger = [ "parking_lot", "rand", "tokio", "tracing" ]
 ledger-write = [ ]
 mock = [ "parking_lot", "tracing" ]
 prover = [ ]
@@ -31,6 +31,9 @@ version = "0.1"
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
+
+[dependencies.lru]
+version = "0.12"
 
 [dependencies.parking_lot]
 version = "0.12"

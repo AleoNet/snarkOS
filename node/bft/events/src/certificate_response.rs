@@ -86,11 +86,20 @@ pub mod prop_tests {
         (Just(committee.clone()), any::<Selector>(), vec(any_transmission(), 0..16))
             .prop_map(|(committee, selector, transmissions)| {
                 let mut rng = TestRng::default();
-                let CommitteeContext(_, ValidatorSet(validators)) = committee;
+                let CommitteeContext(committee, ValidatorSet(validators)) = committee;
                 let signer = selector.select(validators);
                 let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
 
-                BatchHeader::new(&signer.private_key, 0, now(), transmission_ids, Default::default(), &mut rng).unwrap()
+                BatchHeader::new(
+                    &signer.private_key,
+                    0,
+                    now(),
+                    committee.id(),
+                    transmission_ids,
+                    Default::default(),
+                    &mut rng,
+                )
+                .unwrap()
             })
             .boxed()
     }
