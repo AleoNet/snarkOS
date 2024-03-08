@@ -1357,12 +1357,10 @@ mod tests {
     #[tracing_test::traced_test]
     async fn test_sync_bft_dag_at_bootup_shutdown() -> Result<()> {
         /*
-        BFT bootup unit test -
         1. Run one uninterrupted BFT on a set of certificates for 2 leader commits.
         2. Run a separate bootup BFT that syncs with a set of pre shutdown certificates, and then commits a second leader normally over a set of post shutdown certificates.
         3. Observe that the uninterrupted BFT and the bootup BFT end in the same state.
         */
-        use indexmap::{IndexMap, IndexSet};
 
         let rng = &mut TestRng::default();
 
@@ -1576,7 +1574,6 @@ mod tests {
     #[tracing_test::traced_test]
     async fn test_sync_bft_dag_at_bootup_dfs() -> Result<()> {
         /*
-        BFT bootup unit test -
         1. Run a bootup BFT that syncs with a set of pre shutdown certificates.
         2. Add post shutdown certificates to the bootup BFT.
         2. Observe that in the commit subdag of the second leader certificate, there are no repeated vertices from the pre shutdown certificates.
