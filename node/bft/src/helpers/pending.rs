@@ -26,11 +26,6 @@ use std::{
 use time::OffsetDateTime;
 use tokio::sync::oneshot;
 
-#[cfg(not(test))]
-pub const NUM_REDUNDANT_REQUESTS: usize = 2;
-#[cfg(test)]
-pub const NUM_REDUNDANT_REQUESTS: usize = 10;
-
 /// The maximum number of seconds to wait before expiring a callback.
 /// We ensure that we don't truncate `MAX_FETCH_TIMEOUT_IN_MS` when converting to seconds.
 const CALLBACK_EXPIRATION_IN_SECS: i64 = (MAX_FETCH_TIMEOUT_IN_MS as i64 + (1000 - 1)) / 1000;
