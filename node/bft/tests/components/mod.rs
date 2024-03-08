@@ -59,12 +59,15 @@ pub fn sample_storage<N: Network>(ledger: Arc<TranslucentLedgerService<N, Consen
 }
 
 /// Samples a new gateway with the given ledger.
-pub fn sample_gateway<N: Network>(ledger: Arc<TranslucentLedgerService<N, ConsensusMemory<N>>>) -> Gateway<N> {
+pub fn sample_gateway<N: Network>(
+    storage: Storage<N>,
+    ledger: Arc<TranslucentLedgerService<N, ConsensusMemory<N>>>,
+) -> Gateway<N> {
     let num_nodes: u16 = ledger.current_committee().unwrap().num_members().try_into().unwrap();
     let (accounts, _committee) = primary::new_test_committee(num_nodes);
     let account = Account::from_str(&accounts[0].private_key().to_string()).unwrap();
     // Initialize the gateway.
-    Gateway::new(account, ledger, None, &[], None).unwrap()
+    Gateway::new(account, storage, ledger, None, &[], None).unwrap()
 }
 
 /// Samples a new worker with the given ledger.
@@ -72,7 +75,7 @@ pub fn sample_worker<N: Network>(id: u8, ledger: Arc<TranslucentLedgerService<N,
     // Sample a storage.
     let storage = sample_storage(ledger.clone());
     // Sample a gateway.
-    let gateway = sample_gateway(ledger.clone());
+    let gateway = sample_gateway(storage.clone(), ledger.clone());
     // Sample a dummy proposed batch.
     let proposed_batch = Arc::new(RwLock::new(None));
     // Construct the worker instance.
