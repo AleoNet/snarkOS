@@ -14,6 +14,8 @@
 
 #[allow(dead_code)]
 mod common;
+#[allow(dead_code)]
+mod components;
 
 use crate::common::primary::{TestNetwork, TestNetworkConfig};
 use deadline::deadline;

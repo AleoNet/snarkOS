@@ -519,6 +519,8 @@ impl<N: Network> BFT<N> {
         &self,
         leader_certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        // Fetch the leader round.
+        let latest_leader_round = leader_certificate.round();
         // Determine the list of all previous leader certificates since the last committed round.
         // The order of the leader certificates is from **newest** to **oldest**.
         let mut leader_certificates = vec![leader_certificate.clone()];
@@ -656,6 +658,12 @@ impl<N: Network> BFT<N> {
                 }
             }
         }
+
+        // Perform garbage collection based on the latest committed leader round if the node is not syncing.
+        if !IS_SYNCING {
+            self.storage().garbage_collect_certificates(latest_leader_round);
+        }
+
         Ok(())
     }
 
@@ -1251,6 +1259,73 @@ mod tests {
         let result = bft.order_dag_with_dfs::<false>(certificate);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), error_msg);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_bft_gc_on_commit() -> Result<()> {
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters.
+        let max_gc_rounds = 1;
+        let committee_round = 0;
+        let commit_round = 2;
+        let current_round = commit_round + 1;
+
+        // Sample the certificates.
+        let (_, certificates) = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_with_previous_certificates(
+            current_round,
+            rng,
+        );
+
+        // Initialize the committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+            committee_round,
+            vec![
+                certificates[0].author(),
+                certificates[1].author(),
+                certificates[2].author(),
+                certificates[3].author(),
+            ],
+            rng,
+        );
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+
+        // Initialize the storage.
+        let transmissions = Arc::new(BFTMemoryService::new());
+        let storage = Storage::new(ledger.clone(), transmissions, max_gc_rounds);
+        // Insert the certificates into the storage.
+        for certificate in certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+
+        // Get the leader certificate.
+        let leader = committee.get_leader(commit_round).unwrap();
+        let leader_certificate = storage.get_certificate_for_round_with_author(commit_round, leader).unwrap();
+
+        // Initialize the BFT.
+        let account = Account::new(rng)?;
+        let bft = BFT::new(account, storage.clone(), ledger, None, &[], None)?;
+        // Insert a mock DAG in the BFT.
+        *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(commit_round);
+
+        // Ensure that the `gc_round` has not been updated yet.
+        assert_eq!(bft.storage().gc_round(), committee_round.saturating_sub(max_gc_rounds));
+
+        // Insert the certificates into the BFT.
+        for certificate in certificates {
+            assert!(bft.update_dag::<false>(certificate).await.is_ok());
+        }
+
+        // Commit the leader certificate.
+        bft.commit_leader_certificate::<false, false>(leader_certificate).await.unwrap();
+
+        // Ensure that the `gc_round` has been updated.
+        assert_eq!(bft.storage().gc_round(), commit_round - max_gc_rounds);
+
         Ok(())
     }
 }
