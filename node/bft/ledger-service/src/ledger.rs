@@ -41,6 +41,7 @@ use std::{
 const COMMITTEE_CACHE_SIZE: usize = 16;
 
 /// A core ledger service.
+#[allow(clippy::type_complexity)]
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
