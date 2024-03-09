@@ -50,7 +50,7 @@ impl<N: Network> Node<N> {
         genesis: Block<N>,
         cdn: Option<String>,
         storage_mode: StorageMode,
-        dev_traffic: bool,
+        dev_txs: bool,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
             Validator::new(
@@ -64,7 +64,7 @@ impl<N: Network> Node<N> {
                 genesis,
                 cdn,
                 storage_mode,
-                dev_traffic,
+                dev_txs,
             )
             .await?,
         )))
