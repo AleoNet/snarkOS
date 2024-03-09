@@ -807,10 +807,9 @@ impl<N: Network> BFT<N> {
     /// Syncs the BFT DAG with the given batch certificates. These batch certificates **must**
     /// already exist in the ledger.
     ///
-    /// This method commits all the certificates into the dag.
+    /// This method commits all the certificates into the DAG.
     /// Note that there is no need to insert the certificates into the DAG, because these certificates
-    /// already exist in the ledger and therefor do not need to be re-ordered into future
-    /// committed subdags.
+    /// already exist in the ledger and therefore do not need to be re-ordered into future committed subdags.
     async fn sync_bft_dag_at_bootup(&self, certificates: Vec<BatchCertificate<N>>) {
         // Acquire the BFT write lock.
         let mut dag = self.dag.write();
