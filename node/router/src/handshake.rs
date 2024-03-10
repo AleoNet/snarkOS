@@ -265,9 +265,9 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection request from '{peer_ip}' (already connected)")
         }
         // Only allow trusted peers to connect if we are a validator
-        // (unless allow_outside_peers is set)
+        // (unless allow_external_peers is set)
         let is_validator = self.node_type().is_validator();
-        if is_validator && !self.allow_outside_peers() && !self.is_trusted(&peer_ip) {
+        if is_validator && !self.allow_external_peers() && !self.is_trusted(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (untrusted)")
         }
         // Ensure the peer is not restricted.
