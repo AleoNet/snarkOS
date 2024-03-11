@@ -335,6 +335,7 @@ impl<N: Network> Consensus<N> {
         // Iterate over the transactions.
         for transaction in transactions.into_iter() {
             let transaction_id = transaction.id();
+            info!("tx_propagation_logging-add_unconfirmed_transaction- Added transaction to mempool. Transaction ID: \"{}\"", fmt_id(transaction_id));
             trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
             // Send the unconfirmed transaction to the primary.
             if let Err(e) =
