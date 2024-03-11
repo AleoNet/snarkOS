@@ -63,7 +63,7 @@ pub fn init_consensus_channels<N: Network>() -> (ConsensusSender<N>, ConsensusRe
 pub struct BFTSender<N: Network> {
     pub tx_primary_round: mpsc::Sender<(u64, oneshot::Sender<bool>)>,
     pub tx_primary_certificate: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
-    pub tx_sync_bft_dag_at_bootup: mpsc::Sender<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
+    pub tx_sync_bft_dag_at_bootup: mpsc::Sender<Vec<BatchCertificate<N>>>,
     pub tx_sync_bft: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
 }
 
@@ -103,7 +103,7 @@ impl<N: Network> BFTSender<N> {
 pub struct BFTReceiver<N: Network> {
     pub rx_primary_round: mpsc::Receiver<(u64, oneshot::Sender<bool>)>,
     pub rx_primary_certificate: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
-    pub rx_sync_bft_dag_at_bootup: mpsc::Receiver<(Vec<BatchCertificate<N>>, Vec<BatchCertificate<N>>)>,
+    pub rx_sync_bft_dag_at_bootup: mpsc::Receiver<Vec<BatchCertificate<N>>>,
     pub rx_sync_bft: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
 }
 
