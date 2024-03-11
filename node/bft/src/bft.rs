@@ -857,10 +857,7 @@ impl<N: Network> BFT<N> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        helpers::{now, Storage},
-        BFT,
-    };
+    use crate::{helpers::Storage, BFT, MAX_LEADER_CERTIFICATE_DELAY_IN_SECS};
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;
@@ -874,7 +871,7 @@ mod tests {
 
     use anyhow::Result;
     use indexmap::IndexSet;
-    use std::sync::{atomic::Ordering, Arc};
+    use std::sync::Arc;
 
     type CurrentNetwork = snarkvm::console::network::MainnetV0;
 
@@ -906,13 +903,13 @@ mod tests {
     fn test_is_leader_quorum_odd() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        // Sample batch certificates. 
-        let mut certificates = IndexSet::new(); 
-        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng)); 
-        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng)); 
-        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng)); 
-        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng)); 
-       
+        // Sample batch certificates.
+        let mut certificates = IndexSet::new();
+        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng));
+        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng));
+        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng));
+        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng));
+
         // Initialize the committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
             1,
@@ -931,14 +928,14 @@ mod tests {
         let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
         // Initialize the account.
         let account = Account::new(rng)?;
-        // Initialize the BFT. 
+        // Initialize the BFT.
         let bft = BFT::new(account.clone(), storage.clone(), ledger.clone(), None, &[], None)?;
         assert!(bft.is_timer_expired());
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
         // If timer has expired but quorum threshold is not reached, return 'false'.
-        assert!(!result); 
-        // Insert certificates into storage. 
+        assert!(!result);
+        // Insert certificates into storage.
         for certificate in certificates.iter() {
             storage.testing_only_insert_certificate_testing_only(certificate.clone());
         }
@@ -1001,16 +998,15 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn test_is_even_round_ready() -> Result<()> {
-        use crate::MAX_LEADER_CERTIFICATE_DELAY_IN_SECS;
         let rng = &mut TestRng::default();
 
-        // Sample batch certificates. 
-        let mut certificates = IndexSet::new(); 
-        certificates.insert(sample_batch_certificate_for_round(2, rng)); 
-        certificates.insert(sample_batch_certificate_for_round(2, rng)); 
-        certificates.insert(sample_batch_certificate_for_round(2, rng)); 
-        certificates.insert(sample_batch_certificate_for_round(2, rng)); 
-       
+        // Sample batch certificates.
+        let mut certificates = IndexSet::new();
+        certificates.insert(sample_batch_certificate_for_round(2, rng));
+        certificates.insert(sample_batch_certificate_for_round(2, rng));
+        certificates.insert(sample_batch_certificate_for_round(2, rng));
+        certificates.insert(sample_batch_certificate_for_round(2, rng));
+
         // Initialize the committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
             2,
@@ -1029,36 +1025,37 @@ mod tests {
         let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
         // Initialize the account.
         let account = Account::new(rng)?;
-        // Initialize the BFT. 
+        // Initialize the BFT.
         let bft = BFT::new(account.clone(), storage.clone(), ledger.clone(), None, &[], None)?;
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate_for_round(2, rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
         let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee.clone(), 2);
-        // If leader certificate is set but quorum threshold is not reached, we are not ready for the next round. 
+        // If leader certificate is set but quorum threshold is not reached, we are not ready for the next round.
         assert!(!result);
-        // Once quorum threshold is reached, we are ready for the next round. 
+        // Once quorum threshold is reached, we are ready for the next round.
         let result = bft.is_even_round_ready_for_next_round(certificates.clone(), committee.clone(), 2);
-        assert!(result); 
+        assert!(result);
 
-        // Initialize a new BFT. 
+        // Initialize a new BFT.
         let bft_timer = BFT::new(account.clone(), storage.clone(), ledger.clone(), None, &[], None)?;
         // If the leader certificate is not set and the timer has not expired, we are not ready for the next round.
         let result = bft_timer.is_even_round_ready_for_next_round(certificates.clone(), committee.clone(), 2);
-        if !bft_timer.is_timer_expired() { 
-            assert!(!result); 
+        if !bft_timer.is_timer_expired() {
+            assert!(!result);
         }
-        // Wait for the timer to expire. 
-        let leader_certificate_timeout = std::time::Duration::from_millis(MAX_LEADER_CERTIFICATE_DELAY_IN_SECS as u64 * 1000);
-        std::thread::sleep(leader_certificate_timeout); 
-        // Once the leader certificate timer has expired and quorum threshold is reached, we are ready to advance to the next round. 
+        // Wait for the timer to expire.
+        let leader_certificate_timeout =
+            std::time::Duration::from_millis(MAX_LEADER_CERTIFICATE_DELAY_IN_SECS as u64 * 1000);
+        std::thread::sleep(leader_certificate_timeout);
+        // Once the leader certificate timer has expired and quorum threshold is reached, we are ready to advance to the next round.
         let result = bft_timer.is_even_round_ready_for_next_round(certificates.clone(), committee.clone(), 2);
-        if bft_timer.is_timer_expired() { 
-            assert!(result); 
+        if bft_timer.is_timer_expired() {
+            assert!(result);
         } else {
-            assert!(!result); 
+            assert!(!result);
         }
-        
+
         Ok(())
     }
 
