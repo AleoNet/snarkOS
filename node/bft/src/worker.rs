@@ -437,7 +437,7 @@ impl<N: Network> Worker<N> {
     fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) {
         let TransmissionResponse { transmission_id, mut transmission } = response;
         // Check if the peer IP exists in the pending queue for the given transmission ID.
-        let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
+        let exists = self.pending.get_peers(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
             // Ensure the transmission is not a fee and matches the transmission ID.

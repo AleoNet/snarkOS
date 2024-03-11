@@ -472,7 +472,7 @@ impl<N: Network> Sync<N> {
     fn finish_certificate_request(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) {
         let certificate = response.certificate;
         // Check if the peer IP exists in the pending queue for the given certificate ID.
-        let exists = self.pending.get(certificate.id()).unwrap_or_default().contains(&peer_ip);
+        let exists = self.pending.get_peers(certificate.id()).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
             // TODO: Validate the certificate.
