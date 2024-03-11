@@ -1555,4 +1555,65 @@ mod prop_tests {
         );
         assert_eq!(gateway.num_workers(), workers.len() as u8);
     }
+    #[proptest]
+    fn test_is_authorized_validator(#[strategy(any_valid_dev_gateway())] input: GatewayInput) {
+        use indexmap::IndexSet;
+        use crate::helpers::Storage;
+        use snarkos_account::Account;
+        use snarkos_node_bft_ledger_service::MockLedgerService;
+        use snarkos_node_bft_storage_service::BFTMemoryService;
+        use snarkvm::{
+            ledger::{
+                narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round,
+                committee::test_helpers::sample_committee_for_round_and_members,
+            },
+            utilities::TestRng,
+        };
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters. 
+        let current_round = 2; 
+        let committee_size = 4; 
+        let max_gc_rounds = snarkvm::ledger::narwhal::BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
+        let (_, _, private_key, dev) = input;
+        let account = Account::try_from(private_key).unwrap();
+
+        // Sample the certificates. 
+        let mut certificates = IndexSet::new(); 
+        for _ in 0..committee_size{ 
+            certificates.insert(sample_batch_certificate_for_round(current_round, rng)); 
+        }
+        let addresses: Vec<_> = certificates.iter()
+            .map(|certificate| certificate.author())
+            .collect();
+        // Initialize the committee.
+        let committee = sample_committee_for_round_and_members(
+            current_round,
+            addresses, 
+            rng,
+        );
+        // Sample extra certificates from non-committee members. 
+        for _ in 0..committee_size{ 
+            certificates.insert(sample_batch_certificate_for_round(current_round, rng)); 
+        }    
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Initialize the gateway. 
+        let gateway = Gateway::new(account.clone(), storage.clone(), ledger.clone(), dev.ip(), &[], dev.port()).unwrap();
+        // Insert certificate to the storage.
+        for certificate in certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+        // Check that the current committee members are authorized validators.
+        for i in 0..certificates.clone().len(){ 
+            let is_authorized = gateway.is_authorized_validator_address(certificates[i].author()); 
+            if i < committee_size { 
+                assert!(is_authorized); 
+            } else { 
+                assert!(!is_authorized); 
+            }
+        }
+    }
 }
