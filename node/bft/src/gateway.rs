@@ -334,35 +334,38 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given address is an authorized validator.
     pub fn is_authorized_validator_address(&self, validator_address: Address<N>) -> bool {
+        // Determine if the validator address is a member of the committee lookback,
+        // the current committee, or the previous committee lookbacks.
+        // We allow leniency in this validation check in order to accommodate these two scenarios:
+        //  1. New validators should be able to connect immediately once bonded as a committee member.
+        //  2. Existing validators must remain connected until they are no longer bonded as a committee member.
+        //     (i.e. meaning they must stay online until the next block has been produced)
+
+        // Determine if the validator is in the current committee with lookback.
+        if self
+            .ledger
+            .get_committee_lookback_for_round(self.storage.current_round())
+            .map_or(false, |committee| committee.is_committee_member(validator_address))
+        {
+            return true;
+        }
+
+        // Determine if the validator is in the latest committee on the ledger.
+        if self.ledger.current_committee().map_or(false, |committee| committee.is_committee_member(validator_address)) {
+            return true;
+        }
+
         // Retrieve the previous block height to consider from the sync tolerance.
         let previous_block_height = self.ledger.latest_block_height().saturating_sub(MAX_BLOCKS_BEHIND);
         // Determine if the validator is in any of the previous committee lookbacks.
-        let exists_in_previous_committee_lookback = match self.ledger.get_block_round(previous_block_height) {
+        match self.ledger.get_block_round(previous_block_height) {
             Ok(block_round) => (block_round..self.storage.current_round()).step_by(2).any(|round| {
                 self.ledger
                     .get_committee_lookback_for_round(round)
                     .map_or(false, |committee| committee.is_committee_member(validator_address))
             }),
             Err(_) => false,
-        };
-
-        // Determine if the validator is in the current committee with lookback.
-        let exists_in_current_committee_lookback = self
-            .ledger
-            .get_committee_lookback_for_round(self.storage.current_round())
-            .map_or(false, |committee| committee.is_committee_member(validator_address));
-
-        // Determine if the validator is in the latest committee on the ledger.
-        let exists_in_latest_committee =
-            self.ledger.current_committee().map_or(false, |committee| committee.is_committee_member(validator_address));
-
-        // Determine if the validator address is a member of the previous committee lookbacks,
-        // the committee lookback, or the current committee.
-        // We allow leniency in this validation check in order to accommodate these two scenarios:
-        //  1. New validators should be able to connect immediately once bonded as a committee member.
-        //  2. Existing validators must remain connected until they are no longer bonded as a committee member.
-        //     (i.e. meaning they must stay online until the next block has been produced)
-        exists_in_previous_committee_lookback || exists_in_current_committee_lookback || exists_in_latest_committee
+        }
     }
 
     /// Returns the maximum number of connected peers.
