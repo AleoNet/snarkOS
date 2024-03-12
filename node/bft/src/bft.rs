@@ -359,7 +359,7 @@ impl<N: Network> BFT<N> {
         self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY_IN_SECS <= now()
     }
 
-    /// Returns 'true' if the quorum threshold is reached for this round under one of the following conditions:
+    /// Returns 'true' if the quorum threshold `(2f + 1)` is reached for this round under one of the following conditions:
     ///  - The leader certificate is `None`.
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.
