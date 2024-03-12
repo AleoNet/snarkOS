@@ -109,7 +109,7 @@ impl<N: Network> Primary<N> {
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the gateway.
-        let gateway = Gateway::new(account, ledger.clone(), ip, trusted_validators, dev)?;
+        let gateway = Gateway::new(account, storage.clone(), ledger.clone(), ip, trusted_validators, dev)?;
         // Initialize the sync module.
         let sync = Sync::new(gateway.clone(), storage.clone(), ledger.clone());
         // Initialize the primary instance.
