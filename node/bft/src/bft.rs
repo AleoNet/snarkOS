@@ -323,10 +323,9 @@ impl<N: Network> BFT<N> {
         self.is_even_round_ready_for_next_round(current_certificates, committee_lookback, current_round)
     }
 
-    /// Returns 'true' under one of the following conditions:
-    ///  - If the leader certificate is set for the current even round,
-    ///  - The timer for the leader certificate has expired, and we can
-    ///    achieve quorum threshold (2f + 1) without the leader.
+    /// Returns 'true' if the quorum threshold is reached for this round under one of the following conditions:
+    ///  - If the leader certificate is set for the current even round.
+    ///  - The timer for the leader certificate has expired.
     fn is_even_round_ready_for_next_round(
         &self,
         certificates: IndexSet<BatchCertificate<N>>,
@@ -360,9 +359,8 @@ impl<N: Network> BFT<N> {
         self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY_IN_SECS <= now()
     }
 
-    /// Returns 'true' if any of the following conditions hold:
-    ///  - The leader certificate is 'None'.
-    ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round).
+    /// Returns 'true' if the quorum threshold is reached for this round under one of the following conditions:
+    ///  - The leader certificate is `None`.
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.
     fn is_leader_quorum_or_nonleaders_available(&self, odd_round: u64) -> bool {
@@ -853,6 +851,7 @@ mod tests {
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
+        console::account::{Address, PrivateKey},
         ledger::{
             committee::Committee,
             narwhal::batch_certificate::test_helpers::{sample_batch_certificate, sample_batch_certificate_for_round},
@@ -861,7 +860,7 @@ mod tests {
     };
 
     use anyhow::Result;
-    use indexmap::IndexSet;
+    use indexmap::{IndexMap, IndexSet};
     use std::sync::Arc;
 
     type CurrentNetwork = snarkvm::console::network::MainnetV0;
