@@ -24,7 +24,7 @@ use snarkvm::{
         store::ConsensusStorage,
         Ledger,
     },
-    prelude::{narwhal::BatchCertificate, Field, Network, Result},
+    prelude::{narwhal::BatchCertificate, Address, Field, Network, Result},
 };
 use std::{
     fmt,
@@ -65,6 +65,16 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     /// Returns the latest block in the ledger.
     fn latest_block(&self) -> Block<N> {
         self.inner.latest_block()
+    }
+
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        self.inner.latest_leader()
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, round: u64, leader: Address<N>) {
+        self.inner.update_latest_leader(round, leader);
     }
 
     /// Returns `true` if the given block height exists in the ledger.
@@ -135,7 +145,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Always succeeds.
-    fn ensure_transmission_id_matches(
+    fn ensure_transmission_is_well_formed(
         &self,
         _transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,

@@ -20,7 +20,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, Address, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
@@ -54,6 +54,16 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     /// Returns the latest block in the ledger.
     fn latest_block(&self) -> Block<N> {
         unreachable!("Latest block does not exist in prover")
+    }
+
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        unreachable!("Latest leader does not exist in prover");
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, _round: u64, _leader: Address<N>) {
+        unreachable!("Latest leader does not exist in prover");
     }
 
     /// Returns `true` if the given block height exists in the ledger.
@@ -124,8 +134,8 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Transmission '{transmission_id}' does not exist in prover")
     }
 
-    /// Ensures the given transmission ID matches the given transmission.
-    fn ensure_transmission_id_matches(
+    /// Ensures that the given transmission is not a fee and matches the given transmission ID.
+    fn ensure_transmission_is_well_formed(
         &self,
         _transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,
