@@ -55,7 +55,7 @@ use tokio::{
 
 /// The capacity of the queue reserved for deployments.
 /// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
-const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 4;
+const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 10;
 /// The capacity of the queue reserved for executions.
 /// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
 const CAPACITY_FOR_EXECUTIONS: usize = 1 << 10;
