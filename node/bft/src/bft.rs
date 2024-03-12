@@ -323,7 +323,7 @@ impl<N: Network> BFT<N> {
         self.is_even_round_ready_for_next_round(current_certificates, committee_lookback, current_round)
     }
 
-    /// Returns 'true' if the quorum threshold is reached for this round under one of the following conditions:
+    /// Returns 'true' if the quorum threshold `(2f + 1)` is reached for this round under one of the following conditions:
     ///  - If the leader certificate is set for the current even round.
     ///  - The timer for the leader certificate has expired.
     fn is_even_round_ready_for_next_round(
