@@ -399,8 +399,11 @@ impl<N: Network> BFT<N> {
             return true;
         };
         // Compute the stake for the leader certificate.
-        let (stake_with_leader, stake_without_leader) =
-            self.compute_stake_for_leader_certificate(leader_certificate.id(), current_certificates, &committee_lookback);
+        let (stake_with_leader, stake_without_leader) = self.compute_stake_for_leader_certificate(
+            leader_certificate.id(),
+            current_certificates,
+            &committee_lookback,
+        );
         // Return 'true' if any of the following conditions hold:
         stake_with_leader >= committee_lookback.availability_threshold()
             || stake_without_leader >= committee_lookback.quorum_threshold()
