@@ -26,7 +26,7 @@ use std::{
 use time::OffsetDateTime;
 use tokio::sync::oneshot;
 
-const CALLBACK_TIMEOUT_IN_SECS: i64 = MAX_FETCH_TIMEOUT_IN_MS as i64 / 1000;
+const CALLBACK_TIMEOUT_IN_SECS: i64 = 2 * MAX_FETCH_TIMEOUT_IN_MS as i64 / 1000;
 
 /// Returns the maximum number of redundant requests for the number of validators in the specified round.
 pub fn max_redundant_requests<N: Network>(ledger: Arc<dyn LedgerService<N>>, round: u64) -> usize {
