@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use super::{CurrentAleo, CurrentNetwork, Developer};
-
 use snarkvm::{
     console::program::ProgramOwner,
     prelude::{
@@ -27,10 +26,12 @@ use snarkvm::{
     },
 };
 
+use aleo_std::StorageMode;
 use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
+use zeroize::Zeroize;
 
 /// Deploys an Aleo program.
 #[derive(Debug, Parser)]
@@ -61,6 +62,16 @@ pub struct Deploy {
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage_path")]
+    storage_path: Option<PathBuf>,
+}
+
+impl Drop for Deploy {
+    /// Zeroize the private key when the `Deploy` struct goes out of scope.
+    fn drop(&mut self) {
+        self.private_key.zeroize();
+    }
 }
 
 impl Deploy {
@@ -78,7 +89,7 @@ impl Deploy {
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
         // Fetch the package from the directory.
-        let package = Developer::parse_package(self.program_id, self.path)?;
+        let package = Developer::parse_package(self.program_id, &self.path)?;
 
         println!("📦 Creating deployment transaction for '{}'...\n", &self.program_id.to_string().bold());
 
@@ -91,12 +102,18 @@ impl Deploy {
             // Initialize an RNG.
             let rng = &mut rand::thread_rng();
 
+            // Initialize the storage.
+            let storage_mode = match &self.storage_path {
+                Some(path) => StorageMode::Custom(path.clone()),
+                None => StorageMode::Production,
+            };
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(storage_mode)?;
+
             // Initialize the VM.
-            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
 
             // Compute the minimum deployment cost.
-            let (minimum_deployment_cost, (_, _)) = deployment_cost(&deployment)?;
+            let (minimum_deployment_cost, (_, _, _)) = deployment_cost(&deployment)?;
 
             // Prepare the fees.
             let fee = match &self.record {
@@ -131,11 +148,11 @@ impl Deploy {
         };
         println!("✅ Created deployment transaction for '{}'", self.program_id.to_string().bold());
 
-        // Determine if the transaction should be broadcast, stored, or displayed to user.
+        // Determine if the transaction should be broadcast, stored, or displayed to the user.
         Developer::handle_transaction(
-            self.broadcast,
+            &self.broadcast,
             self.dry_run,
-            self.store,
+            &self.store,
             transaction,
             self.program_id.to_string(),
         )

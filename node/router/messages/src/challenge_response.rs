@@ -25,6 +25,7 @@ use std::borrow::Cow;
 pub struct ChallengeResponse<N: Network> {
     pub genesis_header: Header<N>,
     pub signature: Data<Signature<N>>,
+    pub nonce: u64,
 }
 
 impl<N: Network> MessageTrait for ChallengeResponse<N> {
@@ -38,13 +39,18 @@ impl<N: Network> MessageTrait for ChallengeResponse<N> {
 impl<N: Network> ToBytes for ChallengeResponse<N> {
     fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
         self.genesis_header.write_le(&mut writer)?;
-        self.signature.write_le(&mut writer)
+        self.signature.write_le(&mut writer)?;
+        self.nonce.write_le(&mut writer)
     }
 }
 
 impl<N: Network> FromBytes for ChallengeResponse<N> {
     fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
-        Ok(Self { genesis_header: Header::read_le(&mut reader)?, signature: Data::read_le(reader)? })
+        Ok(Self {
+            genesis_header: Header::read_le(&mut reader)?,
+            signature: Data::read_le(&mut reader)?,
+            nonce: u64::read_le(reader)?,
+        })
     }
 }
 
@@ -62,7 +68,7 @@ pub mod prop_tests {
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
         (0..64)
@@ -80,8 +86,12 @@ pub mod prop_tests {
     }
 
     pub fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
-        (any_signature(), any_genesis_header())
-            .prop_map(|(sig, genesis_header)| ChallengeResponse { signature: Data::Object(sig), genesis_header })
+        (any_signature(), any_genesis_header(), any::<u64>())
+            .prop_map(|(sig, genesis_header, nonce)| ChallengeResponse {
+                signature: Data::Object(sig),
+                genesis_header,
+                nonce,
+            })
             .boxed()
     }
 

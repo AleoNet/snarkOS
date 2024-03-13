@@ -80,17 +80,26 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_batch_header(committee: &CommitteeContext) -> BoxedStrategy<BatchHeader<CurrentNetwork>> {
         (Just(committee.clone()), any::<Selector>(), vec(any_transmission(), 0..16))
             .prop_map(|(committee, selector, transmissions)| {
                 let mut rng = TestRng::default();
-                let CommitteeContext(_, ValidatorSet(validators)) = committee;
+                let CommitteeContext(committee, ValidatorSet(validators)) = committee;
                 let signer = selector.select(validators);
                 let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
 
-                BatchHeader::new(&signer.private_key, 0, now(), transmission_ids, Default::default(), &mut rng).unwrap()
+                BatchHeader::new(
+                    &signer.private_key,
+                    0,
+                    now(),
+                    committee.id(),
+                    transmission_ids,
+                    Default::default(),
+                    &mut rng,
+                )
+                .unwrap()
             })
             .boxed()
     }
@@ -99,8 +108,12 @@ pub mod prop_tests {
         any::<CommitteeContext>()
             .prop_flat_map(|committee| (Just(committee.clone()), any_batch_header(&committee)))
             .prop_map(|(committee, batch_header)| {
-                let CommitteeContext(_, validator_set) = committee;
+                let CommitteeContext(_, mut validator_set) = committee;
                 let mut rng = TestRng::default();
+
+                // Remove the author from the validator set passed to create the batch
+                // certificate, the author should not sign their own batch.
+                validator_set.0.retain(|v| v.address != batch_header.author());
                 BatchCertificate::from(batch_header.clone(), sign_batch_header(&validator_set, &batch_header, &mut rng))
                     .unwrap()
             })

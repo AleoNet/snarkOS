@@ -65,7 +65,7 @@ pub mod prop_tests {
     use proptest::prelude::{BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_batch_certified() -> BoxedStrategy<BatchCertified<CurrentNetwork>> {
         any_batch_certificate().prop_map(BatchCertified::from).boxed()

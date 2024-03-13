@@ -29,8 +29,6 @@ use snarkos_node_bft::{
     },
     spawn_blocking,
     BFT,
-    MAX_GC_ROUNDS,
-    MAX_TRANSMISSIONS_PER_BATCH,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_bft_storage_service::BFTPersistentStorage;
@@ -38,11 +36,12 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        narwhal::{Data, Subdag, Transmission, TransmissionID},
+        narwhal::{BatchHeader, Data, Subdag, Transmission, TransmissionID},
     },
     prelude::*,
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use colored::Colorize;
 use indexmap::IndexMap;
@@ -54,6 +53,34 @@ use tokio::{
     task::JoinHandle,
 };
 
+/// The capacity of the queue reserved for deployments.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 10;
+/// The capacity of the queue reserved for executions.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_EXECUTIONS: usize = 1 << 10;
+/// The capacity of the queue reserved for solutions.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_SOLUTIONS: usize = 1 << 10;
+/// The **suggested** maximum number of deployments in each interval.
+/// Note: This is an inbound queue limit, not a Narwhal-enforced limit.
+const MAX_DEPLOYMENTS_PER_INTERVAL: usize = 1;
+
+/// Helper struct to track incoming transactions.
+struct TransactionsQueue<N: Network> {
+    pub deployments: LruCache<N::TransactionID, Transaction<N>>,
+    pub executions: LruCache<N::TransactionID, Transaction<N>>,
+}
+
+impl<N: Network> Default for TransactionsQueue<N> {
+    fn default() -> Self {
+        Self {
+            deployments: LruCache::new(NonZeroUsize::new(CAPACITY_FOR_DEPLOYMENTS).unwrap()),
+            executions: LruCache::new(NonZeroUsize::new(CAPACITY_FOR_EXECUTIONS).unwrap()),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Consensus<N: Network> {
     /// The ledger.
@@ -63,9 +90,9 @@ pub struct Consensus<N: Network> {
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The unconfirmed solutions queue.
-    solutions_queue: Arc<Mutex<IndexMap<PuzzleCommitment<N>, ProverSolution<N>>>>,
+    solutions_queue: Arc<Mutex<LruCache<PuzzleCommitment<N>, ProverSolution<N>>>>,
     /// The unconfirmed transactions queue.
-    transactions_queue: Arc<Mutex<IndexMap<N::TransactionID, Transaction<N>>>>,
+    transactions_queue: Arc<Mutex<TransactionsQueue<N>>>,
     /// The recently-seen unconfirmed solutions.
     seen_solutions: Arc<Mutex<LruCache<PuzzleCommitment<N>, ()>>>,
     /// The recently-seen unconfirmed transactions.
@@ -81,12 +108,17 @@ impl<N: Network> Consensus<N> {
         ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
-        dev: Option<u16>,
+        storage_mode: StorageMode,
     ) -> Result<Self> {
+        // Recover the development ID, if it is present.
+        let dev = match storage_mode {
+            StorageMode::Development(id) => Some(id),
+            StorageMode::Production | StorageMode::Custom(..) => None,
+        };
         // Initialize the Narwhal transmissions.
-        let transmissions = Arc::new(BFTPersistentStorage::open(dev)?);
+        let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode)?);
         // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new(ledger.clone(), transmissions, MAX_GC_ROUNDS);
+        let storage = NarwhalStorage::new(ledger.clone(), transmissions, BatchHeader::<N>::MAX_GC_ROUNDS as u64);
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger.clone(), ip, trusted_validators, dev)?;
         // Return the consensus.
@@ -94,7 +126,7 @@ impl<N: Network> Consensus<N> {
             ledger,
             bft,
             primary_sender: Default::default(),
-            solutions_queue: Default::default(),
+            solutions_queue: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(CAPACITY_FOR_SOLUTIONS).unwrap()))),
             transactions_queue: Default::default(),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
@@ -180,6 +212,11 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
+        #[cfg(feature = "metrics")]
+        {
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+        }
         // Process the unconfirmed solution.
         {
             let solution_id = solution.commitment();
@@ -195,14 +232,14 @@ impl<N: Network> Consensus<N> {
             }
             // Add the solution to the memory pool.
             trace!("Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
-            if self.solutions_queue.lock().insert(solution_id, solution).is_some() {
+            if self.solutions_queue.lock().put(solution_id, solution).is_some() {
                 bail!("Solution '{}' exists in the memory pool", fmt_id(solution_id));
             }
         }
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         // Retrieve the solutions.
@@ -214,15 +251,18 @@ impl<N: Network> Consensus<N> {
             // Determine the number of solutions to send.
             let num_solutions = queue.len().min(capacity);
             // Drain the solutions from the queue.
-            queue.drain(..num_solutions).collect::<Vec<_>>()
+            (0..num_solutions).filter_map(|_| queue.pop_lru().map(|(_, solution)| solution)).collect::<Vec<_>>()
         };
         // Iterate over the solutions.
-        for (_, solution) in solutions.into_iter() {
+        for solution in solutions.into_iter() {
             let solution_id = solution.commitment();
             trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
             // Send the unconfirmed solution to the primary.
             if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
-                warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+                // If the BFT is synced, then log the warning.
+                if self.bft.is_synced() {
+                    warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+                }
             }
         }
         Ok(())
@@ -230,6 +270,11 @@ impl<N: Network> Consensus<N> {
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        #[cfg(feature = "metrics")]
+        {
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+        }
         // Process the unconfirmed transaction.
         {
             let transaction_id = transaction.id();
@@ -249,36 +294,59 @@ impl<N: Network> Consensus<N> {
             }
             // Add the transaction to the memory pool.
             trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
-            if self.transactions_queue.lock().insert(transaction_id, transaction).is_some() {
+            if transaction.is_deploy() {
+                if self.transactions_queue.lock().deployments.put(transaction_id, transaction).is_some() {
+                    bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
+                }
+            } else if self.transactions_queue.lock().executions.put(transaction_id, transaction).is_some() {
                 bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
             }
         }
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         // Retrieve the transactions.
         let transactions = {
             // Determine the available capacity.
-            let capacity = MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
-            // Acquire the lock on the queue.
-            let mut queue = self.transactions_queue.lock();
-            // Determine the number of transactions to send.
-            let num_transactions = queue.len().min(capacity);
-            // Drain the solutions from the queue.
-            queue.drain(..num_transactions).collect::<Vec<_>>()
+            let capacity = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+            // Acquire the lock on the transactions queue.
+            let mut tx_queue = self.transactions_queue.lock();
+            // Determine the number of deployments to send.
+            let num_deployments = tx_queue.deployments.len().min(capacity).min(MAX_DEPLOYMENTS_PER_INTERVAL);
+            // Determine the number of executions to send.
+            let num_executions = tx_queue.executions.len().min(capacity.saturating_sub(num_deployments));
+            // Create an iterator which will select interleaved deployments and executions within the capacity.
+            // Note: interleaving ensures we will never have consecutive invalid deployments blocking the queue.
+            let selector_iter = (0..num_deployments).map(|_| true).interleave((0..num_executions).map(|_| false));
+            // Drain the transactions from the queue, interleaving deployments and executions.
+            selector_iter
+                .filter_map(|select_deployment| {
+                    if select_deployment {
+                        tx_queue.deployments.pop_lru().map(|(_, tx)| tx)
+                    } else {
+                        tx_queue.executions.pop_lru().map(|(_, tx)| tx)
+                    }
+                })
+                .collect_vec()
         };
         // Iterate over the transactions.
-        for (_, transaction) in transactions.into_iter() {
+        for transaction in transactions.into_iter() {
             let transaction_id = transaction.id();
             trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
             // Send the unconfirmed transaction to the primary.
             if let Err(e) =
                 self.primary_sender().send_unconfirmed_transaction(transaction_id, Data::Object(transaction)).await
             {
-                warn!("Failed to add unconfirmed transaction '{}' to the memory pool - {e}", fmt_id(transaction_id));
+                // If the BFT is synced, then log the warning.
+                if self.bft.is_synced() {
+                    warn!(
+                        "Failed to add unconfirmed transaction '{}' to the memory pool - {e}",
+                        fmt_id(transaction_id)
+                    );
+                }
             }
         }
         Ok(())
@@ -328,12 +396,38 @@ impl<N: Network> Consensus<N> {
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<()> {
+        #[cfg(feature = "metrics")]
+        let start = subdag.leader_certificate().batch_header().timestamp();
+        #[cfg(feature = "metrics")]
+        let num_committed_certificates = subdag.values().map(|c| c.len()).sum::<usize>();
+        #[cfg(feature = "metrics")]
+        let current_block_timestamp = self.ledger.latest_block().header().metadata().timestamp();
+
         // Create the candidate next block.
         let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
         // Check that the block is well-formed.
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
+
+        #[cfg(feature = "metrics")]
+        {
+            let elapsed = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - start) as u64);
+            let next_block_timestamp = next_block.header().metadata().timestamp();
+            let block_latency = next_block_timestamp - current_block_timestamp;
+            let num_sol = next_block.solutions().len();
+            let num_tx = next_block.transactions().len();
+            let num_transmissions = num_tx + num_sol;
+
+            metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
+            metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
+            metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
+            metrics::increment_gauge(metrics::blocks::TRANSMISSIONS, num_transmissions as f64);
+            metrics::gauge(metrics::consensus::LAST_COMMITTED_ROUND, next_block.round() as f64);
+            metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
+            metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
+            metrics::histogram(metrics::consensus::BLOCK_LATENCY, block_latency as f64);
+        }
         Ok(())
     }
 

@@ -15,19 +15,21 @@
 use crate::common::test_peer::sample_genesis_block;
 use snarkos_account::Account;
 use snarkos_node::{Client, Prover, Validator};
-use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, MainnetV0 as CurrentNetwork};
 
+use aleo_std::StorageMode;
 use std::str::FromStr;
 
 pub async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
     Client::new(
         "127.0.0.1:0".parse().unwrap(),
         None,
+        10,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         sample_genesis_block(),
         None, // No CDN.
-        None,
+        StorageMode::Production,
     )
     .await
     .expect("couldn't create client instance")
@@ -39,7 +41,7 @@ pub async fn prover() -> Prover<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         sample_genesis_block(),
-        None,
+        StorageMode::Production,
     )
     .await
     .expect("couldn't create prover instance")
@@ -50,12 +52,14 @@ pub async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNet
         "127.0.0.1:0".parse().unwrap(),
         None,
         None,
+        10,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         &[],
         sample_genesis_block(), // Should load the current network's genesis block.
         None,                   // No CDN.
-        None,
+        StorageMode::Production,
+        false, // No dev traffic in production mode.
     )
     .await
     .expect("couldn't create validator instance")

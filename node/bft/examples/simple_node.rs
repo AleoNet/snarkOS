@@ -20,35 +20,23 @@ use snarkos_node_bft::{
     helpers::{init_consensus_channels, init_primary_channels, ConsensusReceiver, PrimarySender, Storage},
     Primary,
     BFT,
-    MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
 use snarkos_node_bft_ledger_service::TranslucentLedgerService;
 use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
-    console::algorithms::BHP256,
+    console::{account::PrivateKey, algorithms::BHP256, types::Address},
     ledger::{
-        committee::{Committee, MIN_VALIDATOR_STAKE},
-        narwhal::Data,
-    },
-    prelude::{
-        block::{Block, Transaction},
+        block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        committee::{Committee, MIN_VALIDATOR_STAKE},
+        narwhal::{BatchHeader, Data},
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Address,
-        Field,
-        FromBytes,
-        Hash,
+        Block,
         Ledger,
-        Network,
-        PrivateKey,
-        TestRng,
-        ToBits,
-        ToBytes,
-        Uniform,
-        VM,
     },
-    utilities::to_bytes_le,
+    prelude::{Field, Hash, Network, Uniform, VM},
+    utilities::{to_bytes_le, FromBytes, TestRng, ToBits, ToBytes},
 };
 
 use ::bytes::Bytes;
@@ -63,22 +51,21 @@ use axum::{
 use axum_extra::response::ErasedJson;
 use clap::{Parser, ValueEnum};
 use indexmap::IndexMap;
-use parking_lot::Mutex;
 use rand::{CryptoRng, Rng, SeedableRng};
 use std::{
     collections::HashMap,
     net::SocketAddr,
     path::PathBuf,
     str::FromStr,
-    sync::{Arc, OnceLock},
+    sync::{atomic::AtomicBool, Arc, Mutex, OnceLock},
 };
-use tokio::sync::oneshot;
+use tokio::{net::TcpListener, sync::oneshot};
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
 };
 
-type CurrentNetwork = snarkvm::prelude::Testnet3;
+type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
 /**************************************************************************************************/
 
@@ -141,10 +128,14 @@ pub async fn start_bft(
         balances.insert(*address, public_balance_per_validator);
     }
     let mut rng = TestRng::default();
-    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), &mut rng);
-    let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger));
+    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), node_id, &mut rng);
+    let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger, Arc::new(AtomicBool::new(false))));
     // Initialize the storage.
-    let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
+    let storage = Storage::new(
+        ledger.clone(),
+        Arc::new(BFTMemoryService::new()),
+        BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+    );
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -186,10 +177,14 @@ pub async fn start_primary(
         balances.insert(*address, public_balance_per_validator);
     }
     let mut rng = TestRng::default();
-    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), &mut rng);
-    let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger));
+    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), node_id, &mut rng);
+    let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger, Arc::new(AtomicBool::new(false))));
     // Initialize the storage.
-    let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
+    let storage = Storage::new(
+        ledger.clone(),
+        Arc::new(BFTMemoryService::new()),
+        BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+    );
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -225,13 +220,16 @@ fn genesis_block(
     // Initialize a new VM.
     let vm = VM::from(store).unwrap();
     // Initialize the genesis block.
-    vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng).unwrap()
+    let bonded_balances: IndexMap<_, _> =
+        committee.members().iter().map(|(address, (amount, _))| (*address, (*address, *amount))).collect();
+    vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng).unwrap()
 }
 
 fn genesis_ledger(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    node_id: u16,
     rng: &mut (impl Rng + CryptoRng),
 ) -> CurrentLedger {
     let cache_key =
@@ -240,6 +238,7 @@ fn genesis_ledger(
     // will wait for it on the mutex.
     let block = genesis_cache()
         .lock()
+        .unwrap()
         .entry(cache_key.clone())
         .or_insert_with(|| {
             let hasher = BHP256::<CurrentNetwork>::setup("aleo.dev.block").unwrap();
@@ -256,7 +255,7 @@ fn genesis_ledger(
         })
         .clone();
     // Initialize the ledger with the genesis block.
-    CurrentLedger::load(block, None).unwrap()
+    CurrentLedger::load(block, aleo_std::StorageMode::Development(node_id)).unwrap()
 }
 
 /// Initializes the components of the node.
@@ -489,10 +488,9 @@ async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<Current
 
     // Run the server.
     info!("Starting the server at '{addr}'...");
-    axum::Server::bind(&addr.parse().unwrap())
-        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-        .await
-        .unwrap();
+    let rest_addr: SocketAddr = addr.parse().unwrap();
+    let rest_listener = TcpListener::bind(rest_addr).await.unwrap();
+    axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
 }
 
 /**************************************************************************************************/
@@ -530,6 +528,9 @@ struct Args {
     /// Enables the solution and transaction cannons, and optionally the interval in ms to run them on.
     #[arg(long, value_name = "INTERVAL_MS")]
     fire_transmissions: Option<Option<u64>>,
+    /// Enables the metrics exporter.
+    #[clap(long, default_value = "false")]
+    metrics: bool,
 }
 
 /// A helper method to parse the peers provided to the CLI.
@@ -595,6 +596,13 @@ async fn main() -> Result<()> {
         }
         _ => (),
     };
+
+    // Initialize the metrics.
+    #[cfg(feature = "metrics")]
+    if args.metrics {
+        info!("Initializing metrics...");
+        metrics::initialize_metrics();
+    }
 
     // Start the monitoring server.
     start_server(bft_holder, primary, args.id).await;

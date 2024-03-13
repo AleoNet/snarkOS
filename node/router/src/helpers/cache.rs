@@ -16,11 +16,10 @@ use crate::messages::BlockRequest;
 use snarkvm::prelude::{coinbase::PuzzleCommitment, Network};
 
 use core::hash::Hash;
-use indexmap::{IndexMap, IndexSet};
 use linked_hash_map::LinkedHashMap;
 use parking_lot::RwLock;
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, HashSet, VecDeque},
     net::{IpAddr, SocketAddr},
 };
 use time::{Duration, OffsetDateTime};
@@ -36,23 +35,25 @@ type TransactionKey<N> = (SocketAddr, <N as Network>::TransactionID);
 #[derive(Debug)]
 pub struct Cache<N: Network> {
     /// The map of peer connections to their recent timestamps.
-    seen_inbound_connections: RwLock<IndexMap<IpAddr, VecDeque<OffsetDateTime>>>,
+    seen_inbound_connections: RwLock<HashMap<IpAddr, VecDeque<OffsetDateTime>>>,
     /// The map of peer IPs to their recent timestamps.
-    seen_inbound_messages: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
+    seen_inbound_messages: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
     /// The map of peer IPs to their recent timestamps.
-    seen_inbound_puzzle_requests: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
+    seen_inbound_puzzle_requests: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
     /// The map of solution commitments to their last seen timestamp.
     seen_inbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
     seen_inbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
     /// The map of peer IPs to their block requests.
-    seen_outbound_block_requests: RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>,
+    seen_outbound_block_requests: RwLock<HashMap<SocketAddr, HashSet<BlockRequest>>>,
     /// The map of peer IPs to the number of puzzle requests.
-    seen_outbound_puzzle_requests: RwLock<IndexMap<SocketAddr, u32>>,
+    seen_outbound_puzzle_requests: RwLock<HashMap<SocketAddr, u32>>,
     /// The map of solution commitments to their last seen timestamp.
     seen_outbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
     seen_outbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
+    /// The map of peer IPs to the number of sent peer requests.
+    seen_outbound_peer_requests: RwLock<HashMap<SocketAddr, u32>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -75,6 +76,7 @@ impl<N: Network> Cache<N> {
             seen_outbound_puzzle_requests: Default::default(),
             seen_outbound_solutions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
             seen_outbound_transactions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
+            seen_outbound_peer_requests: Default::default(),
         }
     }
 }
@@ -166,12 +168,27 @@ impl<N: Network> Cache<N> {
     ) -> Option<OffsetDateTime> {
         Self::refresh_and_insert(&self.seen_outbound_transactions, (peer_ip, transaction))
     }
+
+    /// Returns `true` if the cache contains a peer request from the given peer.
+    pub fn contains_outbound_peer_request(&self, peer_ip: SocketAddr) -> bool {
+        self.seen_outbound_peer_requests.read().get(&peer_ip).map(|r| *r > 0).unwrap_or(false)
+    }
+
+    /// Increment the peer IP's number of peer requests, returning the updated number of peer requests.
+    pub fn increment_outbound_peer_requests(&self, peer_ip: SocketAddr) -> u32 {
+        Self::increment_counter(&self.seen_outbound_peer_requests, peer_ip)
+    }
+
+    /// Decrement the peer IP's number of peer requests, returning the updated number of peer requests.
+    pub fn decrement_outbound_peer_requests(&self, peer_ip: SocketAddr) -> u32 {
+        Self::decrement_counter(&self.seen_outbound_peer_requests, peer_ip)
+    }
 }
 
 impl<N: Network> Cache<N> {
     /// Insert a new timestamp for the given key, returning the number of recent entries.
     fn retain_and_insert<K: Eq + Hash + Clone>(
-        map: &RwLock<IndexMap<K, VecDeque<OffsetDateTime>>>,
+        map: &RwLock<HashMap<K, VecDeque<OffsetDateTime>>>,
         key: K,
         interval_in_secs: i64,
     ) -> usize {
@@ -192,7 +209,7 @@ impl<N: Network> Cache<N> {
     }
 
     /// Increments the key's counter in the map, returning the updated counter.
-    fn increment_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, u32>>, key: K) -> u32 {
+    fn increment_counter<K: Hash + Eq>(map: &RwLock<HashMap<K, u32>>, key: K) -> u32 {
         let mut map_write = map.write();
         // Load the entry for the key, and increment the counter.
         let entry = map_write.entry(key).or_default();
@@ -202,7 +219,7 @@ impl<N: Network> Cache<N> {
     }
 
     /// Decrements the key's counter in the map, returning the updated counter.
-    fn decrement_counter<K: Copy + Hash + Eq>(map: &RwLock<IndexMap<K, u32>>, key: K) -> u32 {
+    fn decrement_counter<K: Copy + Hash + Eq>(map: &RwLock<HashMap<K, u32>>, key: K) -> u32 {
         let mut map_write = map.write();
         // Load the entry for the key, and decrement the counter.
         let entry = map_write.entry(key).or_default();
@@ -243,11 +260,11 @@ impl<N: Network> Cache<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::Testnet3;
+    use snarkvm::prelude::MainnetV0;
 
     use std::net::Ipv4Addr;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     #[test]
     fn test_inbound_solution() {
@@ -335,5 +352,36 @@ mod tests {
 
         // Check that the cache still contains the transaction.
         assert_eq!(cache.seen_outbound_transactions.read().len(), 1);
+    }
+
+    #[test]
+    fn test_outbound_peer_request() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let peer_ip = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1234);
+
+        // Check the cache is empty.
+        assert!(cache.seen_outbound_peer_requests.read().is_empty());
+        assert!(!cache.contains_outbound_peer_request(peer_ip));
+
+        // Increment the peer requests.
+        assert_eq!(cache.increment_outbound_peer_requests(peer_ip), 1);
+
+        // Check the cache contains the peer request.
+        assert!(cache.contains_outbound_peer_request(peer_ip));
+
+        // Increment the peer requests again for the same peer IP.
+        assert_eq!(cache.increment_outbound_peer_requests(peer_ip), 2);
+
+        // Check the cache still contains the peer request.
+        assert!(cache.contains_outbound_peer_request(peer_ip));
+
+        // Decrement the peer requests.
+        assert_eq!(cache.decrement_outbound_peer_requests(peer_ip), 1);
+
+        // Decrement the peer requests again.
+        assert_eq!(cache.decrement_outbound_peer_requests(peer_ip), 0);
+
+        // Check the cache is empty.
+        assert!(!cache.contains_outbound_peer_request(peer_ip));
     }
 }

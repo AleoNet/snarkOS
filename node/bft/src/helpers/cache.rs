@@ -191,11 +191,11 @@ impl<N: Network> Cache<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::Testnet3;
+    use snarkvm::prelude::MainnetV0;
 
     use std::{net::Ipv4Addr, thread, time::Duration};
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     trait Input {
         fn input() -> Self;

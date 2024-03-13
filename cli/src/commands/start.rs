@@ -19,11 +19,11 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey},
         algorithms::Hash,
-        network::{Network, Testnet3},
+        network::{MainnetV0, Network},
     },
     ledger::{
         block::Block,
-        committee::{Committee, MIN_VALIDATOR_STAKE},
+        committee::{Committee, MIN_DELEGATOR_STAKE, MIN_VALIDATOR_STAKE},
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
     },
     prelude::{FromBytes, ToBits, ToBytes},
@@ -31,12 +31,15 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
+use aleo_std::StorageMode;
 use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
+use indexmap::IndexMap;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
+use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
 
@@ -50,11 +53,22 @@ const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 /// The development mode number of genesis committee members.
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+struct BondedBalances(IndexMap<String, (String, u64)>);
+
+impl FromStr for BondedBalances {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s)
+    }
+}
+
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
     /// Specify the network ID of this node
-    #[clap(default_value = "3", long = "network")]
+    #[clap(default_value = "0", long = "network")]
     pub network: u16,
 
     /// Specify this node as a validator
@@ -75,7 +89,7 @@ pub struct Start {
     pub private_key_file: Option<PathBuf>,
 
     /// Specify the IP address and port for the node server
-    #[clap(default_value = "0.0.0.0:4133", long = "node")]
+    #[clap(default_value = "0.0.0.0:4130", long = "node")]
     pub node: SocketAddr,
     /// Specify the IP address and port for the BFT
     #[clap(long = "bft")]
@@ -88,8 +102,11 @@ pub struct Start {
     pub validators: String,
 
     /// Specify the IP address and port for the REST server
-    #[clap(default_value = "0.0.0.0:3033", long = "rest")]
+    #[clap(default_value = "0.0.0.0:3030", long = "rest")]
     pub rest: SocketAddr,
+    /// Specify the requests per second (RPS) rate limit per IP for the REST server
+    #[clap(default_value = "10", long = "rest-rps")]
+    pub rest_rps: u32,
     /// If the flag is set, the node will not initialize the REST server
     #[clap(long)]
     pub norest: bool,
@@ -103,11 +120,14 @@ pub struct Start {
     /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
+    /// Enables the metrics exporter
+    #[clap(default_value = "false", long = "metrics")]
+    pub metrics: bool,
 
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
-    /// If the flag is set, the node will not prefresh from a CDN
+    /// If the flag is set, the node will not prefetch from a CDN
     #[clap(long)]
     pub nocdn: bool,
 
@@ -117,6 +137,16 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
+    /// If developtment mode is enabled, specify whether node 0 should generate traffic to drive the network
+    #[clap(default_value = "false", long = "no-dev-txs")]
+    pub no_dev_txs: bool,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage_path")]
+    pub storage_path: Option<PathBuf>,
+
+    #[clap(long)]
+    /// If development mode is enabled, specify the custom bonded balances as a json object. (default: None)
+    dev_bonded_balances: Option<BondedBalances>,
 }
 
 impl Start {
@@ -130,9 +160,9 @@ impl Start {
             let mut cli = self.clone();
             // Parse the network.
             match cli.network {
-                3 => {
+                0 => {
                     // Parse the node from the configurations.
-                    let node = cli.parse_node::<Testnet3>().await.expect("Failed to parse the node");
+                    let node = cli.parse_node::<MainnetV0>().await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
                     if !cli.nodisplay {
                         // Initialize the display.
@@ -214,7 +244,10 @@ impl Start {
                 // Parse the private key directly.
                 (Some(private_key), None) => Account::from_str(private_key.trim()),
                 // Parse the private key from a file.
-                (None, Some(path)) => Account::from_str(std::fs::read_to_string(path)?.trim()),
+                (None, Some(path)) => {
+                    check_permissions(path)?;
+                    Account::from_str(std::fs::read_to_string(path)?.trim())
+                }
                 // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
                 (None, None) => match self.client {
                     true => Account::new(&mut rand::thread_rng()),
@@ -235,7 +268,7 @@ impl Start {
                         let _ = PrivateKey::<N>::new(&mut rng)?;
                     }
                     let private_key = PrivateKey::<N>::new(&mut rng)?;
-                    println!("🔑 Your development private key for node {dev} is {}\n", private_key.to_string().bold());
+                    println!("🔑 Your development private key for node {dev} is {}.\n", private_key.to_string().bold());
                     private_key
                 })
             }
@@ -301,23 +334,79 @@ impl Start {
             // Initialize the development private keys.
             let development_private_keys =
                 (0..num_committee_members).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
+            // Initialize the development addresses.
+            let development_addresses =
+                development_private_keys.iter().map(Address::<N>::try_from).collect::<Result<Vec<_>>>()?;
 
-            // Construct the committee.
-            let committee = {
-                // Calculate the committee stake per member.
-                let stake_per_member =
-                    N::STARTING_SUPPLY.saturating_div(2).saturating_div(num_committee_members as u64);
-                ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
+            // Construct the committee based on the state of the bonded balances.
+            let (committee, bonded_balances) = match &self.dev_bonded_balances {
+                Some(bonded_balances) => {
+                    // Parse the bonded balances.
+                    let bonded_balances = bonded_balances
+                        .0
+                        .iter()
+                        .map(|(staker_address, (validator_address, amount))| {
+                            let staker_addr = Address::<N>::from_str(staker_address)?;
+                            let validator_addr = Address::<N>::from_str(validator_address)?;
+                            Ok((staker_addr, (validator_addr, *amount)))
+                        })
+                        .collect::<Result<IndexMap<_, _>>>()?;
 
-                // Construct the committee members and distribute stakes evenly among committee members.
-                let members = development_private_keys
-                    .iter()
-                    .map(|private_key| Ok((Address::try_from(private_key)?, (stake_per_member, true))))
-                    .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+                    // Construct the committee members.
+                    let mut members = IndexMap::new();
+                    for (staker_address, (validator_address, amount)) in bonded_balances.iter() {
+                        // Ensure that the staking amount is sufficient.
+                        match staker_address == validator_address {
+                            true => ensure!(amount >= &MIN_VALIDATOR_STAKE, "Validator stake is too low"),
+                            false => ensure!(amount >= &MIN_DELEGATOR_STAKE, "Delegator stake is too low"),
+                        }
 
-                // Output the committee.
-                Committee::<N>::new(0u64, members)?
+                        // Ensure that the validator address is included in the list of development addresses.
+                        ensure!(
+                            development_addresses.contains(validator_address),
+                            "Validator address {validator_address} is not included in the list of development addresses"
+                        );
+
+                        // Add or update the validator entry in the list of members.
+                        members
+                            .entry(*validator_address)
+                            .and_modify(|(stake, _)| *stake += amount)
+                            .or_insert((*amount, true));
+                    }
+                    // Construct the committee.
+                    let committee = Committee::<N>::new(0u64, members)?;
+                    (committee, bonded_balances)
+                }
+                None => {
+                    // Calculate the committee stake per member.
+                    let stake_per_member =
+                        N::STARTING_SUPPLY.saturating_div(2).saturating_div(num_committee_members as u64);
+                    ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
+
+                    // Construct the committee members and distribute stakes evenly among committee members.
+                    let members = development_addresses
+                        .iter()
+                        .map(|address| (*address, (stake_per_member, true)))
+                        .collect::<IndexMap<_, _>>();
+
+                    // Construct the bonded balances.
+                    let bonded_balances = members
+                        .iter()
+                        .map(|(address, (stake, _))| (*address, (*address, *stake)))
+                        .collect::<IndexMap<_, _>>();
+                    // Construct the committee.
+                    let committee = Committee::<N>::new(0u64, members)?;
+
+                    (committee, bonded_balances)
+                }
             };
+
+            // Ensure that the number of committee members is correct.
+            ensure!(
+                committee.members().len() == num_committee_members as usize,
+                "Number of committee members {} does not match the expected number of members {num_committee_members}",
+                committee.members().len()
+            );
 
             // Calculate the public balance per validator.
             let remaining_balance = N::STARTING_SUPPLY.saturating_sub(committee.total_stake());
@@ -344,7 +433,7 @@ impl Start {
             }
 
             // Construct the genesis block.
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, &mut rng)
+            load_or_compute_genesis(development_private_keys[0], committee, public_balances, bonded_balances, &mut rng)
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
@@ -398,13 +487,12 @@ impl Start {
         // If the display is not enabled, render the welcome message.
         if self.nodisplay {
             // Print the Aleo address.
-            println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
+            println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
             // Print the node type and network.
             println!(
-                "🧭 Starting {} on {} {} at {}.\n",
+                "🧭 Starting {} on {} at {}.\n",
                 node_type.description().bold(),
                 N::NAME.bold(),
-                "Phase 3".bold(),
                 self.node.to_string().bold()
             );
 
@@ -428,12 +516,35 @@ impl Start {
         // Check if the machine meets the minimum requirements for a validator.
         crate::helpers::check_validator_machine(node_type);
 
+        // Initialize the metrics.
+        if self.metrics {
+            metrics::initialize_metrics();
+        }
+
+        // Initialize the storage mode.
+        let storage_mode = match &self.storage_path {
+            Some(path) => StorageMode::Custom(path.clone()),
+            None => StorageMode::from(self.dev),
+        };
+
+        // Determine whether to generate background transactions in dev mode.
+        let dev_txs = match self.dev {
+            Some(_) => !self.no_dev_txs,
+            None => {
+                // If the `no_dev_txs` flag is set, inform the user that it is ignored.
+                if self.no_dev_txs {
+                    eprintln!("The '--no-dev-txs' flag is ignored because '--dev' is not set");
+                }
+                false
+            }
+        };
+
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, bft_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
-            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
-            NodeType::Client => Node::new_client(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, dev_txs).await,
+            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
+            NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }
     }
 
@@ -441,20 +552,12 @@ impl Start {
     fn runtime() -> Runtime {
         // Retrieve the number of cores.
         let num_cores = num_cpus::get();
-        // Determine the number of main cores.
-        let main_cores = match num_cores {
-            // Insufficient
-            0..=3 => unreachable!("The number of cores is insufficient"),
-            // Efficiency mode
-            4..=8 => 2,
-            // Standard mode
-            9..=16 => 8,
-            // Performance mode
-            _ => 16,
-        };
 
+        // Initialize the number of tokio worker threads, max tokio blocking threads, and rayon cores.
+        // Note: We intentionally set the number of tokio worker threads and number of rayon cores to be
+        // more than the number of physical cores, because the node is expected to be I/O-bound.
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
-            { (num_cores.min(main_cores), 512, num_cores.saturating_sub(main_cores).max(1)) };
+            (2 * num_cores, 512, num_cores);
 
         // Initialize the parallelization parameters.
         rayon::ThreadPoolBuilder::new()
@@ -474,11 +577,32 @@ impl Start {
     }
 }
 
+fn check_permissions(path: &PathBuf) -> Result<(), snarkvm::prelude::Error> {
+    #[cfg(target_family = "unix")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        ensure!(path.exists(), "The file '{:?}' does not exist", path);
+        let parent = path.parent();
+        if let Some(parent) = parent {
+            let parent_permissions = parent.metadata()?.permissions().mode();
+            ensure!(
+                parent_permissions & 0o777 == 0o700,
+                "The folder {:?} must be readable only by the owner (0700)",
+                parent
+            );
+        }
+        let permissions = path.metadata()?.permissions().mode();
+        ensure!(permissions & 0o777 == 0o600, "The file {:?} must be readable only by the owner (0600)", path);
+    }
+    Ok(())
+}
+
 /// Loads or computes the genesis block.
 fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
+    bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, u64)>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
@@ -488,20 +612,21 @@ fn load_or_compute_genesis<N: Network>(
     preimage.extend(genesis_private_key.to_bytes_le()?);
     preimage.extend(committee.to_bytes_le()?);
     preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
+    preimage.extend(&to_bytes_le![bonded_balances.iter().collect::<Vec<(_, _)>>()]?);
 
     // Input the parameters' metadata.
-    preimage.extend(snarkvm::parameters::testnet3::BondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::UnbondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::UnbondDelegatorAsValidatorVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::SetValidatorStateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::TransferPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::FeePrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::FeePublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::testnet3::InclusionVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::UnbondDelegatorAsValidatorVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
+    preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
 
     // Initialize the hasher.
     let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
@@ -529,9 +654,9 @@ fn load_or_compute_genesis<N: Network>(
     /* Otherwise, compute the genesis block and store it. */
 
     // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(Some(0))?)?;
     // Initialize the genesis block.
-    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng)?;
+    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng)?;
     // Write the genesis block to the file.
     std::fs::write(&file_path, block.to_bytes_le()?)?;
     // Return the genesis block.
@@ -542,9 +667,9 @@ fn load_or_compute_genesis<N: Network>(
 mod tests {
     use super::*;
     use crate::commands::{Command, CLI};
-    use snarkvm::prelude::Testnet3;
+    use snarkvm::prelude::MainnetV0;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     #[test]
     fn test_parse_trusted_peers() {
@@ -770,7 +895,7 @@ mod tests {
             "--validators",
             "IP1,IP2,IP3",
             "--rest",
-            "127.0.0.1:3033",
+            "127.0.0.1:3030",
         ];
         let cli = CLI::parse_from(arg_vec);
 
@@ -780,8 +905,8 @@ mod tests {
             assert!(start.validator);
             assert_eq!(start.private_key.as_deref(), Some("PRIVATE_KEY"));
             assert_eq!(start.cdn, "CDN");
-            assert_eq!(start.rest, "127.0.0.1:3033".parse().unwrap());
-            assert_eq!(start.network, 3);
+            assert_eq!(start.rest, "127.0.0.1:3030".parse().unwrap());
+            assert_eq!(start.network, 0);
             assert_eq!(start.peers, "IP1,IP2,IP3");
             assert_eq!(start.validators, "IP1,IP2,IP3");
         } else {

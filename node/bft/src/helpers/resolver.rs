@@ -95,7 +95,7 @@ mod tests {
     use super::*;
     use snarkvm::{prelude::Rng, utilities::TestRng};
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     #[test]
     fn test_resolver() {

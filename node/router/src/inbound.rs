@@ -35,8 +35,12 @@ use snarkvm::prelude::{
 };
 
 use anyhow::{anyhow, bail, Result};
+use snarkos_node_tcp::is_bogon_ip;
 use std::{net::SocketAddr, time::Instant};
 use tokio::task::spawn_blocking;
+
+/// The max number of peers to send in a `PeerResponse` message.
+const MAX_PEERS_TO_SEND: usize = u8::MAX as usize;
 
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
@@ -67,7 +71,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         trace!("Received '{}' from '{peer_ip}'", message.name());
 
         // This match statement handles the inbound message by deserializing the message,
-        // checking the message is valid, and then calling the appropriate (trait) handler.
+        // checking that the message is valid, and then calling the appropriate (trait) handler.
         match message {
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
@@ -117,10 +121,16 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 true => Ok(()),
                 false => bail!("Peer '{peer_ip}' sent an invalid peer request"),
             },
-            Message::PeerResponse(message) => match self.peer_response(peer_ip, &message.peers) {
-                true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
-            },
+            Message::PeerResponse(message) => {
+                if !self.router().cache.contains_outbound_peer_request(peer_ip) {
+                    bail!("Peer '{peer_ip}' is not following the protocol (unexpected peer response)")
+                }
+
+                match self.peer_response(peer_ip, &message.peers) {
+                    true => Ok(()),
+                    false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
+                }
+            }
             Message::Ping(message) => {
                 // Ensure the message protocol version is not outdated.
                 if message.version < Message::<N>::VERSION {
@@ -200,7 +210,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 let seen_before = self.router().cache.insert_inbound_solution(peer_ip, message.solution_id).is_some();
                 // Determine whether to propagate the solution.
                 if seen_before {
-                    bail!("Skipping 'UnconfirmedSolution' from '{peer_ip}'")
+                    trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
+                    return Ok(());
                 }
                 // Perform the deferred non-blocking deserialization of the solution.
                 let solution = match message.solution.deserialize().await {
@@ -225,7 +236,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     self.router().cache.insert_inbound_transaction(peer_ip, message.transaction_id).is_some();
                 // Determine whether to propagate the transaction.
                 if seen_before {
-                    bail!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'")
+                    trace!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'");
+                    return Ok(());
                 }
                 // Perform the deferred non-blocking deserialization of the transaction.
                 let transaction = match message.transaction.deserialize().await {
@@ -256,7 +268,18 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Retrieve the connected peers.
         let peers = self.router().connected_peers();
         // Filter out invalid addresses.
-        let peers = peers.into_iter().filter(|ip| self.router().is_valid_peer_ip(ip)).collect();
+        let peers = match self.router().is_dev() {
+            // In development mode, relax the validity requirements to make operating devnets more flexible.
+            true => {
+                peers.into_iter().filter(|ip| *ip != peer_ip && !is_bogon_ip(ip.ip())).take(MAX_PEERS_TO_SEND).collect()
+            }
+            // In production mode, ensure the peer IPs are valid.
+            false => peers
+                .into_iter()
+                .filter(|ip| *ip != peer_ip && self.router().is_valid_peer_ip(ip))
+                .take(MAX_PEERS_TO_SEND)
+                .collect(),
+        };
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
         true
@@ -264,8 +287,17 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
     /// Handles a `PeerResponse` message.
     fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
+        // Check if the number of peers received is less than MAX_PEERS_TO_SEND.
+        if peers.len() > MAX_PEERS_TO_SEND {
+            return false;
+        }
         // Filter out invalid addresses.
-        let peers = peers.iter().copied().filter(|ip| self.router().is_valid_peer_ip(ip)).collect::<Vec<_>>();
+        let peers = match self.router().is_dev() {
+            // In development mode, relax the validity requirements to make operating devnets more flexible.
+            true => peers.iter().copied().filter(|ip| !is_bogon_ip(ip.ip())).collect::<Vec<_>>(),
+            // In production mode, ensure the peer IPs are valid.
+            false => peers.iter().copied().filter(|ip| self.router().is_valid_peer_ip(ip)).collect(),
+        };
         // Adds the given peer IPs to the list of candidate peers.
         self.router().insert_candidate_peers(&peers);
         true

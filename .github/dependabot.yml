@@ -5,5 +5,5 @@ updates:
   schedule:
     interval: daily
     time: "10:00"
-  target-branch: "testnet3"
+  target-branch: "mainnet"
   open-pull-requests-limit: 10

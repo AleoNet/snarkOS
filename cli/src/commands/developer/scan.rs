@@ -15,7 +15,6 @@
 #![allow(clippy::type_complexity)]
 
 use super::CurrentNetwork;
-
 use snarkvm::prelude::{block::Block, Ciphertext, Field, FromBytes, Network, Plaintext, PrivateKey, Record, ViewKey};
 
 use anyhow::{bail, ensure, Result};
@@ -26,12 +25,13 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+use zeroize::Zeroize;
 
 const MAX_BLOCK_RANGE: u32 = 50;
 const CDN_ENDPOINT: &str = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3";
 
 /// Scan the snarkOS node for records.
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Zeroize)]
 pub struct Scan {
     /// An optional private key scan for unspent records.
     #[clap(short, long)]
@@ -122,10 +122,10 @@ impl Scan {
             }
             (Some(start), None, None) => {
                 // Request the latest block height from the endpoint.
-                let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
+                let endpoint = format!("{}/mainnet/latest/height", self.endpoint);
                 let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
-                // Print warning message if the user is attempting to scan the whole chain.
+                // Print a warning message if the user is attempting to scan the whole chain.
                 if start == 0 {
                     println!("⚠️  Attention - Scanning the entire chain. This may take a while...\n");
                 }
@@ -135,7 +135,7 @@ impl Scan {
             (None, Some(end), None) => Ok((0, end)),
             (None, None, Some(last)) => {
                 // Request the latest block height from the endpoint.
-                let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
+                let endpoint = format!("{}/mainnet/latest/height", self.endpoint);
                 let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
                 Ok((latest_height.saturating_sub(last), latest_height))
@@ -173,7 +173,7 @@ impl Scan {
 
         // Fetch the genesis block from the endpoint.
         let genesis_block: Block<CurrentNetwork> =
-            ureq::get(&format!("{endpoint}/testnet3/block/0")).call()?.into_json()?;
+            ureq::get(&format!("{endpoint}/mainnet/block/0")).call()?.into_json()?;
         // Determine if the endpoint is on a development network.
         let is_development_network = genesis_block != Block::from_bytes_le(CurrentNetwork::genesis_bytes())?;
 
@@ -210,7 +210,7 @@ impl Scan {
             let request_end = request_start.saturating_add(num_blocks_to_request);
 
             // Establish the endpoint.
-            let blocks_endpoint = format!("{endpoint}/testnet3/blocks?start={request_start}&end={request_end}");
+            let blocks_endpoint = format!("{endpoint}/mainnet/blocks?start={request_start}&end={request_end}");
             // Fetch blocks
             let blocks: Vec<Block<CurrentNetwork>> = ureq::get(&blocks_endpoint).call()?.into_json()?;
 
@@ -222,7 +222,7 @@ impl Scan {
             request_start = request_start.saturating_add(num_blocks_to_request);
         }
 
-        // Print final complete message.
+        // Print the final complete message.
         println!("\rScanning {total_blocks} blocks for records (100% complete)...   \n");
         stdout().flush()?;
 
@@ -252,25 +252,41 @@ impl Scan {
         // Construct the runtime.
         let rt = tokio::runtime::Runtime::new()?;
 
+        // Create a placeholder shutdown flag.
+        let _shutdown = Default::default();
+
         // Scan the blocks via the CDN.
         rt.block_on(async move {
-            let _ = snarkos_node_cdn::load_blocks(&cdn, cdn_request_start, Some(cdn_request_end), move |block| {
-                // Check if the block is within the requested range.
-                if block.height() < start_height || block.height() > end_height {
-                    return Ok(());
-                }
+            let _ = snarkos_node_cdn::load_blocks(
+                &cdn,
+                cdn_request_start,
+                Some(cdn_request_end),
+                _shutdown,
+                move |block| {
+                    // Check if the block is within the requested range.
+                    if block.height() < start_height || block.height() > end_height {
+                        return Ok(());
+                    }
 
-                // Log the progress.
-                let percentage_complete =
-                    block.height().saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
-                print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
-                stdout().flush()?;
+                    // Log the progress.
+                    let percentage_complete =
+                        block.height().saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
+                    print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
+                    stdout().flush()?;
 
-                // Scan the block for records.
-                Self::scan_block(&block, &endpoint, private_key, &view_key, &address_x_coordinate, records.clone())?;
+                    // Scan the block for records.
+                    Self::scan_block(
+                        &block,
+                        &endpoint,
+                        private_key,
+                        &view_key,
+                        &address_x_coordinate,
+                        records.clone(),
+                    )?;
 
-                Ok(())
-            })
+                    Ok(())
+                },
+            )
             .await;
         });
 
@@ -316,7 +332,7 @@ impl Scan {
                 Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::serial_number(private_key, commitment)?;
 
             // Establish the endpoint.
-            let endpoint = format!("{endpoint}/testnet3/find/transitionID/{serial_number}");
+            let endpoint = format!("{endpoint}/mainnet/find/transitionID/{serial_number}");
 
             // Check if the record is spent.
             match ureq::get(&endpoint).call() {
@@ -341,9 +357,9 @@ impl Scan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::{TestRng, Testnet3};
+    use snarkvm::prelude::{MainnetV0, TestRng};
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     #[test]
     fn test_parse_account() {

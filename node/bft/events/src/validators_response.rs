@@ -72,7 +72,7 @@ pub mod prop_tests {
     use std::net::{IpAddr, SocketAddr};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_valid_socket_addr() -> BoxedStrategy<SocketAddr> {
         any::<(IpAddr, u16)>().prop_map(|(ip_addr, port)| SocketAddr::new(ip_addr, port)).boxed()
