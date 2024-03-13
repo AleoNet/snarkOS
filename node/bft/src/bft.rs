@@ -226,7 +226,7 @@ impl<N: Network> BFT<N> {
             if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
                 // Ensure the state of the leader certificate is consistent with the BFT being ready.
                 if !is_ready {
-                    error!(is_ready, "BFT - A leader certificate was found, but 'is_ready' is false");
+                    debug!(is_ready, "BFT - A leader certificate was found, but 'is_ready' is false");
                 }
                 // Log the leader election.
                 let leader_round = leader_certificate.round();
