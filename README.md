@@ -152,6 +152,15 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Before running the command above (`snarkos account new`) try `source ~/.bashrc`
 - Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, and the command is `snarkos`
 
+### 4. How do I use the CLI to sign and verify a message?
+
+1. Generate an account with `snarkos account new` if you haven't already
+2. Sign a message with your private key using `snarkos account sign --raw -m "Message" --private-key-file=<PRIVATE_KEY_FILE>`
+3. Verify your signature with `snarkos account verify --raw -m "Message" -s sign1SignatureHere -a aleo1YourAccountAddress`
+
+Note, using the `--raw` flag with the command will sign plaintext messages as bytes rather than [Aleo](https://developer.aleo.org/aleo/language#data-types-and-values) values such as `1u8` or `100field`.
+
+
 ## 5. Command Line Interface
 
 To run a node with custom settings, refer to the options and flags available in the `snarkOS` CLI.
