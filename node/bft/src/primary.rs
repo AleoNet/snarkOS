@@ -1005,11 +1005,16 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
+                // TODO: We can start pre-emptively process new certificates here when we are close to being synced up.
+
+                // TODO (raychu86): Uncomment this.
+
                 // If the primary is not synced, then do not store the certificate.
-                if !self_.sync.is_synced() {
-                    trace!("Skipping a certified batch from '{peer_ip}' {}", "(node is syncing)".dimmed());
-                    continue;
-                }
+                // if !self_.sync.is_synced() {
+                //     trace!("Skipping a certified batch from '{peer_ip}' {}", "(node is syncing)".dimmed());
+                //     continue;
+                // }
+
                 // Spawn a task to process the batch certificate.
                 let self_ = self_.clone();
                 tokio::spawn(async move {
