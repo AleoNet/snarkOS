@@ -120,16 +120,7 @@ pub async fn start_bft(
     // Initialize the components.
     let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the translucent ledger service.
-    let gen_key = account.private_key();
-    let public_balance_per_validator =
-        (1_500_000_000_000_000 - (num_nodes as u64) * 1_000_000_000_000) / (num_nodes as u64);
-    let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
-    for address in committee.members().keys() {
-        balances.insert(*address, public_balance_per_validator);
-    }
-    let mut rng = TestRng::default();
-    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), node_id, &mut rng);
-    let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger, Arc::new(AtomicBool::new(false))));
+    let ledger = create_ledger(&account, num_nodes, committee, node_id);
     // Initialize the storage.
     let storage = Storage::new(
         ledger.clone(),
@@ -169,16 +160,8 @@ pub async fn start_primary(
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (committee, account) = initialize_components(node_id, num_nodes)?;
-    let gen_key = account.private_key();
-    let public_balance_per_validator =
-        (1_500_000_000_000_000 - (num_nodes as u64) * 1_000_000_000_000) / (num_nodes as u64);
-    let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
-    for address in committee.members().keys() {
-        balances.insert(*address, public_balance_per_validator);
-    }
-    let mut rng = TestRng::default();
-    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), node_id, &mut rng);
-    let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger, Arc::new(AtomicBool::new(false))));
+    // Initialize the translucent ledger service.
+    let ledger = create_ledger(&account, num_nodes, committee, node_id);
     // Initialize the storage.
     let storage = Storage::new(
         ledger.clone(),
@@ -200,6 +183,25 @@ pub async fn start_primary(
     handle_signals(&primary);
     // Return the primary instance.
     Ok((primary, sender))
+}
+
+/// Initialize the translucent ledger service.
+fn create_ledger(
+    account: &Account<CurrentNetwork>,
+    num_nodes: u16,
+    committee: Committee<snarkvm::prelude::MainnetV0>,
+    node_id: u16,
+) -> Arc<TranslucentLedgerService<snarkvm::prelude::MainnetV0, ConsensusMemory<snarkvm::prelude::MainnetV0>>> {
+    let gen_key = account.private_key();
+    let public_balance_per_validator =
+        (1_500_000_000_000_000 - (num_nodes as u64) * 1_000_000_000_000) / (num_nodes as u64);
+    let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
+    for address in committee.members().keys() {
+        balances.insert(*address, public_balance_per_validator);
+    }
+    let mut rng = TestRng::default();
+    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), node_id, &mut rng);
+    Arc::new(TranslucentLedgerService::new(gen_ledger, Arc::new(AtomicBool::new(false))))
 }
 
 pub type CurrentLedger = Ledger<CurrentNetwork, ConsensusMemory<CurrentNetwork>>;
