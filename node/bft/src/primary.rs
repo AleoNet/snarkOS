@@ -981,6 +981,24 @@ impl<N: Network> Primary<N> {
             }
         });
 
+        // Start the round incrementer.   
+        let self_ = self.clone();
+        self.spawn(async move {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
+                let current_round = self_.current_round();
+                if let Some(bft_sender) = self_.bft_sender.get() {
+                    match bft_sender.send_primary_round_to_bft(current_round).await {
+                        Ok(_) => {
+                        },
+                        Err(e) => {
+                            warn!("Failed to update the BFT to the next round - {}", e);
+                        },
+                    }
+                }
+            }
+        });
+
         // Process the batch signature.
         let self_ = self.clone();
         self.spawn(async move {
