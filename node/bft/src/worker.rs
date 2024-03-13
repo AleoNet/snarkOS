@@ -15,6 +15,7 @@
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, max_redundant_requests, Pending, Ready, Storage, WorkerReceiver},
+    spawn_blocking,
     ProposedBatch,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -376,7 +377,11 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
                 // Process the transmission response.
-                self_.finish_transmission_request(peer_ip, transmission_response);
+                let self__ = self_.clone();
+                let _ = spawn_blocking!({
+                    self__.finish_transmission_request(peer_ip, transmission_response);
+                    Ok(())
+                });
             }
         });
     }
