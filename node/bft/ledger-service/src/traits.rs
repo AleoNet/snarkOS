@@ -51,6 +51,9 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// Returns the block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
 
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64>;
+
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>>;
 
