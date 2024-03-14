@@ -55,10 +55,18 @@ use tokio::{
 #[cfg(feature = "metrics")]
 use std::collections::HashMap;
 
-/// Percentage of mempool transactions capacity reserved for deployments.
-const CAPACITY_FOR_DEPLOYMENTS: usize = 20;
-/// Percentage of mempool transactions capacity reserved for executions.
-const CAPACITY_FOR_EXECUTIONS: usize = 80;
+/// The capacity of the queue reserved for deployments.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 10;
+/// The capacity of the queue reserved for executions.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_EXECUTIONS: usize = 1 << 10;
+/// The capacity of the queue reserved for solutions.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_SOLUTIONS: usize = 1 << 10;
+/// The **suggested** maximum number of deployments in each interval.
+/// Note: This is an inbound queue limit, not a Narwhal-enforced limit.
+const MAX_DEPLOYMENTS_PER_INTERVAL: usize = 1;
 
 /// Helper struct to track incoming transactions.
 struct TransactionsQueue<N: Network> {
@@ -69,14 +77,8 @@ struct TransactionsQueue<N: Network> {
 impl<N: Network> Default for TransactionsQueue<N> {
     fn default() -> Self {
         Self {
-            deployments: LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_DEPLOYMENTS / 100)
-                    .unwrap(),
-            ),
-            executions: LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_EXECUTIONS / 100)
-                    .unwrap(),
-            ),
+            deployments: LruCache::new(NonZeroUsize::new(CAPACITY_FOR_DEPLOYMENTS).unwrap()),
+            executions: LruCache::new(NonZeroUsize::new(CAPACITY_FOR_EXECUTIONS).unwrap()),
         }
     }
 }
@@ -223,7 +225,6 @@ impl<N: Network> Consensus<N> {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
             self.transmissions_queue_timestamps.lock().insert(TransmissionID::Solution(solution.commitment()), snarkos_node_bft::helpers::now());
-            info!("added unconfirmed solution {} to queue", solution.commitment());
         }
         // Process the unconfirmed solution.
         {
@@ -283,7 +284,6 @@ impl<N: Network> Consensus<N> {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
             self.transmissions_queue_timestamps.lock().insert(TransmissionID::Transaction(transaction.id()), snarkos_node_bft::helpers::now());
-            info!("added unconfirmed transaction {} to queue", transaction.id());
         }
         // Process the unconfirmed transaction.
         {
@@ -325,7 +325,7 @@ impl<N: Network> Consensus<N> {
             // Acquire the lock on the transactions queue.
             let mut tx_queue = self.transactions_queue.lock();
             // Determine the number of deployments to send.
-            let num_deployments = tx_queue.deployments.len().min(capacity * CAPACITY_FOR_DEPLOYMENTS / 100);
+            let num_deployments = tx_queue.deployments.len().min(capacity).min(MAX_DEPLOYMENTS_PER_INTERVAL);
             // Determine the number of executions to send.
             let num_executions = tx_queue.executions.len().min(capacity.saturating_sub(num_deployments));
             // Create an iterator which will select interleaved deployments and executions within the capacity.
@@ -414,7 +414,7 @@ impl<N: Network> Consensus<N> {
         let current_block_timestamp = self.ledger.latest_block().header().metadata().timestamp();
 
         // Create the candidate next block.
-        let next_block     = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
+        let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
         // Check that the block is well-formed.
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.
@@ -439,13 +439,12 @@ impl<N: Network> Consensus<N> {
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
             metrics::histogram(metrics::consensus::BLOCK_LATENCY, block_latency as f64);
-        } 
+        }
         Ok(())
     }
 
     #[cfg(feature = "metrics")]
     fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
-        info!("adding latency to next block");
         let age_threshold_seconds = 30 * 60; // 30 minutes set as stale transmission threshold
     
         let mut keys_to_remove = Vec::new();
@@ -462,7 +461,6 @@ impl<N: Network> Consensus<N> {
                 metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
                 keys_to_remove.push(key.clone());
             } else {
-                info!("looking for transmission key {}", key);
                 let transmission_type = match key {
                     TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
                     TransmissionID::Transaction(transaction_id) if transaction_ids.contains(transaction_id) => Some("transaction"),
