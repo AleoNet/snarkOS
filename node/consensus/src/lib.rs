@@ -442,8 +442,8 @@ impl<N: Network> Consensus<N> {
     }
 
     #[cfg(feature = "metrics")]
-    fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
-        let age_threshold_seconds = 30 * 60; // 30 minutes set as stale transmission threshold
+    fn add_transmission_latency_metric(&self, next_block: &Block<N>) {hold
+        const AGE_THRESHOLD_SECONDS: i32 = 30 * 60; // 30 minutes set as stale transmission threshold
     
         let mut keys_to_remove = Vec::new();
         let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
@@ -454,7 +454,7 @@ impl<N: Network> Consensus<N> {
         for (key, timestamp) in transmission_queue_timestamps.iter() {
             let elapsed_time = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - *timestamp) as u64);
     
-            if elapsed_time.as_secs() > age_threshold_seconds as u64 {
+            if elapsed_time.as_secs() > AGE_THRESHOLD_SECONDS as u64 {
                 // This entry is stale-- remove it from transmission queue and record it as a stale transmission
                 metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
                 keys_to_remove.push(key.clone());
@@ -468,8 +468,6 @@ impl<N: Network> Consensus<N> {
                 if let Some(transmission_type_string) = transmission_type {
                     metrics::histogram_label(metrics::consensus::TRANSMISSION_LATENCY, "transmission_type", transmission_type_string.to_string(), elapsed_time.as_secs_f64());
                     keys_to_remove.push(key.clone());
-                } else {
-                    continue
                 }
             }
         }
