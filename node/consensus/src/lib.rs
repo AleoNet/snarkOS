@@ -223,6 +223,7 @@ impl<N: Network> Consensus<N> {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
             self.transmissions_queue_timestamps.lock().insert(TransmissionID::Solution(solution.commitment()), snarkos_node_bft::helpers::now());
+            info!("added unconfirmed solution to queue");
         }
         // Process the unconfirmed solution.
         {
@@ -282,6 +283,7 @@ impl<N: Network> Consensus<N> {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
             self.transmissions_queue_timestamps.lock().insert(TransmissionID::Transaction(transaction.id()), snarkos_node_bft::helpers::now());
+            info!("added unconfirmed transaction to queue");
         }
         // Process the unconfirmed transaction.
         {
@@ -443,6 +445,7 @@ impl<N: Network> Consensus<N> {
 
     #[cfg(feature = "metrics")]
     fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
+        info!("adding latency to next block");
         let age_threshold_seconds = 30 * 60; // 30 minutes set as stale transmission threshold
     
         let mut keys_to_remove = Vec::new();
@@ -459,6 +462,7 @@ impl<N: Network> Consensus<N> {
                 metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
                 keys_to_remove.push(key.clone());
             } else {
+                info!("looking for transmission key {}", key);
                 let transmission_type = match key {
                     TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
                     TransmissionID::Transaction(transaction_id) if transaction_ids.contains(transaction_id) => Some("transaction"),
