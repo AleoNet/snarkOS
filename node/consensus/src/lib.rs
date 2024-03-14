@@ -130,9 +130,7 @@ impl<N: Network> Consensus<N> {
             ledger,
             bft,
             primary_sender: Default::default(),
-            solutions_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
-            ))),
+            solutions_queue: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(CAPACITY_FOR_SOLUTIONS).unwrap()))),
             transactions_queue: Default::default(),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
