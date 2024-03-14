@@ -40,6 +40,7 @@ use crate::{
 use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
 use snarkos_node_bft_ledger_service::LedgerService;
+use snarkos_node_sync::MAX_BLOCKS_BEHIND;
 use snarkvm::{
     console::{
         account::Signature,
@@ -1005,8 +1006,9 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
-                // If the primary is not synced, then do not store the certificate.
-                if !self_.sync.is_synced() {
+                // If the primary is not synced and lagging by more than `MAX_BLOCKS_BEHIND`, then do not store the certificate.
+                // This allows us to start processing the certificate as soon as we are within `MAX_BLOCKS_BEHIND` blocks.
+                if !self_.sync.is_synced() && self_.sync.num_blocks_behind() > MAX_BLOCKS_BEHIND {
                     trace!("Skipping a certified batch from '{peer_ip}' {}", "(node is syncing)".dimmed());
                     continue;
                 }
