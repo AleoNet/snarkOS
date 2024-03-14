@@ -442,7 +442,7 @@ impl<N: Network> Consensus<N> {
     }
 
     #[cfg(feature = "metrics")]
-    fn add_transmission_latency_metric(&self, next_block: &Block<N>) {hold
+    fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
         const AGE_THRESHOLD_SECONDS: i32 = 30 * 60; // 30 minutes set as stale transmission threshold
     
         let mut keys_to_remove = Vec::new();
