@@ -15,6 +15,7 @@
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, max_redundant_requests, Pending, Ready, Storage, WorkerReceiver},
+    spawn_blocking,
     ProposedBatch,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -376,7 +377,11 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
                 // Process the transmission response.
-                self_.finish_transmission_request(peer_ip, transmission_response);
+                let self__ = self_.clone();
+                let _ = spawn_blocking!({
+                    self__.finish_transmission_request(peer_ip, transmission_response);
+                    Ok(())
+                });
             }
         });
     }
@@ -477,6 +482,7 @@ mod tests {
             committee::Committee,
             narwhal::{BatchCertificate, Subdag, Transmission, TransmissionID},
         },
+        prelude::Address,
     };
 
     use bytes::Bytes;
@@ -505,9 +511,12 @@ mod tests {
             fn latest_round(&self) -> u64;
             fn latest_block_height(&self) -> u32;
             fn latest_block(&self) -> Block<N>;
+            fn latest_leader(&self) -> Option<(u64, Address<N>)>;
+            fn update_latest_leader(&self, round: u64, leader: Address<N>);
             fn contains_block_height(&self, height: u32) -> bool;
             fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32>;
             fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
+            fn get_block_round(&self, height: u32) -> Result<u64>;
             fn get_block(&self, height: u32) -> Result<Block<N>>;
             fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
             fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;

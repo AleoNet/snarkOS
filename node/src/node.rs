@@ -50,6 +50,7 @@ impl<N: Network> Node<N> {
         genesis: Block<N>,
         cdn: Option<String>,
         storage_mode: StorageMode,
+        dev_txs: bool,
         allow_external_peers: bool,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
@@ -64,6 +65,7 @@ impl<N: Network> Node<N> {
                 genesis,
                 cdn,
                 storage_mode,
+                dev_txs,
                 allow_external_peers,
             )
             .await?,

@@ -137,6 +137,9 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
+    /// If developtment mode is enabled, specify whether node 0 should generate traffic to drive the network
+    #[clap(default_value = "false", long = "no-dev-txs")]
+    pub no_dev_txs: bool,
     /// Specify the path to a directory containing the ledger
     #[clap(long = "storage_path")]
     pub storage_path: Option<PathBuf>,
@@ -528,10 +531,22 @@ impl Start {
             None => StorageMode::from(self.dev),
         };
 
+        // Determine whether to generate background transactions in dev mode.
+        let dev_txs = match self.dev {
+            Some(_) => !self.no_dev_txs,
+            None => {
+                // If the `no_dev_txs` flag is set, inform the user that it is ignored.
+                if self.no_dev_txs {
+                    eprintln!("The '--no-dev-txs' flag is ignored because '--dev' is not set");
+                }
+                false
+            }
+        };
+
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, dev_txs, self.allow_external_peers).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }
