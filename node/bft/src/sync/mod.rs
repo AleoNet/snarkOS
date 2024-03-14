@@ -309,17 +309,21 @@ impl<N: Network> Sync<N> {
         // Acquire the sync lock.
         let _lock = self.sync_lock.lock().await;
 
-        // Check the next block.
-        self.ledger.check_next_block(&block)?;
-        // Attempt to advance to the next block.
-        self.ledger.advance_to_next_block(&block)?;
+        let self_ = self.clone();
+        tokio::task::spawn_blocking(move || {
+            // Check the next block.
+            self_.ledger.check_next_block(&block)?;
+            // Attempt to advance to the next block.
+            self_.ledger.advance_to_next_block(&block)?;
 
-        // Sync the height with the block.
-        self.storage.sync_height_with_block(block.height());
-        // Sync the round with the block.
-        self.storage.sync_round_with_block(block.round());
+            // Sync the height with the block.
+            self_.storage.sync_height_with_block(block.height());
+            // Sync the round with the block.
+            self_.storage.sync_round_with_block(block.round());
 
-        Ok(())
+            Ok(())
+        })
+        .await?
     }
 
     /// Syncs the storage with the given blocks.

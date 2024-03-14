@@ -81,6 +81,11 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Block {height} does not exist in prover")
     }
 
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        bail!("Block {height} does not exist in prover")
+    }
+
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>> {
         bail!("Block {height} does not exist in prover")
