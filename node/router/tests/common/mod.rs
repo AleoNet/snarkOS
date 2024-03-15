@@ -78,7 +78,7 @@ pub async fn client(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
         &[],
         max_peers,
         true,
-        false,
+        true,
     )
     .await
     .expect("couldn't create client router")
@@ -95,7 +95,7 @@ pub async fn prover(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
         &[],
         max_peers,
         true,
-        false,
+        true,
     )
     .await
     .expect("couldn't create prover router")

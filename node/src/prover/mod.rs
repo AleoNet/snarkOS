@@ -110,7 +110,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
             matches!(storage_mode, StorageMode::Development(_)),
-            false,
+            true,
         )
         .await?;
         // Load the coinbase puzzle.
