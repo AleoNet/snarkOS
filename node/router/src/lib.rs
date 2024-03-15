@@ -93,7 +93,7 @@ pub struct InnerRouter<N: Network> {
     restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The spawned handles.
     handles: Mutex<Vec<JoinHandle<()>>>,
-    /// If the flag is set, the node will not engage in P2P gossip to request more peers.
+    /// If the flag is set, the node will engage in P2P gossip to request more peers.
     allow_external_peers: bool,
     /// The boolean flag for the development mode.
     is_dev: bool,
@@ -255,7 +255,7 @@ impl<N: Network> Router<N> {
         self.is_dev
     }
 
-    /// Returns `true` if the node is not engaging in P2P gossip to request more peers.
+    /// Returns `true` if the node is engaging in P2P gossip to request more peers.
     pub fn allow_external_peers(&self) -> bool {
         self.allow_external_peers
     }
