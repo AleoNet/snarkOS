@@ -126,7 +126,7 @@ pub struct Gateway<N: Network> {
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
     connecting_peers: Arc<Mutex<IndexSet<SocketAddr>>>,
-    /// The cached view of connected validators validators.
+    /// The cached view of connected validator.
     cached_validator_view: Arc<Mutex<HashMap<SocketAddr, Address<N>>>>,
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
