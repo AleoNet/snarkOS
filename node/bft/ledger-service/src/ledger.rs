@@ -22,12 +22,12 @@ use snarkvm::{
         store::ConsensusStorage,
         Ledger,
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, Address, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
 use lru::LruCache;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use std::{
     fmt,
     ops::Range,
@@ -41,10 +41,12 @@ use std::{
 const COMMITTEE_CACHE_SIZE: usize = 16;
 
 /// A core ledger service.
+#[allow(clippy::type_complexity)]
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
     committee_cache: Arc<Mutex<LruCache<u64, Committee<N>>>>,
+    latest_leader: Arc<RwLock<Option<(u64, Address<N>)>>>,
     shutdown: Arc<AtomicBool>,
 }
 
@@ -53,7 +55,7 @@ impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
         let coinbase_verifying_key = Arc::new(ledger.coinbase_puzzle().coinbase_verifying_key().clone());
         let committee_cache = Arc::new(Mutex::new(LruCache::new(COMMITTEE_CACHE_SIZE.try_into().unwrap())));
-        Self { ledger, coinbase_verifying_key, committee_cache, shutdown }
+        Self { ledger, coinbase_verifying_key, committee_cache, latest_leader: Default::default(), shutdown }
     }
 }
 
@@ -81,6 +83,16 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         self.ledger.latest_block()
     }
 
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        *self.latest_leader.read()
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, round: u64, leader: Address<N>) {
+        *self.latest_leader.write() = Some((round, leader));
+    }
+
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, height: u32) -> bool {
         self.ledger.contains_block_height(height).unwrap_or(false)
@@ -94,6 +106,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Returns the block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
         self.ledger.get_hash(height)
+    }
+
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        self.ledger.get_block(height).map(|block| block.round())
     }
 
     /// Returns the block for the given block height.
@@ -311,7 +328,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<Block<N>> {
-        self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)
+        self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions, &mut rand::thread_rng())
     }
 
     /// Adds the given block as the next block in the ledger.

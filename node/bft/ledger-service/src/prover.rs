@@ -20,7 +20,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, Address, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
@@ -56,6 +56,16 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         unreachable!("Latest block does not exist in prover")
     }
 
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        unreachable!("Latest leader does not exist in prover");
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, _round: u64, _leader: Address<N>) {
+        unreachable!("Latest leader does not exist in prover");
+    }
+
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, _height: u32) -> bool {
         false
@@ -68,6 +78,11 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
 
     /// Returns the block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
+        bail!("Block {height} does not exist in prover")
+    }
+
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
         bail!("Block {height} does not exist in prover")
     }
 

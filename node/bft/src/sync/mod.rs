@@ -236,22 +236,6 @@ impl<N: Network> Sync<N> {
 
         /* Sync the BFT DAG */
 
-        // Retrieve the leader certificates.
-        let leader_certificates = blocks
-            .iter()
-            .flat_map(|block| {
-                match block.authority() {
-                    // If the block authority is a beacon, then skip the block.
-                    Authority::Beacon(_) => None,
-                    // If the block authority is a subdag, then retrieve the certificates.
-                    Authority::Quorum(subdag) => Some(subdag.leader_certificate().clone()),
-                }
-            })
-            .collect::<Vec<_>>();
-        if leader_certificates.is_empty() {
-            return Ok(());
-        }
-
         // Construct a list of the certificates.
         let certificates = blocks
             .iter()
@@ -266,10 +250,10 @@ impl<N: Network> Sync<N> {
             .flatten()
             .collect::<Vec<_>>();
 
-        // If a BFT sender was provided, send the certificate to the BFT.
+        // If a BFT sender was provided, send the certificates to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
             // Await the callback to continue.
-            if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send((leader_certificates, certificates)).await {
+            if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send(certificates).await {
                 bail!("Failed to update the BFT DAG from sync: {e}");
             }
         }
@@ -325,17 +309,21 @@ impl<N: Network> Sync<N> {
         // Acquire the sync lock.
         let _lock = self.sync_lock.lock().await;
 
-        // Check the next block.
-        self.ledger.check_next_block(&block)?;
-        // Attempt to advance to the next block.
-        self.ledger.advance_to_next_block(&block)?;
+        let self_ = self.clone();
+        tokio::task::spawn_blocking(move || {
+            // Check the next block.
+            self_.ledger.check_next_block(&block)?;
+            // Attempt to advance to the next block.
+            self_.ledger.advance_to_next_block(&block)?;
 
-        // Sync the height with the block.
-        self.storage.sync_height_with_block(block.height());
-        // Sync the round with the block.
-        self.storage.sync_round_with_block(block.round());
+            // Sync the height with the block.
+            self_.storage.sync_height_with_block(block.height());
+            // Sync the round with the block.
+            self_.storage.sync_round_with_block(block.round());
 
-        Ok(())
+            Ok(())
+        })
+        .await?
     }
 
     /// Syncs the storage with the given blocks.

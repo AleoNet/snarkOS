@@ -55,7 +55,6 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [features]
-jemalloc = [ "tikv-jemallocator" ]
 metrics = [ "snarkos-node-metrics", "snarkos-node/metrics" ]
 
 [dependencies.anyhow]
@@ -120,9 +119,8 @@ version = "=2.2.7"
 path = "./node/tcp"
 version = "=2.2.7"
 
-[dependencies.tikv-jemallocator]
-version = "0.5"
-optional = true
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
+tikv-jemallocator = "0.5"
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"
