@@ -93,10 +93,10 @@ pub struct InnerRouter<N: Network> {
     restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The spawned handles.
     handles: Mutex<Vec<JoinHandle<()>>>,
-    /// The boolean flag for the development mode.
-    is_dev: bool,
     /// If the flag is set, the node will not engage in P2P gossip to request more peers.
     allow_external_peers: bool,
+    /// The boolean flag for the development mode.
+    is_dev: bool,
 }
 
 impl<N: Network> Router<N> {
@@ -117,8 +117,8 @@ impl<N: Network> Router<N> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         max_peers: u16,
-        is_dev: bool,
         allow_external_peers: bool,
+        is_dev: bool,
     ) -> Result<Self> {
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(node_ip, max_peers));
@@ -135,8 +135,8 @@ impl<N: Network> Router<N> {
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
-            is_dev,
             allow_external_peers,
+            is_dev,
         })))
     }
 }
