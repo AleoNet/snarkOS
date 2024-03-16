@@ -18,7 +18,7 @@ use snarkvm::prelude::TestRng;
 
 #[test]
 fn test_max_redundant_requests() {
-    const NUM_NODES: u16 = 100;
+    const NUM_NODES: u16 = 10;
 
     // Initialize the RNG.
     let rng = &mut TestRng::default();

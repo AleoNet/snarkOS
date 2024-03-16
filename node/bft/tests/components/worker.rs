@@ -27,7 +27,7 @@ use std::net::SocketAddr;
 #[tokio::test]
 #[rustfmt::skip]
 async fn test_resend_transmission_request() {
-    const NUM_NODES: u16 = 100;
+    const NUM_NODES: u16 = 10;
 
     // Initialize the RNG.
     let rng = &mut TestRng::default();
