@@ -567,7 +567,7 @@ mod tests {
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
 
         // Ensure the maximum number of redundant requests is correct and consistent across iterations.
-        assert_eq!(max_redundant_requests(ledger, 0), 34, "Update me if the formula changes");
+        assert_eq!(max_redundant_requests(ledger, 0), 4, "Update me if the formula changes");
     }
 
     #[tokio::test]
