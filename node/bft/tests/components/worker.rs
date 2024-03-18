@@ -36,6 +36,10 @@ async fn test_resend_transmission_request() {
     // Sample a worker.
     let worker = sample_worker(0, ledger.clone());
 
+    // Determine the maximum number of redundant requests.
+    let max_redundancy = max_redundant_requests(ledger.clone(), 0);
+    assert_eq!(max_redundancy, 4, "Update me if the formula changes");
+
     // Prepare a dummy transmission ID.
     let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
     let transmission_id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::default());
@@ -75,14 +79,14 @@ async fn test_resend_transmission_request() {
         // Ensure the number of callbacks is correct.
         assert_eq!(pending.num_callbacks(transmission_id), 1 + i, "Incorrect number of callbacks for transmission");
         // Ensure the number of sent requests is correct.
-        assert_eq!(pending.num_sent_requests(transmission_id), 1 + i, "Incorrect number of sent requests for transmission");
+        assert_eq!(pending.num_sent_requests(transmission_id), (1 + i).min(max_redundancy), "Incorrect number of sent requests for transmission");
     }
 }
 
 #[tokio::test]
 #[rustfmt::skip]
 async fn test_flood_transmission_requests() {
-    const NUM_NODES: u16 = 100;
+    const NUM_NODES: u16 = 10;
 
     // Initialize the RNG.
     let rng = &mut TestRng::default();
@@ -93,7 +97,7 @@ async fn test_flood_transmission_requests() {
 
     // Determine the maximum number of redundant requests.
     let max_redundancy = max_redundant_requests(ledger.clone(), 0);
-    assert_eq!(max_redundancy, 34, "Update me if the formula changes");
+    assert_eq!(max_redundancy, 4, "Update me if the formula changes");
 
     // Prepare a dummy transmission ID.
     let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
