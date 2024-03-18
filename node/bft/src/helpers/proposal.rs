@@ -205,8 +205,8 @@ mod prop_tests {
             &signer.private_key,
             committee.starting_round(),
             now(),
+            committee.id(),
             transmission_map.keys().cloned().collect(),
-            Default::default(),
             Default::default(),
             &mut rng,
         )

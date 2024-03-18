@@ -24,7 +24,7 @@ use snarkvm::{
         store::ConsensusStorage,
         Ledger,
     },
-    prelude::{narwhal::BatchCertificate, Field, Network, Result},
+    prelude::{narwhal::BatchCertificate, Address, Field, Network, Result},
 };
 use std::{
     fmt,
@@ -67,6 +67,16 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.latest_block()
     }
 
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        self.inner.latest_leader()
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, round: u64, leader: Address<N>) {
+        self.inner.update_latest_leader(round, leader);
+    }
+
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, height: u32) -> bool {
         self.inner.contains_block_height(height)
@@ -80,6 +90,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     /// Returns the block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
         self.inner.get_block_hash(height)
+    }
+
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        self.inner.get_block_round(height)
     }
 
     /// Returns the block for the given block height.
@@ -119,8 +134,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.get_committee_for_round(round)
     }
 
-    fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
-        self.inner.get_previous_committee_for_round(round)
+    /// Returns the committee lookback for the given round.
+    fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>> {
+        self.inner.get_committee_lookback_for_round(round)
     }
 
     /// Returns `true` if the ledger contains the given certificate ID in block history.
@@ -134,7 +150,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Always succeeds.
-    fn ensure_transmission_id_matches(
+    fn ensure_transmission_is_well_formed(
         &self,
         _transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,

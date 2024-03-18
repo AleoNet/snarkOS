@@ -18,7 +18,7 @@ edition = "2021"
 
 [features]
 default = [ ]
-metrics = [ "dep:metrics" ]
+metrics = ["dep:metrics", "snarkvm/metrics"]
 
 [dependencies.anyhow]
 version = "1.0"
@@ -48,9 +48,6 @@ version = "=2.2.7"
 
 [dependencies.snarkvm]
 workspace = true
-
-[dependencies.snow]
-version = "0.9"
 
 [dependencies.tokio-util]
 version = "0.7"

@@ -17,8 +17,8 @@
   * [2.1 Requirements](#21-requirements)
   * [2.2 Installation](#22-installation)
 * [3. Run an Aleo Node](#3-run-an-aleo-node)
-  * [3a. Run an Aleo Client](#3a-run-an-aleo-client)
-  * [3b. Run an Aleo Prover](#3b-run-an-aleo-prover)
+  * [3.1 Run an Aleo Client](#31-run-an-aleo-client)
+  * [3.2 Run an Aleo Prover](#32-run-an-aleo-prover)
 * [4. FAQs](#4-faqs)
 * [5. Command Line Interface](#5-command-line-interface)
 * [6. Development Guide](#6-development-guide)
@@ -92,11 +92,11 @@ Lastly, install `snarkOS`:
 cargo install --locked --path .
 ```
 
-Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
+Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS firewall.
 
 ## 3. Run an Aleo Node
 
-## 3a. Run an Aleo Client
+## 3.1 Run an Aleo Client
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
 
@@ -105,7 +105,7 @@ Next, to start a client node, from the `snarkOS` directory, run:
 ./run-client.sh
 ```
 
-## 3b. Run an Aleo Prover
+## 3.2 Run an Aleo Prover
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
 
@@ -144,7 +144,7 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ### 2. My node is unable to connect to peers on the network.
 
-- Ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
+- Ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS firewall.
 - Ensure `snarkOS` is started using `./run-client.sh` or `./run-prover.sh`.
 
 ### 3. I can't generate a new address ### 
@@ -200,10 +200,10 @@ OPTIONS:
         --private-key <PRIVATE_KEY>             Specify the node's account private key
         --private-key-file <PRIVATE_KEY_FILE>   Specify the path to a file containing the node's account private key
         
-        --node <IP:PORT>                        Specify the IP address and port for the node server [default: 0.0.0.0:4133]
+        --node <IP:PORT>                        Specify the IP address and port for the node server [default: 0.0.0.0:4130]
         --connect <IP:PORT>                     Specify the IP address and port of a peer to connect to
  
-        --rest <REST>                           Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
+        --rest <REST>                           Specify the IP address and port for the REST server [default: 0.0.0.0:3030]
         --norest                                If the flag is set, the node will not initialize the REST server
         
         --nodisplay                             If the flag is set, the node will not render the display

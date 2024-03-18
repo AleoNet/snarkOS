@@ -19,7 +19,7 @@ use snarkos_node_router::{
 };
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Block, error, Address, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork},
+    prelude::{block::Block, error, Address, FromBytes, MainnetV0 as CurrentNetwork, Network, TestRng},
 };
 
 use std::{
@@ -140,10 +140,13 @@ impl Handshake for TestPeer {
                 let peer_request = expect_message!(Message::ChallengeRequest, framed, peer_addr);
 
                 // Sign the nonce.
-                let signature = self.account().sign_bytes(&peer_request.nonce.to_le_bytes(), rng).unwrap();
+                let response_nonce: u64 = rng.gen();
+                let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+                let signature = self.account().sign_bytes(&data, rng).unwrap();
 
                 // Send the challenge response.
-                let our_response = ChallengeResponse { genesis_header, signature: Data::Object(signature) };
+                let our_response =
+                    ChallengeResponse { genesis_header, signature: Data::Object(signature), nonce: response_nonce };
                 framed.send(Message::ChallengeResponse(our_response)).await?;
             }
             ConnectionSide::Responder => {
@@ -151,10 +154,13 @@ impl Handshake for TestPeer {
                 let peer_request = expect_message!(Message::ChallengeRequest, framed, peer_addr);
 
                 // Sign the nonce.
-                let signature = self.account().sign_bytes(&peer_request.nonce.to_le_bytes(), rng).unwrap();
+                let response_nonce: u64 = rng.gen();
+                let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+                let signature = self.account().sign_bytes(&data, rng).unwrap();
 
                 // Send our challenge bundle.
-                let our_response = ChallengeResponse { genesis_header, signature: Data::Object(signature) };
+                let our_response =
+                    ChallengeResponse { genesis_header, signature: Data::Object(signature), nonce: response_nonce };
                 framed.send(Message::ChallengeResponse(our_response)).await?;
                 let our_request = ChallengeRequest::new(local_ip.port(), self.node_type(), self.address(), rng.gen());
                 framed.send(Message::ChallengeRequest(our_request)).await?;

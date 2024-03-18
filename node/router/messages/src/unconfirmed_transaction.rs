@@ -68,7 +68,7 @@ pub mod prop_tests {
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_transaction() -> BoxedStrategy<Transaction<CurrentNetwork>> {
         any::<u64>()

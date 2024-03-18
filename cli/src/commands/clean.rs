@@ -22,7 +22,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 pub struct Clean {
     /// Specify the network to remove from storage.
-    #[clap(default_value = "3", long = "network")]
+    #[clap(default_value = "0", long = "network")]
     pub network: u16,
     /// Enables development mode, specify the unique ID of the local node to clean.
     #[clap(long)]

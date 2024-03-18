@@ -36,7 +36,7 @@ use std::{
 };
 use zeroize::Zeroize;
 
-type Network = snarkvm::prelude::Testnet3;
+type Network = snarkvm::prelude::MainnetV0;
 
 /// Commands to manage Aleo accounts.
 #[derive(Debug, Parser, Zeroize)]

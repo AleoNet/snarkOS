@@ -80,7 +80,7 @@ impl<N: Network> Decoder for MessageCodec<N> {
         match Message::read_le(reader) {
             Ok(message) => Ok(Some(message)),
             Err(error) => {
-                error!("Failed to deserialize a message: {}", error);
+                warn!("Failed to deserialize a message - {}", error);
                 Err(std::io::ErrorKind::InvalidData.into())
             }
         }

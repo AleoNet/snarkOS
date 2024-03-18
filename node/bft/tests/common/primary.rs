@@ -23,29 +23,21 @@ use snarkos_node_bft::{
     Primary,
     BFT,
     MAX_BATCH_DELAY_IN_MS,
-    MAX_GC_ROUNDS,
 };
 use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
-    console::algorithms::BHP256,
+    console::{
+        account::{Address, PrivateKey},
+        algorithms::{Hash, BHP256},
+    },
     ledger::{
         block::Block,
         committee::{Committee, MIN_VALIDATOR_STAKE},
+        narwhal::BatchHeader,
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
         Ledger,
     },
-    prelude::{
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Address,
-        CryptoRng,
-        FromBytes,
-        Hash,
-        PrivateKey,
-        Rng,
-        TestRng,
-        ToBits,
-        ToBytes,
-        VM,
-    },
+    prelude::{CryptoRng, FromBytes, Rng, TestRng, ToBits, ToBytes, VM},
     utilities::to_bytes_le,
 };
 
@@ -139,6 +131,11 @@ impl TestNetwork {
         }
 
         let (accounts, committee) = new_test_committee(config.num_nodes);
+        let bonded_balances: IndexMap<_, _> = committee
+            .members()
+            .iter()
+            .map(|(address, (amount, _))| (*address, (*address, *address, *amount)))
+            .collect();
         let gen_key = *accounts[0].private_key();
         let public_balance_per_validator =
             (1_500_000_000_000_000 - (config.num_nodes as u64) * 1_000_000_000_000) / (config.num_nodes as u64);
@@ -150,9 +147,14 @@ impl TestNetwork {
         let mut validators = HashMap::with_capacity(config.num_nodes as usize);
         for (id, account) in accounts.into_iter().enumerate() {
             let mut rng = TestRng::fixed(id as u64);
-            let gen_ledger = genesis_ledger(gen_key, committee.clone(), balances.clone(), &mut rng);
+            let gen_ledger =
+                genesis_ledger(gen_key, committee.clone(), balances.clone(), bonded_balances.clone(), &mut rng);
             let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger, Default::default()));
-            let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
+            let storage = Storage::new(
+                ledger.clone(),
+                Arc::new(BFTMemoryService::new()),
+                BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+            );
 
             let (primary, bft) = if config.bft {
                 let bft = BFT::<CurrentNetwork>::new(account, storage, ledger, None, &[], Some(id as u16)).unwrap();
@@ -325,7 +327,7 @@ impl TestNetwork {
 }
 
 // Initializes a new test committee.
-fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
+pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
     let mut accounts = Vec::with_capacity(n as usize);
     let mut members = IndexMap::with_capacity(n as usize);
     for i in 0..n {
@@ -347,10 +349,11 @@ fn genesis_cache() -> &'static Mutex<HashMap<Vec<u8>, Block<CurrentNetwork>>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn genesis_block(
+pub fn genesis_block(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    bonded_balances: IndexMap<Address<CurrentNetwork>, (Address<CurrentNetwork>, Address<CurrentNetwork>, u64)>,
     rng: &mut (impl Rng + CryptoRng),
 ) -> Block<CurrentNetwork> {
     // Initialize the store.
@@ -358,13 +361,14 @@ fn genesis_block(
     // Initialize a new VM.
     let vm = VM::from(store).unwrap();
     // Initialize the genesis block.
-    vm.genesis_quorum(&genesis_private_key, committee, public_balances, rng).unwrap()
+    vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng).unwrap()
 }
 
-fn genesis_ledger(
+pub fn genesis_ledger(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    bonded_balances: IndexMap<Address<CurrentNetwork>, (Address<CurrentNetwork>, Address<CurrentNetwork>, u64)>,
     rng: &mut (impl Rng + CryptoRng),
 ) -> CurrentLedger {
     let cache_key =
@@ -383,7 +387,7 @@ fn genesis_ledger(
                 return Block::from_bytes_le(&buffer).unwrap();
             }
 
-            let block = genesis_block(genesis_private_key, committee, public_balances, rng);
+            let block = genesis_block(genesis_private_key, committee, public_balances, bonded_balances, rng);
             std::fs::write(&file_path, block.to_bytes_le().unwrap()).unwrap();
             block
         })

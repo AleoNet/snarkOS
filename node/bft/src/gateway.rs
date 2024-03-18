@@ -14,13 +14,11 @@
 
 use crate::{
     events::{EventCodec, PrimaryPing},
-    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
+    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, Storage, SyncSender, WorkerSender},
     spawn_blocking,
+    Worker,
     CONTEXT,
     MAX_BATCH_DELAY_IN_MS,
-    MAX_GC_ROUNDS,
-    MAX_TRANSMISSIONS_PER_BATCH,
-    MAX_TRANSMISSIONS_PER_WORKER_PING,
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
@@ -41,7 +39,7 @@ use snarkos_node_bft_events::{
     ValidatorsResponse,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_sync::communication_service::CommunicationService;
+use snarkos_node_sync::{communication_service::CommunicationService, MAX_BLOCKS_BEHIND};
 use snarkos_node_tcp::{
     is_bogon_ip,
     is_unspecified_or_broadcast_ip,
@@ -54,7 +52,10 @@ use snarkos_node_tcp::{
 };
 use snarkvm::{
     console::prelude::*,
-    ledger::{committee::Committee, narwhal::Data},
+    ledger::{
+        committee::Committee,
+        narwhal::{BatchHeader, Data},
+    },
     prelude::Address,
 };
 
@@ -99,6 +100,8 @@ pub trait Transport<N: Network>: Send + Sync {
 pub struct Gateway<N: Network> {
     /// The account of the node.
     account: Account<N>,
+    /// The storage.
+    storage: Storage<N>,
     /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
     /// The TCP stack.
@@ -132,6 +135,7 @@ impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
     pub fn new(
         account: Account<N>,
+        storage: Storage<N>,
         ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
@@ -148,6 +152,7 @@ impl<N: Network> Gateway<N> {
         // Return the gateway.
         Ok(Self {
             account,
+            storage,
             ledger,
             tcp,
             cache: Default::default(),
@@ -215,12 +220,12 @@ impl<N: Network> Gateway<N> {
 
     /// The maximum number of certificate requests to cache.
     fn max_cache_certificates(&self) -> usize {
-        2 * MAX_GC_ROUNDS as usize * self.max_committee_size()
+        2 * BatchHeader::<N>::MAX_GC_ROUNDS * self.max_committee_size()
     }
 
     /// The maximum number of transmission requests to cache.
     fn max_cache_transmissions(&self) -> usize {
-        self.max_cache_certificates() * MAX_TRANSMISSIONS_PER_BATCH
+        self.max_cache_certificates() * BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH
     }
 
     /// The maximum number of duplicates for any particular request.
@@ -329,18 +334,38 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given address is an authorized validator.
     pub fn is_authorized_validator_address(&self, validator_address: Address<N>) -> bool {
-        // Determine if the validator address is a member of the previous or current committee.
+        // Determine if the validator address is a member of the committee lookback,
+        // the current committee, or the previous committee lookbacks.
         // We allow leniency in this validation check in order to accommodate these two scenarios:
         //  1. New validators should be able to connect immediately once bonded as a committee member.
         //  2. Existing validators must remain connected until they are no longer bonded as a committee member.
         //     (i.e. meaning they must stay online until the next block has been produced)
-        self.ledger
-            .get_previous_committee_for_round(self.ledger.latest_round())
+
+        // Determine if the validator is in the current committee with lookback.
+        if self
+            .ledger
+            .get_committee_lookback_for_round(self.storage.current_round())
             .map_or(false, |committee| committee.is_committee_member(validator_address))
-            || self
-                .ledger
-                .current_committee()
-                .map_or(false, |committee| committee.is_committee_member(validator_address))
+        {
+            return true;
+        }
+
+        // Determine if the validator is in the latest committee on the ledger.
+        if self.ledger.current_committee().map_or(false, |committee| committee.is_committee_member(validator_address)) {
+            return true;
+        }
+
+        // Retrieve the previous block height to consider from the sync tolerance.
+        let previous_block_height = self.ledger.latest_block_height().saturating_sub(MAX_BLOCKS_BEHIND);
+        // Determine if the validator is in any of the previous committee lookbacks.
+        match self.ledger.get_block_round(previous_block_height) {
+            Ok(block_round) => (block_round..self.storage.current_round()).step_by(2).any(|round| {
+                self.ledger
+                    .get_committee_lookback_for_round(round)
+                    .map_or(false, |committee| committee.is_committee_member(validator_address))
+            }),
+            Err(_) => false,
+        }
     }
 
     /// Returns the maximum number of connected peers.
@@ -606,7 +631,9 @@ impl<N: Network> Gateway<N> {
                     // Ensure the block response is well-formed.
                     blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
                     // Send the blocks to the sync module.
-                    return sync_sender.advance_with_sync_blocks(peer_ip, blocks.0).await;
+                    if let Err(e) = sync_sender.advance_with_sync_blocks(peer_ip, blocks.0).await {
+                        warn!("Unable to process block response from '{peer_ip}' - {e}");
+                    }
                 }
                 Ok(())
             }
@@ -634,7 +661,7 @@ impl<N: Network> Gateway<N> {
                 bail!("{CONTEXT} {:?}", disconnect.reason)
             }
             Event::PrimaryPing(ping) => {
-                let PrimaryPing { version, block_locators, primary_certificate, batch_certificates } = ping;
+                let PrimaryPing { version, block_locators, primary_certificate } = ping;
 
                 // Ensure the event version is not outdated.
                 if version < Event::<N>::VERSION {
@@ -650,11 +677,7 @@ impl<N: Network> Gateway<N> {
                 }
 
                 // Send the batch certificates to the primary.
-                let _ = self
-                    .primary_sender()
-                    .tx_primary_ping
-                    .send((peer_ip, primary_certificate, batch_certificates))
-                    .await;
+                let _ = self.primary_sender().tx_primary_ping.send((peer_ip, primary_certificate)).await;
                 Ok(())
             }
             Event::TransmissionRequest(request) => {
@@ -770,7 +793,7 @@ impl<N: Network> Gateway<N> {
             Event::WorkerPing(ping) => {
                 // Ensure the number of transmissions is not too large.
                 ensure!(
-                    ping.transmission_ids.len() <= MAX_TRANSMISSIONS_PER_WORKER_PING,
+                    ping.transmission_ids.len() <= Worker::<N>::MAX_TRANSMISSIONS_PER_WORKER_PING,
                     "{CONTEXT} Received too many transmissions"
                 );
                 // Retrieve the number of workers.
@@ -1004,8 +1027,10 @@ impl<N: Network> Reading for Gateway<N> {
     type Message = Event<N>;
 
     /// The maximum queue depth of incoming messages for a single peer.
-    const MESSAGE_QUEUE_DEPTH: usize =
-        2 * MAX_GC_ROUNDS as usize * Committee::<N>::MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
+    const MESSAGE_QUEUE_DEPTH: usize = 2
+        * BatchHeader::<N>::MAX_GC_ROUNDS
+        * Committee::<N>::MAX_COMMITTEE_SIZE as usize
+        * BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH;
 
     /// Creates a [`Decoder`] used to interpret messages from the network.
     /// The `side` param indicates the connection side **from the node's perspective**.
@@ -1037,8 +1062,10 @@ impl<N: Network> Writing for Gateway<N> {
     type Message = Event<N>;
 
     /// The maximum queue depth of outgoing messages for a single peer.
-    const MESSAGE_QUEUE_DEPTH: usize =
-        2 * MAX_GC_ROUNDS as usize * Committee::<N>::MAX_COMMITTEE_SIZE as usize * MAX_TRANSMISSIONS_PER_BATCH;
+    const MESSAGE_QUEUE_DEPTH: usize = 2
+        * BatchHeader::<N>::MAX_GC_ROUNDS
+        * Committee::<N>::MAX_COMMITTEE_SIZE as usize
+        * BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH;
 
     /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
     /// The `side` parameter indicates the connection side **from the node's perspective**.
@@ -1193,11 +1220,13 @@ impl<N: Network> Gateway<N> {
         /* Step 3: Send the challenge response. */
 
         // Sign the counterparty nonce.
-        let Ok(our_signature) = self.account.sign_bytes(&peer_request.nonce.to_le_bytes(), rng) else {
+        let response_nonce: u64 = rng.gen();
+        let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+        let Ok(our_signature) = self.account.sign_bytes(&data, rng) else {
             return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
         };
         // Send the challenge response.
-        let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
+        let our_response = ChallengeResponse { signature: Data::Object(our_signature), nonce: response_nonce };
         send_event(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
 
         // Add the peer to the gateway.
@@ -1246,11 +1275,13 @@ impl<N: Network> Gateway<N> {
         let rng = &mut rand::rngs::OsRng;
 
         // Sign the counterparty nonce.
-        let Ok(our_signature) = self.account.sign_bytes(&peer_request.nonce.to_le_bytes(), rng) else {
+        let response_nonce: u64 = rng.gen();
+        let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+        let Ok(our_signature) = self.account.sign_bytes(&data, rng) else {
             return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
         };
         // Send the challenge response.
-        let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
+        let our_response = ChallengeResponse { signature: Data::Object(our_signature), nonce: response_nonce };
         send_event(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
 
         // Sample a random nonce.
@@ -1307,14 +1338,14 @@ impl<N: Network> Gateway<N> {
         expected_nonce: u64,
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge response.
-        let ChallengeResponse { signature } = response;
+        let ChallengeResponse { signature, nonce } = response;
         // Perform the deferred non-blocking deserialization of the signature.
         let Ok(signature) = spawn_blocking!(signature.deserialize_blocking()) else {
             warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (cannot deserialize the signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         };
         // Verify the signature.
-        if !signature.verify_bytes(&peer_address, &expected_nonce.to_le_bytes()) {
+        if !signature.verify_bytes(&peer_address, &[expected_nonce.to_le_bytes(), nonce.to_le_bytes()].concat()) {
             warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (invalid signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         }
@@ -1334,16 +1365,22 @@ mod prop_tests {
     };
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;
+    use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkos_node_tcp::P2P;
     use snarkvm::{
-        ledger::committee::{
-            prop_tests::{CommitteeContext, ValidatorSet},
-            Committee,
+        ledger::{
+            committee::{
+                prop_tests::{CommitteeContext, ValidatorSet},
+                test_helpers::sample_committee_for_round_and_members,
+                Committee,
+            },
+            narwhal::{batch_certificate::test_helpers::sample_batch_certificate_for_round, BatchHeader},
         },
-        prelude::{PrivateKey, Testnet3},
+        prelude::{MainnetV0, PrivateKey},
+        utilities::TestRng,
     };
 
-    use indexmap::IndexMap;
+    use indexmap::{IndexMap, IndexSet};
     use proptest::{
         prelude::{any, any_with, Arbitrary, BoxedStrategy, Just, Strategy},
         sample::Selector,
@@ -1355,7 +1392,7 @@ mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     impl Debug for Gateway<CurrentNetwork> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -1395,6 +1432,7 @@ mod prop_tests {
                 .prop_map(|(storage, _, private_key, address)| {
                     Gateway::new(
                         Account::try_from(private_key).unwrap(),
+                        storage.clone(),
                         storage.ledger().clone(),
                         address.ip(),
                         &[],
@@ -1443,7 +1481,9 @@ mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+        let gateway =
+            Gateway::new(account.clone(), storage.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port())
+                .unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.port().unwrap()));
@@ -1458,7 +1498,9 @@ mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+        let gateway =
+            Gateway::new(account.clone(), storage.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port())
+                .unwrap();
         let tcp_config = gateway.tcp().config();
         if let Some(socket_addr) = dev.ip() {
             assert_eq!(tcp_config.listener_ip, Some(socket_addr.ip()));
@@ -1483,7 +1525,8 @@ mod prop_tests {
         let worker_storage = storage.clone();
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account, storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+        let gateway =
+            Gateway::new(account, storage.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
 
         let (primary_sender, _) = init_primary_channels();
 
@@ -1517,5 +1560,50 @@ mod prop_tests {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + dev.port().unwrap())
         );
         assert_eq!(gateway.num_workers(), workers.len() as u8);
+    }
+
+    #[proptest]
+    fn test_is_authorized_validator(#[strategy(any_valid_dev_gateway())] input: GatewayInput) {
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters.
+        let current_round = 2;
+        let committee_size = 4;
+        let max_gc_rounds = BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
+        let (_, _, private_key, dev) = input;
+        let account = Account::try_from(private_key).unwrap();
+
+        // Sample the certificates.
+        let mut certificates = IndexSet::new();
+        for _ in 0..committee_size {
+            certificates.insert(sample_batch_certificate_for_round(current_round, rng));
+        }
+        let addresses: Vec<_> = certificates.iter().map(|certificate| certificate.author()).collect();
+        // Initialize the committee.
+        let committee = sample_committee_for_round_and_members(current_round, addresses, rng);
+        // Sample extra certificates from non-committee members.
+        for _ in 0..committee_size {
+            certificates.insert(sample_batch_certificate_for_round(current_round, rng));
+        }
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Initialize the gateway.
+        let gateway =
+            Gateway::new(account.clone(), storage.clone(), ledger.clone(), dev.ip(), &[], dev.port()).unwrap();
+        // Insert certificate to the storage.
+        for certificate in certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+        // Check that the current committee members are authorized validators.
+        for i in 0..certificates.clone().len() {
+            let is_authorized = gateway.is_authorized_validator_address(certificates[i].author());
+            if i < committee_size {
+                assert!(is_authorized);
+            } else {
+                assert!(!is_authorized);
+            }
+        }
     }
 }

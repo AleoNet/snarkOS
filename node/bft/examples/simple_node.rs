@@ -20,23 +20,18 @@ use snarkos_node_bft::{
     helpers::{init_consensus_channels, init_primary_channels, ConsensusReceiver, PrimarySender, Storage},
     Primary,
     BFT,
-    MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
 use snarkos_node_bft_ledger_service::MockLedgerService;
 use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
     ledger::{
-        committee::{Committee, MIN_VALIDATOR_STAKE},
-        narwhal::Data,
-    },
-    prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        Field,
-        Network,
-        Uniform,
+        committee::{Committee, MIN_VALIDATOR_STAKE},
+        narwhal::{BatchHeader, Data},
     },
+    prelude::{Field, Network, Uniform},
 };
 
 use ::bytes::Bytes;
@@ -59,7 +54,7 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
 };
 
-type CurrentNetwork = snarkvm::prelude::Testnet3;
+type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
 /**************************************************************************************************/
 
@@ -116,7 +111,11 @@ pub async fn start_bft(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the storage.
-    let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
+    let storage = Storage::new(
+        ledger.clone(),
+        Arc::new(BFTMemoryService::new()),
+        BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+    );
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -153,7 +152,11 @@ pub async fn start_primary(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the storage.
-    let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), MAX_GC_ROUNDS);
+    let storage = Storage::new(
+        ledger.clone(),
+        Arc::new(BFTMemoryService::new()),
+        BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+    );
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),

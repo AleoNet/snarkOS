@@ -39,6 +39,9 @@ use snarkos_node_tcp::is_bogon_ip;
 use std::{net::SocketAddr, time::Instant};
 use tokio::task::spawn_blocking;
 
+/// The max number of peers to send in a `PeerResponse` message.
+const MAX_PEERS_TO_SEND: usize = u8::MAX as usize;
+
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// The maximum number of puzzle requests per interval.
@@ -121,6 +124,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             Message::PeerResponse(message) => {
                 if !self.router().cache.contains_outbound_peer_request(peer_ip) {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected peer response)")
+                }
+                if !self.router().allow_external_peers() {
+                    bail!("Not accepting peer response from '{peer_ip}' (validator gossip is disabled)");
                 }
 
                 match self.peer_response(peer_ip, &message.peers) {
@@ -207,7 +213,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 let seen_before = self.router().cache.insert_inbound_solution(peer_ip, message.solution_id).is_some();
                 // Determine whether to propagate the solution.
                 if seen_before {
-                    bail!("Skipping 'UnconfirmedSolution' from '{peer_ip}'")
+                    trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
+                    return Ok(());
                 }
                 // Perform the deferred non-blocking deserialization of the solution.
                 let solution = match message.solution.deserialize().await {
@@ -232,7 +239,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     self.router().cache.insert_inbound_transaction(peer_ip, message.transaction_id).is_some();
                 // Determine whether to propagate the transaction.
                 if seen_before {
-                    bail!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'")
+                    trace!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'");
+                    return Ok(());
                 }
                 // Perform the deferred non-blocking deserialization of the transaction.
                 let transaction = match message.transaction.deserialize().await {
@@ -266,13 +274,13 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         let peers = match self.router().is_dev() {
             // In development mode, relax the validity requirements to make operating devnets more flexible.
             true => {
-                peers.into_iter().filter(|ip| *ip != peer_ip && !is_bogon_ip(ip.ip())).take(u8::MAX as usize).collect()
+                peers.into_iter().filter(|ip| *ip != peer_ip && !is_bogon_ip(ip.ip())).take(MAX_PEERS_TO_SEND).collect()
             }
             // In production mode, ensure the peer IPs are valid.
             false => peers
                 .into_iter()
                 .filter(|ip| *ip != peer_ip && self.router().is_valid_peer_ip(ip))
-                .take(u8::MAX as usize)
+                .take(MAX_PEERS_TO_SEND)
                 .collect(),
         };
         // Send a `PeerResponse` message to the peer.
@@ -282,6 +290,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
     /// Handles a `PeerResponse` message.
     fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
+        // Check if the number of peers received is less than MAX_PEERS_TO_SEND.
+        if peers.len() > MAX_PEERS_TO_SEND {
+            return false;
+        }
         // Filter out invalid addresses.
         let peers = match self.router().is_dev() {
             // In development mode, relax the validity requirements to make operating devnets more flexible.

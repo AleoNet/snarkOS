@@ -40,6 +40,8 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     const MEDIAN_NUMBER_OF_PEERS: usize = max(Self::MAXIMUM_NUMBER_OF_PEERS / 2, Self::MINIMUM_NUMBER_OF_PEERS);
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
+    /// The maximum number of provers to maintain connections with.
+    const MAXIMUM_NUMBER_OF_PROVERS: usize = Self::MAXIMUM_NUMBER_OF_PEERS / 4;
 
     /// Handles the heartbeat request.
     fn heartbeat(&self) {
@@ -68,6 +70,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
         assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MEDIAN_NUMBER_OF_PEERS);
         assert!(Self::MEDIAN_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
+        assert!(Self::MAXIMUM_NUMBER_OF_PROVERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
     }
 
     /// This function logs the connected peers.
@@ -104,6 +107,11 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             return;
         }
 
+        // Skip if the node is not requesting peers.
+        if !self.router().allow_external_peers() {
+            return;
+        }
+
         // Retrieve the trusted peers.
         let trusted = self.router().trusted_peers();
         // Retrieve the bootstrap peers.
@@ -132,13 +140,22 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     fn handle_connected_peers(&self) {
         // Obtain the number of connected peers.
         let num_connected = self.router().number_of_connected_peers();
-        // Compute the number of surplus peers.
-        let num_surplus = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
-        // Compute the number of deficit peers.
-        let num_deficient = Self::MEDIAN_NUMBER_OF_PEERS.saturating_sub(num_connected);
+        // Compute the total number of surplus peers.
+        let num_surplus_peers = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
 
-        if num_surplus > 0 {
-            debug!("Exceeded maximum number of connected peers, disconnecting from {num_surplus} peers");
+        // Obtain the number of connected provers.
+        let num_connected_provers = self.router().number_of_connected_provers();
+        // Compute the number of surplus provers.
+        let num_surplus_provers = num_connected_provers.saturating_sub(Self::MAXIMUM_NUMBER_OF_PROVERS);
+        // Compute the number of provers remaining connected.
+        let num_remaining_provers = num_connected_provers.saturating_sub(num_surplus_provers);
+        // Compute the number of surplus clients and validators.
+        let num_surplus_clients_validators = num_surplus_peers.saturating_sub(num_remaining_provers);
+
+        if num_surplus_provers > 0 || num_surplus_clients_validators > 0 {
+            debug!(
+                "Exceeded maximum number of connected peers, disconnecting from ({num_surplus_provers} + {num_surplus_clients_validators}) peers"
+            );
 
             // Retrieve the trusted peers.
             let trusted = self.router().trusted_peers();
@@ -148,18 +165,33 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             // Initialize an RNG.
             let rng = &mut OsRng;
 
-            // TODO (howardwu): As a validator, prioritize disconnecting from clients and provers.
-            //  Remove RNG, pick the `n` oldest nodes.
-            // Determine the peers to disconnect from.
-            let peer_ips_to_disconnect = self
+            // Determine the provers to disconnect from.
+            let prover_ips_to_disconnect = self
                 .router()
-                .connected_peers()
+                .connected_provers()
                 .into_iter()
                 .filter(|peer_ip| !trusted.contains(peer_ip) && !bootstrap.contains(peer_ip))
-                .choose_multiple(rng, num_surplus);
+                .choose_multiple(rng, num_surplus_provers);
+
+            // TODO (howardwu): As a validator, prioritize disconnecting from clients.
+            //  Remove RNG, pick the `n` oldest nodes.
+            // Determine the clients and validators to disconnect from.
+            let peer_ips_to_disconnect = self
+                .router()
+                .get_connected_peers()
+                .into_iter()
+                .filter_map(|peer| {
+                    let peer_ip = peer.ip();
+                    if !peer.is_prover() && !trusted.contains(&peer_ip) && !bootstrap.contains(&peer_ip) {
+                        Some(peer_ip)
+                    } else {
+                        None
+                    }
+                })
+                .choose_multiple(rng, num_surplus_clients_validators);
 
             // Proceed to send disconnect requests to these peers.
-            for peer_ip in peer_ips_to_disconnect {
+            for peer_ip in peer_ips_to_disconnect.into_iter().chain(prover_ips_to_disconnect) {
                 // TODO (howardwu): Remove this after specializing this function.
                 if self.router().node_type().is_prover() {
                     if let Some(peer) = self.router().get_connected_peer(&peer_ip) {
@@ -176,6 +208,11 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             }
         }
 
+        // Obtain the number of connected peers.
+        let num_connected = self.router().number_of_connected_peers();
+        // Compute the number of deficit peers.
+        let num_deficient = Self::MEDIAN_NUMBER_OF_PEERS.saturating_sub(num_connected);
+
         if num_deficient > 0 {
             // Initialize an RNG.
             let rng = &mut OsRng;
@@ -184,9 +221,11 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             for peer_ip in self.router().candidate_peers().into_iter().choose_multiple(rng, num_deficient) {
                 self.router().connect(peer_ip);
             }
-            // Request more peers from the connected peers.
-            for peer_ip in self.router().connected_peers().into_iter().choose_multiple(rng, 3) {
-                self.send(peer_ip, Message::PeerRequest(PeerRequest));
+            if self.router().allow_external_peers() {
+                // Request more peers from the connected peers.
+                for peer_ip in self.router().connected_peers().into_iter().choose_multiple(rng, 3) {
+                    self.send(peer_ip, Message::PeerRequest(PeerRequest));
+                }
             }
         }
     }

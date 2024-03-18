@@ -16,7 +16,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
+use snarkos_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService, spawn_blocking};
 use snarkos_node_consensus::Consensus;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
@@ -83,6 +83,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         genesis: Block<N>,
         cdn: Option<String>,
         storage_mode: StorageMode,
+        allow_external_peers: bool,
+        dev_txs: bool,
     ) -> Result<Self> {
         // Prepare the shutdown flag.
         let shutdown: Arc<AtomicBool> = Default::default();
@@ -92,8 +94,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, storage_mode.clone())?;
-        // TODO: Remove me after Phase 3.
-        let ledger = crate::phase_3_reset(ledger, storage_mode.clone())?;
+
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
@@ -125,6 +126,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            allow_external_peers,
             matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
@@ -140,7 +142,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             shutdown,
         };
         // Initialize the transaction pool.
-        node.initialize_transaction_pool(storage_mode)?;
+        node.initialize_transaction_pool(storage_mode, dev_txs)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
@@ -340,7 +342,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     // }
 
     /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self, storage_mode: StorageMode) -> Result<()> {
+    fn initialize_transaction_pool(&self, storage_mode: StorageMode, dev_txs: bool) -> Result<()> {
         use snarkvm::console::{
             program::{Identifier, Literal, ProgramID, Value},
             types::U64,
@@ -354,8 +356,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         match storage_mode {
             // If the node is running in development mode, only generate if you are allowed.
             StorageMode::Development(id) => {
-                // If the node is not the first node, do not start the loop.
-                if id != 0 {
+                // If the node is not the first node, or if we should not create dev traffic, do not start the loop.
+                if id != 0 || !dev_txs {
                     return Ok(());
                 }
             }
@@ -387,15 +389,16 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 // Prepare the inputs.
                 let inputs = [Value::from(Literal::Address(self_.address())), Value::from(Literal::U64(U64::new(1)))];
                 // Execute the transaction.
-                let transaction = match self_.ledger.vm().execute(
-                    self_.private_key(),
+                let self__ = self_.clone();
+                let transaction = match spawn_blocking!(self__.ledger.vm().execute(
+                    self__.private_key(),
                     locator,
                     inputs.into_iter(),
                     None,
                     10_000,
                     None,
                     &mut rand::thread_rng(),
-                ) {
+                )) {
                     Ok(transaction) => transaction,
                     Err(error) => {
                         error!("Transaction pool encountered an execution error - {error}");
@@ -454,7 +457,7 @@ mod tests {
     use super::*;
     use snarkvm::prelude::{
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Testnet3,
+        MainnetV0,
         VM,
     };
 
@@ -463,16 +466,17 @@ mod tests {
     use rand_chacha::ChaChaRng;
     use std::str::FromStr;
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     /// Use `RUST_MIN_STACK=67108864 cargo test --release profiler --features timer` to run this test.
     #[ignore]
     #[tokio::test]
     async fn test_profiler() -> Result<()> {
         // Specify the node attributes.
-        let node = SocketAddr::from_str("0.0.0.0:4133").unwrap();
-        let rest = SocketAddr::from_str("0.0.0.0:3033").unwrap();
+        let node = SocketAddr::from_str("0.0.0.0:4130").unwrap();
+        let rest = SocketAddr::from_str("0.0.0.0:3030").unwrap();
         let storage_mode = StorageMode::Development(0);
+        let dev_txs = true;
 
         // Initialize an (insecure) fixed RNG.
         let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
@@ -496,6 +500,8 @@ mod tests {
             genesis,
             None,
             storage_mode,
+            false,
+            dev_txs,
         )
         .await
         .unwrap();

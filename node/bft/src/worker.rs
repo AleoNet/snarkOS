@@ -14,21 +14,20 @@
 
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
-    helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
+    helpers::{fmt_id, max_redundant_requests, Pending, Ready, Storage, WorkerReceiver},
+    spawn_blocking,
     ProposedBatch,
     Transport,
-    MAX_BATCH_DELAY_IN_MS,
-    MAX_TRANSMISSIONS_PER_BATCH,
-    MAX_TRANSMISSIONS_PER_WORKER_PING,
+    MAX_FETCH_TIMEOUT_IN_MS,
     MAX_WORKERS,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Data, Transmission, TransmissionID},
-    prelude::{
+    ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{BatchHeader, Data, Transmission, TransmissionID},
     },
 };
 
@@ -36,8 +35,6 @@ use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
-
-const MAX_TRANSMISSIONS_PER_WORKER: usize = MAX_TRANSMISSIONS_PER_BATCH / MAX_WORKERS as usize;
 
 #[derive(Clone)]
 pub struct Worker<N: Network> {
@@ -94,9 +91,22 @@ impl<N: Network> Worker<N> {
     pub const fn id(&self) -> u8 {
         self.id
     }
+
+    /// Returns a reference to the pending transmissions queue.
+    pub fn pending(&self) -> &Arc<Pending<TransmissionID<N>, Transmission<N>>> {
+        &self.pending
+    }
 }
 
 impl<N: Network> Worker<N> {
+    /// The maximum number of transmissions allowed in a worker.
+    pub const MAX_TRANSMISSIONS_PER_WORKER: usize =
+        BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / MAX_WORKERS as usize;
+    /// The maximum number of transmissions allowed in a worker ping.
+    pub const MAX_TRANSMISSIONS_PER_WORKER_PING: usize = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / 10;
+
+    // transmissions
+
     /// Returns the number of transmissions in the ready queue.
     pub fn num_transmissions(&self) -> usize {
         self.ready.num_transmissions()
@@ -209,8 +219,12 @@ impl<N: Network> Worker<N> {
     /// Broadcasts a worker ping event.
     pub(crate) fn broadcast_ping(&self) {
         // Retrieve the transmission IDs.
-        let transmission_ids =
-            self.ready.transmission_ids().into_iter().take(MAX_TRANSMISSIONS_PER_WORKER_PING).collect::<IndexSet<_>>();
+        let transmission_ids = self
+            .ready
+            .transmission_ids()
+            .into_iter()
+            .take(Self::MAX_TRANSMISSIONS_PER_WORKER_PING)
+            .collect::<IndexSet<_>>();
 
         // Broadcast the ping event.
         if !transmission_ids.is_empty() {
@@ -228,7 +242,7 @@ impl<N: Network> Worker<N> {
         }
         // If the ready queue is full, then skip this transmission.
         // Note: We must prioritize the unconfirmed solutions and unconfirmed transactions, not transmissions.
-        if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_WORKER {
+        if self.ready.num_transmissions() > Self::MAX_TRANSMISSIONS_PER_WORKER {
             return;
         }
         // Attempt to fetch the transmission from the peer.
@@ -363,7 +377,11 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
                 // Process the transmission response.
-                self_.finish_transmission_request(peer_ip, transmission_response);
+                let self__ = self_.clone();
+                let _ = spawn_blocking!({
+                    self__.finish_transmission_request(peer_ip, transmission_response);
+                    Ok(())
+                });
             }
         });
     }
@@ -376,14 +394,30 @@ impl<N: Network> Worker<N> {
     ) -> Result<(TransmissionID<N>, Transmission<N>)> {
         // Initialize a oneshot channel.
         let (callback_sender, callback_receiver) = oneshot::channel();
+        // Determine how many sent requests are pending.
+        let num_sent_requests = self.pending.num_sent_requests(transmission_id);
+        // Determine the maximum number of redundant requests.
+        let num_redundant_requests = max_redundant_requests(self.ledger.clone(), self.storage.current_round());
+        // Determine if we should send a transmission request to the peer.
+        let should_send_request = num_sent_requests < num_redundant_requests;
+
         // Insert the transmission ID into the pending queue.
-        self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
-        // Send the transmission request to the peer.
-        if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
-            bail!("Unable to fetch transmission - failed to send request")
+        self.pending.insert(transmission_id, peer_ip, Some((callback_sender, should_send_request)));
+
+        // If the number of requests is less than or equal to the the redundancy factor, send the transmission request to the peer.
+        if should_send_request {
+            // Send the transmission request to the peer.
+            if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {
+                bail!("Unable to fetch transmission - failed to send request")
+            }
+        } else {
+            debug!(
+                "Skipped sending request for transmission {} to '{peer_ip}' ({num_sent_requests} redundant requests)",
+                fmt_id(transmission_id)
+            );
         }
         // Wait for the transmission to be fetched.
-        match timeout(Duration::from_millis(MAX_BATCH_DELAY_IN_MS), callback_receiver).await {
+        match timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {
             // If the transmission was fetched, return it.
             Ok(result) => Ok((transmission_id, result?)),
             // If the transmission was not fetched, return an error.
@@ -399,8 +433,8 @@ impl<N: Network> Worker<N> {
         let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
-            // Ensure the transmission ID matches the transmission.
-            match self.ledger.ensure_transmission_id_matches(transmission_id, &mut transmission) {
+            // Ensure the transmission is not a fee and matches the transmission ID.
+            match self.ledger.ensure_transmission_is_well_formed(transmission_id, &mut transmission) {
                 Ok(()) => {
                     // Remove the transmission ID from the pending queue.
                     self.pending.remove(transmission_id, Some(transmission));
@@ -448,6 +482,7 @@ mod tests {
             committee::Committee,
             narwhal::{BatchCertificate, Subdag, Transmission, TransmissionID},
         },
+        prelude::Address,
     };
 
     use bytes::Bytes;
@@ -455,7 +490,9 @@ mod tests {
     use mockall::mock;
     use std::{io, ops::Range};
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
+
+    const ITERATIONS: usize = 100;
 
     mock! {
         Gateway<N: Network> {}
@@ -474,9 +511,12 @@ mod tests {
             fn latest_round(&self) -> u64;
             fn latest_block_height(&self) -> u32;
             fn latest_block(&self) -> Block<N>;
+            fn latest_leader(&self) -> Option<(u64, Address<N>)>;
+            fn update_latest_leader(&self, round: u64, leader: Address<N>);
             fn contains_block_height(&self, height: u32) -> bool;
             fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32>;
             fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
+            fn get_block_round(&self, height: u32) -> Result<u64>;
             fn get_block(&self, height: u32) -> Result<Block<N>>;
             fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
             fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
@@ -484,10 +524,10 @@ mod tests {
             fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;
             fn current_committee(&self) -> Result<Committee<N>>;
             fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
-            fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
+            fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>>;
             fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
             fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
-            fn ensure_transmission_id_matches(
+            fn ensure_transmission_is_well_formed(
                 &self,
                 transmission_id: TransmissionID<N>,
                 transmission: &mut Transmission<N>,
@@ -513,14 +553,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_max_redundant_requests() {
+        let rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_size(0, 100, rng);
+        let committee_clone = committee.clone();
+        // Setup the mock ledger.
+        let mut mock_ledger = MockLedger::default();
+        mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
+        mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
+        mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
+
+        // Ensure the maximum number of redundant requests is correct and consistent across iterations.
+        assert_eq!(max_redundant_requests(ledger, 0), 34, "Update me if the formula changes");
+    }
+
+    #[tokio::test]
     async fn test_process_transmission() {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let gateway = MockGateway::default();
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -550,6 +610,7 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -558,7 +619,8 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
-        mock_ledger.expect_ensure_transmission_id_matches().returning(|_, _| Ok(()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
+        mock_ledger.expect_ensure_transmission_is_well_formed().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
@@ -585,6 +647,7 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -593,6 +656,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -623,6 +687,7 @@ mod tests {
         let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -631,6 +696,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -661,6 +727,7 @@ mod tests {
         let mut rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -669,6 +736,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -699,6 +767,7 @@ mod tests {
         let mut rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
         // Setup the mock gateway and ledger.
         let mut gateway = MockGateway::default();
         gateway.expect_send().returning(|_, _| {
@@ -707,6 +776,7 @@ mod tests {
         });
         let mut mock_ledger = MockLedger::default();
         mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
         mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
@@ -731,6 +801,112 @@ mod tests {
         assert!(!worker.pending.contains(transmission_id));
         assert!(!worker.ready.contains(transmission_id));
     }
+
+    #[tokio::test]
+    async fn test_flood_transmission_requests() {
+        let mut rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let committee_clone = committee.clone();
+        // Setup the mock gateway and ledger.
+        let mut gateway = MockGateway::default();
+        gateway.expect_send().returning(|_, _| {
+            let (_tx, rx) = oneshot::channel();
+            Some(rx)
+        });
+        let mut mock_ledger = MockLedger::default();
+        mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+        mock_ledger.expect_get_committee_lookback_for_round().returning(move |_| Ok(committee_clone.clone()));
+        mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
+        mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
+        let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
+
+        // Create the Worker.
+        let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
+        let transmission_id = TransmissionID::Transaction(transaction_id);
+        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+
+        // Determine the number of redundant requests are sent.
+        let num_redundant_requests = max_redundant_requests(worker.ledger.clone(), worker.storage.current_round());
+        let num_flood_requests = num_redundant_requests * 10;
+        // Flood the pending queue with transmission requests.
+        for i in 1..=num_flood_requests {
+            let worker_ = worker.clone();
+            tokio::spawn(async move {
+                let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+            });
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            // Check that the number of sent requests does not exceed the maximum number of redundant requests.
+            assert!(worker.pending.num_sent_requests(transmission_id) <= num_redundant_requests);
+            assert_eq!(worker.pending.num_callbacks(transmission_id), i);
+        }
+        // Check that the number of sent requests does not exceed the maximum number of redundant requests.
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), num_redundant_requests);
+        assert_eq!(worker.pending.num_callbacks(transmission_id), num_flood_requests);
+
+        // Let all the requests expire.
+        tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS + 1000)).await;
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
+        assert_eq!(worker.pending.num_callbacks(transmission_id), 0);
+
+        // Flood the pending queue with transmission requests again.
+        for i in 1..=num_flood_requests {
+            let worker_ = worker.clone();
+            tokio::spawn(async move {
+                let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+            });
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            assert!(worker.pending.num_sent_requests(transmission_id) <= num_redundant_requests);
+            assert_eq!(worker.pending.num_callbacks(transmission_id), i);
+        }
+        // Check that the number of sent requests does not exceed the maximum number of redundant requests.
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), num_redundant_requests);
+        assert_eq!(worker.pending.num_callbacks(transmission_id), num_flood_requests);
+
+        // Check that fulfilling a transmission request clears the pending queue.
+        let result = worker
+            .process_unconfirmed_transaction(
+                transaction_id,
+                Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>())),
+            )
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
+        assert_eq!(worker.pending.num_callbacks(transmission_id), 0);
+        assert!(!worker.pending.contains(transmission_id));
+        assert!(worker.ready.contains(transmission_id));
+    }
+
+    #[tokio::test]
+    async fn test_storage_gc_on_initialization() {
+        let rng = &mut TestRng::default();
+
+        for _ in 0..ITERATIONS {
+            // Mock the ledger round.
+            let max_gc_rounds = rng.gen_range(50..=100);
+            let latest_ledger_round = rng.gen_range((max_gc_rounds + 1)..1000);
+            let expected_gc_round = latest_ledger_round - max_gc_rounds;
+
+            // Sample a committee.
+            let committee =
+                snarkvm::ledger::committee::test_helpers::sample_committee_for_round(latest_ledger_round, rng);
+
+            // Setup the mock gateway and ledger.
+            let mut mock_ledger = MockLedger::default();
+            mock_ledger.expect_current_committee().returning(move || Ok(committee.clone()));
+
+            let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
+            // Initialize the storage.
+            let storage =
+                Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+
+            // Ensure that the storage GC round is correct.
+            assert_eq!(storage.gc_round(), expected_gc_round);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -745,7 +921,7 @@ mod prop_tests {
 
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     // Initializes a new test committee.
     fn new_test_committee(n: u16) -> Committee<CurrentNetwork> {

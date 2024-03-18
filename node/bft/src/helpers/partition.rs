@@ -78,7 +78,7 @@ mod tests {
     use super::*;
     use snarkvm::prelude::coinbase::PuzzleCommitment;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     #[test]
     fn test_assign_to_worker() {

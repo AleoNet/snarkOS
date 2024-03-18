@@ -112,7 +112,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             GovernorConfigBuilder::default()
                 .per_second(1)
                 .burst_size(rest_rps)
-                .error_handler(|error| Response::new(error.to_string()))
+                .error_handler(|error| Response::new(error.to_string().into()))
                 .finish()
                 .expect("Couldn't set up rate limiting for the REST server!"),
         );
@@ -121,67 +121,67 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             axum::Router::new()
 
             // All the endpoints before the call to `route_layer` are protected with JWT auth.
-            .route("/testnet3/node/address", get(Self::get_node_address))
+            .route("/mainnet/node/address", get(Self::get_node_address))
             .route_layer(middleware::from_fn(auth_middleware))
 
             // ----------------- DEPRECATED ROUTES -----------------
             // The following `GET ../latest/..` routes will be removed before mainnet.
             // Please refer to the recommended routes for each endpoint:
 
-            // Deprecated: use `/testnet3/block/height/latest` instead.
-            .route("/testnet3/latest/height", get(Self::latest_height))
-            // Deprecated: use `/testnet3/block/hash/latest` instead.
-            .route("/testnet3/latest/hash", get(Self::latest_hash))
-            // Deprecated: use `/testnet3/latest/block/height` instead.
-            .route("/testnet3/latest/block", get(Self::latest_block))
-            // Deprecated: use `/testnet3/stateRoot/latest` instead.
-            .route("/testnet3/latest/stateRoot", get(Self::latest_state_root))
-            // Deprecated: use `/testnet3/committee/latest` instead.
-            .route("/testnet3/latest/committee", get(Self::latest_committee))
+            // Deprecated: use `/mainnet/block/height/latest` instead.
+            .route("/mainnet/latest/height", get(Self::latest_height))
+            // Deprecated: use `/mainnet/block/hash/latest` instead.
+            .route("/mainnet/latest/hash", get(Self::latest_hash))
+            // Deprecated: use `/mainnet/latest/block/height` instead.
+            .route("/mainnet/latest/block", get(Self::latest_block))
+            // Deprecated: use `/mainnet/stateRoot/latest` instead.
+            .route("/mainnet/latest/stateRoot", get(Self::latest_state_root))
+            // Deprecated: use `/mainnet/committee/latest` instead.
+            .route("/mainnet/latest/committee", get(Self::latest_committee))
             // ------------------------------------------------------
 
             // GET ../block/..
-            .route("/testnet3/block/height/latest", get(Self::get_block_height_latest))
-            .route("/testnet3/block/hash/latest", get(Self::get_block_hash_latest))
-            .route("/testnet3/block/latest", get(Self::get_block_latest))
-            .route("/testnet3/block/:height_or_hash", get(Self::get_block))
+            .route("/mainnet/block/height/latest", get(Self::get_block_height_latest))
+            .route("/mainnet/block/hash/latest", get(Self::get_block_hash_latest))
+            .route("/mainnet/block/latest", get(Self::get_block_latest))
+            .route("/mainnet/block/:height_or_hash", get(Self::get_block))
             // The path param here is actually only the height, but the name must match the route
             // above, otherwise there'll be a conflict at runtime.
-            .route("/testnet3/block/:height_or_hash/transactions", get(Self::get_block_transactions))
+            .route("/mainnet/block/:height_or_hash/transactions", get(Self::get_block_transactions))
 
             // GET and POST ../transaction/..
-            .route("/testnet3/transaction/:id", get(Self::get_transaction))
-            .route("/testnet3/transaction/confirmed/:id", get(Self::get_confirmed_transaction))
-            .route("/testnet3/transaction/broadcast", post(Self::transaction_broadcast))
+            .route("/mainnet/transaction/:id", get(Self::get_transaction))
+            .route("/mainnet/transaction/confirmed/:id", get(Self::get_confirmed_transaction))
+            .route("/mainnet/transaction/broadcast", post(Self::transaction_broadcast))
 
             // POST ../solution/broadcast
-            .route("/testnet3/solution/broadcast", post(Self::solution_broadcast))
+            .route("/mainnet/solution/broadcast", post(Self::solution_broadcast))
 
             // GET ../find/..
-            .route("/testnet3/find/blockHash/:tx_id", get(Self::find_block_hash))
-            .route("/testnet3/find/transactionID/deployment/:program_id", get(Self::find_transaction_id_from_program_id))
-            .route("/testnet3/find/transactionID/:transition_id", get(Self::find_transaction_id_from_transition_id))
-            .route("/testnet3/find/transitionID/:input_or_output_id", get(Self::find_transition_id))
+            .route("/mainnet/find/blockHash/:tx_id", get(Self::find_block_hash))
+            .route("/mainnet/find/transactionID/deployment/:program_id", get(Self::find_transaction_id_from_program_id))
+            .route("/mainnet/find/transactionID/:transition_id", get(Self::find_transaction_id_from_transition_id))
+            .route("/mainnet/find/transitionID/:input_or_output_id", get(Self::find_transition_id))
 
             // GET ../peers/..
-            .route("/testnet3/peers/count", get(Self::get_peers_count))
-            .route("/testnet3/peers/all", get(Self::get_peers_all))
-            .route("/testnet3/peers/all/metrics", get(Self::get_peers_all_metrics))
+            .route("/mainnet/peers/count", get(Self::get_peers_count))
+            .route("/mainnet/peers/all", get(Self::get_peers_all))
+            .route("/mainnet/peers/all/metrics", get(Self::get_peers_all_metrics))
 
             // GET ../program/..
-            .route("/testnet3/program/:id", get(Self::get_program))
-            .route("/testnet3/program/:id/mappings", get(Self::get_mapping_names))
-            .route("/testnet3/program/:id/mapping/:name/:key", get(Self::get_mapping_value))
+            .route("/mainnet/program/:id", get(Self::get_program))
+            .route("/mainnet/program/:id/mappings", get(Self::get_mapping_names))
+            .route("/mainnet/program/:id/mapping/:name/:key", get(Self::get_mapping_value))
 
             // GET misc endpoints.
-            .route("/testnet3/blocks", get(Self::get_blocks))
-            .route("/testnet3/height/:hash", get(Self::get_height))
-            .route("/testnet3/memoryPool/transmissions", get(Self::get_memory_pool_transmissions))
-            .route("/testnet3/memoryPool/solutions", get(Self::get_memory_pool_solutions))
-            .route("/testnet3/memoryPool/transactions", get(Self::get_memory_pool_transactions))
-            .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
-            .route("/testnet3/stateRoot/latest", get(Self::get_state_root_latest))
-            .route("/testnet3/committee/latest", get(Self::get_committee_latest))
+            .route("/mainnet/blocks", get(Self::get_blocks))
+            .route("/mainnet/height/:hash", get(Self::get_height))
+            .route("/mainnet/memoryPool/transmissions", get(Self::get_memory_pool_transmissions))
+            .route("/mainnet/memoryPool/solutions", get(Self::get_memory_pool_solutions))
+            .route("/mainnet/memoryPool/transactions", get(Self::get_memory_pool_transactions))
+            .route("/mainnet/statePath/:commitment", get(Self::get_state_path_for_commitment))
+            .route("/mainnet/stateRoot/latest", get(Self::get_state_root_latest))
+            .route("/mainnet/committee/latest", get(Self::get_committee_latest))
 
             // Pass in `Rest` to make things convenient.
             .with_state(self.clone())

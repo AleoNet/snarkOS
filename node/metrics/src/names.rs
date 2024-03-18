@@ -14,15 +14,21 @@
 
 pub(super) const COUNTER_NAMES: [&str; 1] = [bft::LEADERS_ELECTED];
 
-pub(super) const GAUGE_NAMES: [&str; 12] = [
+pub(super) const GAUGE_NAMES: [&str; 18] = [
     bft::CONNECTED,
     bft::CONNECTING,
     bft::LAST_STORED_ROUND,
     bft::PROPOSAL_ROUND,
+    bft::CERTIFIED_BATCHES,
     blocks::HEIGHT,
+    blocks::SOLUTIONS,
     blocks::TRANSACTIONS,
+    blocks::TRANSMISSIONS,
     consensus::COMMITTED_CERTIFICATES,
     consensus::LAST_COMMITTED_ROUND,
+    consensus::UNCONFIRMED_SOLUTIONS,
+    consensus::UNCONFIRMED_TRANSACTIONS,
+    consensus::UNCONFIRMED_TRANSMISSIONS,
     router::CONNECTED,
     router::CANDIDATE,
     router::RESTRICTED,
@@ -46,11 +52,14 @@ pub mod bft {
     pub const LAST_STORED_ROUND: &str = "snarkos_bft_last_stored_round";
     pub const LEADERS_ELECTED: &str = "snarkos_bft_leaders_elected_total";
     pub const PROPOSAL_ROUND: &str = "snarkos_bft_primary_proposal_round";
+    pub const CERTIFIED_BATCHES: &str = "snarkos_bft_primary_certified_batches";
 }
 
 pub mod blocks {
     pub const HEIGHT: &str = "snarkos_blocks_height_total";
     pub const TRANSACTIONS: &str = "snarkos_blocks_transactions_total";
+    pub const TRANSMISSIONS: &str = "snarkos_blocks_transmissions_total";
+    pub const SOLUTIONS: &str = "snarkos_blocks_solutions_total";
 }
 
 pub mod consensus {
@@ -58,6 +67,9 @@ pub mod consensus {
     pub const COMMITTED_CERTIFICATES: &str = "snarkos_consensus_committed_certificates_total";
     pub const LAST_COMMITTED_ROUND: &str = "snarkos_consensus_last_committed_round";
     pub const BLOCK_LATENCY: &str = "snarkos_consensus_block_latency_secs";
+    pub const UNCONFIRMED_TRANSACTIONS: &str = "snarkos_consensus_unconfirmed_transactions_total";
+    pub const UNCONFIRMED_TRANSMISSIONS: &str = "snarkos_consensus_unconfirmed_transmissions_total";
+    pub const UNCONFIRMED_SOLUTIONS: &str = "snarkos_consensus_unconfirmed_solutions_total";
 }
 
 pub mod router {

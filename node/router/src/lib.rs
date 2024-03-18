@@ -93,6 +93,8 @@ pub struct InnerRouter<N: Network> {
     restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The spawned handles.
     handles: Mutex<Vec<JoinHandle<()>>>,
+    /// If the flag is set, the node will engage in P2P gossip to request more peers.
+    allow_external_peers: bool,
     /// The boolean flag for the development mode.
     is_dev: bool,
 }
@@ -115,6 +117,7 @@ impl<N: Network> Router<N> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         max_peers: u16,
+        allow_external_peers: bool,
         is_dev: bool,
     ) -> Result<Self> {
         // Initialize the TCP stack.
@@ -132,6 +135,7 @@ impl<N: Network> Router<N> {
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
+            allow_external_peers,
             is_dev,
         })))
     }
@@ -251,6 +255,11 @@ impl<N: Network> Router<N> {
         self.is_dev
     }
 
+    /// Returns `true` if the node is engaging in P2P gossip to request more peers.
+    pub fn allow_external_peers(&self) -> bool {
+        self.allow_external_peers
+    }
+
     /// Returns the listener IP address from the (ambiguous) peer address.
     pub fn resolve_to_listener(&self, peer_addr: &SocketAddr) -> Option<SocketAddr> {
         self.resolver.get_listener(peer_addr)
@@ -293,6 +302,11 @@ impl<N: Network> Router<N> {
             .get(ip)
             .map(|time| time.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS)
             .unwrap_or(false)
+    }
+
+    /// Returns `true` if the given IP is trusted.
+    pub fn is_trusted(&self, ip: &SocketAddr) -> bool {
+        self.trusted_peers.contains(ip)
     }
 
     /// Returns the maximum number of connected peers.
@@ -381,10 +395,10 @@ impl<N: Network> Router<N> {
             vec![]
         } else {
             vec![
-                SocketAddr::from_str("35.224.50.150:4133").unwrap(),
-                SocketAddr::from_str("35.227.159.141:4133").unwrap(),
-                SocketAddr::from_str("34.139.203.87:4133").unwrap(),
-                SocketAddr::from_str("34.150.221.166:4133").unwrap(),
+                SocketAddr::from_str("64.23.169.88:4130").unwrap(),
+                SocketAddr::from_str("146.190.35.174:4130").unwrap(),
+                SocketAddr::from_str("45.55.201.67:4130").unwrap(),
+                SocketAddr::from_str("45.55.201.80:4130").unwrap(),
             ]
         }
     }

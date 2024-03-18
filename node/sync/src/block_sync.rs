@@ -36,16 +36,19 @@ use std::{
     time::Instant,
 };
 
+#[cfg(not(test))]
+pub const REDUNDANCY_FACTOR: usize = 1;
+#[cfg(test)]
 pub const REDUNDANCY_FACTOR: usize = 3;
-const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
+const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 3;
 const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
-const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 60; // 60 seconds
+const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 600; // 600 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
 /// The maximum number of blocks tolerated before the primary is considered behind its peers.
-pub const MAX_BLOCKS_BEHIND: u32 = 2; // blocks
+pub const MAX_BLOCKS_BEHIND: u32 = 1; // blocks
 
 /// This is a dummy IP address that is used to represent the local node.
 /// Note: This here does not need to be a real IP address, but it must be unique/distinct from all other connections.
@@ -891,7 +894,7 @@ mod tests {
     use snarkvm::ledger::committee::Committee;
     use std::net::{IpAddr, Ipv4Addr};
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Returns the peer IP for the sync pool.
     fn sample_peer_ip(id: u16) -> SocketAddr {
