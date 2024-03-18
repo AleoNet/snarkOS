@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub(super) const COUNTER_NAMES: [&str; 2] = [
-    bft::LEADERS_ELECTED,
-    consensus::STALE_UNCONFIRMED_TRANSMISSIONS,
-];
+pub(super) const COUNTER_NAMES: [&str; 2] = [bft::LEADERS_ELECTED, consensus::STALE_UNCONFIRMED_TRANSMISSIONS];
 
 pub(super) const GAUGE_NAMES: [&str; 18] = [
     bft::CONNECTED,
