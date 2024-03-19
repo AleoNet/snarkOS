@@ -29,6 +29,7 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey},
         algorithms::{Hash, BHP256},
+        network::Network,
     },
     ledger::{
         block::Block,
@@ -137,8 +138,9 @@ impl TestNetwork {
             .map(|(address, (amount, _))| (*address, (*address, *address, *amount)))
             .collect();
         let gen_key = *accounts[0].private_key();
-        let public_balance_per_validator =
-            (1_500_000_000_000_000 - (config.num_nodes as u64) * 10_000_000_000_000) / (config.num_nodes as u64);
+        let public_balance_per_validator = (<CurrentNetwork as Network>::STARTING_SUPPLY
+            - (config.num_nodes as u64) * MIN_VALIDATOR_STAKE)
+            / (config.num_nodes as u64);
         let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
         for account in accounts.iter() {
             balances.insert(account.address(), public_balance_per_validator);

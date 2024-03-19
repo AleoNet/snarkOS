@@ -554,9 +554,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_max_redundant_requests() {
+        const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
+
         let rng = &mut TestRng::default();
         // Sample a committee.
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_size(0, 10, rng);
+        let committee =
+            snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_size(0, NUM_NODES, rng);
         let committee_clone = committee.clone();
         // Setup the mock ledger.
         let mut mock_ledger = MockLedger::default();
@@ -567,7 +570,7 @@ mod tests {
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
 
         // Ensure the maximum number of redundant requests is correct and consistent across iterations.
-        assert_eq!(max_redundant_requests(ledger, 0), 4, "Update me if the formula changes");
+        assert_eq!(max_redundant_requests(ledger, 0), 34, "Update me if the formula changes");
     }
 
     #[tokio::test]
