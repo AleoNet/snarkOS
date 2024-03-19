@@ -39,7 +39,7 @@ pub fn sample_ledger(
 ) -> Arc<TranslucentLedgerService<CurrentNetwork, ConsensusMemory<CurrentNetwork>>> {
     let (accounts, committee) = primary::new_test_committee(num_nodes);
     let bonded_balances: IndexMap<_, _> =
-        committee.members().iter().map(|(address, (amount, _))| (*address, (*address, *amount))).collect();
+        committee.members().iter().map(|(address, (amount, _))| (*address, (*address, *address, *amount))).collect();
     let gen_key = *accounts[0].private_key();
     let public_balance_per_validator =
         (1_500_000_000_000_000 - (num_nodes as u64) * 1_000_000_000_000) / (num_nodes as u64);

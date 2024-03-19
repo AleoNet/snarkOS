@@ -108,6 +108,8 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone(), shutdown.clone()));
         // Initialize the sync module.
         let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
+        // Determine if the client should allow external peers.
+        let allow_external_peers = true;
 
         // Initialize the node router.
         let router = Router::new(
@@ -116,6 +118,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            allow_external_peers,
             matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
