@@ -18,7 +18,7 @@ use crate::{
 };
 use snarkos_node_bft::helpers::max_redundant_requests;
 use snarkvm::{
-    ledger::narwhal::TransmissionID,
+    ledger::{committee::Committee, narwhal::TransmissionID},
     prelude::{Network, TestRng},
 };
 
@@ -27,7 +27,7 @@ use std::net::SocketAddr;
 #[tokio::test]
 #[rustfmt::skip]
 async fn test_resend_transmission_request() {
-    const NUM_NODES: u16 = 10;
+    const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
 
     // Initialize the RNG.
     let rng = &mut TestRng::default();
@@ -38,7 +38,7 @@ async fn test_resend_transmission_request() {
 
     // Determine the maximum number of redundant requests.
     let max_redundancy = max_redundant_requests(ledger.clone(), 0);
-    assert_eq!(max_redundancy, 4, "Update me if the formula changes");
+    assert_eq!(max_redundancy, 34, "Update me if the formula changes");
 
     // Prepare a dummy transmission ID.
     let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -86,7 +86,7 @@ async fn test_resend_transmission_request() {
 #[tokio::test]
 #[rustfmt::skip]
 async fn test_flood_transmission_requests() {
-    const NUM_NODES: u16 = 10;
+    const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
 
     // Initialize the RNG.
     let rng = &mut TestRng::default();
@@ -97,7 +97,7 @@ async fn test_flood_transmission_requests() {
 
     // Determine the maximum number of redundant requests.
     let max_redundancy = max_redundant_requests(ledger.clone(), 0);
-    assert_eq!(max_redundancy, 4, "Update me if the formula changes");
+    assert_eq!(max_redundancy, 34, "Update me if the formula changes");
 
     // Prepare a dummy transmission ID.
     let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
