@@ -125,6 +125,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 if !self.router().cache.contains_outbound_peer_request(peer_ip) {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected peer response)")
                 }
+                if !self.router().allow_external_peers() {
+                    bail!("Not accepting peer response from '{peer_ip}' (validator gossip is disabled)");
+                }
 
                 match self.peer_response(peer_ip, &message.peers) {
                     true => Ok(()),

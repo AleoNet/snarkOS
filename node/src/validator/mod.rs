@@ -83,6 +83,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         genesis: Block<N>,
         cdn: Option<String>,
         storage_mode: StorageMode,
+        allow_external_peers: bool,
         dev_txs: bool,
     ) -> Result<Self> {
         // Prepare the shutdown flag.
@@ -125,6 +126,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            allow_external_peers,
             matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
@@ -498,6 +500,7 @@ mod tests {
             genesis,
             None,
             storage_mode,
+            false,
             dev_txs,
         )
         .await
