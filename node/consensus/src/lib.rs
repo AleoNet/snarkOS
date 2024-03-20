@@ -475,7 +475,7 @@ impl<N: Network> Consensus<N> {
                     metrics::histogram_label(
                         metrics::consensus::TRANSMISSION_LATENCY,
                         "transmission_type",
-                        transmission_type_string.to_string(),
+                        transmission_type_string.to_owned(),
                         elapsed_time.as_secs_f64(),
                     );
                     keys_to_remove.push(key.clone());
