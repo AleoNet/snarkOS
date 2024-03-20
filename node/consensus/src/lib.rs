@@ -222,9 +222,10 @@ impl<N: Network> Consensus<N> {
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+            let timestamp = snarkos_node_bft::helpers::now();
             self.transmissions_queue_timestamps
                 .lock()
-                .insert(TransmissionID::Solution(solution.commitment()), snarkos_node_bft::helpers::now());
+                .insert(TransmissionID::Solution(solution.commitment()), timestamp);
         }
         // Process the unconfirmed solution.
         {
@@ -283,9 +284,10 @@ impl<N: Network> Consensus<N> {
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+            let timestamp = snarkos_node_bft::helpers::now();
             self.transmissions_queue_timestamps
                 .lock()
-                .insert(TransmissionID::Transaction(transaction.id()), snarkos_node_bft::helpers::now());
+                .insert(TransmissionID::Transaction(transaction.id()), timestamp);
         }
         // Process the unconfirmed transaction.
         {
@@ -450,16 +452,17 @@ impl<N: Network> Consensus<N> {
         const AGE_THRESHOLD_SECONDS: i32 = 30 * 60; // 30 minutes set as stale transmission threshold
 
         let mut keys_to_remove = Vec::new();
-        let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
 
         let solution_ids: std::collections::HashSet<_> = next_block.solutions().solution_ids().collect();
         let transaction_ids: std::collections::HashSet<_> = next_block.transaction_ids().collect();
 
+        let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
+        let ts_now  = snarkos_node_bft::helpers::now();
         for (key, timestamp) in transmission_queue_timestamps.iter() {
-            let elapsed_time = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - *timestamp) as u64);
+            let elapsed_time = std::time::Duration::from_secs((ts_now - *timestamp) as u64);
 
             if elapsed_time.as_secs() > AGE_THRESHOLD_SECONDS as u64 {
-                // This entry is stale-- remove it from transmission queue and record it as a stale transmission
+                // This entry is stale-- remove it from transmission queue and record it as a stale transmission.
                 metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
                 keys_to_remove.push(key.clone());
             } else {
