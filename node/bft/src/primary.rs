@@ -398,43 +398,59 @@ impl<N: Network> Primary<N> {
         let mut num_transactions = 0;
         // Take the transmissions from the workers.
         for worker in self.workers.iter() {
-            for (id, transmission) in worker.drain(num_transmissions_per_worker) {
-                // Check if the ledger already contains the transmission.
-                if self.ledger.contains_transmission(&id).unwrap_or(true) {
-                    trace!("Proposing - Skipping transmission '{}' - Already in ledger", fmt_id(id));
-                    continue;
+            // Initialize a tracker for included transmissions for the current worker.
+            let mut num_transmissions_included_for_worker = 0;
+            // Keep draining the worker until the desired number of transmissions is reached or the worker is empty.
+            'outer: while num_transmissions_included_for_worker < num_transmissions_per_worker {
+                // Determine the number of remaining transmissions for the worker.
+                let num_remaining_transmissions =
+                    num_transmissions_per_worker.saturating_sub(num_transmissions_included_for_worker);
+                // Drain the worker.
+                let mut worker_transmissions = worker.drain(num_remaining_transmissions).peekable();
+                // If the worker is empty, break early.
+                if worker_transmissions.peek().is_none() {
+                    break 'outer;
                 }
-                // Check if the previous certificates already contain the transmission.
-                if previous_certificate_transmissions.contains(&id) {
-                    trace!("Proposing - Skipping transmission '{}' - Already in previous certificates", fmt_id(id));
-                    continue;
-                }
-                // Check the transmission is still valid.
-                match (id, transmission.clone()) {
-                    (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
-                        // Check if the solution is still valid.
-                        if let Err(e) = self.ledger.check_solution_basic(solution_id, solution).await {
-                            trace!("Proposing - Skipping solution '{}' - {e}", fmt_id(solution_id));
-                            continue;
-                        }
+                // Iterate through the worker transmissions.
+                'inner: for (id, transmission) in worker_transmissions {
+                    // Check if the ledger already contains the transmission.
+                    if self.ledger.contains_transmission(&id).unwrap_or(true) {
+                        trace!("Proposing - Skipping transmission '{}' - Already in ledger", fmt_id(id));
+                        continue 'inner;
                     }
-                    (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
-                        // Check if the transaction is still valid.
-                        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
-                            trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
-                            continue;
-                        }
-                        // Increment the number of transactions.
-                        num_transactions += 1;
+                    // Check if the previous certificates already contain the transmission.
+                    if previous_certificate_transmissions.contains(&id) {
+                        trace!("Proposing - Skipping transmission '{}' - Already in previous certificates", fmt_id(id));
+                        continue 'inner;
                     }
-                    // Note: We explicitly forbid including ratifications,
-                    // as the protocol currently does not support ratifications.
-                    (TransmissionID::Ratification, Transmission::Ratification) => continue,
-                    // All other combinations are clearly invalid.
-                    _ => continue,
+                    // Check the transmission is still valid.
+                    match (id, transmission.clone()) {
+                        (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
+                            // Check if the solution is still valid.
+                            if let Err(e) = self.ledger.check_solution_basic(solution_id, solution).await {
+                                trace!("Proposing - Skipping solution '{}' - {e}", fmt_id(solution_id));
+                                continue 'inner;
+                            }
+                        }
+                        (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+                            // Check if the transaction is still valid.
+                            if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
+                                trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
+                                continue 'inner;
+                            }
+                            // Increment the number of transactions.
+                            num_transactions += 1;
+                        }
+                        // Note: We explicitly forbid including ratifications,
+                        // as the protocol currently does not support ratifications.
+                        (TransmissionID::Ratification, Transmission::Ratification) => continue,
+                        // All other combinations are clearly invalid.
+                        _ => continue 'inner,
+                    }
+                    // Insert the transmission into the map.
+                    transmissions.insert(id, transmission);
+                    num_transmissions_included_for_worker += 1;
                 }
-                // Insert the transmission into the map.
-                transmissions.insert(id, transmission);
             }
         }
         // If there are no unconfirmed transmissions to propose, return early.
