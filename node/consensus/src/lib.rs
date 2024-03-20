@@ -136,7 +136,7 @@ impl<N: Network> Consensus<N> {
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             handles: Default::default(),
             #[cfg(feature = "metrics")]
-            transmissions_queue_timestamps: Arc::new(Mutex::new(HashMap::new())),
+            transmissions_queue_timestamps: Default::default(),
         })
     }
 
