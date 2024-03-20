@@ -285,9 +285,7 @@ impl<N: Network> Consensus<N> {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
             let timestamp = snarkos_node_bft::helpers::now();
-            self.transmissions_queue_timestamps
-                .lock()
-                .insert(TransmissionID::Transaction(transaction.id()), timestamp);
+            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Transaction(transaction.id()), timestamp);
         }
         // Process the unconfirmed transaction.
         {
@@ -457,7 +455,7 @@ impl<N: Network> Consensus<N> {
         let transaction_ids: std::collections::HashSet<_> = next_block.transaction_ids().collect();
 
         let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
-        let ts_now  = snarkos_node_bft::helpers::now();
+        let ts_now = snarkos_node_bft::helpers::now();
         for (key, timestamp) in transmission_queue_timestamps.iter() {
             let elapsed_time = std::time::Duration::from_secs((ts_now - *timestamp) as u64);
 
