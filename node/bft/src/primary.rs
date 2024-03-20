@@ -1787,6 +1787,72 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_propose_batch_skip_transmissions_from_previous_certificates() {
+        let round = 3;
+        let prev_round = round - 1;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+        let peer_account = &accounts[1];
+        let peer_ip = peer_account.0;
+
+        // Fill primary storage.
+        store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Get transmissions from previous certificates.
+        let previous_certificate_ids: IndexSet<_> =
+            primary.storage.get_certificates_for_round(prev_round).iter().map(|cert| cert.id()).collect();
+
+        // Track the number of transmissions in the previous round.
+        let mut num_transmissions_in_previous_round = 0;
+
+        // Create certificates for the current round and add the transmissions to the worker before inserting the certificate to storage.
+        for (_, account) in accounts.iter() {
+            let (certificate, transmissions) = create_batch_certificate(
+                account.address(),
+                &accounts,
+                round,
+                previous_certificate_ids.clone(),
+                &mut rng,
+            );
+
+            // Add the transmissions to the worker.
+            for (transmission_id, transmission) in transmissions.iter() {
+                primary.workers[0].process_transmission_from_peer(peer_ip, *transmission_id, transmission.clone());
+            }
+
+            // Insert the certificate to storage.
+            num_transmissions_in_previous_round += transmissions.len();
+            primary.storage.insert_certificate(certificate, transmissions).unwrap();
+        }
+
+        // Check that the worker has `num_transmissions_in_previous_round` transmissions.
+        assert_eq!(primary.workers[0].num_transmissions(), num_transmissions_in_previous_round);
+
+        // Advance to the next round.
+        assert!(primary.storage.increment_to_next_round(round).is_ok());
+
+        // Generate a solution and a transaction.
+        let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Check that the worker has `num_transmissions_in_previous_round + 2` transmissions.
+        assert_eq!(primary.workers[0].num_transmissions(), num_transmissions_in_previous_round + 2);
+
+        // Propose the batch.
+        assert!(primary.propose_batch().await.is_ok());
+
+        // Check that the proposal only contains the new transmissions that were not in previous certificates.
+        let proposed_transmissions = primary.proposed_batch.read().as_ref().unwrap().transmissions().clone();
+        assert_eq!(proposed_transmissions.len(), 2);
+        assert!(proposed_transmissions.contains_key(&TransmissionID::Solution(solution_commitment)));
+        assert!(proposed_transmissions.contains_key(&TransmissionID::Transaction(transaction_id)));
+    }
+
+    #[tokio::test]
     async fn test_batch_propose_from_peer() {
         let mut rng = TestRng::default();
         let (primary, accounts) = primary_without_handlers(&mut rng).await;
