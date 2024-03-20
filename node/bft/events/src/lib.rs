@@ -70,6 +70,7 @@ use snarkvm::{
     console::prelude::{error, FromBytes, Network, Read, ToBytes, Write},
     ledger::{
         block::Block,
+        committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     },
     prelude::{Address, Field, Signature},
