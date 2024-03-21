@@ -138,7 +138,7 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
-    /// If developtment mode is enabled, specify whether node 0 should generate traffic to drive the network
+    /// If development mode is enabled, specify whether node 0 should generate traffic to drive the network
     #[clap(default_value = "false", long = "no-dev-txs")]
     pub no_dev_txs: bool,
     /// Specify the path to a directory containing the ledger
