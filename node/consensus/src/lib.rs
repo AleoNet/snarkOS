@@ -462,7 +462,7 @@ impl<N: Network> Consensus<N> {
             if elapsed_time.as_secs() > AGE_THRESHOLD_SECONDS as u64 {
                 // This entry is stale-- remove it from transmission queue and record it as a stale transmission.
                 metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
-                keys_to_remove.push(key.clone());
+                keys_to_remove.push(*key);
             } else {
                 let transmission_type = match key {
                     TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
@@ -479,7 +479,7 @@ impl<N: Network> Consensus<N> {
                         transmission_type_string.to_owned(),
                         elapsed_time.as_secs_f64(),
                     );
-                    keys_to_remove.push(key.clone());
+                    keys_to_remove.push(*key);
                 }
             }
         }
