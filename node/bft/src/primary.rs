@@ -1806,6 +1806,17 @@ mod tests {
         // Track the number of transmissions in the previous round.
         let mut num_transmissions_in_previous_round = 0;
 
+        // Generate a solution and a transaction.
+        let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Check that the worker has 2 transmissions.
+        assert_eq!(primary.workers[0].num_transmissions(), 2);
+
         // Create certificates for the current round and add the transmissions to the worker before inserting the certificate to storage.
         for (_, account) in accounts.iter() {
             let (certificate, transmissions) = create_batch_certificate(
@@ -1826,19 +1837,8 @@ mod tests {
             primary.storage.insert_certificate(certificate, transmissions).unwrap();
         }
 
-        // Check that the worker has `num_transmissions_in_previous_round` transmissions.
-        assert_eq!(primary.workers[0].num_transmissions(), num_transmissions_in_previous_round);
-
         // Advance to the next round.
         assert!(primary.storage.increment_to_next_round(round).is_ok());
-
-        // Generate a solution and a transaction.
-        let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
-        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
-
-        // Store it on one of the workers.
-        primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
-        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Check that the worker has `num_transmissions_in_previous_round + 2` transmissions.
         assert_eq!(primary.workers[0].num_transmissions(), num_transmissions_in_previous_round + 2);
