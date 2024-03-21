@@ -363,10 +363,6 @@ impl<N: Network> Primary<N> {
         let previous_round = round.saturating_sub(1);
         // Retrieve the previous certificates.
         let previous_certificates = self.storage.get_certificates_for_round(previous_round);
-        // Retrieve the transmissions included in the previous certificates.
-        let previous_certificate_transmissions = cfg_iter!(previous_certificates)
-            .flat_map(|certificate| certificate.transmission_ids())
-            .collect::<IndexSet<_>>();
 
         // Check if the batch is ready to be proposed.
         // Note: The primary starts at round 1, and round 0 contains no certificates, by definition.
@@ -421,9 +417,11 @@ impl<N: Network> Primary<N> {
                         trace!("Proposing - Skipping transmission '{}' - Already in ledger", fmt_id(id));
                         continue 'inner;
                     }
-                    // Check if the previous certificates already contain the transmission.
-                    if previous_certificate_transmissions.contains(&id) {
-                        trace!("Proposing - Skipping transmission '{}' - Already in previous certificates", fmt_id(id));
+                    // Check if the storage already contain the transmission.
+                    // Note: We do not skip if this is the first transmission in the proposal, to ensure that
+                    // the primary does not propose a batch with no transmissions.
+                    if !transmissions.is_empty() && self.storage.contains_transmission(id) {
+                        trace!("Proposing - Skipping transmission '{}' - Already in storage", fmt_id(id));
                         continue 'inner;
                     }
                     // Check the transmission is still valid.
