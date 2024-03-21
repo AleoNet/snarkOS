@@ -28,6 +28,7 @@ use snarkos_node_bft::{
         Storage as NarwhalStorage,
     },
     spawn_blocking,
+    Primary,
     BFT,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -305,13 +306,13 @@ impl<N: Network> Consensus<N> {
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
+        if num_unconfirmed > Primary::<N>::MAX_TRANSMISSIONS_IN_MEMORY_POOL {
             return Ok(());
         }
         // Retrieve the transactions.
         let transactions = {
             // Determine the available capacity.
-            let capacity = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+            let capacity = Primary::<N>::MAX_TRANSMISSIONS_IN_MEMORY_POOL.saturating_sub(num_unconfirmed);
             // Acquire the lock on the transactions queue.
             let mut tx_queue = self.transactions_queue.lock();
             // Determine the number of deployments to send.
