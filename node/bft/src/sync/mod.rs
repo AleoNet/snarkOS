@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{fmt_id, BFTSender, Pending, Storage, SyncReceiver, NUM_REDUNDANT_REQUESTS},
+    helpers::{fmt_id, max_redundant_requests, BFTSender, Pending, Storage, SyncReceiver},
     Gateway,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -212,6 +212,8 @@ impl<N: Network> Sync<N> {
         self.storage.sync_height_with_block(latest_block.height());
         // Sync the round with the block.
         self.storage.sync_round_with_block(latest_block.round());
+        // Perform GC on the latest block round.
+        self.storage.garbage_collect_certificates(latest_block.round());
         // Iterate over the blocks.
         for block in &blocks {
             // If the block authority is a subdag, then sync the batch certificates with the block.
@@ -234,22 +236,6 @@ impl<N: Network> Sync<N> {
 
         /* Sync the BFT DAG */
 
-        // Retrieve the leader certificates.
-        let leader_certificates = blocks
-            .iter()
-            .flat_map(|block| {
-                match block.authority() {
-                    // If the block authority is a beacon, then skip the block.
-                    Authority::Beacon(_) => None,
-                    // If the block authority is a subdag, then retrieve the certificates.
-                    Authority::Quorum(subdag) => Some(subdag.leader_certificate().clone()),
-                }
-            })
-            .collect::<Vec<_>>();
-        if leader_certificates.is_empty() {
-            return Ok(());
-        }
-
         // Construct a list of the certificates.
         let certificates = blocks
             .iter()
@@ -264,10 +250,10 @@ impl<N: Network> Sync<N> {
             .flatten()
             .collect::<Vec<_>>();
 
-        // If a BFT sender was provided, send the certificate to the BFT.
+        // If a BFT sender was provided, send the certificates to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
             // Await the callback to continue.
-            if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send((leader_certificates, certificates)).await {
+            if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send(certificates).await {
                 bail!("Failed to update the BFT DAG from sync: {e}");
             }
         }
@@ -323,17 +309,21 @@ impl<N: Network> Sync<N> {
         // Acquire the sync lock.
         let _lock = self.sync_lock.lock().await;
 
-        // Check the next block.
-        self.ledger.check_next_block(&block)?;
-        // Attempt to advance to the next block.
-        self.ledger.advance_to_next_block(&block)?;
+        let self_ = self.clone();
+        tokio::task::spawn_blocking(move || {
+            // Check the next block.
+            self_.ledger.check_next_block(&block)?;
+            // Attempt to advance to the next block.
+            self_.ledger.advance_to_next_block(&block)?;
 
-        // Sync the height with the block.
-        self.storage.sync_height_with_block(block.height());
-        // Sync the round with the block.
-        self.storage.sync_round_with_block(block.round());
+            // Sync the height with the block.
+            self_.storage.sync_height_with_block(block.height());
+            // Sync the round with the block.
+            self_.storage.sync_round_with_block(block.round());
 
-        Ok(())
+            Ok(())
+        })
+        .await?
     }
 
     /// Syncs the storage with the given blocks.
@@ -410,19 +400,27 @@ impl<N: Network> Sync<N> {
     ) -> Result<BatchCertificate<N>> {
         // Initialize a oneshot channel.
         let (callback_sender, callback_receiver) = oneshot::channel();
+        // Determine how many sent requests are pending.
+        let num_sent_requests = self.pending.num_sent_requests(certificate_id);
+        // Determine the maximum number of redundant requests.
+        let num_redundant_requests = max_redundant_requests(self.ledger.clone(), self.storage.current_round());
+        // Determine if we should send a certificate request to the peer.
+        let should_send_request = num_sent_requests < num_redundant_requests;
+
         // Insert the certificate ID into the pending queue.
-        if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
-            // Determine how many requests are pending for the certificate.
-            let num_pending_requests = self.pending.num_callbacks(certificate_id);
-            // If the number of requests is less than or equal to the redundancy factor, send the certificate request to the peer.
-            if num_pending_requests <= NUM_REDUNDANT_REQUESTS {
-                // Send the certificate request to the peer.
-                if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
-                    bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
-                }
-            } else {
-                trace!("Skipped sending redundant request for certificate {} to '{peer_ip}'", fmt_id(certificate_id));
+        self.pending.insert(certificate_id, peer_ip, Some((callback_sender, should_send_request)));
+
+        // If the number of requests is less than or equal to the redundancy factor, send the certificate request to the peer.
+        if should_send_request {
+            // Send the certificate request to the peer.
+            if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
+                bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
             }
+        } else {
+            debug!(
+                "Skipped sending request for certificate {} to '{peer_ip}' ({num_sent_requests} redundant requests)",
+                fmt_id(certificate_id)
+            );
         }
         // Wait for the certificate to be fetched.
         match tokio::time::timeout(core::time::Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await

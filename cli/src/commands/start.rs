@@ -53,8 +53,9 @@ const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 /// The development mode number of genesis committee members.
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
+/// A mapping of `staker_address` to `(validator_address, withdrawal_address, amount)`.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-struct BondedBalances(IndexMap<String, (String, u64)>);
+struct BondedBalances(IndexMap<String, (String, String, u64)>);
 
 impl FromStr for BondedBalances {
     type Err = serde_json::Error;
@@ -137,13 +138,20 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
+    /// If developtment mode is enabled, specify whether node 0 should generate traffic to drive the network
+    #[clap(default_value = "false", long = "no-dev-txs")]
+    pub no_dev_txs: bool,
     /// Specify the path to a directory containing the ledger
     #[clap(long = "storage_path")]
     pub storage_path: Option<PathBuf>,
 
-    #[clap(long)]
     /// If development mode is enabled, specify the custom bonded balances as a json object. (default: None)
+    #[clap(long)]
     dev_bonded_balances: Option<BondedBalances>,
+
+    /// If the flag is set, the validator will allow untrusted peers to connect
+    #[clap(long = "allow-external-peers")]
+    allow_external_peers: bool,
 }
 
 impl Start {
@@ -342,16 +350,17 @@ impl Start {
                     let bonded_balances = bonded_balances
                         .0
                         .iter()
-                        .map(|(staker_address, (validator_address, amount))| {
+                        .map(|(staker_address, (validator_address, withdrawal_address, amount))| {
                             let staker_addr = Address::<N>::from_str(staker_address)?;
                             let validator_addr = Address::<N>::from_str(validator_address)?;
-                            Ok((staker_addr, (validator_addr, *amount)))
+                            let withdrawal_addr = Address::<N>::from_str(withdrawal_address)?;
+                            Ok((staker_addr, (validator_addr, withdrawal_addr, *amount)))
                         })
                         .collect::<Result<IndexMap<_, _>>>()?;
 
                     // Construct the committee members.
                     let mut members = IndexMap::new();
-                    for (staker_address, (validator_address, amount)) in bonded_balances.iter() {
+                    for (staker_address, (validator_address, _, amount)) in bonded_balances.iter() {
                         // Ensure that the staking amount is sufficient.
                         match staker_address == validator_address {
                             true => ensure!(amount >= &MIN_VALIDATOR_STAKE, "Validator stake is too low"),
@@ -387,9 +396,10 @@ impl Start {
                         .collect::<IndexMap<_, _>>();
 
                     // Construct the bonded balances.
+                    // Note: The withdrawal address is set to the staker address.
                     let bonded_balances = members
                         .iter()
-                        .map(|(address, (stake, _))| (*address, (*address, *stake)))
+                        .map(|(address, (stake, _))| (*address, (*address, *address, *stake)))
                         .collect::<IndexMap<_, _>>();
                     // Construct the committee.
                     let committee = Committee::<N>::new(0u64, members)?;
@@ -524,10 +534,22 @@ impl Start {
             None => StorageMode::from(self.dev),
         };
 
+        // Determine whether to generate background transactions in dev mode.
+        let dev_txs = match self.dev {
+            Some(_) => !self.no_dev_txs,
+            None => {
+                // If the `no_dev_txs` flag is set, inform the user that it is ignored.
+                if self.no_dev_txs {
+                    eprintln!("The '--no-dev-txs' flag is ignored because '--dev' is not set");
+                }
+                false
+            }
+        };
+
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }
@@ -587,7 +609,7 @@ fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
-    bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, u64)>,
+    bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, Address<N>, u64)>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
@@ -597,7 +619,12 @@ fn load_or_compute_genesis<N: Network>(
     preimage.extend(genesis_private_key.to_bytes_le()?);
     preimage.extend(committee.to_bytes_le()?);
     preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
-    preimage.extend(&to_bytes_le![bonded_balances.iter().collect::<Vec<(_, _)>>()]?);
+    preimage.extend(&to_bytes_le![
+        bonded_balances
+            .iter()
+            .flat_map(|(staker, (validator, withdrawal, amount))| to_bytes_le![staker, validator, withdrawal, amount])
+            .collect::<Vec<_>>()
+    ]?);
 
     // Input the parameters' metadata.
     preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());

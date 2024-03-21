@@ -53,10 +53,18 @@ use tokio::{
     task::JoinHandle,
 };
 
-/// Percentage of mempool transactions capacity reserved for deployments.
-const CAPACITY_FOR_DEPLOYMENTS: usize = 20;
-/// Percentage of mempool transactions capacity reserved for executions.
-const CAPACITY_FOR_EXECUTIONS: usize = 80;
+/// The capacity of the queue reserved for deployments.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 10;
+/// The capacity of the queue reserved for executions.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_EXECUTIONS: usize = 1 << 10;
+/// The capacity of the queue reserved for solutions.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_SOLUTIONS: usize = 1 << 10;
+/// The **suggested** maximum number of deployments in each interval.
+/// Note: This is an inbound queue limit, not a Narwhal-enforced limit.
+const MAX_DEPLOYMENTS_PER_INTERVAL: usize = 1;
 
 /// Helper struct to track incoming transactions.
 struct TransactionsQueue<N: Network> {
@@ -67,14 +75,8 @@ struct TransactionsQueue<N: Network> {
 impl<N: Network> Default for TransactionsQueue<N> {
     fn default() -> Self {
         Self {
-            deployments: LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_DEPLOYMENTS / 100)
-                    .unwrap(),
-            ),
-            executions: LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * CAPACITY_FOR_EXECUTIONS / 100)
-                    .unwrap(),
-            ),
+            deployments: LruCache::new(NonZeroUsize::new(CAPACITY_FOR_DEPLOYMENTS).unwrap()),
+            executions: LruCache::new(NonZeroUsize::new(CAPACITY_FOR_EXECUTIONS).unwrap()),
         }
     }
 }
@@ -124,9 +126,7 @@ impl<N: Network> Consensus<N> {
             ledger,
             bft,
             primary_sender: Default::default(),
-            solutions_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH).unwrap(),
-            ))),
+            solutions_queue: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(CAPACITY_FOR_SOLUTIONS).unwrap()))),
             transactions_queue: Default::default(),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
@@ -212,6 +212,11 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
+        #[cfg(feature = "metrics")]
+        {
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+        }
         // Process the unconfirmed solution.
         {
             let solution_id = solution.commitment();
@@ -265,6 +270,11 @@ impl<N: Network> Consensus<N> {
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        #[cfg(feature = "metrics")]
+        {
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
+            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+        }
         // Process the unconfirmed transaction.
         {
             let transaction_id = transaction.id();
@@ -305,7 +315,7 @@ impl<N: Network> Consensus<N> {
             // Acquire the lock on the transactions queue.
             let mut tx_queue = self.transactions_queue.lock();
             // Determine the number of deployments to send.
-            let num_deployments = tx_queue.deployments.len().min(capacity * CAPACITY_FOR_DEPLOYMENTS / 100);
+            let num_deployments = tx_queue.deployments.len().min(capacity).min(MAX_DEPLOYMENTS_PER_INTERVAL);
             // Determine the number of executions to send.
             let num_executions = tx_queue.executions.len().min(capacity.saturating_sub(num_deployments));
             // Create an iterator which will select interleaved deployments and executions within the capacity.
@@ -405,9 +415,14 @@ impl<N: Network> Consensus<N> {
             let elapsed = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - start) as u64);
             let next_block_timestamp = next_block.header().metadata().timestamp();
             let block_latency = next_block_timestamp - current_block_timestamp;
+            let num_sol = next_block.solutions().len();
+            let num_tx = next_block.transactions().len();
+            let num_transmissions = num_tx + num_sol;
 
             metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
-            metrics::counter(metrics::blocks::TRANSACTIONS, next_block.transactions().len() as u64);
+            metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
+            metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
+            metrics::increment_gauge(metrics::blocks::TRANSMISSIONS, num_transmissions as f64);
             metrics::gauge(metrics::consensus::LAST_COMMITTED_ROUND, next_block.round() as f64);
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());

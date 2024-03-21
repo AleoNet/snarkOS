@@ -17,8 +17,8 @@
   * [2.1 Requirements](#21-requirements)
   * [2.2 Installation](#22-installation)
 * [3. Run an Aleo Node](#3-run-an-aleo-node)
-  * [3a. Run an Aleo Client](#3a-run-an-aleo-client)
-  * [3b. Run an Aleo Prover](#3b-run-an-aleo-prover)
+  * [3.1 Run an Aleo Client](#31-run-an-aleo-client)
+  * [3.2 Run an Aleo Prover](#32-run-an-aleo-prover)
 * [4. FAQs](#4-faqs)
 * [5. Command Line Interface](#5-command-line-interface)
 * [6. Development Guide](#6-development-guide)
@@ -96,7 +96,7 @@ Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS fir
 
 ## 3. Run an Aleo Node
 
-## 3a. Run an Aleo Client
+## 3.1 Run an Aleo Client
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
 
@@ -105,7 +105,7 @@ Next, to start a client node, from the `snarkOS` directory, run:
 ./run-client.sh
 ```
 
-## 3b. Run an Aleo Prover
+## 3.2 Run an Aleo Prover
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
 
@@ -151,6 +151,15 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 - Before running the command above (`snarkos account new`) try `source ~/.bashrc`
 - Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, and the command is `snarkos`
+
+### 4. How do I use the CLI to sign and verify a message?
+
+1. Generate an account with `snarkos account new` if you haven't already
+2. Sign a message with your private key using `snarkos account sign --raw -m "Message" --private-key-file=<PRIVATE_KEY_FILE>`
+3. Verify your signature with `snarkos account verify --raw -m "Message" -s sign1SignatureHere -a aleo1YourAccountAddress`
+
+Note, using the `--raw` flag with the command will sign plaintext messages as bytes rather than [Aleo](https://developer.aleo.org/aleo/language#data-types-and-values) values such as `1u8` or `100field`.
+
 
 ## 5. Command Line Interface
 
