@@ -138,7 +138,7 @@ impl TestNetwork {
             .map(|(address, (amount, _))| (*address, (*address, *address, *amount)))
             .collect();
         let gen_key = *accounts[0].private_key();
-        let public_balance_per_validator = (<CurrentNetwork as Network>::STARTING_SUPPLY
+        let public_balance_per_validator = (CurrentNetwork::STARTING_SUPPLY
             - (config.num_nodes as u64) * MIN_VALIDATOR_STAKE)
             / (config.num_nodes as u64);
         let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
