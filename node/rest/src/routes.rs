@@ -15,7 +15,7 @@
 use super::*;
 use snarkos_node_router::messages::UnconfirmedSolution;
 use snarkvm::{
-    ledger::coinbase::ProverSolution,
+    ledger::puzzle::Solution,
     prelude::{block::Transaction, Identifier, Plaintext},
 };
 
@@ -335,24 +335,22 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // POST /mainnet/solution/broadcast
     pub(crate) async fn solution_broadcast(
         State(rest): State<Self>,
-        Json(prover_solution): Json<ProverSolution<N>>,
+        Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
         // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed solution to the memory pool.
-            consensus.add_unconfirmed_solution(prover_solution).await?;
+            consensus.add_unconfirmed_solution(solution).await?;
         }
 
-        let commitment = prover_solution.commitment();
+        let solution_id = solution.id();
         // Prepare the unconfirmed solution message.
-        let message = Message::UnconfirmedSolution(UnconfirmedSolution {
-            solution_id: commitment,
-            solution: Data::Object(prover_solution),
-        });
+        let message =
+            Message::UnconfirmedSolution(UnconfirmedSolution { solution_id, solution: Data::Object(solution) });
 
         // Broadcast the unconfirmed solution message.
         rest.routing.propagate(message, &[]);
 
-        Ok(ErasedJson::pretty(commitment))
+        Ok(ErasedJson::pretty(solution_id))
     }
 }

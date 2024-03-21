@@ -33,9 +33,9 @@ use snarkvm::{
     console::account::Address,
     ledger::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
     prelude::{bail, ensure, Field, Network, Result},
 };
@@ -183,7 +183,7 @@ impl<N: Network> BFT<N> {
     }
 
     /// Returns the unconfirmed solutions.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
         self.primary.unconfirmed_solutions()
     }
 

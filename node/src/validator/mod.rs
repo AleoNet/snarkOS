@@ -34,7 +34,7 @@ use snarkos_node_tcp::{
 };
 use snarkvm::prelude::{
     block::{Block, Header},
-    coinbase::ProverSolution,
+    puzzle::Solution,
     store::ConsensusStorage,
     Ledger,
     Network,
