@@ -194,7 +194,7 @@ fn create_ledger(
 ) -> Arc<TranslucentLedgerService<snarkvm::prelude::MainnetV0, ConsensusMemory<snarkvm::prelude::MainnetV0>>> {
     let gen_key = account.private_key();
     let public_balance_per_validator =
-        (1_500_000_000_000_000 - (num_nodes as u64) * 1_000_000_000_000) / (num_nodes as u64);
+        (CurrentNetwork::STARTING_SUPPLY - (num_nodes as u64) * MIN_VALIDATOR_STAKE) / (num_nodes as u64);
     let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
     for address in committee.members().keys() {
         balances.insert(*address, public_balance_per_validator);
