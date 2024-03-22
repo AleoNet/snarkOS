@@ -76,7 +76,7 @@ pub fn assign_to_workers<N: Network>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::coinbase::PuzzleCommitment;
+    use snarkvm::prelude::puzzle::SolutionID;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
@@ -90,8 +90,8 @@ mod tests {
         ]);
         let hash = sha256d_to_u128(data);
         assert_eq!(hash, 274520597840828436951879875061540363633u128);
-        let transmission_id: TransmissionID<CurrentNetwork> = TransmissionID::Solution(PuzzleCommitment::default());
+        let transmission_id: TransmissionID<CurrentNetwork> = TransmissionID::Solution(SolutionID::from(123456789));
         let worker_id = assign_to_worker(transmission_id, 5).unwrap();
-        assert_eq!(worker_id, 4);
+        assert_eq!(worker_id, 2);
     }
 }

@@ -48,8 +48,8 @@ use snarkvm::{
     },
     ledger::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
     prelude::committee::Committee,
 };
@@ -259,7 +259,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Returns the unconfirmed solutions.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
         self.workers.iter().flat_map(|worker| worker.solutions())
     }
 
@@ -1055,9 +1055,9 @@ impl<N: Network> Primary<N> {
         // Process the unconfirmed solutions.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((puzzle_commitment, prover_solution, callback)) = rx_unconfirmed_solution.recv().await {
+            while let Some((solution_id, solution, callback)) = rx_unconfirmed_solution.recv().await {
                 // Compute the worker ID.
-                let Ok(worker_id) = assign_to_worker(puzzle_commitment, self_.num_workers()) else {
+                let Ok(worker_id) = assign_to_worker(solution_id, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed solution");
                     continue;
                 };
@@ -1066,7 +1066,7 @@ impl<N: Network> Primary<N> {
                     // Retrieve the worker.
                     let worker = &self_.workers[worker_id as usize];
                     // Process the unconfirmed solution.
-                    let result = worker.process_unconfirmed_solution(puzzle_commitment, prover_solution).await;
+                    let result = worker.process_unconfirmed_solution(solution_id, solution).await;
                     // Send the result to the callback.
                     callback.send(result).ok();
                 });
@@ -1549,20 +1549,17 @@ mod tests {
     }
 
     // Creates a mock solution.
-    fn sample_unconfirmed_solution(
-        rng: &mut TestRng,
-    ) -> (PuzzleCommitment<CurrentNetwork>, Data<ProverSolution<CurrentNetwork>>) {
-        // Sample a random fake puzzle commitment.
-        let affine = rng.gen();
-        let commitment = PuzzleCommitment::<CurrentNetwork>::from_g1_affine(affine);
+    fn sample_unconfirmed_solution(rng: &mut TestRng) -> (SolutionID<CurrentNetwork>, Data<Solution<CurrentNetwork>>) {
+        // Sample a random fake solution ID.
+        let solution_id = rng.gen::<u64>().into();
         // Vary the size of the solutions.
         let size = rng.gen_range(1024..10 * 1024);
         // Sample random fake solution bytes.
         let mut vec = vec![0u8; size];
         rng.fill_bytes(&mut vec);
         let solution = Data::Buffer(Bytes::from(vec));
-        // Return the ID and solution.
-        (commitment, solution)
+        // Return the solution ID and solution.
+        (solution_id, solution)
     }
 
     // Creates a mock transaction.
@@ -1590,15 +1587,15 @@ mod tests {
         timestamp: i64,
         rng: &mut TestRng,
     ) -> Proposal<CurrentNetwork> {
-        let (solution_commitment, solution) = sample_unconfirmed_solution(rng);
+        let (solution_id, solution) = sample_unconfirmed_solution(rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
 
         // Retrieve the private key.
         let private_key = author.private_key();
         // Prepare the transmission IDs.
-        let transmission_ids = [solution_commitment.into(), (&transaction_id).into()].into();
+        let transmission_ids = [solution_id.into(), (&transaction_id).into()].into();
         let transmissions = [
-            (solution_commitment.into(), Transmission::Solution(solution)),
+            (solution_id.into(), Transmission::Solution(solution)),
             ((&transaction_id).into(), Transmission::Transaction(transaction)),
         ]
         .into();
@@ -1671,11 +1668,11 @@ mod tests {
         let private_key = author.private_key();
 
         let committee_id = Field::rand(rng);
-        let (solution_commitment, solution) = sample_unconfirmed_solution(rng);
+        let (solution_id, solution) = sample_unconfirmed_solution(rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
-        let transmission_ids = [solution_commitment.into(), (&transaction_id).into()].into();
+        let transmission_ids = [solution_id.into(), (&transaction_id).into()].into();
         let transmissions = [
-            (solution_commitment.into(), Transmission::Solution(solution)),
+            (solution_id.into(), Transmission::Solution(solution)),
             ((&transaction_id).into(), Transmission::Transaction(transaction)),
         ]
         .into();
@@ -1748,11 +1745,11 @@ mod tests {
         assert!(primary.proposed_batch.read().is_none());
 
         // Generate a solution and a transaction.
-        let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
+        let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
 
         // Store it on one of the workers.
-        primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_solution(solution_id, solution).await.unwrap();
         primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Try to propose a batch again. This time, it should succeed.
@@ -1775,11 +1772,11 @@ mod tests {
         assert!(primary.proposed_batch.read().is_none());
 
         // Generate a solution and a transaction.
-        let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
+        let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
 
         // Store it on one of the workers.
-        primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_solution(solution_id, solution).await.unwrap();
         primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Propose a batch again. This time, it should succeed.
