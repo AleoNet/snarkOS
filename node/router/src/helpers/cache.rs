@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::messages::BlockRequest;
-use snarkvm::prelude::{coinbase::PuzzleCommitment, Network};
+use snarkvm::prelude::{puzzle::SolutionID, Network};
 
 use core::hash::Hash;
 use linked_hash_map::LinkedHashMap;
@@ -27,8 +27,8 @@ use time::{Duration, OffsetDateTime};
 /// The maximum number of items to store in a cache map.
 const MAX_CACHE_SIZE: usize = 1 << 17;
 
-/// A helper containing the peer IP and solution commitment.
-type SolutionKey<N> = (SocketAddr, PuzzleCommitment<N>);
+/// A helper containing the peer IP and solution ID.
+type SolutionKey<N> = (SocketAddr, SolutionID<N>);
 /// A helper containing the peer IP and transaction ID.
 type TransactionKey<N> = (SocketAddr, <N as Network>::TransactionID);
 
@@ -40,7 +40,7 @@ pub struct Cache<N: Network> {
     seen_inbound_messages: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
     /// The map of peer IPs to their recent timestamps.
     seen_inbound_puzzle_requests: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
-    /// The map of solution commitments to their last seen timestamp.
+    /// The map of solution IDs to their last seen timestamp.
     seen_inbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
     seen_inbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
@@ -48,7 +48,7 @@ pub struct Cache<N: Network> {
     seen_outbound_block_requests: RwLock<HashMap<SocketAddr, HashSet<BlockRequest>>>,
     /// The map of peer IPs to the number of puzzle requests.
     seen_outbound_puzzle_requests: RwLock<HashMap<SocketAddr, u32>>,
-    /// The map of solution commitments to their last seen timestamp.
+    /// The map of solution IDs to their last seen timestamp.
     seen_outbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
     seen_outbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
@@ -97,13 +97,9 @@ impl<N: Network> Cache<N> {
         Self::retain_and_insert(&self.seen_inbound_puzzle_requests, peer_ip, 60)
     }
 
-    /// Inserts a solution commitment into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_inbound_solution(
-        &self,
-        peer_ip: SocketAddr,
-        solution: PuzzleCommitment<N>,
-    ) -> Option<OffsetDateTime> {
-        Self::refresh_and_insert(&self.seen_inbound_solutions, (peer_ip, solution))
+    /// Inserts a solution ID into the cache, returning the previously seen timestamp if it existed.
+    pub fn insert_inbound_solution(&self, peer_ip: SocketAddr, solution_id: SolutionID<N>) -> Option<OffsetDateTime> {
+        Self::refresh_and_insert(&self.seen_inbound_solutions, (peer_ip, solution_id))
     }
 
     /// Inserts a transaction ID into the cache, returning the previously seen timestamp if it existed.
@@ -151,13 +147,9 @@ impl<N: Network> Cache<N> {
         Self::decrement_counter(&self.seen_outbound_puzzle_requests, peer_ip)
     }
 
-    /// Inserts a solution commitment into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_outbound_solution(
-        &self,
-        peer_ip: SocketAddr,
-        solution: PuzzleCommitment<N>,
-    ) -> Option<OffsetDateTime> {
-        Self::refresh_and_insert(&self.seen_outbound_solutions, (peer_ip, solution))
+    /// Inserts a solution ID into the cache, returning the previously seen timestamp if it existed.
+    pub fn insert_outbound_solution(&self, peer_ip: SocketAddr, solution_id: SolutionID<N>) -> Option<OffsetDateTime> {
+        Self::refresh_and_insert(&self.seen_outbound_solutions, (peer_ip, solution_id))
     }
 
     /// Inserts a transaction ID into the cache, returning the previously seen timestamp if it existed.
@@ -270,19 +262,19 @@ mod tests {
     fn test_inbound_solution() {
         let cache = Cache::<CurrentNetwork>::default();
         let peer_ip = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1234);
-        let solution = PuzzleCommitment::<CurrentNetwork>::default();
+        let solution_id = SolutionID::<CurrentNetwork>::from(123456789);
 
         // Check that the cache is empty.
         assert_eq!(cache.seen_inbound_solutions.read().len(), 0);
 
         // Insert a solution.
-        assert!(cache.insert_inbound_solution(peer_ip, solution).is_none());
+        assert!(cache.insert_inbound_solution(peer_ip, solution_id).is_none());
 
         // Check that the cache contains the solution.
         assert_eq!(cache.seen_inbound_solutions.read().len(), 1);
 
         // Insert the same solution again.
-        assert!(cache.insert_inbound_solution(peer_ip, solution).is_some());
+        assert!(cache.insert_inbound_solution(peer_ip, solution_id).is_some());
 
         // Check that the cache still contains the solution.
         assert_eq!(cache.seen_inbound_solutions.read().len(), 1);
@@ -314,19 +306,19 @@ mod tests {
     fn test_outbound_solution() {
         let cache = Cache::<CurrentNetwork>::default();
         let peer_ip = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1234);
-        let solution = PuzzleCommitment::<CurrentNetwork>::default();
+        let solution_id = SolutionID::<CurrentNetwork>::from(123456789);
 
         // Check that the cache is empty.
         assert_eq!(cache.seen_outbound_solutions.read().len(), 0);
 
         // Insert a solution.
-        assert!(cache.insert_outbound_solution(peer_ip, solution).is_none());
+        assert!(cache.insert_outbound_solution(peer_ip, solution_id).is_none());
 
         // Check that the cache contains the solution.
         assert_eq!(cache.seen_outbound_solutions.read().len(), 1);
 
         // Insert the same solution again.
-        assert!(cache.insert_outbound_solution(peer_ip, solution).is_some());
+        assert!(cache.insert_outbound_solution(peer_ip, solution_id).is_some());
 
         // Check that the cache still contains the solution.
         assert_eq!(cache.seen_outbound_solutions.read().len(), 1);

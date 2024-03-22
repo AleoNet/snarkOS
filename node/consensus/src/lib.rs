@@ -28,6 +28,7 @@ use snarkos_node_bft::{
         Storage as NarwhalStorage,
     },
     spawn_blocking,
+    Primary,
     BFT,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -35,8 +36,8 @@ use snarkos_node_bft_storage_service::BFTPersistentStorage;
 use snarkvm::{
     ledger::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchHeader, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
     prelude::*,
 };
@@ -92,11 +93,11 @@ pub struct Consensus<N: Network> {
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The unconfirmed solutions queue.
-    solutions_queue: Arc<Mutex<LruCache<PuzzleCommitment<N>, ProverSolution<N>>>>,
+    solutions_queue: Arc<Mutex<LruCache<SolutionID<N>, Solution<N>>>>,
     /// The unconfirmed transactions queue.
     transactions_queue: Arc<Mutex<TransactionsQueue<N>>>,
     /// The recently-seen unconfirmed solutions.
-    seen_solutions: Arc<Mutex<LruCache<PuzzleCommitment<N>, ()>>>,
+    seen_solutions: Arc<Mutex<LruCache<SolutionID<N>, ()>>>,
     /// The recently-seen unconfirmed transactions.
     seen_transactions: Arc<Mutex<LruCache<N::TransactionID, ()>>>,
     /// The spawned handles.
@@ -205,7 +206,7 @@ impl<N: Network> Consensus<N> {
     }
 
     /// Returns the unconfirmed solutions.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
         self.bft.unconfirmed_solutions()
     }
 
@@ -217,7 +218,7 @@ impl<N: Network> Consensus<N> {
 
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
-    pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
+    pub async fn add_unconfirmed_solution(&self, solution: Solution<N>) -> Result<()> {
         #[cfg(feature = "metrics")]
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
@@ -229,7 +230,7 @@ impl<N: Network> Consensus<N> {
         }
         // Process the unconfirmed solution.
         {
-            let solution_id = solution.commitment();
+            let solution_id = solution.id();
 
             // Check if the transaction was recently seen.
             if self.seen_solutions.lock().put(solution_id, ()).is_some() {
@@ -248,14 +249,17 @@ impl<N: Network> Consensus<N> {
         }
 
         // If the memory pool of this node is full, return early.
-        let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
+        let num_unconfirmed_solutions = self.num_unconfirmed_solutions();
+        let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
+        if num_unconfirmed_solutions >= N::MAX_SOLUTIONS
+            || num_unconfirmed_transmissions >= Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE
+        {
             return Ok(());
         }
         // Retrieve the solutions.
         let solutions = {
             // Determine the available capacity.
-            let capacity = N::MAX_SOLUTIONS.saturating_sub(num_unconfirmed);
+            let capacity = N::MAX_SOLUTIONS.saturating_sub(num_unconfirmed_solutions);
             // Acquire the lock on the queue.
             let mut queue = self.solutions_queue.lock();
             // Determine the number of solutions to send.
@@ -265,7 +269,7 @@ impl<N: Network> Consensus<N> {
         };
         // Iterate over the solutions.
         for solution in solutions.into_iter() {
-            let solution_id = solution.commitment();
+            let solution_id = solution.id();
             trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
             // Send the unconfirmed solution to the primary.
             if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
@@ -316,14 +320,14 @@ impl<N: Network> Consensus<N> {
         }
 
         // If the memory pool of this node is full, return early.
-        let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
+        let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
+        if num_unconfirmed_transmissions >= Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE {
             return Ok(());
         }
         // Retrieve the transactions.
         let transactions = {
             // Determine the available capacity.
-            let capacity = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+            let capacity = Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE.saturating_sub(num_unconfirmed_transmissions);
             // Acquire the lock on the transactions queue.
             let mut tx_queue = self.transactions_queue.lock();
             // Determine the number of deployments to send.
@@ -512,9 +516,9 @@ impl<N: Network> Consensus<N> {
         // Send the transmission to the primary.
         match (transmission_id, transmission) {
             (TransmissionID::Ratification, Transmission::Ratification) => return Ok(()),
-            (TransmissionID::Solution(commitment), Transmission::Solution(solution)) => {
+            (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
                 // Send the solution to the primary.
-                self.primary_sender().tx_unconfirmed_solution.send((commitment, solution, callback)).await?;
+                self.primary_sender().tx_unconfirmed_solution.send((solution_id, solution, callback)).await?;
             }
             (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
                 // Send the transaction to the primary.

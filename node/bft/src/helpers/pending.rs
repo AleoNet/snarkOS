@@ -177,7 +177,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
 mod tests {
     use super::*;
     use snarkvm::{
-        ledger::{coinbase::PuzzleCommitment, narwhal::TransmissionID},
+        ledger::narwhal::TransmissionID,
         prelude::{Rng, TestRng},
     };
 
@@ -198,27 +198,27 @@ mod tests {
         assert!(pending.is_empty());
         assert_eq!(pending.len(), 0);
 
-        // Initialize the commitments.
-        let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
-        let commitment_2 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
-        let commitment_3 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        // Initialize the solution IDs.
+        let solution_id_1 = TransmissionID::Solution(rng.gen::<u64>().into());
+        let solution_id_2 = TransmissionID::Solution(rng.gen::<u64>().into());
+        let solution_id_3 = TransmissionID::Solution(rng.gen::<u64>().into());
 
         // Initialize the SocketAddrs.
         let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
         let addr_2 = SocketAddr::from(([127, 0, 0, 1], 2345));
         let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
 
-        // Insert the commitments.
-        assert!(pending.insert(commitment_1, addr_1, None));
-        assert!(pending.insert(commitment_2, addr_2, None));
-        assert!(pending.insert(commitment_3, addr_3, None));
+        // Insert the solution IDs.
+        assert!(pending.insert(solution_id_1, addr_1, None));
+        assert!(pending.insert(solution_id_2, addr_2, None));
+        assert!(pending.insert(solution_id_3, addr_3, None));
 
         // Check the number of SocketAddrs.
         assert_eq!(pending.len(), 3);
         assert!(!pending.is_empty());
 
         // Check the items.
-        let ids = [commitment_1, commitment_2, commitment_3];
+        let ids = [solution_id_1, solution_id_2, solution_id_3];
         let peers = [addr_1, addr_2, addr_3];
 
         for i in 0..3 {
@@ -226,19 +226,19 @@ mod tests {
             assert!(pending.contains(id));
             assert!(pending.contains_peer(id, peers[i]));
         }
-        let unknown_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        let unknown_id = TransmissionID::Solution(rng.gen::<u64>().into());
         assert!(!pending.contains(unknown_id));
 
         // Check get.
-        assert_eq!(pending.get(commitment_1), Some(HashSet::from([addr_1])));
-        assert_eq!(pending.get(commitment_2), Some(HashSet::from([addr_2])));
-        assert_eq!(pending.get(commitment_3), Some(HashSet::from([addr_3])));
+        assert_eq!(pending.get(solution_id_1), Some(HashSet::from([addr_1])));
+        assert_eq!(pending.get(solution_id_2), Some(HashSet::from([addr_2])));
+        assert_eq!(pending.get(solution_id_3), Some(HashSet::from([addr_3])));
         assert_eq!(pending.get(unknown_id), None);
 
         // Check remove.
-        assert!(pending.remove(commitment_1, None).is_some());
-        assert!(pending.remove(commitment_2, None).is_some());
-        assert!(pending.remove(commitment_3, None).is_some());
+        assert!(pending.remove(solution_id_1, None).is_some());
+        assert!(pending.remove(solution_id_2, None).is_some());
+        assert!(pending.remove(solution_id_3, None).is_some());
         assert!(pending.remove(unknown_id, None).is_none());
 
         // Check empty again.
@@ -256,8 +256,8 @@ mod tests {
         assert!(pending.is_empty());
         assert_eq!(pending.len(), 0);
 
-        // Initialize the commitments.
-        let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        // Initialize the solution ID.
+        let solution_id_1 = TransmissionID::Solution(rng.gen::<u64>().into());
 
         // Initialize the SocketAddrs.
         let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -269,29 +269,29 @@ mod tests {
         let (callback_sender_2, _) = oneshot::channel();
         let (callback_sender_3, _) = oneshot::channel();
 
-        // Insert the commitments.
-        assert!(pending.insert(commitment_1, addr_1, Some((callback_sender_1, true))));
-        assert!(pending.insert(commitment_1, addr_2, Some((callback_sender_2, true))));
+        // Insert the solution ID.
+        assert!(pending.insert(solution_id_1, addr_1, Some((callback_sender_1, true))));
+        assert!(pending.insert(solution_id_1, addr_2, Some((callback_sender_2, true))));
 
         // Sleep for a few seconds.
         thread::sleep(Duration::from_secs(CALLBACK_TIMEOUT_IN_SECS as u64 - 1));
 
-        assert!(pending.insert(commitment_1, addr_3, Some((callback_sender_3, true))));
+        assert!(pending.insert(solution_id_1, addr_3, Some((callback_sender_3, true))));
 
         // Check that the number of callbacks has not changed.
-        assert_eq!(pending.num_callbacks(commitment_1), 3);
+        assert_eq!(pending.num_callbacks(solution_id_1), 3);
 
         // Wait for 2 seconds.
         thread::sleep(Duration::from_secs(2));
 
         // Ensure that the expired callbacks have been removed.
-        assert_eq!(pending.num_callbacks(commitment_1), 1);
+        assert_eq!(pending.num_callbacks(solution_id_1), 1);
 
         // Wait for `CALLBACK_TIMEOUT_IN_SECS` seconds.
         thread::sleep(Duration::from_secs(CALLBACK_TIMEOUT_IN_SECS as u64));
 
         // Ensure that the expired callbacks have been removed.
-        assert_eq!(pending.num_callbacks(commitment_1), 0);
+        assert_eq!(pending.num_callbacks(solution_id_1), 0);
     }
 
     #[test]
@@ -302,8 +302,8 @@ mod tests {
         let pending = Pending::<TransmissionID<CurrentNetwork>, ()>::new();
 
         for _ in 0..ITERATIONS {
-            // Generate a commitment.
-            let commitment = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+            // Generate a solution ID.
+            let solution_id = TransmissionID::Solution(rng.gen::<u64>().into());
             // Check if the number of sent requests is correct.
             let mut expected_num_sent_requests = 0;
             for i in 0..ITERATIONS {
@@ -317,11 +317,11 @@ mod tests {
                 if is_sent_request {
                     expected_num_sent_requests += 1;
                 }
-                // Insert the commitment.
-                assert!(pending.insert(commitment, addr, Some((callback_sender, is_sent_request))));
+                // Insert the solution ID.
+                assert!(pending.insert(solution_id, addr, Some((callback_sender, is_sent_request))));
             }
             // Ensure that the number of sent requests is correct.
-            assert_eq!(pending.num_sent_requests(commitment), expected_num_sent_requests);
+            assert_eq!(pending.num_sent_requests(solution_id), expected_num_sent_requests);
         }
     }
 }

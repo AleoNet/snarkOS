@@ -277,7 +277,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         }
     }
 
-    /// This function updates the coinbase puzzle if network has updated.
+    /// This function updates the puzzle if network has updated.
     fn handle_puzzle_request(&self) {
         // No-op
     }

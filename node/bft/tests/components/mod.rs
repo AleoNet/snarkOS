@@ -22,7 +22,7 @@ use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
     console::{account::Address, network::Network},
-    ledger::{narwhal::BatchHeader, store::helpers::memory::ConsensusMemory},
+    ledger::{committee::MIN_VALIDATOR_STAKE, narwhal::BatchHeader, store::helpers::memory::ConsensusMemory},
     prelude::TestRng,
 };
 
@@ -42,7 +42,7 @@ pub fn sample_ledger(
         committee.members().iter().map(|(address, (amount, _))| (*address, (*address, *address, *amount))).collect();
     let gen_key = *accounts[0].private_key();
     let public_balance_per_validator =
-        (1_500_000_000_000_000 - (num_nodes as u64) * 1_000_000_000_000) / (num_nodes as u64);
+        (CurrentNetwork::STARTING_SUPPLY - (num_nodes as u64) * MIN_VALIDATOR_STAKE) / (num_nodes as u64);
     let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
     for account in accounts.iter() {
         balances.insert(account.address(), public_balance_per_validator);

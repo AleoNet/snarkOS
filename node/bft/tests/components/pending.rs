@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::components::sample_ledger;
+use crate::{common::CurrentNetwork, components::sample_ledger};
 use snarkos_node_bft::helpers::max_redundant_requests;
-use snarkvm::prelude::TestRng;
+use snarkvm::{ledger::committee::Committee, prelude::TestRng};
 
 #[test]
 fn test_max_redundant_requests() {
-    const NUM_NODES: u16 = 100;
+    const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
 
     // Initialize the RNG.
     let rng = &mut TestRng::default();
