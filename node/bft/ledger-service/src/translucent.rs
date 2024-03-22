@@ -18,9 +18,9 @@ use indexmap::IndexMap;
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
         store::ConsensusStorage,
         Ledger,
     },
@@ -109,7 +109,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         self.inner.get_solution(solution_id)
     }
 
@@ -159,11 +159,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Always succeeds.
-    async fn check_solution_basic(
-        &self,
-        _puzzle_commitment: PuzzleCommitment<N>,
-        _solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, _solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
         Ok(())
     }
 

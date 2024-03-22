@@ -35,7 +35,7 @@ use snarkvm::{
     console::network::Network,
     ledger::{
         block::{Block, Header},
-        coinbase::{CoinbasePuzzle, EpochChallenge, ProverSolution},
+        puzzle::{Puzzle, Solution},
         store::ConsensusStorage,
         Ledger,
     },
@@ -64,8 +64,8 @@ pub struct Client<N: Network, C: ConsensusStorage<N>> {
     sync: Arc<BlockSync<N>>,
     /// The genesis block.
     genesis: Block<N>,
-    /// The coinbase puzzle.
-    coinbase_puzzle: CoinbasePuzzle<N>,
+    /// The puzzle.
+    puzzle: Puzzle<N>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -108,6 +108,8 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone(), shutdown.clone()));
         // Initialize the sync module.
         let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
+        // Determine if the client should allow external peers.
+        let allow_external_peers = true;
 
         // Initialize the node router.
         let router = Router::new(
@@ -116,11 +118,10 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            allow_external_peers,
             matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
-        // Load the coinbase puzzle.
-        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let mut node = Self {
             ledger: ledger.clone(),
@@ -128,7 +129,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             rest: None,
             sync: Arc::new(sync),
             genesis,
-            coinbase_puzzle,
+            puzzle: ledger.puzzle().clone(),
             handles: Default::default(),
             shutdown,
         };

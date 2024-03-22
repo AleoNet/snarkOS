@@ -64,12 +64,12 @@ for validator_index in "${validator_indices[@]}"; do
 
   # Send the command to start the validator to the new window and capture output to the log file
   if [ "$validator_index" -eq 0 ]; then
-    tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file --metrics" C-m
+    tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --allow-external-peers --dev-num-validators $total_validators --validator --logfile $log_file --metrics" C-m
   else
     # Create a new window with a unique name
     window_index=$((validator_index + index_offset))
     tmux new-window -t "devnet:$window_index" -n "window$validator_index"
-    tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --dev-num-validators $total_validators --validator --logfile $log_file" C-m
+    tmux send-keys -t "devnet:window$validator_index" "snarkos start --nodisplay --dev $validator_index --allow-external-peers --dev-num-validators $total_validators --validator --logfile $log_file" C-m
   fi
 done
 
@@ -87,7 +87,7 @@ for client_index in "${client_indices[@]}"; do
   tmux new-window -t "devnet:$window_index" -n "window-$window_index"
 
   # Send the command to start the validator to the new window and capture output to the log file
-  tmux send-keys -t "devnet:window-$window_index" "snarkos start --nodisplay --dev $window_index --client --logfile $log_file" C-m
+  tmux send-keys -t "devnet:window-$window_index" "snarkos start --nodisplay --dev $window_index --dev-num-validators $total_validators --client --logfile $log_file" C-m
 done
 
 # Attach to the tmux session to view and interact with the windows

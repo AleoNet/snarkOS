@@ -16,9 +16,9 @@ use crate::LedgerService;
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
     prelude::{bail, Address, Field, Network, Result},
 };
@@ -98,7 +98,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         bail!("Solution '{solution_id}' does not exist in prover")
     }
 
@@ -149,11 +149,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        _puzzle_commitment: PuzzleCommitment<N>,
-        _solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, _solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
         Ok(())
     }
 

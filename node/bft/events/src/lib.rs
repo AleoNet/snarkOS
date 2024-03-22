@@ -264,7 +264,7 @@ pub mod prop_tests {
     };
     use snarkvm::{
         console::{network::Network, types::Field},
-        ledger::{coinbase::PuzzleCommitment, narwhal::TransmissionID},
+        ledger::{narwhal::TransmissionID, puzzle::SolutionID},
         prelude::{FromBytes, Rng, ToBytes, Uniform},
     };
 
@@ -282,8 +282,8 @@ pub mod prop_tests {
         time::OffsetDateTime::now_utc().unix_timestamp()
     }
 
-    pub fn any_puzzle_commitment() -> BoxedStrategy<PuzzleCommitment<CurrentNetwork>> {
-        Just(0).prop_perturb(|_, mut rng| PuzzleCommitment::from_g1_affine(rng.gen())).boxed()
+    pub fn any_solution_id() -> BoxedStrategy<SolutionID<CurrentNetwork>> {
+        Just(0).prop_perturb(|_, mut rng| rng.gen::<u64>().into()).boxed()
     }
 
     pub fn any_transaction_id() -> BoxedStrategy<<CurrentNetwork as Network>::TransactionID> {
@@ -295,7 +295,7 @@ pub mod prop_tests {
     pub fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
             any_transaction_id().prop_map(TransmissionID::Transaction),
-            any_puzzle_commitment().prop_map(TransmissionID::Solution),
+            any_solution_id().prop_map(TransmissionID::Solution),
         ]
         .boxed()
     }

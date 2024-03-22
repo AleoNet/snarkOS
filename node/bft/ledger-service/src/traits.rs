@@ -15,9 +15,9 @@
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
     prelude::{Address, Field, Network, Result},
 };
@@ -62,7 +62,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>>;
 
     /// Returns the unconfirmed transaction for the given transaction ID.
     fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
@@ -95,11 +95,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     ) -> Result<()>;
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        puzzle_commitment: PuzzleCommitment<N>,
-        solution: Data<ProverSolution<N>>,
-    ) -> Result<()>;
+    async fn check_solution_basic(&self, solution_id: SolutionID<N>, solution: Data<Solution<N>>) -> Result<()>;
 
     /// Checks the given transaction is well-formed and unique.
     async fn check_transaction_basic(

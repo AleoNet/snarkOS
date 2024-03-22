@@ -644,17 +644,17 @@ impl<N: Network> Storage<N> {
             // Retrieve the transmission.
             match transmission_id {
                 TransmissionID::Ratification => (),
-                TransmissionID::Solution(puzzle_commitment) => {
+                TransmissionID::Solution(solution_id) => {
                     // Retrieve the solution.
-                    match block.get_solution(puzzle_commitment) {
+                    match block.get_solution(solution_id) {
                         // Insert the solution.
                         Some(solution) => missing_transmissions.insert(*transmission_id, (*solution).into()),
                         // Otherwise, try to load the solution from the ledger.
-                        None => match self.ledger.get_solution(puzzle_commitment) {
+                        None => match self.ledger.get_solution(solution_id) {
                             // Insert the solution.
                             Ok(solution) => missing_transmissions.insert(*transmission_id, solution.into()),
                             Err(_) => {
-                                error!("Missing solution {puzzle_commitment} in block {}", block.height());
+                                error!("Missing solution {solution_id} in block {}", block.height());
                                 continue;
                             }
                         },
@@ -960,9 +960,9 @@ pub mod prop_tests {
     use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         ledger::{
-            coinbase::PuzzleCommitment,
             committee::prop_tests::{CommitteeContext, ValidatorSet},
             narwhal::{BatchHeader, Data},
+            puzzle::SolutionID,
         },
         prelude::{Signature, Uniform},
     };
@@ -1071,8 +1071,8 @@ pub mod prop_tests {
         .boxed()
     }
 
-    pub fn any_puzzle_commitment() -> BoxedStrategy<PuzzleCommitment<CurrentNetwork>> {
-        Just(0).prop_perturb(|_, rng| PuzzleCommitment::from_g1_affine(CryptoTestRng(rng).gen())).boxed()
+    pub fn any_solution_id() -> BoxedStrategy<SolutionID<CurrentNetwork>> {
+        Just(0).prop_perturb(|_, rng| CryptoTestRng(rng).gen::<u64>().into()).boxed()
     }
 
     pub fn any_transaction_id() -> BoxedStrategy<<CurrentNetwork as Network>::TransactionID> {
@@ -1086,7 +1086,7 @@ pub mod prop_tests {
     pub fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
             any_transaction_id().prop_map(TransmissionID::Transaction),
-            any_puzzle_commitment().prop_map(TransmissionID::Solution),
+            any_solution_id().prop_map(TransmissionID::Solution),
         ]
         .boxed()
     }
