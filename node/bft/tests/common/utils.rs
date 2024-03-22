@@ -18,7 +18,7 @@ use snarkvm::{
     ledger::narwhal::Data,
     prelude::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
+        puzzle::{Solution, SolutionID},
         Field,
         Network,
         TestRng,
@@ -30,7 +30,7 @@ use std::time::Duration;
 
 use ::bytes::Bytes;
 use rand::Rng;
-use tokio::{sync::oneshot, task, task::JoinHandle, time::sleep};
+use tokio::{sync::oneshot, task::JoinHandle, time::sleep};
 use tracing::*;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -83,32 +83,29 @@ pub fn fire_unconfirmed_solutions(
         // This RNG samples *different* fake solutions for each node.
         let mut unique_rng = TestRng::fixed(node_id as u64);
 
-        // A closure to generate a commitment and solution.
-        async fn sample(mut rng: impl Rng) -> (PuzzleCommitment<CurrentNetwork>, Data<ProverSolution<CurrentNetwork>>) {
-            // Sample a random fake puzzle commitment.
-            // TODO (howardwu): Use a mutex to bring in the real 'proof target' and change this sampling to a while loop.
-            let affine = rng.gen();
-            let commitment =
-                task::spawn_blocking(move || PuzzleCommitment::<CurrentNetwork>::from_g1_affine(affine)).await.unwrap();
+        // A closure to generate a solution ID and solution.
+        async fn sample(mut rng: impl Rng) -> (SolutionID<CurrentNetwork>, Data<Solution<CurrentNetwork>>) {
+            // Sample a random fake solution ID.
+            let solution_id = rng.gen::<u64>().into();
             // Sample random fake solution bytes.
             let mut vec = vec![0u8; 1024];
             rng.fill_bytes(&mut vec);
             let solution = Data::Buffer(Bytes::from(vec));
-            // Return the ID and solution.
-            (commitment, solution)
+            // Return the solution ID and solution.
+            (solution_id, solution)
         }
 
         // Initialize a counter.
         let mut counter = 0;
 
         loop {
-            // Sample a random fake puzzle commitment and solution.
-            let (commitment, solution) =
+            // Sample a random fake solution ID and solution.
+            let (solution_id, solution) =
                 if counter % 2 == 0 { sample(&mut shared_rng).await } else { sample(&mut unique_rng).await };
             // Initialize a callback sender and receiver.
             let (callback, callback_receiver) = oneshot::channel();
             // Send the fake solution.
-            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution, callback)).await {
+            if let Err(e) = tx_unconfirmed_solution.send((solution_id, solution, callback)).await {
                 error!("Failed to send unconfirmed solution: {e}");
             }
             let _ = callback_receiver.await;

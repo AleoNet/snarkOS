@@ -39,7 +39,7 @@ use snarkos_node_tcp::{
 };
 use snarkvm::prelude::{
     block::{Block, Header, Transaction},
-    coinbase::{EpochChallenge, ProverSolution},
+    puzzle::Solution,
     Network,
 };
 
@@ -179,7 +179,7 @@ impl<N: Network> Inbound<N> for TestRouter<N> {
     }
 
     /// Handles an `PuzzleResponse` message.
-    fn puzzle_response(&self, _peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
+    fn puzzle_response(&self, _peer_ip: SocketAddr, _epoch_hash: N::BlockHash, _header: Header<N>) -> bool {
         true
     }
 
@@ -188,7 +188,7 @@ impl<N: Network> Inbound<N> for TestRouter<N> {
         &self,
         _peer_ip: SocketAddr,
         _serialized: UnconfirmedSolution<N>,
-        _solution: ProverSolution<N>,
+        _solution: Solution<N>,
     ) -> bool {
         true
     }

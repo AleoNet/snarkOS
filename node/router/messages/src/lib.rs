@@ -64,8 +64,8 @@ pub use snarkos_node_bft_events::DataBlocks;
 use snarkos_node_sync_locators::BlockLocators;
 use snarkvm::prelude::{
     block::{Header, Transaction},
-    coinbase::{EpochChallenge, ProverSolution, PuzzleCommitment},
     error,
+    puzzle::{Solution, SolutionID},
     Address,
     FromBytes,
     Network,
