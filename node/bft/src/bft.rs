@@ -226,7 +226,7 @@ impl<N: Network> BFT<N> {
             if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
                 // Ensure the state of the leader certificate is consistent with the BFT being ready.
                 if !is_ready {
-                    debug!(is_ready, "BFT - A leader certificate was found, but 'is_ready' is false");
+                    trace!(is_ready, "BFT - A leader certificate was found, but 'is_ready' is false");
                 }
                 // Log the leader election.
                 let leader_round = leader_certificate.round();
@@ -336,7 +336,7 @@ impl<N: Network> BFT<N> {
         let authors = certificates.into_iter().map(|c| c.author()).collect();
         // Check if quorum threshold is reached.
         if !committee.is_quorum_threshold_reached(&authors) {
-            debug!("BFT failed to reach quorum threshold in even round {current_round}");
+            trace!("BFT failed to reach quorum threshold in even round {current_round}");
             return false;
         }
         // If the leader certificate is set for the current even round, return 'true'.
@@ -390,7 +390,7 @@ impl<N: Network> BFT<N> {
         let authors = current_certificates.clone().into_iter().map(|c| c.author()).collect();
         // Check if quorum threshold is reached.
         if !committee_lookback.is_quorum_threshold_reached(&authors) {
-            debug!("BFT failed reach quorum threshold in odd round {current_round}. ");
+            trace!("BFT failed reach quorum threshold in odd round {current_round}. ");
             return false;
         }
         // Retrieve the leader certificate.
