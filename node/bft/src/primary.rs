@@ -100,7 +100,7 @@ pub struct Primary<N: Network> {
 
 impl<N: Network> Primary<N> {
     /// The maximum number of unconfirmed transmissions to send to the primary.
-    pub const MAX_TRANSMISSIONS_IN_MEMORY_POOL: usize = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * 2;
+    pub const MAX_TRANSMISSIONS_TOLERANCE: usize = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH * 2;
 
     /// Initializes a new primary instance.
     pub fn new(
