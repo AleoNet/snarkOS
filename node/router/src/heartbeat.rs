@@ -107,6 +107,11 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             return;
         }
 
+        // Skip if the node is not requesting peers.
+        if !self.router().allow_external_peers() {
+            return;
+        }
+
         // Retrieve the trusted peers.
         let trusted = self.router().trusted_peers();
         // Retrieve the bootstrap peers.
@@ -216,9 +221,11 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             for peer_ip in self.router().candidate_peers().into_iter().choose_multiple(rng, num_deficient) {
                 self.router().connect(peer_ip);
             }
-            // Request more peers from the connected peers.
-            for peer_ip in self.router().connected_peers().into_iter().choose_multiple(rng, 3) {
-                self.send(peer_ip, Message::PeerRequest(PeerRequest));
+            if self.router().allow_external_peers() {
+                // Request more peers from the connected peers.
+                for peer_ip in self.router().connected_peers().into_iter().choose_multiple(rng, 3) {
+                    self.send(peer_ip, Message::PeerRequest(PeerRequest));
+                }
             }
         }
     }
@@ -270,7 +277,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         }
     }
 
-    /// This function updates the coinbase puzzle if network has updated.
+    /// This function updates the puzzle if network has updated.
     fn handle_puzzle_request(&self) {
         // No-op
     }

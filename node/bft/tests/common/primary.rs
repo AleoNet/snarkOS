@@ -29,6 +29,7 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey},
         algorithms::{Hash, BHP256},
+        network::Network,
     },
     ledger::{
         block::Block,
@@ -131,11 +132,15 @@ impl TestNetwork {
         }
 
         let (accounts, committee) = new_test_committee(config.num_nodes);
-        let bonded_balances: IndexMap<_, _> =
-            committee.members().iter().map(|(address, (amount, _))| (*address, (*address, *amount))).collect();
+        let bonded_balances: IndexMap<_, _> = committee
+            .members()
+            .iter()
+            .map(|(address, (amount, _))| (*address, (*address, *address, *amount)))
+            .collect();
         let gen_key = *accounts[0].private_key();
-        let public_balance_per_validator =
-            (1_500_000_000_000_000 - (config.num_nodes as u64) * 1_000_000_000_000) / (config.num_nodes as u64);
+        let public_balance_per_validator = (CurrentNetwork::STARTING_SUPPLY
+            - (config.num_nodes as u64) * MIN_VALIDATOR_STAKE)
+            / (config.num_nodes as u64);
         let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
         for account in accounts.iter() {
             balances.insert(account.address(), public_balance_per_validator);
@@ -350,7 +355,7 @@ pub fn genesis_block(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
-    bonded_balances: IndexMap<Address<CurrentNetwork>, (Address<CurrentNetwork>, u64)>,
+    bonded_balances: IndexMap<Address<CurrentNetwork>, (Address<CurrentNetwork>, Address<CurrentNetwork>, u64)>,
     rng: &mut (impl Rng + CryptoRng),
 ) -> Block<CurrentNetwork> {
     // Initialize the store.
@@ -365,7 +370,7 @@ pub fn genesis_ledger(
     genesis_private_key: PrivateKey<CurrentNetwork>,
     committee: Committee<CurrentNetwork>,
     public_balances: IndexMap<Address<CurrentNetwork>, u64>,
-    bonded_balances: IndexMap<Address<CurrentNetwork>, (Address<CurrentNetwork>, u64)>,
+    bonded_balances: IndexMap<Address<CurrentNetwork>, (Address<CurrentNetwork>, Address<CurrentNetwork>, u64)>,
     rng: &mut (impl Rng + CryptoRng),
 ) -> CurrentLedger {
     let cache_key =

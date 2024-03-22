@@ -60,5 +60,9 @@ features = [ "rt" ]
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.tokio]
+version = "1.28"
+features = [ "rt", "rt-multi-thread" ]
+
 [dev-dependencies.tokio-test]
 version = "0.4"
