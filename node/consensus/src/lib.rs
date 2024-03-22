@@ -241,8 +241,8 @@ impl<N: Network> Consensus<N> {
         // If the memory pool of this node is full, return early.
         let num_unconfirmed_solutions = self.num_unconfirmed_solutions();
         let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
-        if num_unconfirmed_solutions > N::MAX_SOLUTIONS
-            || num_unconfirmed_transmissions > Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE
+        if num_unconfirmed_solutions >= N::MAX_SOLUTIONS
+            || num_unconfirmed_transmissions >= Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE
         {
             return Ok(());
         }
@@ -309,7 +309,7 @@ impl<N: Network> Consensus<N> {
 
         // If the memory pool of this node is full, return early.
         let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
-        if num_unconfirmed_transmissions > Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE {
+        if num_unconfirmed_transmissions >= Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE {
             return Ok(());
         }
         // Retrieve the transactions.
