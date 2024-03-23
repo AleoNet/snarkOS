@@ -329,13 +329,13 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given address is an authorized validator.
     pub fn is_authorized_validator_address(&self, validator_address: Address<N>) -> bool {
-        // Determine if the validator address is a member of the previous or current committee.
+        // Determine if the validator address is a member of the committee lookback or the current committee.
         // We allow leniency in this validation check in order to accommodate these two scenarios:
         //  1. New validators should be able to connect immediately once bonded as a committee member.
         //  2. Existing validators must remain connected until they are no longer bonded as a committee member.
         //     (i.e. meaning they must stay online until the next block has been produced)
         self.ledger
-            .get_previous_committee_for_round(self.ledger.latest_round())
+            .get_committee_lookback_for_round(self.ledger.latest_round())
             .map_or(false, |committee| committee.is_committee_member(validator_address))
             || self
                 .ledger
@@ -1193,11 +1193,13 @@ impl<N: Network> Gateway<N> {
         /* Step 3: Send the challenge response. */
 
         // Sign the counterparty nonce.
-        let Ok(our_signature) = self.account.sign_bytes(&peer_request.nonce.to_le_bytes(), rng) else {
+        let response_nonce: u64 = rng.gen();
+        let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+        let Ok(our_signature) = self.account.sign_bytes(&data, rng) else {
             return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
         };
         // Send the challenge response.
-        let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
+        let our_response = ChallengeResponse { signature: Data::Object(our_signature), nonce: response_nonce };
         send_event(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
 
         // Add the peer to the gateway.
@@ -1246,11 +1248,13 @@ impl<N: Network> Gateway<N> {
         let rng = &mut rand::rngs::OsRng;
 
         // Sign the counterparty nonce.
-        let Ok(our_signature) = self.account.sign_bytes(&peer_request.nonce.to_le_bytes(), rng) else {
+        let response_nonce: u64 = rng.gen();
+        let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+        let Ok(our_signature) = self.account.sign_bytes(&data, rng) else {
             return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
         };
         // Send the challenge response.
-        let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
+        let our_response = ChallengeResponse { signature: Data::Object(our_signature), nonce: response_nonce };
         send_event(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
 
         // Sample a random nonce.
@@ -1307,14 +1311,14 @@ impl<N: Network> Gateway<N> {
         expected_nonce: u64,
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge response.
-        let ChallengeResponse { signature } = response;
+        let ChallengeResponse { signature, nonce } = response;
         // Perform the deferred non-blocking deserialization of the signature.
         let Ok(signature) = spawn_blocking!(signature.deserialize_blocking()) else {
             warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (cannot deserialize the signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         };
         // Verify the signature.
-        if !signature.verify_bytes(&peer_address, &expected_nonce.to_le_bytes()) {
+        if !signature.verify_bytes(&peer_address, &[expected_nonce.to_le_bytes(), nonce.to_le_bytes()].concat()) {
             warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (invalid signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         }
