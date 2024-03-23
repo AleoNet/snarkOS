@@ -1319,7 +1319,7 @@ mod tests {
         }
 
         // Commit the leader certificate.
-        bft.commit_leader_certificate::<false>(leader_certificate.clone()).await.unwrap();
+        bft.commit_leader_certificate::<false>(leader_certificate.clone(), Default::default()).await.unwrap();
 
         // Simulate a bootup of the BFT.
 
@@ -1364,7 +1364,7 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Initialize the round parameters.
-        let max_gc_rounds = snarkvm::ledger::narwhal::BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
+        let max_gc_rounds = crate::MAX_GC_ROUNDS;
         let committee_round = 0;
         let commit_round = 2;
         let current_round = commit_round + 1;
@@ -1411,15 +1411,14 @@ mod tests {
                         .into_iter()
                         .collect::<IndexSet<_>>();
                 let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
-                let committee_id = committee.id();
                 for (i, private_key_1) in private_keys.iter().enumerate() {
                     let batch_header = snarkvm::ledger::narwhal::BatchHeader::new(
                         private_key_1,
                         round,
                         timestamp,
-                        committee_id,
                         transmission_ids.clone(),
                         previous_certificate_ids.clone(),
+                        Default::default(),
                         rng,
                     )
                     .unwrap();
@@ -1497,7 +1496,7 @@ mod tests {
         // Commit the second leader certificate.
         let commit_subdag = bft.order_dag_with_dfs::<false>(next_leader_certificate.clone()).unwrap();
         let commit_subdag_metadata = commit_subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
-        bft.commit_leader_certificate::<false>(next_leader_certificate.clone()).await.unwrap();
+        bft.commit_leader_certificate::<false>(next_leader_certificate.clone(), Default::default()).await.unwrap();
 
         // Simulate a bootup of the BFT.
 
@@ -1522,7 +1521,10 @@ mod tests {
         let commit_subdag_metadata_bootup =
             commit_subdag_bootup.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
         let committed_certificates_bootup = commit_subdag_bootup.values().flatten();
-        bootup_bft.commit_leader_certificate::<false>(next_leader_certificate.clone()).await.unwrap();
+        bootup_bft
+            .commit_leader_certificate::<false>(next_leader_certificate.clone(), Default::default())
+            .await
+            .unwrap();
 
         // Check that the final state of both BFTs is the same.
 
@@ -1581,7 +1583,7 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Initialize the round parameters.
-        let max_gc_rounds = snarkvm::ledger::narwhal::BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
+        let max_gc_rounds = crate::MAX_GC_ROUNDS;
         let committee_round = 0;
         let commit_round = 2;
         let current_round = commit_round + 1;
@@ -1628,15 +1630,14 @@ mod tests {
                         .into_iter()
                         .collect::<IndexSet<_>>();
                 let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
-                let committee_id = committee.id();
                 for (i, private_key_1) in private_keys.iter().enumerate() {
                     let batch_header = snarkvm::ledger::narwhal::BatchHeader::new(
                         private_key_1,
                         round,
                         timestamp,
-                        committee_id,
                         transmission_ids.clone(),
                         previous_certificate_ids.clone(),
+                        Default::default(),
                         rng,
                     )
                     .unwrap();
