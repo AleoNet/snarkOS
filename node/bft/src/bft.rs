@@ -1205,11 +1205,11 @@ mod tests {
         let max_gc_rounds = 1;
         let committee_round = 0;
         let commit_round = 2;
-        let current_round = commit_round + 1;
+        let next_round = commit_round + 1;
 
         // Sample the certificates.
         let (_, certificates) = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_with_previous_certificates(
-            current_round,
+            next_round,
             rng,
         );
 
@@ -1257,8 +1257,11 @@ mod tests {
         // Commit the leader certificate.
         bft.commit_leader_certificate::<false>(leader_certificate, Default::default()).await.unwrap();
 
+        // Increment the BFT to the next round.
+        let _next_round = bft.storage().increment_to_next_round(commit_round); 
+
         // Ensure that the `gc_round` has been updated.
-        assert_eq!(bft.storage().gc_round(), commit_round - max_gc_rounds);
+        assert_eq!(bft.storage().gc_round(), next_round - max_gc_rounds);
 
         Ok(())
     }
