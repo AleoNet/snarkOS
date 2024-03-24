@@ -1258,7 +1258,7 @@ mod tests {
         bft.commit_leader_certificate::<false>(leader_certificate, Default::default()).await.unwrap();
 
         // Increment the BFT to the next round.
-        let _next_round = bft.storage().increment_to_next_round(commit_round); 
+        let _next_round = bft.storage().increment_to_next_round(commit_round);
 
         // Ensure that the `gc_round` has been updated.
         assert_eq!(bft.storage().gc_round(), next_round - max_gc_rounds);
