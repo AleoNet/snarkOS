@@ -36,8 +36,11 @@ use std::{
     time::Instant,
 };
 
+#[cfg(not(test))]
+pub const REDUNDANCY_FACTOR: usize = 1;
+#[cfg(test)]
 pub const REDUNDANCY_FACTOR: usize = 3;
-const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
+const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 3;
 const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
 const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 60; // 60 seconds

@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{BFTSender, Pending, Storage, SyncReceiver},
+    helpers::{fmt_id, BFTSender, Pending, Storage, SyncReceiver},
+    spawn_blocking,
     Gateway,
     Transport,
     MAX_BATCH_DELAY_IN_MS,
@@ -177,6 +178,7 @@ impl<N: Network> Sync<N> {
 // Methods to manage storage.
 impl<N: Network> Sync<N> {
     /// Syncs the storage with the ledger at bootup.
+    #[allow(clippy::unnecessary_to_owned)]
     pub async fn sync_storage_with_ledger_at_bootup(&self) -> Result<()> {
         // Retrieve the latest block in the ledger.
         let latest_block = self.ledger.latest_block();
@@ -205,32 +207,16 @@ impl<N: Network> Sync<N> {
             // If the block authority is a subdag, then sync the batch certificates with the block.
             if let Authority::Quorum(subdag) = block.authority() {
                 // Iterate over the certificates.
-                for certificate in subdag.values().flatten() {
+                for certificate in subdag.values().flatten().cloned() {
                     // Sync the batch certificate with the block.
-                    self.storage.sync_certificate_with_block(block, certificate);
+                    let storage = self.storage.clone();
+                    let block = block.clone();
+                    let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block, &certificate)));
                 }
             }
         }
 
         /* Sync the BFT DAG */
-
-        // Retrieve the leader certificates.
-        let leader_certificates = blocks
-            .iter()
-            .flat_map(|block| {
-                match block.authority() {
-                    // If the block authority is a beacon, then skip the block.
-                    Authority::Beacon(_) => None,
-                    // If the block authority is a subdag, then retrieve the certificates.
-                    Authority::Quorum(subdag) => {
-                        Some((subdag.leader_certificate().clone(), subdag.election_certificate_ids().clone()))
-                    }
-                }
-            })
-            .collect::<Vec<_>>();
-        if leader_certificates.is_empty() {
-            return Ok(());
-        }
 
         // Construct a list of the certificates.
         let certificates = blocks
@@ -246,10 +232,10 @@ impl<N: Network> Sync<N> {
             .flatten()
             .collect::<Vec<_>>();
 
-        // If a BFT sender was provided, send the certificate to the BFT.
+        // If a BFT sender was provided, send the certificates to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
             // Await the callback to continue.
-            if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send((leader_certificates, certificates)).await {
+            if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send(certificates).await {
                 bail!("Failed to update the BFT DAG from sync: {e}");
             }
         }
@@ -282,7 +268,10 @@ impl<N: Network> Sync<N> {
             // Iterate over the certificates.
             for certificate in subdag.values().flatten() {
                 // Sync the batch certificate with the block.
-                self.storage.sync_certificate_with_block(&block, certificate);
+                let storage = self.storage.clone();
+                let block_clone = block.clone();
+                let certificate_clone = certificate.clone();
+                let _ = spawn_blocking!(Ok(storage.sync_certificate_with_block(&block_clone, &certificate_clone)));
                 // If a BFT sender was provided, send the certificate to the BFT.
                 if let Some(bft_sender) = self.bft_sender.get() {
                     // Await the callback to continue.
@@ -337,7 +326,7 @@ impl<N: Network> Sync<N> {
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
             // Send the certificate request to the peer.
             if self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into())).await.is_none() {
-                bail!("Unable to fetch batch certificate {certificate_id} - failed to send request")
+                bail!("Unable to fetch certificate {} - failed to send request", fmt_id(certificate_id))
             }
         }
         // Wait for the certificate to be fetched.
@@ -345,7 +334,7 @@ impl<N: Network> Sync<N> {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
-            Err(e) => bail!("Unable to fetch batch certificate {certificate_id} - (timeout) {e}"),
+            Err(e) => bail!("Unable to fetch certificate {} - (timeout) {e}", fmt_id(certificate_id)),
         }
     }
 

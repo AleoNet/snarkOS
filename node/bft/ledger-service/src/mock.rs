@@ -143,8 +143,8 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         Ok(false)
     }
 
-    /// Ensures the given transmission ID matches the given transmission.
-    fn ensure_transmission_id_matches(
+    /// Ensures that the given transmission is not a fee and matches the given transmission ID.
+    fn ensure_transmission_is_well_formed(
         &self,
         transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,
