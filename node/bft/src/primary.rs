@@ -33,6 +33,7 @@ use crate::{
     Transport,
     Worker,
     MAX_BATCH_DELAY_IN_MS,
+    MAX_BATCH_DELAY_IN_SECS,
     MAX_WORKERS,
     PRIMARY_PING_IN_MS,
     WORKER_PING_IN_MS,
@@ -320,6 +321,21 @@ impl<N: Network> Primary<N> {
 
         #[cfg(feature = "metrics")]
         metrics::gauge(metrics::bft::PROPOSAL_ROUND, round as f64);
+
+        // Ensure that the primary does not create a new proposal too quickly.
+        if let Some(previous_certificate) = self
+            .storage
+            .get_certificate_for_round_with_author(round.saturating_sub(1), self.gateway.account().address())
+        {
+            // If the primary proposed a previous certificate too recently, return early.
+            if now().saturating_sub(previous_certificate.timestamp()) < MAX_BATCH_DELAY_IN_SECS as i64 {
+                debug!(
+                    "Primary is safely skipping a batch proposal {}",
+                    format!("(round {round} was proposed too quickly)").dimmed()
+                );
+                return Ok(());
+            }
+        }
 
         // Ensure the primary has not proposed a batch for this round before.
         if self.storage.contains_certificate_in_round_from(round, self.gateway.account().address()) {
