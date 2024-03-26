@@ -256,6 +256,16 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
+    // GET /mainnet/epoch/hash/latest
+    pub(crate) async fn get_epoch_hash_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.latest_epoch_hash()?))
+    }
+
+    // GET /mainnet/epoch/number/latest
+    pub(crate) async fn get_epoch_latest(State(rest): State<Self>) -> ErasedJson {
+        ErasedJson::pretty(rest.ledger.latest_epoch_number())
+    }
+
     // GET /mainnet/peers/count
     pub(crate) async fn get_peers_count(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.routing.router().number_of_connected_peers())

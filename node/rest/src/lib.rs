@@ -168,6 +168,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/mainnet/peers/all", get(Self::get_peers_all))
             .route("/mainnet/peers/all/metrics", get(Self::get_peers_all_metrics))
 
+            // GET ../epoch/..
+            .route("/mainnet/epoch/latest", get(Self::get_epoch_latest))
+            .route("/mainnet/epoch/hash/latest", get(Self::get_epoch_hash_latest))
+
             // GET ../program/..
             .route("/mainnet/program/:id", get(Self::get_program))
             .route("/mainnet/program/:id/mappings", get(Self::get_mapping_names))
