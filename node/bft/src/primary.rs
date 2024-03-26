@@ -325,7 +325,7 @@ impl<N: Network> Primary<N> {
         metrics::gauge(metrics::bft::PROPOSAL_ROUND, round as f64);
 
         // Ensure that the primary does not create a new proposal too quickly.
-        if let Err(e) = self.ensure_proposal_frequency(previous_round, self.gateway.account().address(), now()) {
+        if let Err(e) = self.check_proposal_timestamp(previous_round, self.gateway.account().address(), now()) {
             debug!("Primary is safely skipping a batch proposal - {}", format!("{e}").dimmed());
             return Ok(());
         }
@@ -605,7 +605,7 @@ impl<N: Network> Primary<N> {
         // Compute the previous round.
         let previous_round = batch_round.saturating_sub(1);
         // Ensure that the peer did not propose a batch too quickly.
-        if let Err(e) = self.ensure_proposal_frequency(previous_round, batch_author, batch_header.timestamp()) {
+        if let Err(e) = self.check_proposal_timestamp(previous_round, batch_author, batch_header.timestamp()) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
             bail!("Malicious peer - {e} from '{peer_ip}'");
@@ -1207,12 +1207,17 @@ impl<N: Network> Primary<N> {
 
     /// Ensure the primary is not creating batch proposals too frequently.
     /// This checks that the certificate timestamp for the previous round is within the expected range.
-    fn ensure_proposal_frequency(&self, previous_round: u64, author: Address<N>, timestamp: i64) -> Result<()> {
+    fn check_proposal_timestamp(&self, previous_round: u64, author: Address<N>, timestamp: i64) -> Result<()> {
         // Ensure that the primary does not create a new proposal too quickly.
         match self.storage.get_certificate_for_round_with_author(previous_round, author) {
             // Ensure that the previous certificate was created at least `MAX_BATCH_DELAY_IN_SECS` seconds ago.
             Some(certificate) => {
-                match timestamp.saturating_sub(certificate.timestamp()) < MAX_BATCH_DELAY_IN_SECS as i64 {
+                // Determine the elapsed time since the previous certificate.
+                let elapsed = timestamp.checked_sub(certificate.timestamp()).ok_or_else(|| {
+                    anyhow!("Proposed batch has a timestamp earlier than the certificate at round {previous_round}")
+                })?;
+                // Ensure the elapsed time is within the expected range.
+                match elapsed < MAX_BATCH_DELAY_IN_SECS as i64 {
                     true => {
                         bail!("Proposed batch was created too quickly after the certificate at round {previous_round}")
                     }
@@ -1894,7 +1899,7 @@ mod tests {
         let round = 1;
         let peer_account = &accounts[1];
         let peer_ip = peer_account.0;
-        let timestamp = now();
+        let timestamp = now() + MAX_BATCH_DELAY_IN_SECS as i64;
         let proposal = create_test_proposal(
             &peer_account.1,
             primary.ledger.current_committee().unwrap(),
@@ -1930,7 +1935,7 @@ mod tests {
         // Create a valid proposal with an author that isn't the primary.
         let peer_account = &accounts[1];
         let peer_ip = peer_account.0;
-        let timestamp = now();
+        let timestamp = now() + MAX_BATCH_DELAY_IN_SECS as i64;
         let proposal = create_test_proposal(
             &peer_account.1,
             primary.ledger.current_committee().unwrap(),
@@ -1961,7 +1966,7 @@ mod tests {
         let round = 1;
         let peer_account = &accounts[1];
         let peer_ip = peer_account.0;
-        let timestamp = now();
+        let timestamp = now() + MAX_BATCH_DELAY_IN_SECS as i64;
         let proposal = create_test_proposal(
             &peer_account.1,
             primary.ledger.current_committee().unwrap(),
@@ -2003,7 +2008,7 @@ mod tests {
         // Create a valid proposal with an author that isn't the primary.
         let peer_account = &accounts[1];
         let peer_ip = peer_account.0;
-        let timestamp = now();
+        let timestamp = now() + MAX_BATCH_DELAY_IN_SECS as i64;
         let proposal = create_test_proposal(
             &peer_account.1,
             primary.ledger.current_committee().unwrap(),
@@ -2041,7 +2046,7 @@ mod tests {
 
         // Create a valid proposal.
         let round = 1;
-        let timestamp = now();
+        let timestamp = now() + MAX_BATCH_DELAY_IN_SECS as i64;
         let proposal = create_test_proposal(
             primary.gateway.account(),
             primary.ledger.current_committee().unwrap(),
@@ -2114,7 +2119,7 @@ mod tests {
 
         // Create a valid proposal.
         let round = 1;
-        let timestamp = now();
+        let timestamp = now() + MAX_BATCH_DELAY_IN_SECS as i64;
         let proposal = create_test_proposal(
             primary.gateway.account(),
             primary.ledger.current_committee().unwrap(),
@@ -2151,7 +2156,7 @@ mod tests {
         let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
 
         // Create a valid proposal.
-        let timestamp = now();
+        let timestamp = now() + MAX_BATCH_DELAY_IN_SECS as i64;
         let proposal = create_test_proposal(
             primary.gateway.account(),
             primary.ledger.current_committee().unwrap(),
