@@ -2038,6 +2038,78 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn test_batch_propose_from_peer_with_invalid_timestamp() {
+        let round = 2;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Generate certificates.
+        let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Create a valid proposal with an author that isn't the primary.
+        let peer_account = &accounts[1];
+        let peer_ip = peer_account.0;
+        let invalid_timestamp = now(); // Use a timestamp that is too early.
+        let proposal = create_test_proposal(
+            &peer_account.1,
+            primary.ledger.current_committee().unwrap(),
+            round,
+            previous_certificates,
+            invalid_timestamp,
+            &mut rng,
+        );
+
+        // Make sure the primary is aware of the transmissions in the proposal.
+        for (transmission_id, transmission) in proposal.transmissions() {
+            primary.workers[0].process_transmission_from_peer(peer_ip, *transmission_id, transmission.clone())
+        }
+
+        // The author must be known to resolver to pass propose checks.
+        primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+
+        // Try to process the batch proposal from the peer, should error.
+        assert!(
+            primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_batch_propose_from_peer_with_past_timestamp() {
+        let round = 2;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Generate certificates.
+        let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Create a valid proposal with an author that isn't the primary.
+        let peer_account = &accounts[1];
+        let peer_ip = peer_account.0;
+        let past_timestamp = now() - 5; // Use a timestamp that is in the past.
+        let proposal = create_test_proposal(
+            &peer_account.1,
+            primary.ledger.current_committee().unwrap(),
+            round,
+            previous_certificates,
+            past_timestamp,
+            &mut rng,
+        );
+
+        // Make sure the primary is aware of the transmissions in the proposal.
+        for (transmission_id, transmission) in proposal.transmissions() {
+            primary.workers[0].process_transmission_from_peer(peer_ip, *transmission_id, transmission.clone())
+        }
+
+        // The author must be known to resolver to pass propose checks.
+        primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+
+        // Try to process the batch proposal from the peer, should error.
+        assert!(
+            primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.is_err()
+        );
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn test_batch_signature_from_peer() {
         let mut rng = TestRng::default();
