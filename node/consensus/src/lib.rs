@@ -224,9 +224,7 @@ impl<N: Network> Consensus<N> {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
             let timestamp = snarkos_node_bft::helpers::now();
-            self.transmissions_queue_timestamps
-                .lock()
-                .insert(TransmissionID::Solution(solution.commitment()), timestamp);
+            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Solution(solution.id()), timestamp);
         }
         // Process the unconfirmed solution.
         {
