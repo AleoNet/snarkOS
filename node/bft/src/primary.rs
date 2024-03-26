@@ -318,23 +318,16 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the current round.
         let round = self.current_round();
+        // Compute the previous round.
+        let previous_round = round.saturating_sub(1);
 
         #[cfg(feature = "metrics")]
         metrics::gauge(metrics::bft::PROPOSAL_ROUND, round as f64);
 
         // Ensure that the primary does not create a new proposal too quickly.
-        if let Some(previous_certificate) = self
-            .storage
-            .get_certificate_for_round_with_author(round.saturating_sub(1), self.gateway.account().address())
-        {
-            // If the primary proposed a previous certificate too recently, return early.
-            if now().saturating_sub(previous_certificate.timestamp()) < MAX_BATCH_DELAY_IN_SECS as i64 {
-                debug!(
-                    "Primary is safely skipping a batch proposal {}",
-                    format!("(round {round} was proposed too quickly)").dimmed()
-                );
-                return Ok(());
-            }
+        if let Err(e) = self.ensure_proposal_frequency(previous_round, self.gateway.account().address(), now()) {
+            debug!("Primary is safely skipping a batch proposal - {}", format!("{e}").dimmed());
+            return Ok(());
         }
 
         // Ensure the primary has not proposed a batch for this round before.
@@ -375,8 +368,6 @@ impl<N: Network> Primary<N> {
             }
         }
 
-        // Compute the previous round.
-        let previous_round = round.saturating_sub(1);
         // Retrieve the previous certificates.
         let previous_certificates = self.storage.get_certificates_for_round(previous_round);
 
@@ -609,6 +600,15 @@ impl<N: Network> Primary<N> {
                 // Return early.
                 return Ok(());
             }
+        }
+
+        // Compute the previous round.
+        let previous_round = batch_round.saturating_sub(1);
+        // Ensure that the peer did not propose a batch too quickly.
+        if let Err(e) = self.ensure_proposal_frequency(previous_round, batch_author, batch_header.timestamp()) {
+            // Proceed to disconnect the validator.
+            self.gateway.disconnect(peer_ip);
+            bail!("Malicious peer - {e} from '{peer_ip}'");
         }
 
         // If the peer is ahead, use the batch header to sync up to the peer.
@@ -1203,6 +1203,25 @@ impl<N: Network> Primary<N> {
             }
         }
         Ok(())
+    }
+
+    /// Ensure the primary is not creating batch proposals too frequently.
+    /// This checks that the certificate timestamp for the previous round is within the expected range.
+    fn ensure_proposal_frequency(&self, previous_round: u64, author: Address<N>, timestamp: i64) -> Result<()> {
+        // Ensure that the primary does not create a new proposal too quickly.
+        match self.storage.get_certificate_for_round_with_author(previous_round, author) {
+            // Ensure that the previous certificate was created at least `MAX_BATCH_DELAY_IN_SECS` seconds ago.
+            Some(certificate) => {
+                match timestamp.saturating_sub(certificate.timestamp()) < MAX_BATCH_DELAY_IN_SECS as i64 {
+                    true => {
+                        bail!("Proposed batch was created too quickly after the certificate at round {previous_round}")
+                    }
+                    false => Ok(()),
+                }
+            }
+            // If we do not see a previous certificate for the author, then proceed optimistically.
+            None => Ok(()),
+        }
     }
 
     /// Stores the certified batch and broadcasts it to all validators, returning the certificate.
