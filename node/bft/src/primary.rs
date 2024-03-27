@@ -1806,6 +1806,9 @@ mod tests {
         // Fill primary storage.
         store_certificate_chain(&primary, &accounts, round, &mut rng);
 
+        // Sleep for a while to ensure the primary is ready to propose the next round.
+        tokio::time::sleep(Duration::from_secs(MAX_BATCH_DELAY_IN_SECS + 1)).await;
+
         // Try to propose a batch. There are no transmissions in the workers so the method should
         // just return without proposing a batch.
         assert!(primary.propose_batch().await.is_ok());
@@ -1873,6 +1876,9 @@ mod tests {
             num_transmissions_in_previous_round += transmissions.len();
             primary.storage.insert_certificate(certificate, transmissions).unwrap();
         }
+
+        // Sleep for a while to ensure the primary is ready to propose the next round.
+        tokio::time::sleep(Duration::from_secs(MAX_BATCH_DELAY_IN_SECS + 1)).await;
 
         // Advance to the next round.
         assert!(primary.storage.increment_to_next_round(round).is_ok());
