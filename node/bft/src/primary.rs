@@ -1208,22 +1208,32 @@ impl<N: Network> Primary<N> {
     /// Ensure the primary is not creating batch proposals too frequently.
     /// This checks that the certificate timestamp for the previous round is within the expected range.
     fn check_proposal_timestamp(&self, previous_round: u64, author: Address<N>, timestamp: i64) -> Result<()> {
-        // Ensure that the primary does not create a new proposal too quickly.
-        match self.storage.get_certificate_for_round_with_author(previous_round, author) {
+        // Retrieve the timestamp of the previous timestamp to check against.
+        let previous_timestamp = match self.storage.get_certificate_for_round_with_author(previous_round, author) {
             // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
-            Some(certificate) => {
-                // Determine the elapsed time since the previous certificate.
-                let elapsed = timestamp.checked_sub(certificate.timestamp()).ok_or_else(|| {
-                    anyhow!("Timestamp cannot be before the previous certificate at round {previous_round}")
-                })?;
-                // Ensure the elapsed time is within the expected range.
-                match elapsed < MIN_BATCH_DELAY_IN_SECS as i64 {
-                    true => bail!("Timestamp is too soon after the previous certificate at round {previous_round}"),
-                    false => Ok(()),
-                }
-            }
-            // If we do not see a previous certificate for the author, then proceed optimistically.
-            None => Ok(()),
+            Some(certificate) => certificate.timestamp(),
+            // If we do not see a previous certificate for the author, then proceed check against the earliest timestamp in the previous round.
+            None => match self
+                .storage
+                .get_certificates_for_round(previous_round)
+                .iter()
+                .map(BatchCertificate::timestamp)
+                .min()
+            {
+                Some(latest_timestamp) => latest_timestamp,
+                // If there are no certificates in the previous round, then return early.
+                None => return Ok(()),
+            },
+        };
+
+        // Determine the elapsed time since the previous timestamp.
+        let elapsed = timestamp
+            .checked_sub(previous_timestamp)
+            .ok_or_else(|| anyhow!("Timestamp cannot be before the previous certificate at round {previous_round}"))?;
+        // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
+        match elapsed < MIN_BATCH_DELAY_IN_SECS as i64 {
+            true => bail!("Timestamp is too soon after the previous certificate at round {previous_round}"),
+            false => Ok(()),
         }
     }
 
