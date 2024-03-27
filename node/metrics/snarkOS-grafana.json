@@ -604,7 +604,39 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -613,6 +645,10 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           }
@@ -621,28 +657,24 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 4,
+        "w": 12,
         "x": 12,
         "y": 17
       },
-      "id": 50,
+      "id": 53,
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "tooltip": {
+          "maxHeight": 600,
+          "mode": "single",
+          "sort": "none"
+        }
       },
-      "pluginVersion": "11.0.0-68643",
       "targets": [
         {
           "datasource": {
@@ -651,154 +683,45 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "avg(snarkos_blocks_coinbase_target)",
+          "expr": "max(snarkos_blocks_coinbase_target)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "__auto",
+          "interval": "",
+          "legendFormat": "Coinbase Target",
           "range": true,
           "refId": "A",
           "useBackend": false
-        }
-      ],
-      "title": "Coinbase Target",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
         },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 4,
-        "x": 16,
-        "y": 17
-      },
-      "id": 52,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.0.0-68643",
-      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "avg(snarkos_blocks_proof_target)",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
+          "expr": "max(snarkos_blocks_proof_target)",
+          "hide": false,
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "Proof Target",
           "range": true,
-          "refId": "A",
-          "useBackend": false
-        }
-      ],
-      "title": "Proof Target",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
+          "refId": "B"
         },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 4,
-        "x": 20,
-        "y": 17
-      },
-      "id": 51,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.0.0-68643",
-      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "avg(snarkos_blocks_cumulative_proof_target)",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
+          "expr": "max(snarkos_blocks_cumulative_proof_target)",
+          "hide": false,
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "Cumulative Proof Target",
           "range": true,
-          "refId": "A",
-          "useBackend": false
+          "refId": "C"
         }
       ],
-      "title": "Cumulative Proof Target",
-      "type": "stat"
+      "title": "Difficulty",
+      "type": "timeseries"
     },
     {
       "datasource": {
