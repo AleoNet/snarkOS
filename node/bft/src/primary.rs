@@ -1214,13 +1214,11 @@ impl<N: Network> Primary<N> {
             Some(certificate) => {
                 // Determine the elapsed time since the previous certificate.
                 let elapsed = timestamp.checked_sub(certificate.timestamp()).ok_or_else(|| {
-                    anyhow!("Proposed batch has a timestamp earlier than the certificate at round {previous_round}")
+                    anyhow!("Timestamp cannot be before the previous certificate at round {previous_round}")
                 })?;
                 // Ensure the elapsed time is within the expected range.
                 match elapsed < MAX_BATCH_DELAY_IN_SECS as i64 {
-                    true => {
-                        bail!("Proposed batch was created too quickly after the certificate at round {previous_round}")
-                    }
+                    true => bail!("Timestamp is too soon after the previous certificate at round {previous_round}"),
                     false => Ok(()),
                 }
             }
