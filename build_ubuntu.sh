@@ -21,10 +21,18 @@ sudo apt-get install -y \
 	ufw
 
 
-# Install Rust
+# Check if Rust is installed, if not, install Rust.
 
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-source $HOME/.cargo/env
+if command -v rustc &> /dev/null
+then
+    echo "Rust is already installed. Skipping installation."
+else
+    # Install Rust
+    echo "Rust is not installed. Installing now..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME"/.cargo/env
+    echo "Rust installation complete."
+fi
 
 # Install snarkOS
 # cargo clean
