@@ -91,6 +91,8 @@ pub struct Primary<N: Network> {
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
     proposed_batch: Arc<ProposedBatch<N>>,
+    /// The timestamp of the most recent proposed batch.
+    latest_proposed_batch_timestamp: Arc<RwLock<i64>>,
     /// The recently-signed batch proposals (a map from the address to the round, batch ID, and signature).
     signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, Field<N>, Signature<N>)>>>,
     /// The spawned handles.
@@ -125,6 +127,7 @@ impl<N: Network> Primary<N> {
             workers: Arc::from(vec![]),
             bft_sender: Default::default(),
             proposed_batch: Default::default(),
+            latest_proposed_batch_timestamp: Default::default(),
             signed_proposals: Default::default(),
             handles: Default::default(),
             propose_lock: Default::default(),
@@ -505,6 +508,8 @@ impl<N: Network> Primary<N> {
         let proposal = Proposal::new(committee_lookback, batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
+        // Set the timestamp of the latest proposed batch.
+        *self.latest_proposed_batch_timestamp.write() = proposal.timestamp();
         // Set the proposed batch.
         *self.proposed_batch.write() = Some(proposal);
         Ok(())
@@ -1212,17 +1217,11 @@ impl<N: Network> Primary<N> {
         let previous_timestamp = match self.storage.get_certificate_for_round_with_author(previous_round, author) {
             // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
             Some(certificate) => certificate.timestamp(),
-            // If we do not see a previous certificate for the author, then proceed check against the earliest timestamp in the previous round.
-            None => match self
-                .storage
-                .get_certificates_for_round(previous_round)
-                .iter()
-                .map(BatchCertificate::timestamp)
-                .min()
-            {
-                Some(latest_timestamp) => latest_timestamp,
-                // If there are no certificates in the previous round, then return early.
-                None => return Ok(()),
+            None => match self.gateway.account().address() == author {
+                // If we are the author, then ensure the previous proposal was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
+                true => *self.latest_proposed_batch_timestamp.read(),
+                // If we do not see a previous certificate for the author, then proceed optimistically.
+                false => return Ok(()),
             },
         };
 
