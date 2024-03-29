@@ -623,6 +623,9 @@ fn load_or_compute_genesis<N: Network>(
 ) -> Result<Block<N>> {
     // Construct the preimage.
     let mut preimage = Vec::new();
+    
+    // Input the network ID.
+    preimage.extend(&N::ID.to_le_bytes());
 
     // Input the genesis private key, committee, and public balances.
     preimage.extend(genesis_private_key.to_bytes_le()?);
