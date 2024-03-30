@@ -623,7 +623,7 @@ fn load_or_compute_genesis<N: Network>(
 ) -> Result<Block<N>> {
     // Construct the preimage.
     let mut preimage = Vec::new();
-    
+
     // Input the network ID.
     preimage.extend(&N::ID.to_le_bytes());
 
