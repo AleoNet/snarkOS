@@ -22,7 +22,7 @@ use core::time::Duration;
 #[tokio::test]
 async fn test_connect_without_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 2).await;
+    let node0 = validator(0, 2, true).await;
     let node1 = client(0, 2).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
@@ -78,7 +78,7 @@ async fn test_connect_without_handshake() {
 #[tokio::test]
 async fn test_connect_with_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 2).await;
+    let node0 = validator(0, 2, true).await;
     let node1 = client(0, 2).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
@@ -150,11 +150,48 @@ async fn test_connect_with_handshake() {
     }
 }
 
+#[tokio::test]
+async fn test_validator_connection() {
+    // Create 2 routers.
+    let node0 = validator(0, 2, false).await;
+    let node1 = validator(0, 2, false).await;
+    assert_eq!(node0.number_of_connected_peers(), 0);
+    assert_eq!(node1.number_of_connected_peers(), 0);
+
+    // Enable handshake protocol.
+    node0.enable_handshake().await;
+    node1.enable_handshake().await;
+
+    // Start listening.
+    node0.tcp().enable_listener().await.unwrap();
+    node1.tcp().enable_listener().await.unwrap();
+
+    {
+        // Connect node0 to node1.
+        node0.connect(node1.local_ip());
+        // Sleep briefly.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        print_tcp!(node0);
+        print_tcp!(node1);
+
+        // Check the TCP level.
+        assert_eq!(node0.tcp().num_connected(), 1);
+        assert_eq!(node0.tcp().num_connecting(), 0);
+        assert_eq!(node1.tcp().num_connected(), 1);
+        assert_eq!(node1.tcp().num_connecting(), 0);
+
+        // Check the router level.
+        assert_eq!(node0.number_of_connected_peers(), 1);
+        assert_eq!(node1.number_of_connected_peers(), 1);
+    }
+}
+
 #[ignore]
 #[tokio::test]
 async fn test_connect_simultaneously_with_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 2).await;
+    let node0 = validator(0, 2, true).await;
     let node1 = client(0, 2).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
