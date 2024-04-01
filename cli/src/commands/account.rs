@@ -15,6 +15,7 @@
 use snarkvm::{
     console::{
         account::{Address, PrivateKey, Signature},
+        network::{MainnetV0, Network, TestnetV0},
         prelude::{Environment, Uniform},
         program::{ToFields, Value},
         types::Field,
@@ -36,13 +37,14 @@ use std::{
 };
 use zeroize::Zeroize;
 
-type Network = snarkvm::prelude::MainnetV0;
-
 /// Commands to manage Aleo accounts.
 #[derive(Debug, Parser, Zeroize)]
 pub enum Account {
     /// Generates a new Aleo account
     New {
+        /// Specify the network of the account
+        #[clap(default_value = "0", long = "network")]
+        network: u16,
         /// Seed the RNG with a numeric value
         #[clap(short = 's', long)]
         seed: Option<String>,
@@ -54,6 +56,9 @@ pub enum Account {
         discreet: bool,
     },
     Sign {
+        /// Specify the network of the private key to sign with
+        #[clap(default_value = "0", long = "network")]
+        network: u16,
         /// Specify the account private key of the node
         #[clap(long = "private-key")]
         private_key: Option<String>,
@@ -71,6 +76,9 @@ pub enum Account {
         raw: bool,
     },
     Verify {
+        /// Specify the network of the signature to verify
+        #[clap(default_value = "0", long = "network")]
+        network: u16,
         /// Address to use for verification
         #[clap(short = 'a', long)]
         address: String,
@@ -87,29 +95,35 @@ pub enum Account {
 }
 
 /// Parse a raw Aleo input into fields
-fn aleo_literal_to_fields(input: &str) -> Result<Vec<Field<Network>>> {
-    Value::<Network>::from_str(input)?.to_fields()
+fn aleo_literal_to_fields<N: Network>(input: &str) -> Result<Vec<Field<N>>> {
+    Value::<N>::from_str(input)?.to_fields()
 }
 
 impl Account {
     pub fn parse(self) -> Result<String> {
         match self {
-            Self::New { seed, vanity, discreet } => {
+            Self::New { network, seed, vanity, discreet } => {
                 // Ensure only the seed or the vanity string is specified.
                 if seed.is_some() && vanity.is_some() {
                     bail!("Cannot specify both the '--seed' and '--vanity' flags");
                 }
 
-                // Generate a vanity account.
-                if let Some(vanity) = vanity {
-                    Self::new_vanity(&vanity, discreet)
-                }
-                // Default to generating a normal account, with an optional seed.
-                else {
-                    Self::new_seeded(seed, discreet)
+                match vanity {
+                    // Generate a vanity account for the specified network.
+                    Some(vanity) => match network {
+                        0 => Self::new_vanity::<MainnetV0>(vanity.as_str(), discreet),
+                        1 => Self::new_vanity::<TestnetV0>(vanity.as_str(), discreet),
+                        _ => bail!("Unsupported network ID"),
+                    },
+                    // Generate a seeded account for the specified network.
+                    None => match network {
+                        0 => Self::new_seeded::<MainnetV0>(seed, discreet),
+                        1 => Self::new_seeded::<TestnetV0>(seed, discreet),
+                        _ => bail!("Unsupported network ID"),
+                    },
                 }
             }
-            Self::Sign { message, seed, raw, private_key, private_key_file } => {
+            Self::Sign { network, message, seed, raw, private_key, private_key_file } => {
                 let key = match (private_key, private_key_file) {
                     (Some(private_key), None) => private_key,
                     (None, Some(private_key_file)) => {
@@ -121,16 +135,29 @@ impl Account {
                         bail!("Cannot specify both the '--private-key' and '--private-key-file' flags")
                     }
                 };
-                Self::sign(key, message, seed, raw)
+
+                // Sign the message for the specified network.
+                match network {
+                    0 => Self::sign::<MainnetV0>(key, message, seed, raw),
+                    1 => Self::sign::<TestnetV0>(key, message, seed, raw),
+                    _ => bail!("Unsupported network ID"),
+                }
             }
-            Self::Verify { address, signature, message, raw } => Self::verify(address, signature, message, raw),
+            Self::Verify { network, address, signature, message, raw } => {
+                // Verify the signature for the specified network.
+                match network {
+                    0 => Self::verify::<MainnetV0>(address, signature, message, raw),
+                    1 => Self::verify::<TestnetV0>(address, signature, message, raw),
+                    _ => bail!("Unsupported network ID"),
+                }
+            }
         }
     }
 
     /// Generates a new Aleo account with the given vanity string.
-    fn new_vanity(vanity: &str, discreet: bool) -> Result<String> {
+    fn new_vanity<N: Network>(vanity: &str, discreet: bool) -> Result<String> {
         // A closure to generate a new Aleo account.
-        let sample_account = || snarkos_account::Account::<Network>::new(&mut rand::thread_rng());
+        let sample_account = || snarkos_account::Account::<N>::new(&mut rand::thread_rng());
 
         const ITERATIONS: u128 = u16::MAX as u128;
         const ITERATIONS_STR: &str = "65,535";
@@ -201,12 +228,12 @@ impl Account {
     }
 
     /// Generates a new Aleo account with an optional seed.
-    fn new_seeded(seed: Option<String>, discreet: bool) -> Result<String> {
+    fn new_seeded<N: Network>(seed: Option<String>, discreet: bool) -> Result<String> {
         // Recover the seed.
         let seed = match seed {
             // Recover the field element deterministically.
             Some(seed) => {
-                Field::new(<Network as Environment>::Field::from_str(&seed).map_err(|e| anyhow!("Invalid seed - {e}"))?)
+                Field::new(<N as Environment>::Field::from_str(&seed).map_err(|e| anyhow!("Invalid seed - {e}"))?)
             }
             // Sample a random field element.
             None => Field::rand(&mut ChaChaRng::from_entropy()),
@@ -215,7 +242,7 @@ impl Account {
         let private_key =
             PrivateKey::try_from(seed).map_err(|_| anyhow!("Failed to convert the seed into a valid private key"))?;
         // Construct the account.
-        let account = snarkos_account::Account::<Network>::try_from(private_key)?;
+        let account = snarkos_account::Account::<N>::try_from(private_key)?;
         // Print the new Aleo account.
         if !discreet {
             return Ok(account.to_string());
@@ -236,13 +263,13 @@ impl Account {
     }
 
     // Sign a message with an Aleo private key
-    fn sign(key: String, message: String, seed: Option<String>, raw: bool) -> Result<String> {
+    fn sign<N: Network>(key: String, message: String, seed: Option<String>, raw: bool) -> Result<String> {
         // Recover the seed.
         let mut rng = match seed {
             // Recover the field element deterministically.
             Some(seed) => {
-                let field: Field<_> = Field::<Network>::new(
-                    <Network as Environment>::Field::from_str(&seed).map_err(|e| anyhow!("Invalid seed - {e}"))?,
+                let field: Field<_> = Field::<N>::new(
+                    <N as Environment>::Field::from_str(&seed).map_err(|e| anyhow!("Invalid seed - {e}"))?,
                 );
 
                 // field is always 32 bytes
@@ -254,13 +281,13 @@ impl Account {
 
         // Parse the private key
         let private_key =
-            PrivateKey::<Network>::from_str(&key).map_err(|_| anyhow!("Failed to parse a valid private key"))?;
+            PrivateKey::<N>::from_str(&key).map_err(|_| anyhow!("Failed to parse a valid private key"))?;
         // Sign the message
         let signature = if raw {
             private_key.sign_bytes(message.as_bytes(), &mut rng)
         } else {
             let fields =
-                aleo_literal_to_fields(&message).map_err(|_| anyhow!("Failed to parse a valid Aleo literal"))?;
+                aleo_literal_to_fields::<N>(&message).map_err(|_| anyhow!("Failed to parse a valid Aleo literal"))?;
             private_key.sign(&fields, &mut rng)
         }
         .map_err(|_| anyhow!("Failed to sign the message"))?
@@ -270,12 +297,12 @@ impl Account {
     }
 
     // Verify a signature with an Aleo address
-    fn verify(address: String, signature: String, message: String, raw: bool) -> Result<String> {
+    fn verify<N: Network>(address: String, signature: String, message: String, raw: bool) -> Result<String> {
         // Parse the address
-        let address = Address::<Network>::from_str(&address).map_err(|_| anyhow!("Failed to parse a valid address"))?;
+        let address = Address::<N>::from_str(&address).map_err(|_| anyhow!("Failed to parse a valid address"))?;
         // Parse the signature
         let signature =
-            Signature::<Network>::from_str(&signature).map_err(|_| anyhow!("Failed to parse a valid signature"))?;
+            Signature::<N>::from_str(&signature).map_err(|_| anyhow!("Failed to parse a valid signature"))?;
         // Verify the signature
         let verified = if raw {
             signature.verify_bytes(&address, message.as_bytes())
@@ -323,7 +350,7 @@ mod tests {
     #[test]
     fn test_new() {
         for _ in 0..3 {
-            let account = Account::New { seed: None, vanity: None, discreet: false };
+            let account = Account::New { network: 0, seed: None, vanity: None, discreet: false };
             assert!(account.parse().is_ok());
         }
     }
@@ -349,7 +376,7 @@ mod tests {
         );
 
         let vanity = None;
-        let account = Account::New { seed, vanity, discreet: false };
+        let account = Account::New { network: 0, seed, vanity, discreet: false };
         let actual = account.parse().unwrap();
         assert_eq!(expected, actual);
     }
@@ -375,7 +402,7 @@ mod tests {
         );
 
         let vanity = None;
-        let account = Account::New { seed, vanity, discreet: false };
+        let account = Account::New { network: 0, seed, vanity, discreet: false };
         let actual = account.parse().unwrap();
         assert_eq!(expected, actual);
     }
@@ -384,7 +411,14 @@ mod tests {
     fn test_signature_raw() {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "Hello, world!".to_string();
-        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed: None, raw: true };
+        let account = Account::Sign {
+            network: 0,
+            private_key: Some(key),
+            private_key_file: None,
+            message,
+            seed: None,
+            raw: true,
+        };
         assert!(account.parse().is_ok());
     }
 
@@ -392,7 +426,14 @@ mod tests {
     fn test_signature() {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "5field".to_string();
-        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed: None, raw: false };
+        let account = Account::Sign {
+            network: 0,
+            private_key: Some(key),
+            private_key_file: None,
+            message,
+            seed: None,
+            raw: false,
+        };
         assert!(account.parse().is_ok());
     }
 
@@ -400,7 +441,14 @@ mod tests {
     fn test_signature_fail() {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "not a literal value".to_string();
-        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed: None, raw: false };
+        let account = Account::Sign {
+            network: 0,
+            private_key: Some(key),
+            private_key_file: None,
+            message,
+            seed: None,
+            raw: false,
+        };
         assert!(account.parse().is_err());
     }
 
@@ -410,7 +458,8 @@ mod tests {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "Hello, world!".to_string();
         let expected = "sign1t2hsaqfhcgvsfg2q3q2stxsffyrvdx98pl0ddkdqngqqtn3vsuprhkv9tkeyzs878ccqp62mfptvvp7m5hjcfnf06cc9pu4khxtkkp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkksrwh0";
-        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed, raw: true };
+        let account =
+            Account::Sign { network: 0, private_key: Some(key), private_key_file: None, message, seed, raw: true };
         let actual = account.parse().unwrap();
         assert_eq!(expected, actual);
     }
@@ -421,7 +470,8 @@ mod tests {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "5field".to_string();
         let expected = "sign16f464jk7zrq0az5jne2zvamhlfkksfj23508tqvmj836jpplkuqefcshgk8k8rx9xxu284fuwaua7fcz3jajvnqynwtymfm0p692vq8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk3re27j";
-        let account = Account::Sign { private_key: Some(key), private_key_file: None, message, seed, raw: false };
+        let account =
+            Account::Sign { network: 0, private_key: Some(key), private_key_file: None, message, seed, raw: false };
         let actual = account.parse().unwrap();
         assert_eq!(expected, actual);
     }
@@ -432,14 +482,14 @@ mod tests {
         let address = "aleo1zecnqchckrzw7dlsyf65g6z5le2rmys403ecwmcafrag0e030yxqrnlg8j";
         let signature = "sign1nnvrjlksrkxdpwsrw8kztjukzhmuhe5zf3srk38h7g32u4kqtqpxn3j5a6k8zrqcfx580a96956nsjvluzt64cqf54pdka9mgksfqp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkwsnaqq".to_string();
         let message = "Hello, world!".to_string();
-        let account = Account::Verify { address: address.to_string(), signature, message, raw: true };
+        let account = Account::Verify { network: 0, address: address.to_string(), signature, message, raw: true };
         let actual = account.parse();
         assert!(actual.is_ok());
 
         // test signature of "Hello, world!" against the message "Different Message"
         let signature = "sign1nnvrjlksrkxdpwsrw8kztjukzhmuhe5zf3srk38h7g32u4kqtqpxn3j5a6k8zrqcfx580a96956nsjvluzt64cqf54pdka9mgksfqp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkwsnaqq".to_string();
         let message = "Different Message".to_string();
-        let account = Account::Verify { address: address.to_string(), signature, message, raw: true };
+        let account = Account::Verify { network: 0, address: address.to_string(), signature, message, raw: true };
         let actual = account.parse();
         assert!(actual.is_err());
 
@@ -447,14 +497,14 @@ mod tests {
         let signature = "sign1nnvrjlksrkxdpwsrw8kztjukzhmuhe5zf3srk38h7g32u4kqtqpxn3j5a6k8zrqcfx580a96956nsjvluzt64cqf54pdka9mgksfqp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkwsnaqq".to_string();
         let message = "Hello, world!".to_string();
         let wrong_address = "aleo1uxl69laseuv3876ksh8k0nd7tvpgjt6ccrgccedpjk9qwyfensxst9ftg5".to_string();
-        let account = Account::Verify { address: wrong_address, signature, message, raw: true };
+        let account = Account::Verify { network: 0, address: wrong_address, signature, message, raw: true };
         let actual = account.parse();
         assert!(actual.is_err());
 
         // test a valid signature of "Different Message"
         let signature = "sign1424ztyt9hcm77nq450gvdszrvtg9kvhc4qadg4nzy9y0ah7wdqq7t36cxal42p9jj8e8pjpmc06lfev9nvffcpqv0cxwyr0a2j2tjqlesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk3yrr50".to_string();
         let message = "Different Message".to_string();
-        let account = Account::Verify { address: address.to_string(), signature, message, raw: true };
+        let account = Account::Verify { network: 0, address: address.to_string(), signature, message, raw: true };
         let actual = account.parse();
         assert!(actual.is_ok());
     }
@@ -465,14 +515,14 @@ mod tests {
         let address = "aleo1zecnqchckrzw7dlsyf65g6z5le2rmys403ecwmcafrag0e030yxqrnlg8j";
         let signature = "sign1j7swjfnyujt2vme3ulu88wdyh2ddj85arh64qh6c6khvrx8wvsp8z9wtzde0sahqj2qwz8rgzt803c0ceega53l4hks2mf5sfsv36qhesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkdetews".to_string();
         let message = "5field".to_string();
-        let account = Account::Verify { address: address.to_string(), signature, message, raw: false };
+        let account = Account::Verify { network: 0, address: address.to_string(), signature, message, raw: false };
         let actual = account.parse();
         assert!(actual.is_ok());
 
         // test signature of 5u8 against the message 10u8
         let signature = "sign1j7swjfnyujt2vme3ulu88wdyh2ddj85arh64qh6c6khvrx8wvsp8z9wtzde0sahqj2qwz8rgzt803c0ceega53l4hks2mf5sfsv36qhesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkdetews".to_string();
         let message = "10field".to_string();
-        let account = Account::Verify { address: address.to_string(), signature, message, raw: false };
+        let account = Account::Verify { network: 0, address: address.to_string(), signature, message, raw: false };
         let actual = account.parse();
         assert!(actual.is_err());
 
@@ -480,14 +530,14 @@ mod tests {
         let signature = "sign1j7swjfnyujt2vme3ulu88wdyh2ddj85arh64qh6c6khvrx8wvsp8z9wtzde0sahqj2qwz8rgzt803c0ceega53l4hks2mf5sfsv36qhesm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkdetews".to_string();
         let message = "5field".to_string();
         let wrong_address = "aleo1uxl69laseuv3876ksh8k0nd7tvpgjt6ccrgccedpjk9qwyfensxst9ftg5".to_string();
-        let account = Account::Verify { address: wrong_address, signature, message, raw: false };
+        let account = Account::Verify { network: 0, address: wrong_address, signature, message, raw: false };
         let actual = account.parse();
         assert!(actual.is_err());
 
         // test a valid signature of 10u8
         let signature = "sign1t9v2t5tljk8pr5t6vkcqgkus0a3v69vryxmfrtwrwg0xtj7yv5qj2nz59e5zcyl50w23lhntxvt6vzeqfyu6dt56698zvfj2l6lz6q0esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk8rh9kt".to_string();
         let message = "10field".to_string();
-        let account = Account::Verify { address: address.to_string(), signature, message, raw: false };
+        let account = Account::Verify { network: 0, address: address.to_string(), signature, message, raw: false };
         let actual = account.parse();
         assert!(actual.is_ok());
     }
