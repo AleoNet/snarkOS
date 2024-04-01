@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::CurrentNetwork;
 use snarkvm::{
-    console::program::Ciphertext,
+    console::{
+        network::{MainnetV0, Network, TestnetV0},
+        program::Ciphertext,
+    },
     prelude::{Record, ViewKey},
 };
 
@@ -26,6 +28,9 @@ use zeroize::Zeroize;
 /// Decrypts a record ciphertext.
 #[derive(Debug, Parser, Zeroize)]
 pub struct Decrypt {
+    /// Specify the network of the ciphertext to decrypt.
+    #[clap(default_value = "0", long = "network")]
+    pub network: u16,
     /// The record ciphertext to decrypt.
     #[clap(short, long)]
     pub ciphertext: String,
@@ -36,17 +41,21 @@ pub struct Decrypt {
 
 impl Decrypt {
     pub fn parse(self) -> Result<String> {
-        // Decrypt the ciphertext.
-        Self::decrypt_ciphertext(&self.ciphertext, &self.view_key)
+        // Decrypt the ciphertext for the given network.
+        match self.network {
+            0 => Self::decrypt_ciphertext::<MainnetV0>(&self.ciphertext, &self.view_key),
+            1 => Self::decrypt_ciphertext::<TestnetV0>(&self.ciphertext, &self.view_key),
+            _ => bail!("Unsupported network ID"),
+        }
     }
 
     /// Decrypts the ciphertext record with provided the view key.
-    fn decrypt_ciphertext(ciphertext: &str, view_key: &str) -> Result<String> {
+    fn decrypt_ciphertext<N: Network>(ciphertext: &str, view_key: &str) -> Result<String> {
         // Parse the ciphertext record.
-        let ciphertext_record = Record::<CurrentNetwork, Ciphertext<CurrentNetwork>>::from_str(ciphertext)?;
+        let ciphertext_record = Record::<N, Ciphertext<N>>::from_str(ciphertext)?;
 
         // Parse the account view key.
-        let view_key = ViewKey::<CurrentNetwork>::from_str(view_key)?;
+        let view_key = ViewKey::<N>::from_str(view_key)?;
 
         match ciphertext_record.decrypt(&view_key) {
             Ok(plaintext_record) => Ok(plaintext_record.to_string()),
@@ -75,6 +84,8 @@ mod tests {
         Uniform,
         ViewKey,
     };
+
+    type CurrentNetwork = MainnetV0;
 
     const ITERATIONS: usize = 1000;
 
@@ -120,7 +131,7 @@ mod tests {
             // Decrypt the ciphertext.
             let expected_plaintext = ciphertext.decrypt(&view_key).unwrap();
 
-            let decrypt = Decrypt { ciphertext: ciphertext.to_string(), view_key: view_key.to_string() };
+            let decrypt = Decrypt { network: 0, ciphertext: ciphertext.to_string(), view_key: view_key.to_string() };
             let plaintext = decrypt.parse().unwrap();
 
             // Check that the decryption is correct.
@@ -148,7 +159,8 @@ mod tests {
             let ciphertext = construct_ciphertext::<CurrentNetwork>(view_key, owner, &mut rng).unwrap();
 
             // Enforce that the decryption fails.
-            let decrypt = Decrypt { ciphertext: ciphertext.to_string(), view_key: incorrect_view_key.to_string() };
+            let decrypt =
+                Decrypt { network: 0, ciphertext: ciphertext.to_string(), view_key: incorrect_view_key.to_string() };
             assert!(decrypt.parse().is_err());
         }
     }
