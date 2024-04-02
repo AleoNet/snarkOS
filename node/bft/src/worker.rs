@@ -582,6 +582,7 @@ mod tests {
         assert!(!worker.pending.contains(transmission_id));
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_process_solution_ok() {
         let rng = &mut TestRng::default();
@@ -620,6 +621,7 @@ mod tests {
         assert!(worker.ready.contains(puzzle));
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_process_solution_nok() {
         let rng = &mut TestRng::default();

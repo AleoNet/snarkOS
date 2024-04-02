@@ -55,6 +55,7 @@ use tokio::{
     task::JoinHandle,
 };
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Consensus<N: Network> {
     /// The ledger.
