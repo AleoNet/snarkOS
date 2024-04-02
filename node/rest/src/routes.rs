@@ -39,6 +39,7 @@ pub(crate) struct Metadata {
     metadata: bool,
 }
 
+#[allow(dead_code)]
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // ----------------- DEPRECATED FUNCTIONS -----------------
     // The functions below are associated with deprecated routes.
