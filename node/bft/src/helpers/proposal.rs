@@ -22,11 +22,11 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, Itertools, Result},
+    prelude::{bail, ensure, FromBytes, Itertools, Result, ToBytes},
 };
 
 use indexmap::{IndexMap, IndexSet};
-use std::collections::HashSet;
+use std::{collections::HashSet, io};
 
 pub struct Proposal<N: Network> {
     /// The proposed batch header.
@@ -164,6 +164,42 @@ impl<N: Network> Proposal<N> {
         let certificate = BatchCertificate::from(self.batch_header.clone(), self.signatures.clone())?;
         // Return the certificate and transmissions.
         Ok((certificate, self.transmissions.clone()))
+    }
+}
+
+impl<N: Network> ToBytes for Proposal<N> {
+    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.batch_header.write_le(&mut writer)?;
+        u32::try_from(self.transmissions.len()).map_err(|_| io::ErrorKind::Other)?.write_le(&mut writer)?;
+        for (transmission_id, transmission) in &self.transmissions {
+            transmission_id.write_le(&mut writer)?;
+            transmission.write_le(&mut writer)?;
+        }
+        u32::try_from(self.signatures.len()).map_err(|_| io::ErrorKind::Other)?.write_le(&mut writer)?;
+        for signature in &self.signatures {
+            signature.write_le(&mut writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for Proposal<N> {
+    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
+        let batch_header = FromBytes::read_le(&mut reader)?;
+        let num_transmissions = u32::read_le(&mut reader)?;
+        let mut transmissions = IndexMap::default();
+        for _ in 0..num_transmissions {
+            let transmission_id = FromBytes::read_le(&mut reader)?;
+            let transmission = FromBytes::read_le(&mut reader)?;
+            transmissions.insert(transmission_id, transmission);
+        }
+        let num_signatures = u32::read_le(&mut reader)?;
+        let mut signatures = IndexSet::default();
+        for _ in 0..num_signatures {
+            signatures.insert(FromBytes::read_le(&mut reader)?);
+        }
+
+        Ok(Self { batch_header, transmissions, signatures })
     }
 }
 

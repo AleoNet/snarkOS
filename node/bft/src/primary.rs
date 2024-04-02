@@ -39,6 +39,7 @@ use crate::{
     PRIMARY_PING_IN_MS,
     WORKER_PING_IN_MS,
 };
+use aleo_std::{aleo_ledger_dir, StorageMode};
 use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -53,7 +54,7 @@ use snarkvm::{
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
     },
-    prelude::committee::Committee,
+    prelude::{committee::Committee, ToBytes},
 };
 
 use colored::Colorize;
@@ -63,8 +64,10 @@ use parking_lot::{Mutex, RwLock};
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     future::Future,
     net::SocketAddr,
+    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
@@ -75,6 +78,21 @@ use tokio::{
 
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
+
+// Returns the path where a batch proposal file may be stored.
+pub fn batch_proposal_path(network: u16, dev: Option<u16>) -> PathBuf {
+    // Obtain the path to the ledger.
+    let mut path = aleo_ledger_dir(network, StorageMode::from(dev));
+    // Go to the folder right above the ledger.
+    path.pop();
+    // Append the proposal's file name.
+    path.push(&format!(
+        "current_batch_proposal-{network}{}",
+        if let Some(id) = dev { format!("-{id}") } else { "".into() }
+    ));
+
+    path
+}
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
@@ -119,6 +137,19 @@ impl<N: Network> Primary<N> {
         let gateway = Gateway::new(account, storage.clone(), ledger.clone(), ip, trusted_validators, dev)?;
         // Initialize the sync module.
         let sync = Sync::new(gateway.clone(), storage.clone(), ledger.clone());
+        // Check for the existence of a batch proposal file.
+        let proposed_batch = ProposedBatch::<N>::default();
+        let proposal_path = batch_proposal_path(N::ID, dev);
+        if let Ok(serialized_proposal) = fs::read(&proposal_path) {
+            match Proposal::<N>::from_bytes_le(&serialized_proposal) {
+                Ok(proposal) => *proposed_batch.write() = Some(proposal),
+                Err(_) => bail!("Couldn't deserialize the proposal stored at {}", proposal_path.display()),
+            }
+            if let Err(err) = fs::remove_file(&proposal_path) {
+                bail!("Failed to remove the current batch proposal file at {}: {err}", proposal_path.display());
+            }
+        }
+
         // Initialize the primary instance.
         Ok(Self {
             sync,
@@ -127,7 +158,7 @@ impl<N: Network> Primary<N> {
             ledger,
             workers: Arc::from(vec![]),
             bft_sender: Default::default(),
-            proposed_batch: Default::default(),
+            proposed_batch: Arc::new(proposed_batch),
             latest_proposed_batch_timestamp: Default::default(),
             signed_proposals: Default::default(),
             handles: Default::default(),
@@ -1546,6 +1577,21 @@ impl<N: Network> Primary<N> {
         self.workers.iter().for_each(|worker| worker.shut_down());
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
+        // Save the current batch proposal to disk.
+        if let Some(proposal) = self.proposed_batch.write().take() {
+            let proposal_path = batch_proposal_path(N::ID, self.gateway.dev());
+
+            match proposal.to_bytes_le() {
+                Ok(proposal) => {
+                    if let Err(err) = fs::write(&proposal_path, proposal) {
+                        error!("Couldn't store the current proposal at {}: {err}.", proposal_path.display());
+                    }
+                }
+                Err(err) => {
+                    error!("Couldn't serialize the current proposal: {err}.");
+                }
+            };
+        }
         // Close the gateway.
         self.gateway.shut_down().await;
     }
