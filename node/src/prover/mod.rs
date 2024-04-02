@@ -202,10 +202,12 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 .latest_block_header
                 .read()
                 .as_ref()
-                .map(|header| (header.coinbase_target(), header.proof_target()));
+                .map(|header| (header.coinbase_target(), header.proof_target(), header.height()));
 
             // If the latest epoch hash and latest state exists, then proceed to generate a solution.
-            if let (Some(epoch_hash), Some((coinbase_target, proof_target))) = (latest_epoch_hash, latest_state) {
+            if let (Some(epoch_hash), Some((coinbase_target, proof_target, height))) = (latest_epoch_hash, latest_state)
+            {
+                info!("Starting puzzle iteration for epoch '{epoch_hash}' - at block height {height}");
                 // Execute the puzzle.
                 let prover = self.clone();
                 let result = tokio::task::spawn_blocking(move || {
