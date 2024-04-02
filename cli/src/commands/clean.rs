@@ -16,6 +16,7 @@ use aleo_std::StorageMode;
 use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
+use snarkos_node::bft::batch_proposal_path;
 use std::path::PathBuf;
 
 /// Cleans the snarkOS node storage.
@@ -35,6 +36,13 @@ pub struct Clean {
 impl Clean {
     /// Cleans the snarkOS node storage.
     pub fn parse(self) -> Result<String> {
+        // Remove the current batch proposal file, if it exists.
+        let proposal_path = batch_proposal_path(self.network, self.dev);
+        if proposal_path.exists() {
+            if let Err(err) = std::fs::remove_file(&proposal_path) {
+                bail!("Failed to remove the current batch proposal file at {}: {err}", proposal_path.display());
+            }
+        }
         // Remove the specified ledger from storage.
         Self::remove_ledger(self.network, match self.path {
             Some(path) => StorageMode::Custom(path),
