@@ -43,7 +43,7 @@ async fn test_connection_cleanups() {
         let node = match rng.gen_range(0..3) % 3 {
             0 => client(0, 1).await,
             1 => prover(0, 1).await,
-            2 => validator(0, 1, true).await,
+            2 => validator(0, 1, &[], true).await,
             _ => unreachable!(),
         };
 

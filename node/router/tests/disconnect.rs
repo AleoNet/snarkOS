@@ -22,7 +22,7 @@ use core::time::Duration;
 #[tokio::test]
 async fn test_disconnect_without_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 1, true).await;
+    let node0 = validator(0, 1, &[], true).await;
     let node1 = client(0, 1).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
@@ -64,7 +64,7 @@ async fn test_disconnect_without_handshake() {
 #[tokio::test]
 async fn test_disconnect_with_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 1, true).await;
+    let node0 = validator(0, 1, &[], true).await;
     let node1 = client(0, 1).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);

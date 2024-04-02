@@ -17,7 +17,6 @@ use crate::{
     Peer,
     Router,
 };
-use snarkos_node_router_messages::NodeType;
 use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
 use snarkvm::{
     ledger::narwhal::Data,
@@ -203,7 +202,7 @@ impl<N: Network> Router<N> {
         let peer_ip = peer_ip.unwrap();
 
         // Knowing the peer's listening address, ensure it is allowed to connect.
-        if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_ip, peer_request.node_type) {
+        if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_ip) {
             return Err(error(format!("{forbidden_message}")));
         }
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
@@ -252,7 +251,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Ensure the peer is allowed to connect.
-    fn ensure_peer_is_allowed(&self, peer_ip: SocketAddr, node_type: NodeType) -> Result<()> {
+    fn ensure_peer_is_allowed(&self, peer_ip: SocketAddr) -> Result<()> {
         // Ensure the peer IP is not this node.
         if self.is_local_ip(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (attempted to self-connect)")
@@ -266,7 +265,7 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection request from '{peer_ip}' (already connected)")
         }
         // Only allow trusted peers to connect if allow_external_peers is set
-        if !node_type.is_validator() && !self.allow_external_peers() && !self.is_trusted(&peer_ip) {
+        if !self.allow_external_peers() && !self.is_trusted(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (untrusted)")
         }
         // Ensure the peer is not restricted.
