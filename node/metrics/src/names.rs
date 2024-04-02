@@ -14,7 +14,7 @@
 
 pub(super) const COUNTER_NAMES: [&str; 1] = [bft::LEADERS_ELECTED];
 
-pub(super) const GAUGE_NAMES: [&str; 21] = [
+pub(super) const GAUGE_NAMES: [&str; 23] = [
     bft::CONNECTED,
     bft::CONNECTING,
     bft::LAST_STORED_ROUND,
@@ -32,6 +32,8 @@ pub(super) const GAUGE_NAMES: [&str; 21] = [
     consensus::UNCONFIRMED_SOLUTIONS,
     consensus::UNCONFIRMED_TRANSACTIONS,
     consensus::UNCONFIRMED_TRANSMISSIONS,
+    rest::SOLUTIONS_SUBMITTED_HTTP,
+    rest::TRANSACTIONS_SUBMITTED_HTTP,
     router::CONNECTED,
     router::CANDIDATE,
     router::RESTRICTED,
@@ -49,13 +51,13 @@ pub(super) const HISTOGRAM_NAMES: [&str; 7] = [
 ];
 
 pub mod bft {
+    pub const CERTIFIED_BATCHES: &str = "snarkos_bft_primary_certified_batches";
     pub const COMMIT_ROUNDS_LATENCY: &str = "snarkos_bft_commit_rounds_latency_secs"; // <-- This one doesn't even make sense.
     pub const CONNECTED: &str = "snarkos_bft_connected_total";
     pub const CONNECTING: &str = "snarkos_bft_connecting_total";
     pub const LAST_STORED_ROUND: &str = "snarkos_bft_last_stored_round";
     pub const LEADERS_ELECTED: &str = "snarkos_bft_leaders_elected_total";
     pub const PROPOSAL_ROUND: &str = "snarkos_bft_primary_proposal_round";
-    pub const CERTIFIED_BATCHES: &str = "snarkos_bft_primary_certified_batches";
 }
 
 pub mod blocks {
@@ -76,6 +78,11 @@ pub mod consensus {
     pub const UNCONFIRMED_TRANSACTIONS: &str = "snarkos_consensus_unconfirmed_transactions_total";
     pub const UNCONFIRMED_TRANSMISSIONS: &str = "snarkos_consensus_unconfirmed_transmissions_total";
     pub const UNCONFIRMED_SOLUTIONS: &str = "snarkos_consensus_unconfirmed_solutions_total";
+}
+
+pub mod rest {
+    pub const SOLUTIONS_SUBMITTED_HTTP: &str = "snarkos_rest_solutions_submitted_total";
+    pub const TRANSACTIONS_SUBMITTED_HTTP: &str = "snarkos_rest_transactions_submitted_total";
 }
 
 pub mod router {

@@ -241,7 +241,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     ) -> bool {
         // Add the unconfirmed solution to the memory pool.
         if let Err(error) = self.consensus.add_unconfirmed_solution(solution).await {
-            trace!("[UnconfirmedSolution] {error}");
+            debug!("[UnconfirmedSolution] {error}");
             return true; // Maintain the connection.
         }
         let message = Message::UnconfirmedSolution(serialized);

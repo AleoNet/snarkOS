@@ -313,6 +313,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
+        #[cfg(feature = "metrics")]
+        {
+            metrics::increment_gauge(metrics::rest::TRANSACTIONS_SUBMITTED_HTTP, 1f64);
+        }
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
@@ -337,6 +341,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
+        #[cfg(feature = "metrics")]
+        {
+            metrics::increment_gauge(metrics::rest::SOLUTIONS_SUBMITTED_HTTP, 1f64);
+        }
         // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed solution to the memory pool.

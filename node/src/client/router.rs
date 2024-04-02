@@ -270,6 +270,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
             // Retrieve the latest proof target.
             let proof_target = self.ledger.latest_block().header().proof_target();
             // Ensure that the solution is valid for the given epoch.
+            trace!("Client received solution {solution} from {peer_ip}");
             let puzzle = self.puzzle.clone();
             let is_valid =
                 tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target)).await;

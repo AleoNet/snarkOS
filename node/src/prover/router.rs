@@ -198,7 +198,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         let block_height = header.height();
 
         info!(
-            "Puzzle (Block {block_height}, Coinbase Target {}, Proof Target {})",
+            "Current Puzzle: (Block {block_height}, Epoch Hash {epoch_hash}, Coinbase Target {}, Proof Target {})",
             header.coinbase_target(),
             header.proof_target()
         );
@@ -226,6 +226,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
 
         if let (Some(epoch_hash), Some(proof_target)) = (epoch_hash, proof_target) {
             // Ensure that the solution is valid for the given epoch.
+            trace!("Prover received solution {solution} from {peer_ip}");
             let puzzle = self.puzzle.clone();
             let is_valid =
                 tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target)).await;

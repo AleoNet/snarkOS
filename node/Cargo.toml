@@ -24,6 +24,7 @@ metrics = [
   "dep:metrics",
   "snarkos-node-bft/metrics",
   "snarkos-node-consensus/metrics",
+  "snarkos-node-rest/metrics",
   "snarkos-node-router/metrics",
   "snarkos-node-tcp/metrics"
 ]

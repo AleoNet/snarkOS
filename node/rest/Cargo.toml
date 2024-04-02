@@ -18,6 +18,7 @@ edition = "2021"
 
 [features]
 default = [ "parallel" ]
+metrics = [ "dep:metrics" ]
 parallel = [ "rayon" ]
 
 [dependencies.anyhow]
@@ -39,6 +40,12 @@ features = [ "serde", "rayon" ]
 
 [dependencies.jsonwebtoken]
 version = "9.2"
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../metrics"
+version = "=2.2.7"
+optional = true
 
 [dependencies.once_cell]
 version = "1.19"
