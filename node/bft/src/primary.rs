@@ -35,6 +35,7 @@ use crate::{
     MAX_BATCH_DELAY_IN_MS,
     MAX_WORKERS,
     PRIMARY_PING_IN_MS,
+    PROPOSAL_EXPIRATION_IN_SECS,
     WORKER_PING_IN_MS,
 };
 use snarkos_account::Account;
@@ -572,26 +573,43 @@ impl<N: Network> Primary<N> {
                 bail!("Malicious peer - proposed a batch for a previous round ({})", batch_header.round());
             }
 
-            // If the round matches and the batch ID differs, then the validator is malicious.
-            if signed_round == batch_header.round() && signed_batch_id != batch_header.batch_id() {
-                // Proceed to disconnect the validator.
-                self.gateway.disconnect(peer_ip);
-                bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
-            }
-            // If the round and batch ID matches, then skip signing the batch a second time.
-            // Instead, rebroadcast the cached signature to the peer.
-            if signed_round == batch_header.round() && signed_batch_id == batch_header.batch_id() {
-                let gateway = self.gateway.clone();
-                tokio::spawn(async move {
-                    debug!("Resending a signature for a batch in round {batch_round} from '{peer_ip}'");
-                    let event = Event::BatchSignature(BatchSignature::new(batch_header.batch_id(), signature));
-                    // Resend the batch signature to the peer.
-                    if gateway.send(peer_ip, event).await.is_none() {
-                        warn!("Failed to resend a signature for a batch in round {batch_round} to '{peer_ip}'");
+            // If the signed round matches the peer's batch round then check the contents.
+            if signed_round == batch_header.round() {
+                // Determine if the proposal has expired.
+                let is_proposal_expired = now().saturating_sub(timestamp) >= PROPOSAL_EXPIRATION_IN_SECS;
+                match is_proposal_expired {
+                    // If the proposal has expired, then remove the cached signature.
+                    true => {
+                        self.signed_proposals.write().remove(&batch_author);
                     }
-                });
-                // Return early.
-                return Ok(());
+                    // If the proposal has not expired, then check the batch id.
+                    false => match signed_batch_id == batch_header.batch_id() {
+                        // If the batch ID matches, then skip signing the batch a second time.
+                        // Instead, rebroadcast the cached signature to the peer.
+                        true => {
+                            let gateway = self.gateway.clone();
+                            tokio::spawn(async move {
+                                debug!("Resending a signature for a batch in round {batch_round} from '{peer_ip}'");
+                                let event =
+                                    Event::BatchSignature(BatchSignature::new(batch_header.batch_id(), signature));
+                                // Resend the batch signature to the peer.
+                                if gateway.send(peer_ip, event).await.is_none() {
+                                    warn!(
+                                        "Failed to resend a signature for a batch in round {batch_round} to '{peer_ip}'"
+                                    );
+                                }
+                            });
+                            // Return early.
+                            return Ok(());
+                        }
+                        // If the batch ID differs, then the validator is malicious.
+                        false => {
+                            // Proceed to disconnect the validator.
+                            self.gateway.disconnect(peer_ip);
+                            bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
+                        }
+                    },
+                }
             }
         }
 
@@ -1102,7 +1120,14 @@ impl<N: Network> Primary<N> {
     async fn check_proposed_batch_for_expiration(&self) -> Result<()> {
         // Check if the proposed batch is timed out or stale.
         let is_expired = match self.proposed_batch.read().as_ref() {
-            Some(proposal) => proposal.round() < self.current_round(),
+            Some(proposal) => {
+                // Determine if the proposal is stale.
+                let is_stale = proposal.round() < self.current_round();
+                // Determine if the proposal is timed out.
+                let is_timed_out = now().saturating_sub(proposal.timestamp()) >= PROPOSAL_EXPIRATION_IN_SECS;
+                // Determine if the proposal is expired.
+                is_stale || is_timed_out
+            }
             None => false,
         };
         // If the batch is expired, clear the proposed batch.
