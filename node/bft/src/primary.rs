@@ -90,8 +90,8 @@ pub struct Primary<N: Network> {
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
     proposed_batch: Arc<ProposedBatch<N>>,
-    /// The recently-signed batch proposals (a map from the address to the round, batch ID, and signature).
-    signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, Field<N>, Signature<N>)>>>,
+    /// The recently-signed batch proposals (a map from the address to the round, timestamp, batch ID, and signature).
+    signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, i64, Field<N>, Signature<N>)>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The lock for propose_batch.
@@ -562,7 +562,7 @@ impl<N: Network> Primary<N> {
         }
 
         // Retrieve the cached round and batch ID for this validator.
-        if let Some((signed_round, signed_batch_id, signature)) =
+        if let Some((signed_round, timestamp, signed_batch_id, signature)) =
             self.signed_proposals.read().get(&batch_author).copied()
         {
             // If the signed round is ahead of the peer's batch round, then the validator is malicious.
@@ -626,6 +626,8 @@ impl<N: Network> Primary<N> {
 
         // Retrieve the batch ID.
         let batch_id = batch_header.batch_id();
+        // Retrieve the proposal timestamp.
+        let timestamp = batch_header.timestamp();
         // Sign the batch ID.
         let account = self.gateway.account().clone();
         let signature = spawn_blocking!(account.sign(&[batch_id], &mut rand::thread_rng()))?;
@@ -644,13 +646,13 @@ impl<N: Network> Primary<N> {
                 if entry.get().0 == batch_round {
                     return Ok(());
                 }
-                // Otherwise, cache the round, batch ID, and signature for this validator.
-                entry.insert((batch_round, batch_id, signature));
+                // Otherwise, cache the round, timestamp, batch ID, and signature for this validator.
+                entry.insert((batch_round, timestamp, batch_id, signature));
             }
             // If the validator has not signed a batch before, then continue.
             std::collections::hash_map::Entry::Vacant(entry) => {
-                // Cache the round, batch ID, and signature for this validator.
-                entry.insert((batch_round, batch_id, signature));
+                // Cache the round, timestamp, batch ID, and signature for this validator.
+                entry.insert((batch_round, timestamp, batch_id, signature));
             }
         };
 
