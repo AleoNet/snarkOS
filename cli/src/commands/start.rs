@@ -55,7 +55,7 @@ const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
 /// A mapping of `staker_address` to `(validator_address, withdrawal_address, amount)`.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-struct BondedBalances(IndexMap<String, (String, String, u64)>);
+pub struct BondedBalances(IndexMap<String, (String, String, u64)>);
 
 impl FromStr for BondedBalances {
     type Err = serde_json::Error;
@@ -101,6 +101,9 @@ pub struct Start {
     /// Specify the IP address and port of the validator(s) to connect to
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
+    /// If the flag is set, a node will allow untrusted peers to connect
+    #[clap(long = "allow-external-peers")]
+    pub allow_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3030", long = "rest")]
@@ -125,6 +128,9 @@ pub struct Start {
     #[clap(default_value = "false", long = "metrics")]
     pub metrics: bool,
 
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage_path")]
+    pub storage_path: Option<PathBuf>,
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
@@ -141,17 +147,9 @@ pub struct Start {
     /// If developtment mode is enabled, specify whether node 0 should generate traffic to drive the network
     #[clap(default_value = "false", long = "no-dev-txs")]
     pub no_dev_txs: bool,
-    /// Specify the path to a directory containing the ledger
-    #[clap(long = "storage_path")]
-    pub storage_path: Option<PathBuf>,
-
-    /// If development mode is enabled, specify the custom bonded balances as a json object. (default: None)
+    /// If development mode is enabled, specify the custom bonded balances as a JSON object (default: None)
     #[clap(long)]
-    dev_bonded_balances: Option<BondedBalances>,
-
-    /// If the flag is set, the validator will allow untrusted peers to connect
-    #[clap(long = "allow-external-peers")]
-    allow_external_peers: bool,
+    pub dev_bonded_balances: Option<BondedBalances>,
 }
 
 impl Start {
@@ -489,15 +487,21 @@ impl Start {
         // Parse the node type.
         let node_type = self.parse_node_type();
 
+        // Parse the node IP.
+        let node_ip = match self.node {
+            Some(node_ip) => node_ip,
+            None => SocketAddr::from_str("0.0.0.0:4130").unwrap(),
+        };
+        // Parse the BFT IP.
+        let bft_ip = match self.dev.is_some() {
+            true => self.bft,
+            false => None
+        };
         // Parse the REST IP.
         let rest_ip = match self.norest {
             true => None,
             false => Some(self.rest),
         };
-        // Parse the bft ip.
-        let bft_ip = if self.dev.is_some() { self.bft } else { None };
-        // Parse the node ip.
-        let node_ip = if let Some(node_ip) = self.node { node_ip } else { SocketAddr::from_str("0.0.0.0:4130").unwrap() };
 
         // If the display is not enabled, render the welcome message.
         if self.nodisplay {
