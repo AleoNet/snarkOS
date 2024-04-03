@@ -128,9 +128,9 @@ pub struct Start {
     #[clap(default_value = "false", long = "metrics")]
     pub metrics: bool,
 
-    /// Specify the path to a directory containing the ledger
-    #[clap(long = "storage_path")]
-    pub storage_path: Option<PathBuf>,
+    /// Specify the path to a directory containing the storage database for the ledger
+    #[clap(long = "storage")]
+    pub storage: Option<PathBuf>,
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
@@ -541,7 +541,7 @@ impl Start {
         }
 
         // Initialize the storage mode.
-        let storage_mode = match &self.storage_path {
+        let storage_mode = match &self.storage {
             Some(path) => StorageMode::Custom(path.clone()),
             None => StorageMode::from(self.dev),
         };
