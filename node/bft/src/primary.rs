@@ -585,22 +585,22 @@ impl<N: Network> Primary<N> {
             if signed_round > batch_header.round() {
                 bail!("Proposed a batch for a previous round ({})", batch_header.round());
             }
-
-            // Determine if the proposal has expired.
-            let is_proposal_expired = is_proposal_expired(now(), timestamp);
-            // If the round matches and the proposal has expired, then remove the cached signature.
-            if signed_round == batch_header.round() && is_proposal_expired {
-                self.signed_proposals.write().remove(&batch_author);
-            }
-            // If the round matches and the batch ID differs, then the validator is malicious.
-            else if signed_round == batch_header.round() && signed_batch_id != batch_header.batch_id() {
-                // Proceed to disconnect the validator.
-                self.gateway.disconnect(peer_ip);
-                bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
+            // If the round matches and the batch ID differs, then check if the proposal is expired.
+            if signed_round == batch_header.round() && signed_batch_id != batch_header.batch_id() {
+                // Check if the proposal has expired.
+                match is_proposal_expired(now(), timestamp) {
+                    // If the proposal has expired, then remove the cached signature.
+                    true => self.signed_proposals.write().remove(&batch_author),
+                    // If the proposal has not expired, then disconnect the validator.
+                    false => {
+                        self.gateway.disconnect(peer_ip);
+                        bail!("Proposed another batch for the same round ({signed_round}) prior to expiration");
+                    }
+                };
             }
             // If the round and batch ID matches, then skip signing the batch a second time.
             // Instead, rebroadcast the cached signature to the peer.
-            else if signed_round == batch_header.round() && signed_batch_id == batch_header.batch_id() {
+            if signed_round == batch_header.round() && signed_batch_id == batch_header.batch_id() {
                 let gateway = self.gateway.clone();
                 tokio::spawn(async move {
                     debug!("Resending a signature for a batch in round {batch_round} from '{peer_ip}'");
