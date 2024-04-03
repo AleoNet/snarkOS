@@ -576,43 +576,32 @@ impl<N: Network> Primary<N> {
                 bail!("Malicious peer - proposed a batch for a previous round ({})", batch_header.round());
             }
 
-            // If the signed round matches the peer's batch round then check the contents.
-            if signed_round == batch_header.round() {
-                // Determine if the proposal has expired.
-                let is_proposal_expired = now().saturating_sub(timestamp) >= PROPOSAL_EXPIRATION_IN_SECS;
-                match is_proposal_expired {
-                    // If the proposal has expired, then remove the cached signature.
-                    true => {
-                        self.signed_proposals.write().remove(&batch_author);
+            // Determine if the proposal has expired.
+            let is_proposal_expired = now().saturating_sub(timestamp) >= PROPOSAL_EXPIRATION_IN_SECS;
+            // If the round matches and the proposal has expired, then remove the cached signature.
+            if signed_round == batch_header.round() && is_proposal_expired {
+                self.signed_proposals.write().remove(&batch_author);
+            }
+            // If the round matches and the batch ID differs, then the validator is malicious.
+            else if signed_round == batch_header.round() && signed_batch_id != batch_header.batch_id() {
+                // Proceed to disconnect the validator.
+                self.gateway.disconnect(peer_ip);
+                bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
+            }
+            // If the round and batch ID matches, then skip signing the batch a second time.
+            // Instead, rebroadcast the cached signature to the peer.
+            else if signed_round == batch_header.round() && signed_batch_id == batch_header.batch_id() {
+                let gateway = self.gateway.clone();
+                tokio::spawn(async move {
+                    debug!("Resending a signature for a batch in round {batch_round} from '{peer_ip}'");
+                    let event = Event::BatchSignature(BatchSignature::new(batch_header.batch_id(), signature));
+                    // Resend the batch signature to the peer.
+                    if gateway.send(peer_ip, event).await.is_none() {
+                        warn!("Failed to resend a signature for a batch in round {batch_round} to '{peer_ip}'");
                     }
-                    // If the proposal has not expired, then check the batch id.
-                    false => match signed_batch_id == batch_header.batch_id() {
-                        // If the batch ID matches, then skip signing the batch a second time.
-                        // Instead, rebroadcast the cached signature to the peer.
-                        true => {
-                            let gateway = self.gateway.clone();
-                            tokio::spawn(async move {
-                                debug!("Resending a signature for a batch in round {batch_round} from '{peer_ip}'");
-                                let event =
-                                    Event::BatchSignature(BatchSignature::new(batch_header.batch_id(), signature));
-                                // Resend the batch signature to the peer.
-                                if gateway.send(peer_ip, event).await.is_none() {
-                                    warn!(
-                                        "Failed to resend a signature for a batch in round {batch_round} to '{peer_ip}'"
-                                    );
-                                }
-                            });
-                            // Return early.
-                            return Ok(());
-                        }
-                        // If the batch ID differs, then the validator is malicious.
-                        false => {
-                            // Proceed to disconnect the validator.
-                            self.gateway.disconnect(peer_ip);
-                            bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
-                        }
-                    },
-                }
+                });
+                // Return early.
+                return Ok(());
             }
         }
 
