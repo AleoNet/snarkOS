@@ -18,11 +18,11 @@ use clap::Parser;
 use std::process::exit;
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-use tikv_jemallocator::Jemalloc;
+use tcmalloc::TCMalloc;
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
+static GLOBAL: TCMalloc = TCMalloc;
 
 fn main() -> anyhow::Result<()> {
     // Parse the given arguments.
