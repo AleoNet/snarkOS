@@ -265,16 +265,17 @@ impl<N: Network> Consensus<N> {
             if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
                 // If the BFT is synced, then log the warning.
                 if self.bft.is_synced() {
-                    match self.ledger().latest_block_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
-                        true => warn!(
+                    // If error occurs in the first 10 blocks of the epoch, then log it as a trace, otherwise log it as a warning.
+                    match self.ledger().latest_block_height() % N::NUM_BLOCKS_PER_EPOCH <= 10 {
+                        true => trace!(
                             "Failed to add unconfirmed solution '{}' to the memory pool - {e}",
                             fmt_id(solution_id)
                         ),
-                        false => error!(
+                        false => warn!(
                             "Failed to add unconfirmed solution '{}' to the memory pool - {e}",
                             fmt_id(solution_id)
                         ),
-                    }
+                    };
                 }
             }
         }

@@ -240,6 +240,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
                 Ok(Err(_)) => {
                     trace!("Invalid solution '{}' for the proof target.", solution.id())
                 }
+                // If error occurs in the first 10 blocks of the epoch, then log it as a trace, otherwise log it as a warning.
                 Err(error) => match self.latest_block_header.read().as_ref().map(|header| header.height()) {
                     Some(height) if height % N::NUM_BLOCKS_PER_EPOCH > 10 => {
                         warn!("Failed to verify the solution - {error}")
