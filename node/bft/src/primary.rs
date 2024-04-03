@@ -1945,20 +1945,20 @@ mod tests {
 
         // Propose a batch again. This time, it should succeed.
         assert!(primary.propose_batch().await.is_ok());
-        let original_proposed_batch = primary.proposed_batch.read().clone().unwrap();
+        let original_proposed_batch_id = primary.proposed_batch.read().as_ref().unwrap().batch_id();
 
         // Try to propose the batch again. This time, it should return the same proposal.
         assert!(primary.propose_batch().await.is_ok());
-        let proposal = primary.proposed_batch.read().clone().unwrap();
-        assert_eq!(proposal, original_proposed_batch);
+        let proposal_batch_id = primary.proposed_batch.read().as_ref().unwrap().batch_id();
+        assert_eq!(proposal_batch_id, original_proposed_batch_id);
 
         // Sleep until the proposal is expired.
         tokio::time::sleep(Duration::from_secs(PROPOSAL_EXPIRATION_IN_SECS as u64)).await;
 
         // Try to propose a batch again. This time the proposal should be expired and a new proposal should be created.
         assert!(primary.propose_batch().await.is_ok());
-        let new_proposal = primary.proposed_batch.read().clone().unwrap();
-        assert_ne!(new_proposal, proposal);
+        let new_proposal_batch_id = primary.proposed_batch.read().as_ref().unwrap().batch_id();
+        assert_ne!(new_proposal_batch_id, original_proposed_batch_id);
     }
 
     #[tokio::test]
