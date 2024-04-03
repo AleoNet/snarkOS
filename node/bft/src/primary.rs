@@ -1936,6 +1936,9 @@ mod tests {
         assert!(primary.propose_batch().await.is_ok());
         assert!(primary.proposed_batch.read().is_none());
 
+        // Sleep for a while to ensure the primary is ready to propose the next round.
+        tokio::time::sleep(Duration::from_secs(MIN_BATCH_DELAY_IN_SECS)).await;
+
         // Generate a solution and a transaction.
         let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
@@ -2119,6 +2122,9 @@ mod tests {
         // Generate certificates.
         let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
 
+        // Sleep for a while to ensure the primary is ready to propose the next round.
+        tokio::time::sleep(Duration::from_secs(MIN_BATCH_DELAY_IN_SECS)).await;
+
         // Create a valid proposal with an author that isn't the primary.
         let peer_account = &accounts[1];
         let peer_address = peer_account.1.address();
@@ -2181,6 +2187,9 @@ mod tests {
 
         // Generate certificates.
         let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Sleep for a while to ensure the primary is ready to propose the next round.
+        tokio::time::sleep(Duration::from_secs(MIN_BATCH_DELAY_IN_SECS)).await;
 
         // Create a valid proposal with an author that isn't the primary.
         let peer_account = &accounts[1];
@@ -2332,6 +2341,9 @@ mod tests {
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
 
+        // Sleep for a while to ensure the primary is ready to process the proposal.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
         // Each committee member signs the batch.
         let signatures = peer_signatures_for_proposal(&primary, &accounts, &mut rng);
 
@@ -2370,6 +2382,9 @@ mod tests {
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
 
+        // Sleep for a while to ensure the primary is ready to process the proposal.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
         // Each committee member signs the batch.
         let signatures = peer_signatures_for_proposal(&primary, &accounts, &mut rng);
 
@@ -2404,6 +2419,9 @@ mod tests {
 
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
+
+        // Sleep for a while to ensure the primary is ready to process the proposal.
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         // Each committee member signs the batch.
         let signatures = peer_signatures_for_proposal(&primary, &accounts, &mut rng);
@@ -2441,6 +2459,9 @@ mod tests {
 
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
+
+        // Sleep for a while to ensure the primary is ready to process the proposal.
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         // Each committee member signs the batch.
         let signatures = peer_signatures_for_proposal(&primary, &accounts, &mut rng);
