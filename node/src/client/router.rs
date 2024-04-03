@@ -286,7 +286,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
                 }
                 // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
                 Err(error) => {
-                    if self.ledger.latest_height() % N::NUM_BLOCKS_PER_EPOCH <= 10 {
+                    if self.ledger.latest_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
                         warn!("Failed to verify the solution - {error}")
                     }
                 }

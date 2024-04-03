@@ -266,7 +266,7 @@ impl<N: Network> Consensus<N> {
                 // If the BFT is synced, then log the warning.
                 if self.bft.is_synced() {
                     // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
-                    if self.ledger().latest_block_height() % N::NUM_BLOCKS_PER_EPOCH <= 10 {
+                    if self.ledger().latest_block_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
                         warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id))
                     };
                 }
