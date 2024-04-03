@@ -202,11 +202,10 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 .latest_block_header
                 .read()
                 .as_ref()
-                .map(|header| (header.coinbase_target(), header.proof_target(), header.height()));
+                .map(|header| (header.coinbase_target(), header.proof_target()));
 
             // If the latest epoch hash and latest state exists, then proceed to generate a solution.
-            if let (Some(epoch_hash), Some((coinbase_target, proof_target, height))) = (latest_epoch_hash, latest_state)
-            {
+            if let (Some(epoch_hash), Some((coinbase_target, proof_target))) = (latest_epoch_hash, latest_state) {
                 // Execute the puzzle.
                 let prover = self.clone();
                 let result = tokio::task::spawn_blocking(move || {
@@ -216,10 +215,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
                 // If the prover found a solution, then broadcast it.
                 if let Ok(Some((solution_target, solution))) = result {
-                    info!(
-                        "Found solution '{}' (proof target {solution_target}, epoch hash '{epoch_hash}') at block height {height})",
-                        solution.id()
-                    );
+                    info!("Found a Solution '{}' (Proof Target {solution_target})", solution.id());
                     // Broadcast the solution.
                     self.broadcast_solution(solution);
                 }
