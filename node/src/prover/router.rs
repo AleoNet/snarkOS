@@ -240,7 +240,12 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
                 Ok(Err(_)) => {
                     trace!("Invalid solution '{}' for the proof target.", solution.id())
                 }
-                Err(error) => warn!("Failed to verify the solution - {error}"),
+                Err(error) => match self.latest_block_header.read().as_ref().map(|header| header.height()) {
+                    Some(height) if height % N::NUM_BLOCKS_PER_EPOCH > 10 => {
+                        warn!("Failed to verify the solution - {error}")
+                    }
+                    _ => trace!("Failed to verify the solution - {error}"),
+                },
             }
         }
         true

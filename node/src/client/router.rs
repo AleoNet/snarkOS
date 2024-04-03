@@ -284,7 +284,10 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
                 Ok(Err(_)) => {
                     trace!("Invalid solution '{}' for the proof target.", solution.id())
                 }
-                Err(error) => warn!("Failed to verify the solution: {error}"),
+                Err(error) => match self.ledger.latest_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
+                    true => warn!("Failed to verify the solution - {error}"),
+                    false => trace!("Failed to verify the solution - {error}"),
+                },
             }
         }
         true
