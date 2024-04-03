@@ -569,11 +569,9 @@ impl<N: Network> Primary<N> {
         // Retrieve the cached round and batch ID for this validator.
         let signed_proposal = self.signed_proposals.read().get(&batch_author).copied();
         if let Some((signed_round, timestamp, signed_batch_id, signature)) = signed_proposal {
-            // If the signed round is ahead of the peer's batch round, then the validator is malicious.
+            // If the signed round is ahead of the peer's batch round, then then ignore the proposal.
             if signed_round > batch_header.round() {
-                // Proceed to disconnect the validator.
-                self.gateway.disconnect(peer_ip);
-                bail!("Malicious peer - proposed a batch for a previous round ({})", batch_header.round());
+                bail!("Proposed a batch for a previous round ({})", batch_header.round());
             }
 
             // Determine if the proposal has expired.
@@ -1127,6 +1125,7 @@ impl<N: Network> Primary<N> {
             // Reset the proposed batch.
             let proposal = self.proposed_batch.write().take();
             if let Some(proposal) = proposal {
+                debug!("Cleared expired proposal for round {}", proposal.round());
                 self.reinsert_transmissions_into_workers(proposal)?;
             }
         }
