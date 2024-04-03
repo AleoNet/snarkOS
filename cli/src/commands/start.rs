@@ -55,7 +55,7 @@ const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
 /// A mapping of `staker_address` to `(validator_address, withdrawal_address, amount)`.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-struct BondedBalances(IndexMap<String, (String, String, u64)>);
+pub struct BondedBalances(IndexMap<String, (String, String, u64)>);
 
 impl FromStr for BondedBalances {
     type Err = serde_json::Error;
@@ -90,8 +90,8 @@ pub struct Start {
     pub private_key_file: Option<PathBuf>,
 
     /// Specify the IP address and port for the node server
-    #[clap(default_value = "0.0.0.0:4130", long = "node")]
-    pub node: SocketAddr,
+    #[clap(long = "node")]
+    pub node: Option<SocketAddr>,
     /// Specify the IP address and port for the BFT
     #[clap(long = "bft")]
     pub bft: Option<SocketAddr>,
@@ -101,6 +101,9 @@ pub struct Start {
     /// Specify the IP address and port of the validator(s) to connect to
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
+    /// If the flag is set, a node will allow untrusted peers to connect
+    #[clap(long = "allow-external-peers")]
+    pub allow_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3030", long = "rest")]
@@ -125,6 +128,9 @@ pub struct Start {
     #[clap(default_value = "false", long = "metrics")]
     pub metrics: bool,
 
+    /// Specify the path to a directory containing the storage database for the ledger
+    #[clap(long = "storage")]
+    pub storage: Option<PathBuf>,
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
@@ -141,17 +147,9 @@ pub struct Start {
     /// If developtment mode is enabled, specify whether node 0 should generate traffic to drive the network
     #[clap(default_value = "false", long = "no-dev-txs")]
     pub no_dev_txs: bool,
-    /// Specify the path to a directory containing the ledger
-    #[clap(long = "storage_path")]
-    pub storage_path: Option<PathBuf>,
-
-    /// If development mode is enabled, specify the custom bonded balances as a json object. (default: None)
+    /// If development mode is enabled, specify the custom bonded balances as a JSON object (default: None)
     #[clap(long)]
-    dev_bonded_balances: Option<BondedBalances>,
-
-    /// If the flag is set, the validator will allow untrusted peers to connect
-    #[clap(long = "allow-external-peers")]
-    allow_external_peers: bool,
+    pub dev_bonded_balances: Option<BondedBalances>,
 }
 
 impl Start {
@@ -308,11 +306,15 @@ impl Start {
                 }
             }
             // Set the node IP to `4130 + dev`.
-            self.node = SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?;
+            //
+            // Note: the `node` flag is an option to detect remote devnet testing.
+            if self.node.is_none() {
+                self.node = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?);
+            }
             // If the `norest` flag is not set, and the `bft` flag was not overridden,
             // then set the REST IP to `3030 + dev`.
             //
-            // Note: the reason the `bft` flag is an option is to detect for remote devnet testing.
+            // Note: the `bft` flag is an option to detect remote devnet testing.
             if !self.norest && self.bft.is_none() {
                 self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
             }
@@ -485,6 +487,16 @@ impl Start {
         // Parse the node type.
         let node_type = self.parse_node_type();
 
+        // Parse the node IP.
+        let node_ip = match self.node {
+            Some(node_ip) => node_ip,
+            None => SocketAddr::from_str("0.0.0.0:4130").unwrap(),
+        };
+        // Parse the BFT IP.
+        let bft_ip = match self.dev.is_some() {
+            true => self.bft,
+            false => None
+        };
         // Parse the REST IP.
         let rest_ip = match self.norest {
             true => None,
@@ -500,7 +512,7 @@ impl Start {
                 "🧭 Starting {} on {} at {}.\n",
                 node_type.description().bold(),
                 N::NAME.bold(),
-                self.node.to_string().bold()
+                node_ip.to_string().bold()
             );
 
             // If the node is running a REST server, print the REST IP and JWT.
@@ -529,7 +541,7 @@ impl Start {
         }
 
         // Initialize the storage mode.
-        let storage_mode = match &self.storage_path {
+        let storage_mode = match &self.storage {
             Some(path) => StorageMode::Custom(path.clone()),
             None => StorageMode::from(self.dev),
         };
@@ -547,11 +559,10 @@ impl Start {
         };
 
         // Initialize the node.
-        let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs).await,
-            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
-            NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
+            NodeType::Validator => Node::new_validator(node_ip, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs).await,
+            NodeType::Prover => Node::new_prover(node_ip, account, &trusted_peers, genesis, storage_mode).await,
+            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }
     }
 
@@ -834,7 +845,7 @@ mod tests {
         let mut config = Start::try_parse_from(["snarkos", "--dev", "0"].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let expected_genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
+        assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4130").unwrap()));
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
         assert_eq!(trusted_validators.len(), 1);
@@ -849,7 +860,7 @@ mod tests {
             Start::try_parse_from(["snarkos", "--dev", "1", "--validator", "--private-key", ""].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4131").unwrap());
+        assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4131").unwrap()));
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
         assert_eq!(trusted_peers.len(), 1);
         assert_eq!(trusted_validators.len(), 1);
@@ -864,7 +875,7 @@ mod tests {
             Start::try_parse_from(["snarkos", "--dev", "2", "--prover", "--private-key", ""].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4132").unwrap());
+        assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4132").unwrap()));
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
         assert_eq!(trusted_peers.len(), 2);
         assert_eq!(trusted_validators.len(), 2);
@@ -879,7 +890,7 @@ mod tests {
             Start::try_parse_from(["snarkos", "--dev", "3", "--client", "--private-key", ""].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4133").unwrap());
+        assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4133").unwrap()));
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
         assert_eq!(trusted_peers.len(), 3);
         assert_eq!(trusted_validators.len(), 2);
