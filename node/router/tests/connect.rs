@@ -22,7 +22,7 @@ use core::time::Duration;
 #[tokio::test]
 async fn test_connect_without_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 2).await;
+    let node0 = validator(0, 2, &[], true).await;
     let node1 = client(0, 2).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
@@ -78,7 +78,7 @@ async fn test_connect_without_handshake() {
 #[tokio::test]
 async fn test_connect_with_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 2).await;
+    let node0 = validator(0, 2, &[], true).await;
     let node1 = client(0, 2).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
@@ -150,11 +150,64 @@ async fn test_connect_with_handshake() {
     }
 }
 
+#[tokio::test]
+async fn test_validator_connection() {
+    // Create first router and start listening.
+    let node0 = validator(0, 2, &[], false).await;
+    assert_eq!(node0.number_of_connected_peers(), 0);
+    node0.enable_handshake().await;
+    node0.tcp().enable_listener().await.unwrap();
+
+    // Get the local IP address from the first router.
+    let addr0 = node0.local_ip();
+
+    // Create second router, trusting the first router, and start listening.
+    let node1 = validator(0, 2, &[addr0], false).await;
+    assert_eq!(node1.number_of_connected_peers(), 0);
+    node1.enable_handshake().await;
+    node1.tcp().enable_listener().await.unwrap();
+
+    {
+        // Connect node0 to node1.
+        node0.connect(node1.local_ip());
+        // Sleep briefly.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        print_tcp!(node0);
+        print_tcp!(node1);
+
+        // Check the TCP level - connection was accepted.
+        assert_eq!(node0.tcp().num_connected(), 1);
+        assert_eq!(node1.tcp().num_connected(), 1);
+
+        // Check the router level - connection was accepted.
+        assert_eq!(node0.number_of_connected_peers(), 1);
+        assert_eq!(node1.number_of_connected_peers(), 1);
+
+        // Disconnect the nodes.
+        node0.disconnect(node1.local_ip());
+        node1.disconnect(node0.local_ip());
+
+        // Connect node1 to node0.
+        node1.connect(node0.local_ip());
+        // Sleep briefly.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Check the TCP level - connection was not accepted.
+        assert_eq!(node0.tcp().num_connected(), 0);
+        assert_eq!(node1.tcp().num_connected(), 0);
+
+        // Check the router level - connection was not accepted.
+        assert_eq!(node0.number_of_connected_peers(), 0);
+        assert_eq!(node1.number_of_connected_peers(), 0);
+    }
+}
+
 #[ignore]
 #[tokio::test]
 async fn test_connect_simultaneously_with_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 2).await;
+    let node0 = validator(0, 2, &[], true).await;
     let node1 = client(0, 2).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
