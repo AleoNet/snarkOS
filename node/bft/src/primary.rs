@@ -20,6 +20,7 @@ use crate::{
         fmt_id,
         init_sync_channels,
         init_worker_channels,
+        is_proposal_expired,
         now,
         BFTSender,
         PrimaryReceiver,
@@ -36,7 +37,6 @@ use crate::{
     MAX_WORKERS,
     MIN_BATCH_DELAY_IN_SECS,
     PRIMARY_PING_IN_MS,
-    PROPOSAL_EXPIRATION_IN_SECS,
     WORKER_PING_IN_MS,
 };
 use snarkos_account::Account;
@@ -480,7 +480,7 @@ impl<N: Network> Primary<N> {
         // Determine the current timestamp.
         let current_timestamp = now();
         // Determine if the current proposal is expired.
-        let is_expired = current_timestamp.saturating_sub(lock_guard.1) >= PROPOSAL_EXPIRATION_IN_SECS;
+        let is_expired = is_proposal_expired(current_timestamp, lock_guard.1);
         if lock_guard.0 == round && !is_expired {
             warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
             return Ok(());
@@ -587,7 +587,7 @@ impl<N: Network> Primary<N> {
             }
 
             // Determine if the proposal has expired.
-            let is_proposal_expired = now().saturating_sub(timestamp) >= PROPOSAL_EXPIRATION_IN_SECS;
+            let is_proposal_expired = is_proposal_expired(now(), timestamp);
             // If the round matches and the proposal has expired, then remove the cached signature.
             if signed_round == batch_header.round() && is_proposal_expired {
                 self.signed_proposals.write().remove(&batch_author);
@@ -1135,7 +1135,7 @@ impl<N: Network> Primary<N> {
                 // Determine if the proposal is stale.
                 let is_stale = proposal.round() < self.current_round();
                 // Determine if the proposal is timed out.
-                let is_timed_out = now().saturating_sub(proposal.timestamp()) >= PROPOSAL_EXPIRATION_IN_SECS;
+                let is_timed_out = is_proposal_expired(now(), proposal.timestamp());
                 // Determine if the proposal is expired.
                 is_stale || is_timed_out
             }
@@ -1557,6 +1557,7 @@ impl<N: Network> Primary<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PROPOSAL_EXPIRATION_IN_SECS;
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
