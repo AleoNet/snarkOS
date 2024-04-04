@@ -636,7 +636,20 @@ impl<N: Network> BFT<N> {
                 // Initialize a callback sender and receiver.
                 let (callback_sender, callback_receiver) = oneshot::channel();
                 // Send the subdag and transmissions to consensus.
-                consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
+                // Clone `subdag` and `transmissions` before sending
+                consensus_sender.tx_consensus_subdag.send((subdag.clone(), transmissions.clone(), callback_sender)).await?;
+
+                // Log metadata
+                info!(
+                    "\n\nTriggering consensus for round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
+                );
+                // Log the subdag and the transmissions variables
+                info!(
+                    "kp-log-1 subdag: {:?}, transmissions: {:?}",
+                    subdag, transmissions
+                );                
+                
+
                 // Await the callback to continue.
                 match callback_receiver.await {
                     Ok(Ok(())) => (), // continue
