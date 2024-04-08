@@ -2476,4 +2476,79 @@ mod tests {
         // Check the round was incremented.
         assert_eq!(primary.current_round(), round);
     }
+
+    #[tokio::test]
+    async fn test_insert_certificate_with_aborted_transmissions() {
+        let round = 3;
+        let prev_round = round - 1;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+        let peer_account = &accounts[1];
+        let peer_ip = peer_account.0;
+
+        // Fill primary storage.
+        store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Get transmissions from previous certificates.
+        let previous_certificate_ids: IndexSet<_> =
+            primary.storage.get_certificates_for_round(prev_round).iter().map(|cert| cert.id()).collect();
+
+        // Generate a solution and a transaction.
+        let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Check that the worker has 2 transmissions.
+        assert_eq!(primary.workers[0].num_transmissions(), 2);
+
+        // Create certificates for the current round.
+        let account = accounts[0].1.clone();
+        let (certificate, transmissions) =
+            create_batch_certificate(account.address(), &accounts, round, previous_certificate_ids.clone(), &mut rng);
+        let certificate_id = certificate.id();
+
+        // Randomly abort some of the transmissions.
+        let mut aborted_transmissions = HashSet::new();
+        let mut transmissions_without_aborted = HashMap::new();
+        for (transmission_id, transmission) in transmissions.clone() {
+            match rng.gen::<bool>() {
+                true => {
+                    // Insert the aborted transmission.
+                    aborted_transmissions.insert(transmission_id);
+                }
+                false => {
+                    // Insert the transmission without the aborted transmission.
+                    transmissions_without_aborted.insert(transmission_id, transmission);
+                }
+            };
+        }
+
+        // Add the non-aborted transmissions to the worker.
+        for (transmission_id, transmission) in transmissions_without_aborted.iter() {
+            primary.workers[0].process_transmission_from_peer(peer_ip, *transmission_id, transmission.clone());
+        }
+
+        // Check that inserting the transmission with missing transmissions fails.
+        assert!(
+            primary
+                .storage
+                .check_certificate(&certificate, transmissions_without_aborted.clone(), Default::default())
+                .is_err()
+        );
+        assert!(
+            primary
+                .storage
+                .insert_certificate(certificate.clone(), transmissions_without_aborted.clone(), Default::default())
+                .is_err()
+        );
+
+        // Insert the certificate to storage.
+        primary.storage.insert_certificate(certificate, transmissions_without_aborted, aborted_transmissions).unwrap();
+
+        // Ensure the certificate exists in storage.
+        assert!(primary.storage.contains_certificate(certificate_id));
+    }
 }
