@@ -48,13 +48,14 @@ use colored::Colorize;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::Mutex;
-#[cfg(feature = "metrics")]
-use std::collections::HashMap;
 use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
 };
+
+#[cfg(feature = "metrics")]
+use std::collections::HashMap;
 
 /// The capacity of the queue reserved for deployments.
 /// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
@@ -100,10 +101,10 @@ pub struct Consensus<N: Network> {
     seen_solutions: Arc<Mutex<LruCache<SolutionID<N>, ()>>>,
     /// The recently-seen unconfirmed transactions.
     seen_transactions: Arc<Mutex<LruCache<N::TransactionID, ()>>>,
-    /// The spawned handles.
-    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     #[cfg(feature = "metrics")]
     transmissions_queue_timestamps: Arc<Mutex<HashMap<TransmissionID<N>, i64>>>,
+    /// The spawned handles.
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl<N: Network> Consensus<N> {
@@ -135,9 +136,9 @@ impl<N: Network> Consensus<N> {
             transactions_queue: Default::default(),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
-            handles: Default::default(),
             #[cfg(feature = "metrics")]
             transmissions_queue_timestamps: Default::default(),
+            handles: Default::default(),
         })
     }
 
@@ -456,6 +457,42 @@ impl<N: Network> Consensus<N> {
         Ok(())
     }
 
+    /// Reinserts the given transmissions into the memory pool.
+    async fn reinsert_transmissions(&self, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
+        // Iterate over the transmissions.
+        for (transmission_id, transmission) in transmissions.into_iter() {
+            // Reinsert the transmission into the memory pool.
+            if let Err(e) = self.reinsert_transmission(transmission_id, transmission).await {
+                warn!("Unable to reinsert transmission {} into the memory pool - {e}", fmt_id(transmission_id));
+            }
+        }
+    }
+
+    /// Reinserts the given transmission into the memory pool.
+    async fn reinsert_transmission(
+        &self,
+        transmission_id: TransmissionID<N>,
+        transmission: Transmission<N>,
+    ) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback, callback_receiver) = oneshot::channel();
+        // Send the transmission to the primary.
+        match (transmission_id, transmission) {
+            (TransmissionID::Ratification, Transmission::Ratification) => return Ok(()),
+            (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
+                // Send the solution to the primary.
+                self.primary_sender().tx_unconfirmed_solution.send((solution_id, solution, callback)).await?;
+            }
+            (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+                // Send the transaction to the primary.
+                self.primary_sender().tx_unconfirmed_transaction.send((transaction_id, transaction, callback)).await?;
+            }
+            _ => bail!("Mismatching `(transmission_id, transmission)` pair in consensus"),
+        }
+        // Await the callback.
+        callback_receiver.await?
+    }
+
     #[cfg(feature = "metrics")]
     fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
         const AGE_THRESHOLD_SECONDS: i32 = 30 * 60; // 30 minutes set as stale transmission threshold
@@ -499,42 +536,6 @@ impl<N: Network> Consensus<N> {
         for key in keys_to_remove {
             transmission_queue_timestamps.remove(&key);
         }
-    }
-
-    /// Reinserts the given transmissions into the memory pool.
-    async fn reinsert_transmissions(&self, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
-        // Iterate over the transmissions.
-        for (transmission_id, transmission) in transmissions.into_iter() {
-            // Reinsert the transmission into the memory pool.
-            if let Err(e) = self.reinsert_transmission(transmission_id, transmission).await {
-                warn!("Unable to reinsert transmission {} into the memory pool - {e}", fmt_id(transmission_id));
-            }
-        }
-    }
-
-    /// Reinserts the given transmission into the memory pool.
-    async fn reinsert_transmission(
-        &self,
-        transmission_id: TransmissionID<N>,
-        transmission: Transmission<N>,
-    ) -> Result<()> {
-        // Initialize a callback sender and receiver.
-        let (callback, callback_receiver) = oneshot::channel();
-        // Send the transmission to the primary.
-        match (transmission_id, transmission) {
-            (TransmissionID::Ratification, Transmission::Ratification) => return Ok(()),
-            (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
-                // Send the solution to the primary.
-                self.primary_sender().tx_unconfirmed_solution.send((solution_id, solution, callback)).await?;
-            }
-            (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
-                // Send the transaction to the primary.
-                self.primary_sender().tx_unconfirmed_transaction.send((transaction_id, transaction, callback)).await?;
-            }
-            _ => bail!("Mismatching `(transmission_id, transmission)` pair in consensus"),
-        }
-        // Await the callback.
-        callback_receiver.await?
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
