@@ -38,11 +38,10 @@ pub(super) const GAUGE_NAMES: [&str; 21] = [
     tcp::TCP_TASKS,
 ];
 
-pub(super) const HISTOGRAM_NAMES: [&str; 8] = [
+pub(super) const HISTOGRAM_NAMES: [&str; 7] = [
     bft::COMMIT_ROUNDS_LATENCY,
     consensus::CERTIFICATE_COMMIT_LATENCY,
     consensus::BLOCK_LATENCY,
-    consensus::TRANSMISSION_LATENCY,
     tcp::NOISE_CODEC_ENCRYPTION_TIME,
     tcp::NOISE_CODEC_DECRYPTION_TIME,
     tcp::NOISE_CODEC_ENCRYPTION_SIZE,
