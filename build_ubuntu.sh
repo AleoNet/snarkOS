@@ -18,8 +18,8 @@ sudo apt-get install -y \
 	pkg-config \
 	tmux \
 	xz-utils \
-	ufw
-
+	ufw \
+	libgoogle-perftools-dev
 
 # Install Rust
 
