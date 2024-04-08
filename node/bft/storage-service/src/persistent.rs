@@ -33,7 +33,10 @@ use snarkvm::{
 
 use aleo_std::StorageMode;
 use indexmap::{indexset, IndexSet};
-use std::{borrow::Cow, collections::HashMap};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 use tracing::error;
 
 /// A BFT persistent storage service.
@@ -91,19 +94,27 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
         &self,
         batch_header: &BatchHeader<N>,
         mut transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+        aborted_transmissions: HashSet<TransmissionID<N>>,
     ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>> {
         // Initialize a list for the missing transmissions from storage.
         let mut missing_transmissions = HashMap::new();
         // Ensure the declared transmission IDs are all present in storage or the given transmissions map.
         for transmission_id in batch_header.transmission_ids() {
-            // If the transmission ID does not exist, ensure it was provided by the caller.
+            // If the transmission ID does not exist, ensure it was provided by the caller or aborted.
             if !self.contains_transmission(*transmission_id) {
                 // Retrieve the transmission.
-                let Some(transmission) = transmissions.remove(transmission_id) else {
-                    bail!("Failed to provide a transmission");
-                };
-                // Append the transmission.
-                missing_transmissions.insert(*transmission_id, transmission);
+                match transmissions.remove(transmission_id) {
+                    // Append the transmission if it exists.
+                    Some(transmission) => {
+                        missing_transmissions.insert(*transmission_id, transmission);
+                    }
+                    // If the transmission does not exist, check if it was aborted.
+                    None => {
+                        if !aborted_transmissions.contains(transmission_id) {
+                            bail!("Failed to provide a transmission");
+                        }
+                    }
+                }
             }
         }
         Ok(missing_transmissions)
