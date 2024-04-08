@@ -497,10 +497,16 @@ impl<N: Network> Consensus<N> {
     fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
         const AGE_THRESHOLD_SECONDS: i32 = 30 * 60; // 30 minutes set as stale transmission threshold
 
-        let mut keys_to_remove = Vec::new();
+        // Retrieve the solution IDs.
+        let solution_ids: std::collections::HashSet<_> =
+            next_block.solutions().solution_ids().chain(next_block.aborted_solution_ids()).collect();
 
-        let solution_ids: std::collections::HashSet<_> = next_block.solutions().solution_ids().collect();
-        let transaction_ids: std::collections::HashSet<_> = next_block.transaction_ids().collect();
+        // Retrieve the transaction IDs.
+        let transaction_ids: std::collections::HashSet<_> =
+            next_block.transaction_ids().chain(next_block.aborted_transaction_ids()).collect();
+
+        // Initialize a list of keys to remove.
+        let mut keys_to_remove = Vec::new();
 
         let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
         let ts_now = snarkos_node_bft::helpers::now();
