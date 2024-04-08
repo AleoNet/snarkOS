@@ -339,6 +339,7 @@ impl<N: Network> Storage<N> {
         &self,
         batch_header: &BatchHeader<N>,
         transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+        aborted_transmissions: HashSet<TransmissionID<N>>,
     ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>> {
         // Retrieve the round.
         let round = batch_header.round();
@@ -367,7 +368,7 @@ impl<N: Network> Storage<N> {
         // Retrieve the missing transmissions in storage from the given transmissions.
         let missing_transmissions = self
             .transmissions
-            .find_missing_transmissions(batch_header, transmissions)
+            .find_missing_transmissions(batch_header, transmissions, aborted_transmissions)
             .map_err(|e| anyhow!("{e} for round {round} {gc_log}"))?;
 
         // Compute the previous round.
@@ -435,6 +436,7 @@ impl<N: Network> Storage<N> {
         &self,
         certificate: &BatchCertificate<N>,
         transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+        aborted_transmissions: HashSet<TransmissionID<N>>,
     ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>> {
         // Retrieve the round.
         let round = certificate.round();
@@ -454,7 +456,8 @@ impl<N: Network> Storage<N> {
         }
 
         // Ensure the batch header is well-formed.
-        let missing_transmissions = self.check_batch_header(certificate.batch_header(), transmissions)?;
+        let missing_transmissions =
+            self.check_batch_header(certificate.batch_header(), transmissions, aborted_transmissions)?;
 
         // Check the timestamp for liveness.
         check_timestamp_for_liveness(certificate.timestamp())?;
@@ -503,11 +506,12 @@ impl<N: Network> Storage<N> {
         &self,
         certificate: BatchCertificate<N>,
         transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+        aborted_transmissions: HashSet<TransmissionID<N>>,
     ) -> Result<()> {
         // Ensure the certificate round is above the GC round.
         ensure!(certificate.round() > self.gc_round(), "Certificate round is at or below the GC round");
         // Ensure the certificate and its transmissions are valid.
-        let missing_transmissions = self.check_certificate(&certificate, transmissions)?;
+        let missing_transmissions = self.check_certificate(&certificate, transmissions, aborted_transmissions)?;
         // Insert the certificate into storage.
         self.insert_certificate_atomic(certificate, missing_transmissions);
         Ok(())
@@ -631,6 +635,9 @@ impl<N: Network> Storage<N> {
         // Retrieve the transmissions for the certificate.
         let mut missing_transmissions = HashMap::new();
 
+        // Retrieve the aborted transmissions for the certificate.
+        let mut aborted_transmissions = HashSet::new();
+
         // Iterate over the transmission IDs.
         for transmission_id in certificate.transmission_ids() {
             // If the transmission ID already exists in the map, skip it.
@@ -653,8 +660,15 @@ impl<N: Network> Storage<N> {
                         None => match self.ledger.get_solution(solution_id) {
                             // Insert the solution.
                             Ok(solution) => missing_transmissions.insert(*transmission_id, solution.into()),
+                            // Check if the solution is in the aborted solutions.
                             Err(_) => {
-                                error!("Missing solution {solution_id} in block {}", block.height());
+                                // Insert the aborted solution if it exists in the block.
+                                match block.aborted_solution_ids().contains(solution_id) {
+                                    true => {
+                                        aborted_transmissions.insert(*transmission_id);
+                                    }
+                                    false => error!("Missing solution {solution_id} in block {}", block.height()),
+                                }
                                 continue;
                             }
                         },
@@ -669,8 +683,15 @@ impl<N: Network> Storage<N> {
                         None => match self.ledger.get_unconfirmed_transaction(*transaction_id) {
                             // Insert the transaction.
                             Ok(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
+                            // Check if the transaction is in the aborted transactions.
                             Err(_) => {
-                                warn!("Missing transaction {transaction_id} in block {}", block.height());
+                                // Insert the aborted transaction if it exists in the block.
+                                match block.aborted_transaction_ids().contains(transaction_id) {
+                                    true => {
+                                        aborted_transmissions.insert(*transmission_id);
+                                    }
+                                    false => warn!("Missing transaction {transaction_id} in block {}", block.height()),
+                                }
                                 continue;
                             }
                         },
@@ -685,7 +706,7 @@ impl<N: Network> Storage<N> {
             certificate.round(),
             certificate.transmission_ids().len()
         );
-        if let Err(error) = self.insert_certificate(certificate, missing_transmissions) {
+        if let Err(error) = self.insert_certificate(certificate, missing_transmissions, aborted_transmissions) {
             error!("Failed to insert certificate '{certificate_id}' from block {} - {error}", block.height());
         }
     }

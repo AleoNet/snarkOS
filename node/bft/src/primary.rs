@@ -647,7 +647,8 @@ impl<N: Network> Primary<N> {
 
         // Ensure the batch header from the peer is valid.
         let (storage, header) = (self.storage.clone(), batch_header.clone());
-        let missing_transmissions = spawn_blocking!(storage.check_batch_header(&header, transmissions))?;
+        let missing_transmissions =
+            spawn_blocking!(storage.check_batch_header(&header, transmissions, Default::default()))?;
         // Inserts the missing transmissions into the workers.
         self.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
 
@@ -1263,7 +1264,7 @@ impl<N: Network> Primary<N> {
         let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
         // Store the certified batch.
         let (storage, certificate_) = (self.storage.clone(), certificate.clone());
-        spawn_blocking!(storage.insert_certificate(certificate_, transmissions))?;
+        spawn_blocking!(storage.insert_certificate(certificate_, transmissions, Default::default()))?;
         debug!("Stored a batch certificate for round {}", certificate.round());
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
@@ -1343,7 +1344,7 @@ impl<N: Network> Primary<N> {
         if !self.storage.contains_certificate(certificate.id()) {
             // Store the batch certificate.
             let (storage, certificate_) = (self.storage.clone(), certificate.clone());
-            spawn_blocking!(storage.insert_certificate(certificate_, missing_transmissions))?;
+            spawn_blocking!(storage.insert_certificate(certificate_, missing_transmissions, Default::default()))?;
             debug!("Stored a batch certificate for round {batch_round} from '{peer_ip}'");
             // If a BFT sender was provided, send the round and certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
@@ -1777,7 +1778,7 @@ mod tests {
                     rng,
                 );
                 next_certificates.insert(certificate.id());
-                assert!(primary.storage.insert_certificate(certificate, transmissions).is_ok());
+                assert!(primary.storage.insert_certificate(certificate, transmissions, Default::default()).is_ok());
             }
 
             assert!(primary.storage.increment_to_next_round(cur_round).is_ok());
@@ -1900,7 +1901,7 @@ mod tests {
 
             // Insert the certificate to storage.
             num_transmissions_in_previous_round += transmissions.len();
-            primary.storage.insert_certificate(certificate, transmissions).unwrap();
+            primary.storage.insert_certificate(certificate, transmissions, Default::default()).unwrap();
         }
 
         // Sleep for a while to ensure the primary is ready to propose the next round.
