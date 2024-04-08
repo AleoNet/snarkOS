@@ -55,6 +55,8 @@ use tokio::{
 };
 
 #[cfg(feature = "metrics")]
+use rayon::prelude::*;
+#[cfg(feature = "metrics")]
 use std::collections::HashMap;
 
 /// The capacity of the queue reserved for deployments.
@@ -505,40 +507,43 @@ impl<N: Network> Consensus<N> {
         let transaction_ids: std::collections::HashSet<_> =
             next_block.transaction_ids().chain(next_block.aborted_transaction_ids()).collect();
 
-        // Initialize a list of keys to remove.
-        let mut keys_to_remove = Vec::new();
-
         let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
         let ts_now = snarkos_node_bft::helpers::now();
-        for (key, timestamp) in transmission_queue_timestamps.iter() {
-            let elapsed_time = std::time::Duration::from_secs((ts_now - *timestamp) as u64);
 
-            if elapsed_time.as_secs() > AGE_THRESHOLD_SECONDS as u64 {
-                // This entry is stale-- remove it from transmission queue and record it as a stale transmission.
-                metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
-                keys_to_remove.push(*key);
-            } else {
-                let transmission_type = match key {
-                    TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
-                    TransmissionID::Transaction(transaction_id) if transaction_ids.contains(transaction_id) => {
-                        Some("transaction")
+        // Determine which keys to remove.
+        let keys_to_remove = cfg_iter!(transmission_queue_timestamps)
+            .flat_map(|(key, timestamp)| {
+                let elapsed_time = std::time::Duration::from_secs((ts_now - *timestamp) as u64);
+
+                if elapsed_time.as_secs() > AGE_THRESHOLD_SECONDS as u64 {
+                    // This entry is stale-- remove it from transmission queue and record it as a stale transmission.
+                    metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
+                    Some(*key)
+                } else {
+                    let transmission_type = match key {
+                        TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
+                        TransmissionID::Transaction(transaction_id) if transaction_ids.contains(transaction_id) => {
+                            Some("transaction")
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(transmission_type_string) = transmission_type {
+                        metrics::histogram_label(
+                            metrics::consensus::TRANSMISSION_LATENCY,
+                            "transmission_type",
+                            transmission_type_string.to_owned(),
+                            elapsed_time.as_secs_f64(),
+                        );
+                        Some(*key)
+                    } else {
+                        None
                     }
-                    _ => None,
-                };
-
-                if let Some(transmission_type_string) = transmission_type {
-                    metrics::histogram_label(
-                        metrics::consensus::TRANSMISSION_LATENCY,
-                        "transmission_type",
-                        transmission_type_string.to_owned(),
-                        elapsed_time.as_secs_f64(),
-                    );
-                    keys_to_remove.push(*key);
                 }
-            }
-        }
+            })
+            .collect::<Vec<_>>();
 
-        // Remove keys of stale or seen transmissions
+        // Remove keys of stale or seen transmissions.
         for key in keys_to_remove {
             transmission_queue_timestamps.remove(&key);
         }
