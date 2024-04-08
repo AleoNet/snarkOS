@@ -16,7 +16,6 @@ use super::*;
 
 use snarkvm::prelude::{FromBytes, ToBytes};
 
-use indexmap::IndexMap;
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,18 +39,7 @@ impl<N: Network> ToBytes for Ping<N> {
         self.node_type.write_le(&mut writer)?;
         if let Some(locators) = &self.block_locators {
             1u8.write_le(&mut writer)?;
-
-            (locators.recents.len().min(u32::MAX as usize) as u32).write_le(&mut writer)?;
-            for (height, hash) in locators.recents.iter() {
-                height.write_le(&mut writer)?;
-                hash.write_le(&mut writer)?;
-            }
-
-            (locators.checkpoints.len().min(u32::MAX as usize) as u32).write_le(&mut writer)?;
-            for (height, hash) in locators.checkpoints.iter() {
-                height.write_le(&mut writer)?;
-                hash.write_le(&mut writer)?;
-            }
+            locators.write_le(&mut writer)?;
         } else {
             0u8.write_le(&mut writer)?;
         }
@@ -66,32 +54,13 @@ impl<N: Network> FromBytes for Ping<N> {
         let node_type = NodeType::read_le(&mut reader)?;
 
         let selector = u8::read_le(&mut reader)?;
+        let block_locators = match selector {
+            0 => None,
+            1 => Some(BlockLocators::read_le(&mut reader)?),
+            _ => return Err(error("Invalid block locators marker")),
+        };
 
-        if selector == 0 {
-            Ok(Self { version, node_type, block_locators: None })
-        } else if selector == 1 {
-            let mut recents = IndexMap::new();
-            let num_recents = u32::read_le(&mut reader)?;
-            for _ in 0..num_recents {
-                let height = u32::read_le(&mut reader)?;
-                let hash = N::BlockHash::read_le(&mut reader)?;
-                recents.insert(height, hash);
-            }
-
-            let mut checkpoints = IndexMap::new();
-            let num_checkpoints = u32::read_le(&mut reader)?;
-            for _ in 0..num_checkpoints {
-                let height = u32::read_le(&mut reader)?;
-                let hash = N::BlockHash::read_le(&mut reader)?;
-                checkpoints.insert(height, hash);
-            }
-
-            let block_locators = Some(BlockLocators { recents, checkpoints });
-
-            Ok(Self { version, node_type, block_locators })
-        } else {
-            Err(error("Invalid selector of optional block locators in ping message"))
-        }
+        Ok(Self { version, node_type, block_locators })
     }
 }
 

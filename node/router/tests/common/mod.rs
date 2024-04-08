@@ -104,14 +104,19 @@ pub async fn prover(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
 
 /// Initializes a validator router. Setting the `listening_port = 0` will result in a random port being assigned.
 #[allow(dead_code)]
-pub async fn validator(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNetwork> {
+pub async fn validator(
+    listening_port: u16,
+    max_peers: u16,
+    trusted_peers: &[SocketAddr],
+    allow_external_peers: bool,
+) -> TestRouter<CurrentNetwork> {
     Router::new(
         SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), listening_port),
         NodeType::Validator,
         sample_account(),
-        &[],
+        trusted_peers,
         max_peers,
-        false,
+        allow_external_peers,
         true,
     )
     .await

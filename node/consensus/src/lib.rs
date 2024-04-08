@@ -273,7 +273,10 @@ impl<N: Network> Consensus<N> {
             if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
                 // If the BFT is synced, then log the warning.
                 if self.bft.is_synced() {
-                    warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+                    // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
+                    if self.ledger().latest_block_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
+                        warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id))
+                    };
                 }
             }
         }
@@ -432,6 +435,9 @@ impl<N: Network> Consensus<N> {
             let num_sol = next_block.solutions().len();
             let num_tx = next_block.transactions().len();
             let num_transmissions = num_tx + num_sol;
+            let proof_target = next_block.header().proof_target();
+            let coinbase_target = next_block.header().coinbase_target();
+            let cumulative_proof_target = next_block.header().cumulative_proof_target();
 
             self.add_transmission_latency_metric(&next_block);
 
@@ -443,6 +449,9 @@ impl<N: Network> Consensus<N> {
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
             metrics::histogram(metrics::consensus::BLOCK_LATENCY, block_latency as f64);
+            metrics::gauge(metrics::blocks::PROOF_TARGET, proof_target as f64);
+            metrics::gauge(metrics::blocks::COINBASE_TARGET, coinbase_target as f64);
+            metrics::gauge(metrics::blocks::CUMULATIVE_PROOF_TARGET, cumulative_proof_target as f64);
         }
         Ok(())
     }
