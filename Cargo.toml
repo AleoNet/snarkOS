@@ -120,7 +120,7 @@ path = "./node/tcp"
 version = "=2.2.7"
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
-tcmalloc = { git = "https://github.com/bhansconnect/tcmalloc-rs", branch = "master" }
+tcmalloc = { git = "https://github.com/joske/tcmalloc-rs", tag = "v2.9.1" }
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"

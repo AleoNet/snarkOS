@@ -4345,7 +4345,7 @@ dependencies = [
 [[package]]
 name = "tcmalloc"
 version = "0.3.0"
-source = "git+https://github.com/bhansconnect/tcmalloc-rs?branch=master#b3c33ac6d2a760e05fc3c263d172f3910e6a80ed"
+source = "git+https://github.com/joske/tcmalloc-rs?tag=v2.9.1#bec41cb0f246001c444c13792bc279c818e302e4"
 
 [[package]]
 name = "tempfile"
