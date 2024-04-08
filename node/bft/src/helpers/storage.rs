@@ -662,8 +662,10 @@ impl<N: Network> Storage<N> {
                             Ok(solution) => missing_transmissions.insert(*transmission_id, solution.into()),
                             // Check if the solution is in the aborted solutions.
                             Err(_) => {
-                                // Insert the aborted solution if it exists in the block.
-                                match block.aborted_solution_ids().contains(solution_id) {
+                                // Insert the aborted solution if it exists in the block or ledger.
+                                match block.aborted_solution_ids().contains(solution_id)
+                                    || self.ledger.contains_transmission(transmission_id).unwrap_or(false)
+                                {
                                     true => {
                                         aborted_transmissions.insert(*transmission_id);
                                     }
@@ -685,8 +687,10 @@ impl<N: Network> Storage<N> {
                             Ok(transaction) => missing_transmissions.insert(*transmission_id, transaction.into()),
                             // Check if the transaction is in the aborted transactions.
                             Err(_) => {
-                                // Insert the aborted transaction if it exists in the block.
-                                match block.aborted_transaction_ids().contains(transaction_id) {
+                                // Insert the aborted transaction if it exists in the block or ledger.
+                                match block.aborted_transaction_ids().contains(transaction_id)
+                                    || self.ledger.contains_transmission(transmission_id).unwrap_or(false)
+                                {
                                     true => {
                                         aborted_transmissions.insert(*transmission_id);
                                     }
