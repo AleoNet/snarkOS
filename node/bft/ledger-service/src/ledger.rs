@@ -336,4 +336,15 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         tracing::info!("\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());
         Ok(())
     }
+
+    #[cfg(feature = "metrics")]
+    fn update_bft_metrics(&self, block: &Block<N>) {
+        let num_sol = next_block.solutions().len();
+        let num_tx = next_block.transactions().len();
+
+        metrics::gauge(metrics::bft::HEIGHT, block.height() as f64);
+        metrics::gauge(metrics::bft::LAST_COMMITTED_ROUND, block.round() as f64);
+        metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
+        metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
+    }
 }

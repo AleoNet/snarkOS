@@ -435,20 +435,12 @@ impl<N: Network> Consensus<N> {
             let elapsed = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - start) as u64);
             let next_block_timestamp = next_block.header().metadata().timestamp();
             let block_latency = next_block_timestamp - current_block_timestamp;
-            let num_sol = next_block.solutions().len();
-            let num_tx = next_block.transactions().len();
-            let num_transmissions = num_tx + num_sol;
             let proof_target = next_block.header().proof_target();
             let coinbase_target = next_block.header().coinbase_target();
             let cumulative_proof_target = next_block.header().cumulative_proof_target();
 
             self.add_transmission_latency_metric(&next_block);
 
-            metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
-            metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
-            metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
-            metrics::increment_gauge(metrics::blocks::TRANSMISSIONS, num_transmissions as f64);
-            metrics::gauge(metrics::consensus::LAST_COMMITTED_ROUND, next_block.round() as f64);
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
             metrics::histogram(metrics::consensus::BLOCK_LATENCY, block_latency as f64);
