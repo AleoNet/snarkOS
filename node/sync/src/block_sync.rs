@@ -251,9 +251,8 @@ impl<N: Network> BlockSync<N> {
             // Calculate the end height.
             let end_height = start_height.saturating_add(requests.len() as u32);
 
-            for (height, (hash, previous_hash, sync_ips)) in requests.iter() {
+            for (height, (hash, previous_hash, _)) in requests.iter() {
                 // Insert the block request into the sync pool.
-                // Note that `prepare_block_requests` ensures that the sync IPs are equivalent for each chunk of requests.
                 // TODO (raychu86): Unify the sync_ip selection in `prepare_block_requests` and `insert_block_request`.
                 if let Err(error) = self.insert_block_request(*height, (*hash, *previous_hash, sync_ips.clone())) {
                     warn!("Block sync failed - {error}");
