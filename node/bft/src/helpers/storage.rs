@@ -638,6 +638,10 @@ impl<N: Network> Storage<N> {
         // Retrieve the aborted transmissions for the certificate.
         let mut aborted_transmissions = HashSet::new();
 
+        // Track the block's aborted solutions and transactions.
+        let aborted_solutions: IndexSet<_> = block.aborted_solution_ids().iter().collect();
+        let aborted_transactions: IndexSet<_> = block.aborted_transaction_ids().iter().collect();
+
         // Iterate over the transmission IDs.
         for transmission_id in certificate.transmission_ids() {
             // If the transmission ID already exists in the map, skip it.
@@ -663,7 +667,7 @@ impl<N: Network> Storage<N> {
                             // Check if the solution is in the aborted solutions.
                             Err(_) => {
                                 // Insert the aborted solution if it exists in the block or ledger.
-                                match block.aborted_solution_ids().contains(solution_id)
+                                match aborted_solutions.contains(solution_id)
                                     || self.ledger.contains_transmission(transmission_id).unwrap_or(false)
                                 {
                                     true => {
@@ -688,7 +692,7 @@ impl<N: Network> Storage<N> {
                             // Check if the transaction is in the aborted transactions.
                             Err(_) => {
                                 // Insert the aborted transaction if it exists in the block or ledger.
-                                match block.aborted_transaction_ids().contains(transaction_id)
+                                match aborted_transactions.contains(transaction_id)
                                     || self.ledger.contains_transmission(transmission_id).unwrap_or(false)
                                 {
                                     true => {
