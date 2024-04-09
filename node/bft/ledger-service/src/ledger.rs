@@ -333,6 +333,10 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
         // Advance to the next block.
         self.ledger.advance_to_next_block(block)?;
+        // Update BFT metrics.
+        #[cfg(feature = "metrics")]
+        self.update_bft_metrics(block);
+
         tracing::info!("\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());
         Ok(())
     }
