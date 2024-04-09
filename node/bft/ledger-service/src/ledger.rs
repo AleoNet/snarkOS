@@ -343,8 +343,8 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
 
     #[cfg(feature = "metrics")]
     fn update_bft_metrics(&self, block: &Block<N>) {
-        let num_sol = next_block.solutions().len();
-        let num_tx = next_block.transactions().len();
+        let num_sol = block.solutions().len();
+        let num_tx = block.transactions().len();
 
         metrics::gauge(metrics::bft::HEIGHT, block.height() as f64);
         metrics::gauge(metrics::bft::LAST_COMMITTED_ROUND, block.round() as f64);

@@ -14,7 +14,7 @@
 
 pub(super) const COUNTER_NAMES: [&str; 2] = [bft::LEADERS_ELECTED, consensus::STALE_UNCONFIRMED_TRANSMISSIONS];
 
-pub(super) const GAUGE_NAMES: [&str; 20] = [
+pub(super) const GAUGE_NAMES: [&str; 19] = [
     bft::CONNECTED,
     bft::CONNECTING,
     bft::LAST_STORED_ROUND,
@@ -30,7 +30,6 @@ pub(super) const GAUGE_NAMES: [&str; 20] = [
     consensus::COMMITTED_CERTIFICATES,
     consensus::UNCONFIRMED_SOLUTIONS,
     consensus::UNCONFIRMED_TRANSACTIONS,
-    consensus::UNCONFIRMED_TRANSMISSIONS,
     router::CONNECTED,
     router::CANDIDATE,
     router::RESTRICTED,
@@ -72,7 +71,6 @@ pub mod consensus {
     pub const COMMITTED_CERTIFICATES: &str = "snarkos_consensus_committed_certificates_total";
     pub const BLOCK_LATENCY: &str = "snarkos_consensus_block_latency_secs";
     pub const UNCONFIRMED_TRANSACTIONS: &str = "snarkos_consensus_unconfirmed_transactions_total";
-    pub const UNCONFIRMED_TRANSMISSIONS: &str = "snarkos_consensus_unconfirmed_transmissions_total";
     pub const UNCONFIRMED_SOLUTIONS: &str = "snarkos_consensus_unconfirmed_solutions_total";
     pub const TRANSMISSION_LATENCY: &str = "snarkos_consensus_transmission_latency";
     pub const STALE_UNCONFIRMED_TRANSMISSIONS: &str = "snarkos_consensus_stale_unconfirmed_transmissions";

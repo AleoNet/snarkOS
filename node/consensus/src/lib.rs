@@ -225,7 +225,6 @@ impl<N: Network> Consensus<N> {
         #[cfg(feature = "metrics")]
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
-            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
             let timestamp = snarkos_node_bft::helpers::now();
             self.transmissions_queue_timestamps.lock().insert(TransmissionID::Solution(solution.id()), timestamp);
         }
@@ -291,7 +290,6 @@ impl<N: Network> Consensus<N> {
         #[cfg(feature = "metrics")]
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
-            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
             let timestamp = snarkos_node_bft::helpers::now();
             self.transmissions_queue_timestamps.lock().insert(TransmissionID::Transaction(transaction.id()), timestamp);
         }
