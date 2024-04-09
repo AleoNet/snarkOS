@@ -238,8 +238,8 @@ impl<N: Network> BlockSync<N> {
 
         // Process the block requests.
         'outer: for requests in block_requests.chunks(DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as usize) {
-            // Get the start height and the sync ips for the first block request.
-            let (start_height, (_, _, sync_ips)) = match requests.first() {
+            // Get the last height and the sync ips for the last block request in the chunk
+            let (last_height, (_, _, sync_ips)) = match requests.last() {
                 Some(request) => request.clone(),
                 None => {
                     warn!("Block sync failed - no block requests");
@@ -248,11 +248,12 @@ impl<N: Network> BlockSync<N> {
                 }
             };
 
-            // Calculate the end height.
-            let end_height = start_height.saturating_add(requests.len() as u32);
+            // Calculate the start and end height.
+            let end_height = last_height.saturating_add(1);
+            let start_height = end_height.saturating_sub(requests.len() as u32);
 
             for (height, (hash, previous_hash, _)) in requests.iter() {
-                // Insert the block request into the sync pool.
+                // Insert the block request into the sync pool using the sync IPs from the last block request in the chunk.
                 // TODO (raychu86): Unify the sync_ip selection in `prepare_block_requests` and `insert_block_request`.
                 if let Err(error) = self.insert_block_request(*height, (*hash, *previous_hash, sync_ips.clone())) {
                     warn!("Block sync failed - {error}");
@@ -798,48 +799,14 @@ impl<N: Network> BlockSync<N> {
 
         let mut requests = Vec::with_capacity((start_height..end_height).len());
 
-        let heights_collection: Vec<_> = (start_height..end_height).collect();
-        'outer: for heights in heights_collection.chunks(DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as usize) {
-            // Find the largest height in the chunk.
-            let Some(max_height) = heights.last() else {
-                break;
-            };
-
-            // Construct the request for the latest height in the chunk.
-            let (hash, previous_hash, num_sync_ips, is_honest) = construct_request(*max_height, &sync_peers);
-
-            // Pick the sync peers used for all the heights.
-            // This is done to ensure that the same sync peers are used for all requests of this chunk.
-            let sync_ips = sync_peers.keys().copied().choose_multiple(rng, num_sync_ips);
-
-            // Process the other heights.
-            'inner: for height in heights.iter().take(heights.len() - 1) {
-                // Ensure the current height is not canonized or already requested.
-                if self.check_block_request(*height).is_err() {
-                    continue 'inner;
-                }
-
-                // Construct the block request.
-                let (hash, previous_hash, num_sync_ips, is_honest) = construct_request(*height, &sync_peers);
-
-                // Handle the dishonest case.
-                if !is_honest {
-                    // TODO (howardwu): Consider performing an integrity check on peers (to disconnect).
-                    warn!("Detected dishonest peer(s) when preparing block request");
-                    // If there are not enough peers in the dishonest case, then return early.
-                    if sync_peers.len() < num_sync_ips {
-                        break 'outer;
-                    }
-                }
-
-                // Append the request.
-                requests.push((*height, (hash, previous_hash, sync_ips.iter().cloned().collect())));
-            }
-
+        for height in start_height..end_height {
             // Ensure the current height is not canonized or already requested.
-            if self.check_block_request(*max_height).is_err() {
-                continue 'outer;
+            if self.check_block_request(height).is_err() {
+                continue;
             }
+
+            // Construct the block request.
+            let (hash, previous_hash, num_sync_ips, is_honest) = construct_request(height, &sync_peers);
 
             // Handle the dishonest case.
             if !is_honest {
@@ -847,12 +814,15 @@ impl<N: Network> BlockSync<N> {
                 warn!("Detected dishonest peer(s) when preparing block request");
                 // If there are not enough peers in the dishonest case, then return early.
                 if sync_peers.len() < num_sync_ips {
-                    break 'outer;
+                    break;
                 }
             }
 
+            // Pick the sync peers.
+            let sync_ips = sync_peers.keys().copied().choose_multiple(rng, num_sync_ips);
+
             // Append the request.
-            requests.push((*max_height, (hash, previous_hash, sync_ips.iter().cloned().collect())));
+            requests.push((height, (hash, previous_hash, sync_ips.into_iter().collect())));
         }
 
         requests
