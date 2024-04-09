@@ -312,16 +312,35 @@ impl<N: Network> BlockSync<N> {
                 warn!("Block height mismatch: expected {}, found {}", current_height + 1, block.height());
                 break;
             }
+
+            let responses = self.responses.read();
+            let is_next_block_in_responses = responses.contains_key(&(current_height + 1));
+            let is_next_next_block_in_responses = responses.contains_key(&(current_height + 2));
+
+            info!("\t-----NUM BLOCKS PENDING IN RESPONSES: {}", responses.len());
+            info!(
+                "\t-----IS THE NEXT BLOCK IN THE CURRENT RESPONSES? {is_next_block_in_responses}, next next {is_next_next_block_in_responses}"
+            );
+
+            let timer = Instant::now();
+
             // Check the next block.
             if let Err(error) = self.canon.check_next_block(&block) {
                 warn!("The next block ({}) is invalid - {error}", block.height());
                 break;
             }
+
+            info!("\t\t-----CHECK NEXT BLOCK TIME: {:?}ns", timer.elapsed().as_nanos());
+            let timer = Instant::now();
+
             // Attempt to advance to the next block.
             if let Err(error) = self.canon.advance_to_next_block(&block) {
                 warn!("{error}");
                 break;
             }
+
+            info!("\t\t-----ADVANCE TO NEXT BLOCK TIME: {:?}ns", timer.elapsed().as_nanos());
+
             // Update the latest height.
             current_height = self.canon.latest_block_height();
         }
@@ -674,6 +693,8 @@ impl<N: Network> BlockSync<N> {
 
     /// Returns the sync peers and their minimum common ancestor, if the node needs to sync.
     fn find_sync_peers_inner(&self) -> Option<(IndexMap<SocketAddr, BlockLocators<N>>, u32)> {
+        let timer = Instant::now();
+
         // Retrieve the latest canon height.
         let latest_canon_height = self.canon.latest_block_height();
 
@@ -752,6 +773,8 @@ impl<N: Network> BlockSync<N> {
             return None;
         }
 
+        info!("Time to find sync peers: {:?}", timer.elapsed().as_nanos());
+
         Some((sync_peers, min_common_ancestor))
     }
 
@@ -762,6 +785,8 @@ impl<N: Network> BlockSync<N> {
         min_common_ancestor: u32,
         rng: &mut R,
     ) -> Vec<(u32, SyncRequest<N>)> {
+        let timer = Instant::now();
+
         // Retrieve the latest canon height.
         let latest_canon_height = self.canon.latest_block_height();
 
@@ -803,6 +828,7 @@ impl<N: Network> BlockSync<N> {
             requests.push((height, (hash, previous_hash, sync_ips.into_iter().collect())));
         }
 
+        info!("\t\t -----Time to construct requests: {:?}", timer.elapsed().as_nanos());
         requests
     }
 }
@@ -813,6 +839,8 @@ fn construct_request<N: Network>(
     height: u32,
     sync_peers: &IndexMap<SocketAddr, BlockLocators<N>>,
 ) -> (Option<N::BlockHash>, Option<N::BlockHash>, usize, bool) {
+    let timer = Instant::now();
+
     let mut hash = None;
     let mut hash_redundancy: usize = 0;
     let mut previous_hash = None;
@@ -875,6 +903,8 @@ fn construct_request<N: Network>(
             REDUNDANCY_FACTOR
         }
     };
+
+    info!("\t\t\t ----Time to construct request: {:?}", timer.elapsed().as_nanos());
 
     (hash, previous_hash, num_sync_ips, is_honest)
 }
