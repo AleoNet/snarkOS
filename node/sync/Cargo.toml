@@ -47,16 +47,16 @@ path = "../bft/ledger-service"
 version = "=2.2.7"
 features = [ "ledger-write" ]
 
+[dependencies.snarkos-node-router]
+path = "../router"
+version = "=2.2.7"
+
 [dependencies.snarkos-node-sync-communication-service]
 path = "communication-service"
 version = "=2.2.7"
 
 [dependencies.snarkos-node-sync-locators]
 path = "locators"
-version = "=2.2.7"
-
-[dependencies.snarkos-node-router]
-path = "../router"
 version = "=2.2.7"
 
 [dependencies.snarkvm]

@@ -239,7 +239,6 @@ impl<N: Network> BlockSync<N> {
         // Process the block requests.
         'outer: for requests in block_requests.chunks(DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as usize) {
             // Get the start height and the sync ips for the first block request.
-            // This unwrap is safe because we know that the chunk is non-empty.
             let (start_height, (_, _, sync_ips)) = match requests.first() {
                 Some(request) => request.clone(),
                 None => {
@@ -252,9 +251,10 @@ impl<N: Network> BlockSync<N> {
             // Calculate the end height.
             let end_height = start_height.saturating_add(requests.len() as u32);
 
-            for (height, (hash, previous_hash, _)) in requests.iter() {
-                // TODO (raychu86): Fix this. We are using the sync peers selected for the first block request and disregarding the ones generated for the other block requests.
+            for (height, (hash, previous_hash, sync_ips)) in requests.iter() {
                 // Insert the block request into the sync pool.
+                // Note that `prepare_block_requests` ensures that the sync IPs are equivalent for each chunk of requests.
+                // TODO (raychu86): Unify the sync_ip selection in `prepare_block_requests` and `insert_block_request`.
                 if let Err(error) = self.insert_block_request(*height, (*hash, *previous_hash, sync_ips.clone())) {
                     warn!("Block sync failed - {error}");
                     // Break out of the loop.
@@ -267,8 +267,7 @@ impl<N: Network> BlockSync<N> {
             // Construct the message.
             let message = C::prepare_block_request(start_height, end_height);
 
-            // TODO (raychu86): These sync IPs are not correct. Because we have randomly selected sync IPS for each block request. This needs to be fixed on another level.
-            // Send the message to the peers.
+            // Send the message to the peers with the same sync IPs.
             for sync_ip in sync_ips {
                 let sender = communication.send(sync_ip, message.clone()).await;
                 // If the send fails for any peer, remove the block requests from the sync pool.
@@ -800,14 +799,48 @@ impl<N: Network> BlockSync<N> {
 
         let mut requests = Vec::with_capacity((start_height..end_height).len());
 
-        for height in start_height..end_height {
-            // Ensure the current height is not canonized or already requested.
-            if self.check_block_request(height).is_err() {
-                continue;
+        let heights_collection: Vec<_> = (start_height..end_height).collect();
+        'outer: for heights in heights_collection.chunks(DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as usize) {
+            // Find the largest height in the chunk.
+            let Some(max_height) = heights.last() else {
+                break;
+            };
+
+            // Construct the request for the latest height in the chunk.
+            let (hash, previous_hash, num_sync_ips, is_honest) = construct_request(*max_height, &sync_peers);
+
+            // Pick the sync peers used for all the heights.
+            // This is done to ensure that the same sync peers are used for all requests of this chunk.
+            let sync_ips = sync_peers.keys().copied().choose_multiple(rng, num_sync_ips);
+
+            // Process the other heights.
+            'inner: for height in heights.iter().take(heights.len() - 1) {
+                // Ensure the current height is not canonized or already requested.
+                if self.check_block_request(*height).is_err() {
+                    continue 'inner;
+                }
+
+                // Construct the block request.
+                let (hash, previous_hash, num_sync_ips, is_honest) = construct_request(*height, &sync_peers);
+
+                // Handle the dishonest case.
+                if !is_honest {
+                    // TODO (howardwu): Consider performing an integrity check on peers (to disconnect).
+                    warn!("Detected dishonest peer(s) when preparing block request");
+                    // If there are not enough peers in the dishonest case, then return early.
+                    if sync_peers.len() < num_sync_ips {
+                        break 'outer;
+                    }
+                }
+
+                // Append the request.
+                requests.push((*height, (hash, previous_hash, sync_ips.iter().cloned().collect())));
             }
 
-            // Construct the block request.
-            let (hash, previous_hash, num_sync_ips, is_honest) = construct_request(height, &sync_peers);
+            // Ensure the current height is not canonized or already requested.
+            if self.check_block_request(*max_height).is_err() {
+                continue 'outer;
+            }
 
             // Handle the dishonest case.
             if !is_honest {
@@ -815,15 +848,12 @@ impl<N: Network> BlockSync<N> {
                 warn!("Detected dishonest peer(s) when preparing block request");
                 // If there are not enough peers in the dishonest case, then return early.
                 if sync_peers.len() < num_sync_ips {
-                    break;
+                    break 'outer;
                 }
             }
 
-            // Pick the sync peers.
-            let sync_ips = sync_peers.keys().copied().choose_multiple(rng, num_sync_ips);
-
             // Append the request.
-            requests.push((height, (hash, previous_hash, sync_ips.into_iter().collect())));
+            requests.push((*max_height, (hash, previous_hash, sync_ips.iter().cloned().collect())));
         }
 
         requests
