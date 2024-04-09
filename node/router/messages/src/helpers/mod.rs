@@ -13,7 +13,7 @@
 // limitations under the License.
 
 mod codec;
-pub use codec::MessageCodec;
+pub use codec::{MessageCodec, MAXIMUM_MESSAGE_SIZE};
 
 mod disconnect;
 pub use disconnect::DisconnectReason;
