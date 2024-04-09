@@ -3144,6 +3144,7 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rand",
+ "rayon",
  "snarkos-account",
  "snarkos-node-bft",
  "snarkos-node-bft-ledger-service",

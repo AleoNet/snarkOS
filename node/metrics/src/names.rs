@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub(super) const COUNTER_NAMES: [&str; 1] = [bft::LEADERS_ELECTED];
+pub(super) const COUNTER_NAMES: [&str; 2] = [bft::LEADERS_ELECTED, consensus::STALE_UNCONFIRMED_TRANSMISSIONS];
 
 pub(super) const GAUGE_NAMES: [&str; 21] = [
     bft::CONNECTED,
@@ -76,6 +76,8 @@ pub mod consensus {
     pub const UNCONFIRMED_TRANSACTIONS: &str = "snarkos_consensus_unconfirmed_transactions_total";
     pub const UNCONFIRMED_TRANSMISSIONS: &str = "snarkos_consensus_unconfirmed_transmissions_total";
     pub const UNCONFIRMED_SOLUTIONS: &str = "snarkos_consensus_unconfirmed_solutions_total";
+    pub const TRANSMISSION_LATENCY: &str = "snarkos_consensus_transmission_latency";
+    pub const STALE_UNCONFIRMED_TRANSMISSIONS: &str = "snarkos_consensus_stale_unconfirmed_transmissions";
 }
 
 pub mod router {

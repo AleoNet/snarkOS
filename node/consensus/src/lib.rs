@@ -54,6 +54,11 @@ use tokio::{
     task::JoinHandle,
 };
 
+#[cfg(feature = "metrics")]
+use rayon::prelude::*;
+#[cfg(feature = "metrics")]
+use std::collections::HashMap;
+
 /// The capacity of the queue reserved for deployments.
 /// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
 const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 10;
@@ -98,6 +103,8 @@ pub struct Consensus<N: Network> {
     seen_solutions: Arc<Mutex<LruCache<SolutionID<N>, ()>>>,
     /// The recently-seen unconfirmed transactions.
     seen_transactions: Arc<Mutex<LruCache<N::TransactionID, ()>>>,
+    #[cfg(feature = "metrics")]
+    transmissions_queue_timestamps: Arc<Mutex<HashMap<TransmissionID<N>, i64>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -131,6 +138,8 @@ impl<N: Network> Consensus<N> {
             transactions_queue: Default::default(),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
+            #[cfg(feature = "metrics")]
+            transmissions_queue_timestamps: Default::default(),
             handles: Default::default(),
         })
     }
@@ -217,6 +226,8 @@ impl<N: Network> Consensus<N> {
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+            let timestamp = snarkos_node_bft::helpers::now();
+            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Solution(solution.id()), timestamp);
         }
         // Process the unconfirmed solution.
         {
@@ -281,6 +292,8 @@ impl<N: Network> Consensus<N> {
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+            let timestamp = snarkos_node_bft::helpers::now();
+            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Transaction(transaction.id()), timestamp);
         }
         // Process the unconfirmed transaction.
         {
@@ -429,6 +442,8 @@ impl<N: Network> Consensus<N> {
             let coinbase_target = next_block.header().coinbase_target();
             let cumulative_proof_target = next_block.header().cumulative_proof_target();
 
+            self.add_transmission_latency_metric(&next_block);
+
             metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
             metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
             metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
@@ -478,6 +493,60 @@ impl<N: Network> Consensus<N> {
         }
         // Await the callback.
         callback_receiver.await?
+    }
+
+    #[cfg(feature = "metrics")]
+    fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
+        const AGE_THRESHOLD_SECONDS: i32 = 30 * 60; // 30 minutes set as stale transmission threshold
+
+        // Retrieve the solution IDs.
+        let solution_ids: std::collections::HashSet<_> =
+            next_block.solutions().solution_ids().chain(next_block.aborted_solution_ids()).collect();
+
+        // Retrieve the transaction IDs.
+        let transaction_ids: std::collections::HashSet<_> =
+            next_block.transaction_ids().chain(next_block.aborted_transaction_ids()).collect();
+
+        let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
+        let ts_now = snarkos_node_bft::helpers::now();
+
+        // Determine which keys to remove.
+        let keys_to_remove = cfg_iter!(transmission_queue_timestamps)
+            .flat_map(|(key, timestamp)| {
+                let elapsed_time = std::time::Duration::from_secs((ts_now - *timestamp) as u64);
+
+                if elapsed_time.as_secs() > AGE_THRESHOLD_SECONDS as u64 {
+                    // This entry is stale-- remove it from transmission queue and record it as a stale transmission.
+                    metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
+                    Some(*key)
+                } else {
+                    let transmission_type = match key {
+                        TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
+                        TransmissionID::Transaction(transaction_id) if transaction_ids.contains(transaction_id) => {
+                            Some("transaction")
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(transmission_type_string) = transmission_type {
+                        metrics::histogram_label(
+                            metrics::consensus::TRANSMISSION_LATENCY,
+                            "transmission_type",
+                            transmission_type_string.to_owned(),
+                            elapsed_time.as_secs_f64(),
+                        );
+                        Some(*key)
+                    } else {
+                        None
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Remove keys of stale or seen transmissions.
+        for key in keys_to_remove {
+            transmission_queue_timestamps.remove(&key);
+        }
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
