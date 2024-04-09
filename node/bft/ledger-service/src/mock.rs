@@ -16,9 +16,9 @@ use crate::{fmt_id, LedgerService};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
     prelude::{bail, ensure, Address, Field, Network, Result},
 };
@@ -127,7 +127,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, _solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, _solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         unreachable!("MockLedgerService does not support get_solution")
     }
 
@@ -180,12 +180,8 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        puzzle_commitment: PuzzleCommitment<N>,
-        _solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
-        trace!("[MockLedgerService] Check solution basic {:?} - Ok", fmt_id(puzzle_commitment));
+    async fn check_solution_basic(&self, solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
+        trace!("[MockLedgerService] Check solution basic {:?} - Ok", fmt_id(solution_id));
         Ok(())
     }
 

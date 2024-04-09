@@ -28,6 +28,7 @@ use snarkos_node_bft::{
         Storage as NarwhalStorage,
     },
     spawn_blocking,
+    Primary,
     BFT,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -35,8 +36,8 @@ use snarkos_node_bft_storage_service::BFTPersistentStorage;
 use snarkvm::{
     ledger::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchHeader, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
     prelude::*,
 };
@@ -52,6 +53,11 @@ use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
 };
+
+#[cfg(feature = "metrics")]
+use rayon::prelude::*;
+#[cfg(feature = "metrics")]
+use std::collections::HashMap;
 
 /// The capacity of the queue reserved for deployments.
 /// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
@@ -90,13 +96,15 @@ pub struct Consensus<N: Network> {
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The unconfirmed solutions queue.
-    solutions_queue: Arc<Mutex<LruCache<PuzzleCommitment<N>, ProverSolution<N>>>>,
+    solutions_queue: Arc<Mutex<LruCache<SolutionID<N>, Solution<N>>>>,
     /// The unconfirmed transactions queue.
     transactions_queue: Arc<Mutex<TransactionsQueue<N>>>,
     /// The recently-seen unconfirmed solutions.
-    seen_solutions: Arc<Mutex<LruCache<PuzzleCommitment<N>, ()>>>,
+    seen_solutions: Arc<Mutex<LruCache<SolutionID<N>, ()>>>,
     /// The recently-seen unconfirmed transactions.
     seen_transactions: Arc<Mutex<LruCache<N::TransactionID, ()>>>,
+    #[cfg(feature = "metrics")]
+    transmissions_queue_timestamps: Arc<Mutex<HashMap<TransmissionID<N>, i64>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -130,6 +138,8 @@ impl<N: Network> Consensus<N> {
             transactions_queue: Default::default(),
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
+            #[cfg(feature = "metrics")]
+            transmissions_queue_timestamps: Default::default(),
             handles: Default::default(),
         })
     }
@@ -199,7 +209,7 @@ impl<N: Network> Consensus<N> {
     }
 
     /// Returns the unconfirmed solutions.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
         self.bft.unconfirmed_solutions()
     }
 
@@ -211,15 +221,17 @@ impl<N: Network> Consensus<N> {
 
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
-    pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
+    pub async fn add_unconfirmed_solution(&self, solution: Solution<N>) -> Result<()> {
         #[cfg(feature = "metrics")]
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+            let timestamp = snarkos_node_bft::helpers::now();
+            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Solution(solution.id()), timestamp);
         }
         // Process the unconfirmed solution.
         {
-            let solution_id = solution.commitment();
+            let solution_id = solution.id();
 
             // Check if the transaction was recently seen.
             if self.seen_solutions.lock().put(solution_id, ()).is_some() {
@@ -238,14 +250,17 @@ impl<N: Network> Consensus<N> {
         }
 
         // If the memory pool of this node is full, return early.
-        let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
+        let num_unconfirmed_solutions = self.num_unconfirmed_solutions();
+        let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
+        if num_unconfirmed_solutions >= N::MAX_SOLUTIONS
+            || num_unconfirmed_transmissions >= Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE
+        {
             return Ok(());
         }
         // Retrieve the solutions.
         let solutions = {
             // Determine the available capacity.
-            let capacity = N::MAX_SOLUTIONS.saturating_sub(num_unconfirmed);
+            let capacity = N::MAX_SOLUTIONS.saturating_sub(num_unconfirmed_solutions);
             // Acquire the lock on the queue.
             let mut queue = self.solutions_queue.lock();
             // Determine the number of solutions to send.
@@ -255,13 +270,16 @@ impl<N: Network> Consensus<N> {
         };
         // Iterate over the solutions.
         for solution in solutions.into_iter() {
-            let solution_id = solution.commitment();
+            let solution_id = solution.id();
             trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
             // Send the unconfirmed solution to the primary.
             if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
                 // If the BFT is synced, then log the warning.
                 if self.bft.is_synced() {
-                    warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+                    // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
+                    if self.ledger().latest_block_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
+                        warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id))
+                    };
                 }
             }
         }
@@ -274,6 +292,8 @@ impl<N: Network> Consensus<N> {
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+            let timestamp = snarkos_node_bft::helpers::now();
+            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Transaction(transaction.id()), timestamp);
         }
         // Process the unconfirmed transaction.
         {
@@ -304,14 +324,14 @@ impl<N: Network> Consensus<N> {
         }
 
         // If the memory pool of this node is full, return early.
-        let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
+        let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
+        if num_unconfirmed_transmissions >= Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE {
             return Ok(());
         }
         // Retrieve the transactions.
         let transactions = {
             // Determine the available capacity.
-            let capacity = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH.saturating_sub(num_unconfirmed);
+            let capacity = Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE.saturating_sub(num_unconfirmed_transmissions);
             // Acquire the lock on the transactions queue.
             let mut tx_queue = self.transactions_queue.lock();
             // Determine the number of deployments to send.
@@ -418,6 +438,11 @@ impl<N: Network> Consensus<N> {
             let num_sol = next_block.solutions().len();
             let num_tx = next_block.transactions().len();
             let num_transmissions = num_tx + num_sol;
+            let proof_target = next_block.header().proof_target();
+            let coinbase_target = next_block.header().coinbase_target();
+            let cumulative_proof_target = next_block.header().cumulative_proof_target();
+
+            self.add_transmission_latency_metric(&next_block);
 
             metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
             metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
@@ -427,6 +452,9 @@ impl<N: Network> Consensus<N> {
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
             metrics::histogram(metrics::consensus::BLOCK_LATENCY, block_latency as f64);
+            metrics::gauge(metrics::blocks::PROOF_TARGET, proof_target as f64);
+            metrics::gauge(metrics::blocks::COINBASE_TARGET, coinbase_target as f64);
+            metrics::gauge(metrics::blocks::CUMULATIVE_PROOF_TARGET, cumulative_proof_target as f64);
         }
         Ok(())
     }
@@ -453,9 +481,9 @@ impl<N: Network> Consensus<N> {
         // Send the transmission to the primary.
         match (transmission_id, transmission) {
             (TransmissionID::Ratification, Transmission::Ratification) => return Ok(()),
-            (TransmissionID::Solution(commitment), Transmission::Solution(solution)) => {
+            (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
                 // Send the solution to the primary.
-                self.primary_sender().tx_unconfirmed_solution.send((commitment, solution, callback)).await?;
+                self.primary_sender().tx_unconfirmed_solution.send((solution_id, solution, callback)).await?;
             }
             (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
                 // Send the transaction to the primary.
@@ -465,6 +493,60 @@ impl<N: Network> Consensus<N> {
         }
         // Await the callback.
         callback_receiver.await?
+    }
+
+    #[cfg(feature = "metrics")]
+    fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
+        const AGE_THRESHOLD_SECONDS: i32 = 30 * 60; // 30 minutes set as stale transmission threshold
+
+        // Retrieve the solution IDs.
+        let solution_ids: std::collections::HashSet<_> =
+            next_block.solutions().solution_ids().chain(next_block.aborted_solution_ids()).collect();
+
+        // Retrieve the transaction IDs.
+        let transaction_ids: std::collections::HashSet<_> =
+            next_block.transaction_ids().chain(next_block.aborted_transaction_ids()).collect();
+
+        let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
+        let ts_now = snarkos_node_bft::helpers::now();
+
+        // Determine which keys to remove.
+        let keys_to_remove = cfg_iter!(transmission_queue_timestamps)
+            .flat_map(|(key, timestamp)| {
+                let elapsed_time = std::time::Duration::from_secs((ts_now - *timestamp) as u64);
+
+                if elapsed_time.as_secs() > AGE_THRESHOLD_SECONDS as u64 {
+                    // This entry is stale-- remove it from transmission queue and record it as a stale transmission.
+                    metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
+                    Some(*key)
+                } else {
+                    let transmission_type = match key {
+                        TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
+                        TransmissionID::Transaction(transaction_id) if transaction_ids.contains(transaction_id) => {
+                            Some("transaction")
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(transmission_type_string) = transmission_type {
+                        metrics::histogram_label(
+                            metrics::consensus::TRANSMISSION_LATENCY,
+                            "transmission_type",
+                            transmission_type_string.to_owned(),
+                            elapsed_time.as_secs_f64(),
+                        );
+                        Some(*key)
+                    } else {
+                        None
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Remove keys of stale or seen transmissions.
+        for key in keys_to_remove {
+            transmission_queue_timestamps.remove(&key);
+        }
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.

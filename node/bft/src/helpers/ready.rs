@@ -16,8 +16,8 @@ use snarkvm::{
     console::prelude::*,
     ledger::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{Data, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
 };
 
@@ -80,7 +80,7 @@ impl<N: Network> Ready<N> {
     }
 
     /// Returns the solutions in the ready queue.
-    pub fn solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+    pub fn solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
         self.transmissions.read().clone().into_iter().filter_map(|(id, transmission)| match (id, transmission) {
             (TransmissionID::Solution(id), Transmission::Solution(solution)) => Some((id, solution)),
             _ => None,
@@ -131,7 +131,7 @@ impl<N: Network> Ready<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::ledger::{coinbase::PuzzleCommitment, narwhal::Data};
+    use snarkvm::ledger::narwhal::Data;
 
     use ::bytes::Bytes;
 
@@ -147,38 +147,38 @@ mod tests {
         // Initialize the ready queue.
         let ready = Ready::<CurrentNetwork>::new();
 
-        // Initialize the commitments.
-        let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
-        let commitment_2 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
-        let commitment_3 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        // Initialize the solution IDs.
+        let solution_id_1 = TransmissionID::Solution(rng.gen::<u64>().into());
+        let solution_id_2 = TransmissionID::Solution(rng.gen::<u64>().into());
+        let solution_id_3 = TransmissionID::Solution(rng.gen::<u64>().into());
 
         // Initialize the solutions.
         let solution_1 = Transmission::Solution(data(rng));
         let solution_2 = Transmission::Solution(data(rng));
         let solution_3 = Transmission::Solution(data(rng));
 
-        // Insert the commitments.
-        assert!(ready.insert(commitment_1, solution_1.clone()));
-        assert!(ready.insert(commitment_2, solution_2.clone()));
-        assert!(ready.insert(commitment_3, solution_3.clone()));
+        // Insert the solution IDs.
+        assert!(ready.insert(solution_id_1, solution_1.clone()));
+        assert!(ready.insert(solution_id_2, solution_2.clone()));
+        assert!(ready.insert(solution_id_3, solution_3.clone()));
 
         // Check the number of transmissions.
         assert_eq!(ready.num_transmissions(), 3);
 
         // Check the transmission IDs.
-        let transmission_ids = vec![commitment_1, commitment_2, commitment_3].into_iter().collect::<IndexSet<_>>();
+        let transmission_ids = vec![solution_id_1, solution_id_2, solution_id_3].into_iter().collect::<IndexSet<_>>();
         assert_eq!(ready.transmission_ids(), transmission_ids);
         transmission_ids.iter().for_each(|id| assert!(ready.contains(*id)));
 
-        // Check that an unknown commitment is not in the ready queue.
-        let commitment_unknown = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
-        assert!(!ready.contains(commitment_unknown));
+        // Check that an unknown solution ID is not in the ready queue.
+        let solution_id_unknown = TransmissionID::Solution(rng.gen::<u64>().into());
+        assert!(!ready.contains(solution_id_unknown));
 
         // Check the transmissions.
-        assert_eq!(ready.get(commitment_1), Some(solution_1.clone()));
-        assert_eq!(ready.get(commitment_2), Some(solution_2.clone()));
-        assert_eq!(ready.get(commitment_3), Some(solution_3.clone()));
-        assert_eq!(ready.get(commitment_unknown), None);
+        assert_eq!(ready.get(solution_id_1), Some(solution_1.clone()));
+        assert_eq!(ready.get(solution_id_2), Some(solution_2.clone()));
+        assert_eq!(ready.get(solution_id_3), Some(solution_3.clone()));
+        assert_eq!(ready.get(solution_id_unknown), None);
 
         // Drain the ready queue.
         let transmissions = ready.drain(3);
@@ -191,7 +191,7 @@ mod tests {
         // Check the transmissions.
         assert_eq!(
             transmissions,
-            vec![(commitment_1, solution_1), (commitment_2, solution_2), (commitment_3, solution_3)]
+            vec![(solution_id_1, solution_1), (solution_id_2, solution_2), (solution_id_3, solution_3)]
                 .into_iter()
                 .collect::<IndexMap<_, _>>()
         );
@@ -210,15 +210,15 @@ mod tests {
         // Initialize the ready queue.
         let ready = Ready::<CurrentNetwork>::new();
 
-        // Initialize the commitments.
-        let commitment = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        // Initialize the solution ID.
+        let solution_id = TransmissionID::Solution(rng.gen::<u64>().into());
 
-        // Initialize the solutions.
+        // Initialize the solution.
         let solution = Transmission::Solution(data);
 
-        // Insert the commitments.
-        assert!(ready.insert(commitment, solution.clone()));
-        assert!(!ready.insert(commitment, solution));
+        // Insert the solution ID.
+        assert!(ready.insert(solution_id, solution.clone()));
+        assert!(!ready.insert(solution_id, solution));
 
         // Check the number of transmissions.
         assert_eq!(ready.num_transmissions(), 1);

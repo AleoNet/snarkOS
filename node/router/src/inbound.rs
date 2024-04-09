@@ -30,7 +30,7 @@ use crate::{
 use snarkos_node_tcp::protocols::Reading;
 use snarkvm::prelude::{
     block::{Block, Header, Transaction},
-    coinbase::{EpochChallenge, ProverSolution},
+    puzzle::Solution,
     Network,
 };
 
@@ -201,7 +201,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     Err(error) => bail!("[PuzzleResponse] {error}"),
                 };
                 // Process the puzzle response.
-                match self.puzzle_response(peer_ip, message.epoch_challenge, header) {
+                match self.puzzle_response(peer_ip, message.epoch_hash, header) {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid puzzle response"),
                 }
@@ -222,7 +222,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     Err(error) => bail!("[UnconfirmedSolution] {error}"),
                 };
                 // Check that the solution parameters match.
-                if message.solution_id != solution.commitment() {
+                if message.solution_id != solution.id() {
                     bail!("Peer '{peer_ip}' is not following the 'UnconfirmedSolution' protocol")
                 }
                 // Handle the unconfirmed solution.
@@ -316,14 +316,14 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool;
 
     /// Handles a `PuzzleResponse` message.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _challenge: EpochChallenge<N>, _header: Header<N>) -> bool;
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_hash: N::BlockHash, _header: Header<N>) -> bool;
 
     /// Handles an `UnconfirmedSolution` message.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
-        solution: ProverSolution<N>,
+        solution: Solution<N>,
     ) -> bool;
 
     /// Handles an `UnconfirmedTransaction` message.

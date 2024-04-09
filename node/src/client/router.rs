@@ -235,11 +235,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         true
     }
 
-    /// Disconnects on receipt of a `PuzzleRequest` message.
+    /// Retrieves the latest epoch hash and latest block header, and returns the puzzle response to the peer.
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
-        // Retrieve the latest epoch challenge.
-        let epoch_challenge = match self.ledger.latest_epoch_challenge() {
-            Ok(epoch_challenge) => epoch_challenge,
+        // Retrieve the latest epoch hash.
+        let epoch_hash = match self.ledger.latest_epoch_hash() {
+            Ok(epoch_hash) => epoch_hash,
             Err(error) => {
                 error!("Failed to prepare a puzzle request for '{peer_ip}': {error}");
                 return false;
@@ -248,12 +248,12 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         // Retrieve the latest block header.
         let block_header = Data::Object(self.ledger.latest_header());
         // Send the `PuzzleResponse` message to the peer.
-        Outbound::send(self, peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
+        Outbound::send(self, peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_hash, block_header }));
         true
     }
 
-    /// Saves the latest epoch challenge and latest block header in the node.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
+    /// Saves the latest epoch hash and latest block header in the node.
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_hash: N::BlockHash, _header: Header<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }
@@ -263,30 +263,33 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
-        solution: ProverSolution<N>,
+        solution: Solution<N>,
     ) -> bool {
-        // Retrieve the latest epoch challenge.
-        if let Ok(epoch_challenge) = self.ledger.latest_epoch_challenge() {
+        // Retrieve the latest epoch hash.
+        if let Ok(epoch_hash) = self.ledger.latest_epoch_hash() {
             // Retrieve the latest proof target.
             let proof_target = self.ledger.latest_block().header().proof_target();
-            // Ensure that the prover solution is valid for the given epoch.
-            let coinbase_puzzle = self.coinbase_puzzle.clone();
-            let is_valid = tokio::task::spawn_blocking(move || {
-                solution.verify(coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)
-            })
-            .await;
+            // Ensure that the solution is valid for the given epoch.
+            let puzzle = self.puzzle.clone();
+            let is_valid =
+                tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target)).await;
 
             match is_valid {
                 // If the solution is valid, propagate the `UnconfirmedSolution`.
-                Ok(Ok(true)) => {
+                Ok(Ok(())) => {
                     let message = Message::UnconfirmedSolution(serialized);
                     // Propagate the "UnconfirmedSolution".
                     self.propagate(message, &[peer_ip]);
                 }
-                Ok(Ok(false)) | Ok(Err(_)) => {
-                    trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
+                Ok(Err(_)) => {
+                    trace!("Invalid solution '{}' for the proof target.", solution.id())
                 }
-                Err(error) => warn!("Failed to verify the prover solution: {error}"),
+                // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
+                Err(error) => {
+                    if self.ledger.latest_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
+                        warn!("Failed to verify the solution - {error}")
+                    }
+                }
             }
         }
         true

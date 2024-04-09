@@ -16,9 +16,9 @@ use crate::{fmt_id, spawn_blocking, LedgerService};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{CoinbaseVerifyingKey, ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
         store::ConsensusStorage,
         Ledger,
     },
@@ -37,14 +37,13 @@ use std::{
     },
 };
 
-/// The capacity of the LRU holiding the recently queried committees.
+/// The capacity of the LRU holding the recently queried committees.
 const COMMITTEE_CACHE_SIZE: usize = 16;
 
 /// A core ledger service.
 #[allow(clippy::type_complexity)]
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
-    coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
     committee_cache: Arc<Mutex<LruCache<u64, Committee<N>>>>,
     latest_leader: Arc<RwLock<Option<(u64, Address<N>)>>>,
     shutdown: Arc<AtomicBool>,
@@ -53,9 +52,8 @@ pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
     pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
-        let coinbase_verifying_key = Arc::new(ledger.coinbase_puzzle().coinbase_verifying_key().clone());
         let committee_cache = Arc::new(Mutex::new(LruCache::new(COMMITTEE_CACHE_SIZE.try_into().unwrap())));
-        Self { ledger, coinbase_verifying_key, committee_cache, latest_leader: Default::default(), shutdown }
+        Self { ledger, committee_cache, latest_leader: Default::default(), shutdown }
     }
 }
 
@@ -125,7 +123,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         self.ledger.get_solution(solution_id)
     }
 
@@ -203,7 +201,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         match transmission_id {
             TransmissionID::Ratification => Ok(false),
-            TransmissionID::Solution(puzzle_commitment) => self.ledger.contains_puzzle_commitment(puzzle_commitment),
+            TransmissionID::Solution(solution_id) => self.ledger.contains_solution_id(solution_id),
             TransmissionID::Transaction(transaction_id) => self.ledger.contains_transaction_id(transaction_id),
         }
     }
@@ -241,14 +239,14 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                     }
                 }
             }
-            (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution_data)) => {
+            (TransmissionID::Solution(expected_solution_id), Transmission::Solution(solution_data)) => {
                 match solution_data.clone().deserialize_blocking() {
                     Ok(solution) => {
-                        if solution.commitment() != expected_commitment {
+                        if solution.id() != expected_solution_id {
                             bail!(
                                 "Received mismatching solution ID - expected {}, found {}",
-                                fmt_id(expected_commitment),
-                                fmt_id(solution.commitment()),
+                                fmt_id(expected_solution_id),
+                                fmt_id(solution.id()),
                             );
                         }
 
@@ -269,30 +267,25 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        puzzle_commitment: PuzzleCommitment<N>,
-        solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, solution_id: SolutionID<N>, solution: Data<Solution<N>>) -> Result<()> {
         // Deserialize the solution.
         let solution = spawn_blocking!(solution.deserialize_blocking())?;
-        // Ensure the puzzle commitment matches in the solution.
-        if puzzle_commitment != solution.commitment() {
-            bail!("Invalid solution - expected {puzzle_commitment}, found {}", solution.commitment());
+        // Ensure the solution ID matches in the solution.
+        if solution_id != solution.id() {
+            bail!("Invalid solution - expected {solution_id}, found {}", solution.id());
         }
 
-        // Retrieve the coinbase verifying key.
-        let coinbase_verifying_key = self.coinbase_verifying_key.clone();
-        // Compute the current epoch challenge.
-        let epoch_challenge = self.ledger.latest_epoch_challenge()?;
+        // Compute the current epoch hash.
+        let epoch_hash = self.ledger.latest_epoch_hash()?;
         // Retrieve the current proof target.
         let proof_target = self.ledger.latest_proof_target();
 
-        // Ensure that the prover solution is valid for the given epoch.
-        if !spawn_blocking!(solution.verify(&coinbase_verifying_key, &epoch_challenge, proof_target))? {
-            bail!("Invalid prover solution '{puzzle_commitment}' for the current epoch.");
+        // Ensure that the solution is valid for the given epoch.
+        let puzzle = self.ledger.puzzle().clone();
+        match spawn_blocking!(puzzle.check_solution(&solution, epoch_hash, proof_target)) {
+            Ok(()) => Ok(()),
+            Err(e) => bail!("Invalid solution '{}' for the current epoch - {e}", fmt_id(solution_id)),
         }
-        Ok(())
     }
 
     /// Checks the given transaction is well-formed and unique.
