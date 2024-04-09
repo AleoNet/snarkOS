@@ -99,7 +99,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
                 }
                 // Perform the deferred non-blocking deserialization of the blocks.
+                let timer = Instant::now();
                 let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+                info!("\t\t---Deserialized blocks {request:?} in {:?}ns", timer.elapsed().as_nanos());
                 // Ensure the block response is well-formed.
                 blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
 

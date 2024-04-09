@@ -309,12 +309,25 @@ impl<N: Network> Sync<N> {
         // Acquire the sync lock.
         let _lock = self.sync_lock.lock().await;
 
+        let is_next_block_in_responses = self.block_sync.responses.read().contains_key(&(block.height() + 1));
+        let is_next_next_block_in_responses = self.block_sync.responses.read().contains_key(&(block.height() + 2));
+        info!("\t-----NUM BLOCKS PENDING IN RESPONSES: {}", self.block_sync.responses.read().len());
+        info!(
+            "\t-----IS THE NEXT BLOCK IN THE CURRENT RESPONSES? {is_next_block_in_responses}, next next {is_next_next_block_in_responses}"
+        );
+
         let self_ = self.clone();
         tokio::task::spawn_blocking(move || {
+            let timer = std::time::Instant::now();
             // Check the next block.
             self_.ledger.check_next_block(&block)?;
+
+            info!("\t----Check next block took: {:?}ns", timer.elapsed().as_nanos());
+            let timer = std::time::Instant::now();
+
             // Attempt to advance to the next block.
             self_.ledger.advance_to_next_block(&block)?;
+            info!("\t----Advance to next block took: {:?}ns", timer.elapsed().as_nanos());
 
             // Sync the height with the block.
             self_.storage.sync_height_with_block(block.height());

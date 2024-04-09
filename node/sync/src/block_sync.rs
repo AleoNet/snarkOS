@@ -100,7 +100,7 @@ pub struct BlockSync<N: Network> {
     requests: Arc<RwLock<BTreeMap<u32, SyncRequest<N>>>>,
     /// The map of block height to the received blocks.
     /// Removing an entry from this map must remove the corresponding entry from the requests map.
-    responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
+    pub responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
     /// The map of block height to the timestamp of the last time the block was requested.
     /// This map is used to determine which requests to remove if they have been pending for too long.
     request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
@@ -773,7 +773,7 @@ impl<N: Network> BlockSync<N> {
             return None;
         }
 
-        info!("Time to find sync peers: {:?}", timer.elapsed().as_nanos());
+        info!("Time to find sync peers: {:?}ns", timer.elapsed().as_nanos());
 
         Some((sync_peers, min_common_ancestor))
     }
@@ -828,7 +828,7 @@ impl<N: Network> BlockSync<N> {
             requests.push((height, (hash, previous_hash, sync_ips.into_iter().collect())));
         }
 
-        info!("\t\t -----Time to construct requests: {:?}", timer.elapsed().as_nanos());
+        info!("\t\t -----Time to construct requests: {:?}ns", timer.elapsed().as_nanos());
         requests
     }
 }
@@ -904,7 +904,7 @@ fn construct_request<N: Network>(
         }
     };
 
-    info!("\t\t\t ----Time to construct request: {:?}", timer.elapsed().as_nanos());
+    info!("\t\t\t ----Time to construct request: {:?}ns", timer.elapsed().as_nanos());
 
     (hash, previous_hash, num_sync_ips, is_honest)
 }
