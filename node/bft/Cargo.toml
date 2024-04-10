@@ -18,7 +18,7 @@ edition = "2021"
 
 [features]
 default = [ ]
-metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics" ]
+metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics", "snarkos-node-bft-ledger-service/metrics" ]
 
 [dependencies.aleo-std]
 workspace = true
