@@ -589,6 +589,8 @@ impl<N: Network> Gateway<N> {
             Event::BlockRequest(block_request) => {
                 let BlockRequest { start_height, end_height } = block_request;
 
+                let timer = std::time::Instant::now();
+
                 // Ensure the block request is well-formed.
                 if start_height >= end_height {
                     bail!("Block request from '{peer_ip}' has an invalid range ({start_height}..{end_height})")
@@ -619,6 +621,11 @@ impl<N: Network> Gateway<N> {
                     let event = Event::BlockResponse(BlockResponse { request: block_request, blocks });
                     Transport::send(&self_, peer_ip, event).await;
                 });
+
+                info!(
+                    "\t\t---Sent block Response for height {start_height} to {end_height} in {:?}ns",
+                    timer.elapsed().as_nanos()
+                );
                 Ok(())
             }
             Event::BlockResponse(block_response) => {
@@ -626,6 +633,12 @@ impl<N: Network> Gateway<N> {
                 if let Some(sync_sender) = self.sync_sender.get() {
                     // Retrieve the block response.
                     let BlockResponse { request, blocks } = block_response;
+
+                    info!(
+                        "\t\t----Received block response for height {} to peer '{peer_ip}' - at {:?} ns",
+                        request.start_height,
+                        time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+                    );
 
                     let timer = std::time::Instant::now();
                     // Perform the deferred non-blocking deserialization of the blocks.

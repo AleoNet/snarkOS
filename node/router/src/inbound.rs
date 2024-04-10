@@ -94,6 +94,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             Message::BlockResponse(message) => {
                 let BlockResponse { request, blocks } = message;
 
+                info!(
+                    "\t\t----Received block response for height {} to peer '{peer_ip}' - at {:?} ns",
+                    request.start_height,
+                    time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+                );
+
                 // Remove the block request, checking if this node previously sent a block request to this peer.
                 if !self.router().cache.remove_outbound_block_request(peer_ip, &request) {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")

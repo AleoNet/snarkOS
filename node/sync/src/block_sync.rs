@@ -251,6 +251,12 @@ impl<N: Network> BlockSync<N> {
             // Send the message to the peers.
             for sync_ip in sync_ips {
                 let sender = communication.send(sync_ip, message.clone()).await;
+
+                info!(
+                    "\t\t----Sent block request for height {height} to peer '{sync_ip}' - at {:?} ns",
+                    time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+                );
+
                 // If the send fails for any peer, remove the block request from the sync pool.
                 if sender.is_none() {
                     warn!("Failed to send block request to peer '{sync_ip}'");
