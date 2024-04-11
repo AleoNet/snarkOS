@@ -22,7 +22,7 @@ use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use parking_lot::{Mutex, RwLock};
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
@@ -621,8 +621,6 @@ impl<N: Network> BlockSync<N> {
         // Retrieve the current time.
         let now = Instant::now();
 
-        // Track each unique peer IP that has timed out.
-        let mut timeout_ips = IndexSet::new();
         // Track the number of timed out block requests.
         let mut num_timed_out_block_requests = 0;
 
@@ -639,10 +637,7 @@ impl<N: Network> BlockSync<N> {
             // If the request has timed out, then remove it.
             if is_timeout {
                 // Remove the request entry for the given height.
-                if let Some((_, _, sync_ips)) = requests.remove(height) {
-                    // Add each sync IP to the timeout IPs.
-                    timeout_ips.extend(sync_ips);
-                }
+                requests.remove(height);
                 // Remove the response entry for the given height.
                 responses.remove(height);
                 // Increment the number of timed out block requests.
@@ -880,7 +875,7 @@ mod tests {
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::prelude::{Field, TestRng};
 
-    use indexmap::indexset;
+    use indexmap::{indexset, IndexSet};
     use snarkvm::ledger::committee::Committee;
     use std::net::{IpAddr, Ipv4Addr};
 
