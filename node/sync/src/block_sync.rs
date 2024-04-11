@@ -45,7 +45,6 @@ const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
 const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 600; // 600 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
-const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
 /// The maximum number of blocks tolerated before the primary is considered behind its peers.
 pub const MAX_BLOCKS_BEHIND: u32 = 1; // blocks
@@ -104,9 +103,6 @@ pub struct BlockSync<N: Network> {
     /// The map of block height to the timestamp of the last time the block was requested.
     /// This map is used to determine which requests to remove if they have been pending for too long.
     request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
-    /// The map of (timed out) peer IPs to their request timestamps.
-    /// This map is used to determine which peers to remove if they have timed out too many times.
-    request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
     /// The boolean indicator of whether the node is synced up to the latest block (within the given tolerance).
     is_block_synced: Arc<AtomicBool>,
     /// The lock to guarantee advance_with_sync_blocks() is called only once at a time.
@@ -124,7 +120,6 @@ impl<N: Network> BlockSync<N> {
             requests: Default::default(),
             responses: Default::default(),
             request_timestamps: Default::default(),
-            request_timeouts: Default::default(),
             is_block_synced: Default::default(),
             advance_with_sync_blocks_lock: Default::default(),
         }
@@ -402,8 +397,6 @@ impl<N: Network> BlockSync<N> {
         self.locators.write().swap_remove(peer_ip);
         // Remove all block requests to the peer.
         self.remove_block_requests_to_peer(peer_ip);
-        // Remove the timeouts for the peer.
-        self.request_timeouts.write().swap_remove(peer_ip);
     }
 }
 
@@ -659,16 +652,6 @@ impl<N: Network> BlockSync<N> {
             !is_timeout
         });
 
-        // If there are timeout IPs, then add them to the request timeouts map.
-        if !timeout_ips.is_empty() {
-            // Acquire the write lock on the request timeouts map.
-            let mut request_timeouts = self.request_timeouts.write();
-            // Add each timeout IP to the request timeouts map.
-            for timeout_ip in timeout_ips {
-                request_timeouts.entry(timeout_ip).or_default().push(now);
-            }
-        }
-
         num_timed_out_block_requests
     }
 
@@ -677,21 +660,12 @@ impl<N: Network> BlockSync<N> {
         // Retrieve the latest canon height.
         let latest_canon_height = self.canon.latest_block_height();
 
-        // Compute the timeout frequency of each peer.
-        let timeouts = self
-            .request_timeouts
-            .read()
-            .iter()
-            .map(|(peer_ip, timestamps)| (*peer_ip, timestamps.len()))
-            .collect::<IndexMap<_, _>>();
-
         // Pick a set of peers above the latest canon height, and include their locators.
         let candidate_locators: IndexMap<_, _> = self
             .locators
             .read()
             .iter()
             .filter(|(_, locators)| locators.latest_locator_height() > latest_canon_height)
-            .filter(|(ip, _)| timeouts.get(*ip).map(|count| *count < MAX_BLOCK_REQUEST_TIMEOUTS).unwrap_or(true))
             .sorted_by(|(_, a), (_, b)| b.latest_locator_height().cmp(&a.latest_locator_height()))
             .take(NUM_SYNC_CANDIDATE_PEERS)
             .map(|(peer_ip, locators)| (*peer_ip, locators.clone()))
