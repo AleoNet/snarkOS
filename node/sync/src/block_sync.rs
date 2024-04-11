@@ -726,6 +726,10 @@ impl<N: Network> BlockSync<N> {
             return None;
         }
 
+        // Shuffle the sync peers prior to returning. This ensures the rest of the stack
+        // does not rely on the order of the sync peers, and that the sync peers are not biased.
+        let sync_peers = shuffle_indexmap(sync_peers, &mut rand::thread_rng());
+
         Some((sync_peers, min_common_ancestor))
     }
 
@@ -851,6 +855,18 @@ fn construct_request<N: Network>(
     };
 
     (hash, previous_hash, num_sync_ips, is_honest)
+}
+
+/// Shuffles a given `IndexMap` using the given random number generator.
+fn shuffle_indexmap<K, V, R: Rng + CryptoRng>(mut map: IndexMap<K, V>, rng: &mut R) -> IndexMap<K, V>
+where
+    K: core::hash::Hash + Eq + Clone,
+    V: Clone,
+{
+    use rand::seq::SliceRandom;
+    let mut pairs: Vec<_> = map.drain(..).collect(); // Drain elements to a vector
+    pairs.shuffle(rng); // Shuffle the vector of tuples
+    pairs.into_iter().collect() // Collect back into an IndexMap
 }
 
 #[cfg(test)]
