@@ -356,6 +356,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn update_block_metrics(&self, block: &Block<N>) {
         use snarkvm::ledger::ConfirmedTransaction;
 
+        // Count each type of transaction in the next block.
         let metrics: HashMap<&'static str, usize> = block.transactions().iter().fold(
             HashMap::from([
                 ("AcceptedDeploy", 0),
@@ -381,10 +382,12 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                 transaction_types
             },
         );
-        // Increment metrics at the end
+
         metrics::increment_gauge(metrics::blocks::ACCEPTED_DEPLOY, *metrics.get("AcceptedDeploy").unwrap() as f64);
         metrics::increment_gauge(metrics::blocks::ACCEPTED_EXECUTE, *metrics.get("AcceptedExecute").unwrap() as f64);
         metrics::increment_gauge(metrics::blocks::REJECTED_DEPLOY, *metrics.get("RejectedDeploy").unwrap() as f64);
         metrics::increment_gauge(metrics::blocks::REJECTED_EXECUTE, *metrics.get("RejectedExecute").unwrap() as f64);
+        metrics::increment_gauge(metrics::blocks::ABORTED_TRANSACTIONS, block.aborted_transaction_ids().len() as f64);
+        metrics::increment_gauge(metrics::blocks::ABORTED_SOLUTIONS, block.aborted_solution_ids().len() as f64);
     }
 }
