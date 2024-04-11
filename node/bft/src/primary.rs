@@ -429,9 +429,11 @@ impl<N: Network> Primary<N> {
                         continue 'inner;
                     }
                     // Check if the storage already contain the transmission.
-                    // Note: We do not skip if this is the first transmission in the proposal, to ensure that
-                    // the primary does not propose a batch with no transmissions.
-                    if !transmissions.is_empty() && self.storage.contains_transmission(id) {
+                    // Note: We do not skip if this is the first transaction in the proposal, to ensure that
+                    // the primary does not propose a batch with no transactions.
+                    let first_transaction_in_proposal =
+                        num_transactions == 0 && matches!(transmission, Transmission::Transaction(_));
+                    if !first_transaction_in_proposal && self.storage.contains_transmission(id) {
                         trace!("Proposing - Skipping transmission '{}' - Already in storage", fmt_id(id));
                         continue 'inner;
                     }
