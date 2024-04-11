@@ -404,8 +404,6 @@ impl<N: Network> Primary<N> {
         let num_transmissions_per_worker = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         // Initialize the map of transmissions.
         let mut transmissions: IndexMap<_, _> = Default::default();
-        // Initialize a tracker for the number of transactions.
-        let mut num_transactions = 0;
         // Take the transmissions from the workers.
         for worker in self.workers.iter() {
             // Initialize a tracker for included transmissions for the current worker.
@@ -450,8 +448,6 @@ impl<N: Network> Primary<N> {
                                 trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
                                 continue 'inner;
                             }
-                            // Increment the number of transactions.
-                            num_transactions += 1;
                         }
                         // Note: We explicitly forbid including ratifications,
                         // as the protocol currently does not support ratifications.
@@ -468,11 +464,6 @@ impl<N: Network> Primary<N> {
         // If there are no unconfirmed transmissions to propose, return early.
         if transmissions.is_empty() {
             debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transmissions)".dimmed());
-            return Ok(());
-        }
-        // If there are no unconfirmed transactions to propose, return early.
-        if num_transactions == 0 {
-            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transactions)".dimmed());
             return Ok(());
         }
         // Ditto if the batch had already been proposed and not expired.
