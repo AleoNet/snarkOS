@@ -473,6 +473,8 @@ impl<N: Network> Primary<N> {
         // If there are no unconfirmed transactions to propose, return early.
         if num_transactions == 0 {
             debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transactions)".dimmed());
+            // On failure, reinsert the transmissions into the memory pool.
+            self.reinsert_transmissions_into_workers(transmissions)?;
             return Ok(());
         }
         // Ditto if the batch had already been proposed and not expired.
@@ -483,6 +485,8 @@ impl<N: Network> Primary<N> {
         let is_expired = is_proposal_expired(current_timestamp, lock_guard.1);
         if lock_guard.0 == round && !is_expired {
             warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
+            // On failure, reinsert the transmissions into the memory pool.
+            self.reinsert_transmissions_into_workers(transmissions)?;
             return Ok(());
         }
 
@@ -786,7 +790,7 @@ impl<N: Network> Primary<N> {
         // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
         if let Err(e) = self.store_and_broadcast_certificate(&proposal, &committee_lookback).await {
             // Reinsert the transmissions back into the ready queue for the next proposal.
-            self.reinsert_transmissions_into_workers(proposal)?;
+            self.reinsert_transmissions_into_workers(proposal.into_transmissions())?;
             return Err(e);
         }
 
@@ -1147,7 +1151,7 @@ impl<N: Network> Primary<N> {
             let proposal = self.proposed_batch.write().take();
             if let Some(proposal) = proposal {
                 debug!("Cleared expired proposal for round {}", proposal.round());
-                self.reinsert_transmissions_into_workers(proposal)?;
+                self.reinsert_transmissions_into_workers(proposal.into_transmissions())?;
             }
         }
         Ok(())
@@ -1296,15 +1300,14 @@ impl<N: Network> Primary<N> {
     }
 
     /// Re-inserts the transmissions from the proposal into the workers.
-    fn reinsert_transmissions_into_workers(&self, proposal: Proposal<N>) -> Result<()> {
+    fn reinsert_transmissions_into_workers(
+        &self,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<()> {
         // Re-insert the transmissions into the workers.
-        assign_to_workers(
-            &self.workers,
-            proposal.into_transmissions().into_iter(),
-            |worker, transmission_id, transmission| {
-                worker.reinsert(transmission_id, transmission);
-            },
-        )
+        assign_to_workers(&self.workers, transmissions.into_iter(), |worker, transmission_id, transmission| {
+            worker.reinsert(transmission_id, transmission);
+        })
     }
 
     /// Recursively stores a given batch certificate, after ensuring:
