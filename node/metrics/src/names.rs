@@ -36,15 +36,8 @@ pub(super) const GAUGE_NAMES: [&str; 19] = [
     tcp::TCP_TASKS,
 ];
 
-pub(super) const HISTOGRAM_NAMES: [&str; 7] = [
-    bft::COMMIT_ROUNDS_LATENCY,
-    consensus::CERTIFICATE_COMMIT_LATENCY,
-    consensus::BLOCK_LATENCY,
-    tcp::NOISE_CODEC_ENCRYPTION_TIME,
-    tcp::NOISE_CODEC_DECRYPTION_TIME,
-    tcp::NOISE_CODEC_ENCRYPTION_SIZE,
-    tcp::NOISE_CODEC_DECRYPTION_SIZE,
-];
+pub(super) const HISTOGRAM_NAMES: [&str; 3] =
+    [bft::COMMIT_ROUNDS_LATENCY, consensus::CERTIFICATE_COMMIT_LATENCY, consensus::BLOCK_LATENCY];
 
 pub mod bft {
     pub const COMMIT_ROUNDS_LATENCY: &str = "snarkos_bft_commit_rounds_latency_secs"; // <-- This one doesn't even make sense.
@@ -83,9 +76,5 @@ pub mod router {
 }
 
 pub mod tcp {
-    pub const NOISE_CODEC_ENCRYPTION_TIME: &str = "snarkos_tcp_noise_codec_encryption_micros";
-    pub const NOISE_CODEC_DECRYPTION_TIME: &str = "snarkos_tcp_noise_codec_decryption_micros";
-    pub const NOISE_CODEC_ENCRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_encryption_size";
-    pub const NOISE_CODEC_DECRYPTION_SIZE: &str = "snarkos_tcp_noise_codec_decryption_size";
     pub const TCP_TASKS: &str = "snarkos_tcp_tasks_total";
 }
