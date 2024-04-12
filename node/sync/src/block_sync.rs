@@ -781,7 +781,12 @@ impl<N: Network> BlockSync<N> {
         for height in start_height..end_height {
             // Ensure the current height is not canonized or already requested.
             if self.check_block_request(height).is_err() {
-                break;
+                // If the sequence of block requests is interrupted, then return early.
+                // Otherwise, continue until the first start height that is new.
+                match request_hashes.is_empty() {
+                    true => continue,
+                    false => break,
+                }
             }
 
             // Construct the block request.
