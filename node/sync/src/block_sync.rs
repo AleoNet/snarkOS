@@ -17,6 +17,7 @@ use crate::{
     locators::BlockLocators,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
+use snarkos_node_router::messages::DataBlocks;
 use snarkos_node_sync_communication_service::CommunicationService;
 use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::prelude::{block::Block, Network};
@@ -231,26 +232,45 @@ impl<N: Network> BlockSync<N> {
         }
 
         // Process the block requests.
-        'outer: for (height, (hash, previous_hash, sync_ips)) in block_requests {
-            // Insert the block request into the sync pool.
-            if let Err(error) = self.insert_block_request(height, (hash, previous_hash, sync_ips.clone())) {
-                warn!("Block sync failed - {error}");
-                // Break out of the loop.
-                break 'outer;
+        'outer: for requests in block_requests.chunks(DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as usize) {
+            // Retrieve the starting height and the sync IPs.
+            let (start_height, sync_ips) = match requests.first() {
+                Some((height, (_, _, sync_ips))) => (*height, sync_ips),
+                None => {
+                    warn!("Block sync failed - no block requests");
+                    break 'outer;
+                }
+            };
+
+            // TODO (raychu86): Unify the sync_ip selection or select new sync IPS for each block request.
+
+            // Calculate the end height.
+            let end_height = start_height.saturating_add(requests.len() as u32);
+
+            // Insert the chunk of block requests.
+            for (height, (hash, previous_hash, _)) in requests.iter() {
+                // Insert the block request into the sync pool using the sync IPs from the last block request in the chunk.
+                if let Err(error) = self.insert_block_request(*height, (*hash, *previous_hash, sync_ips.clone())) {
+                    warn!("Block sync failed - {error}");
+                    // Break out of the loop.
+                    break 'outer;
+                }
             }
 
             /* Send the block request to the peers */
 
             // Construct the message.
-            let message = C::prepare_block_request(height, height + 1);
+            let message = C::prepare_block_request(start_height, end_height);
             // Send the message to the peers.
             for sync_ip in sync_ips {
-                let sender = communication.send(sync_ip, message.clone()).await;
+                let sender = communication.send(*sync_ip, message.clone()).await;
                 // If the send fails for any peer, remove the block request from the sync pool.
                 if sender.is_none() {
                     warn!("Failed to send block request to peer '{sync_ip}'");
                     // Remove the entire block request from the sync pool.
-                    self.remove_block_request(height);
+                    for height in start_height..end_height {
+                        self.remove_block_request(height);
+                    }
                     // Break out of the loop.
                     break 'outer;
                 }
@@ -402,7 +422,7 @@ impl<N: Network> BlockSync<N> {
 
 impl<N: Network> BlockSync<N> {
     /// Returns a list of block requests, if the node needs to sync.
-    fn prepare_block_requests(&self) -> IndexMap<u32, SyncRequest<N>> {
+    fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
         // Remove timed out block requests.
         self.remove_timed_out_block_requests();
         // Prepare the block requests.
@@ -734,7 +754,7 @@ impl<N: Network> BlockSync<N> {
         sync_peers: IndexMap<SocketAddr, BlockLocators<N>>,
         min_common_ancestor: u32,
         rng: &mut R,
-    ) -> IndexMap<u32, SyncRequest<N>> {
+    ) -> Vec<(u32, SyncRequest<N>)> {
         // Retrieve the latest canon height.
         let latest_canon_height = self.canon.latest_block_height();
 
