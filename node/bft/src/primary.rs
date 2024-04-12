@@ -461,11 +461,6 @@ impl<N: Network> Primary<N> {
                 }
             }
         }
-        // If there are no unconfirmed transmissions to propose, return early.
-        if transmissions.is_empty() {
-            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transmissions)".dimmed());
-            return Ok(());
-        }
         // Ditto if the batch had already been proposed and not expired.
         ensure!(round > 0, "Round 0 cannot have transaction batches");
         // Determine the current timestamp.
