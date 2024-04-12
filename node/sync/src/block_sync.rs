@@ -214,7 +214,7 @@ impl<N: Network> BlockSync<N> {
     pub async fn try_block_sync<C: CommunicationService>(&self, communication: &C) {
         // Prepare the block requests, if any.
         // In the process, we update the state of `is_block_synced` for the sync module.
-        let block_requests = self.prepare_block_requests();
+        let (block_requests, sync_peers) = self.prepare_block_requests();
         trace!("Prepared {} block requests", block_requests.len());
 
         // If there are no block requests, but there are pending block responses in the sync pool,
@@ -242,7 +242,13 @@ impl<N: Network> BlockSync<N> {
                 }
             };
 
-            // TODO (raychu86): Unify the sync_ip selection or select new sync IPS for each block request.
+            // Use a randomly sampled subset of the sync IPs.
+            let sync_ips: IndexSet<_> = sync_peers
+                .keys()
+                .copied()
+                .choose_multiple(&mut rand::thread_rng(), sync_ips.len())
+                .into_iter()
+                .collect();
 
             // Calculate the end height.
             let end_height = start_height.saturating_add(requests.len() as u32);
@@ -263,7 +269,7 @@ impl<N: Network> BlockSync<N> {
             let message = C::prepare_block_request(start_height, end_height);
             // Send the message to the peers.
             for sync_ip in sync_ips {
-                let sender = communication.send(*sync_ip, message.clone()).await;
+                let sender = communication.send(sync_ip, message.clone()).await;
                 // If the send fails for any peer, remove the block request from the sync pool.
                 if sender.is_none() {
                     warn!("Failed to send block request to peer '{sync_ip}'");
@@ -421,8 +427,9 @@ impl<N: Network> BlockSync<N> {
 }
 
 impl<N: Network> BlockSync<N> {
-    /// Returns a list of block requests, if the node needs to sync.
-    fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
+    /// Returns a list of block requests and the sync peers, if the node needs to sync.
+    #[allow(clippy::type_complexity)]
+    fn prepare_block_requests(&self) -> (Vec<(u32, SyncRequest<N>)>, IndexMap<SocketAddr, BlockLocators<N>>) {
         // Remove timed out block requests.
         self.remove_timed_out_block_requests();
         // Prepare the block requests.
@@ -432,12 +439,12 @@ impl<N: Network> BlockSync<N> {
             // Update the state of `is_block_synced` for the sync module.
             self.update_is_block_synced(greatest_peer_height, MAX_BLOCKS_BEHIND);
             // Return the list of block requests.
-            self.construct_requests(sync_peers, min_common_ancestor, &mut rand::thread_rng())
+            (self.construct_requests(&sync_peers, min_common_ancestor, &mut rand::thread_rng()), sync_peers)
         } else {
             // Update the state of `is_block_synced` for the sync module.
             self.update_is_block_synced(0, MAX_BLOCKS_BEHIND);
             // Return an empty list of block requests.
-            Default::default()
+            (Default::default(), Default::default())
         }
     }
 
@@ -751,7 +758,7 @@ impl<N: Network> BlockSync<N> {
     /// Given the sync peers and their minimum common ancestor, return a list of block requests.
     fn construct_requests<R: Rng + CryptoRng>(
         &self,
-        sync_peers: IndexMap<SocketAddr, BlockLocators<N>>,
+        sync_peers: &IndexMap<SocketAddr, BlockLocators<N>>,
         min_common_ancestor: u32,
         rng: &mut R,
     ) -> Vec<(u32, SyncRequest<N>)> {
@@ -778,7 +785,7 @@ impl<N: Network> BlockSync<N> {
             }
 
             // Construct the block request.
-            let (hash, previous_hash, num_sync_ips, is_honest) = construct_request(height, &sync_peers);
+            let (hash, previous_hash, num_sync_ips, is_honest) = construct_request(height, sync_peers);
 
             // Handle the dishonest case.
             if !is_honest {
@@ -797,6 +804,7 @@ impl<N: Network> BlockSync<N> {
             request_hashes.insert(height, (hash, previous_hash));
         }
 
+        // TODO (raychu86): Remove this. Just return the required num_sync_ips.
         // Pick the sync peers.
         let sync_ips: IndexSet<_> =
             sync_peers.keys().copied().choose_multiple(rng, max_num_sync_ips).into_iter().collect();
@@ -954,7 +962,7 @@ mod tests {
         };
 
         // Prepare the block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
 
         // If there are no peers, then there should be no requests.
         if peers.is_empty() {
@@ -1056,7 +1064,7 @@ mod tests {
         sync.update_peer_locators(peer_3, sample_block_locators(10)).unwrap();
 
         // Prepare the block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
         assert_eq!(requests.len(), 10);
 
         // Check the requests.
@@ -1098,7 +1106,7 @@ mod tests {
         sync.update_peer_locators(peer_3, sample_block_locators(10)).unwrap();
 
         // Prepare the block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
         assert_eq!(requests.len(), 0);
 
         // When there are NUM_REDUNDANCY+1 peers ahead, and 1 is on a fork, then there should be block requests.
@@ -1108,7 +1116,7 @@ mod tests {
         sync.update_peer_locators(peer_4, sample_block_locators(10)).unwrap();
 
         // Prepare the block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
         assert_eq!(requests.len(), 10);
 
         // Check the requests.
@@ -1142,7 +1150,7 @@ mod tests {
         sync.update_peer_locators(peer_3, sample_block_locators_with_fork(20, 10)).unwrap();
 
         // Prepare the block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
         assert_eq!(requests.len(), 0);
 
         // When there are NUM_REDUNDANCY+1 peers ahead, and peer 3 is on a fork, then there should be block requests.
@@ -1152,7 +1160,7 @@ mod tests {
         sync.update_peer_locators(peer_4, sample_block_locators(10)).unwrap();
 
         // Prepare the block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
         assert_eq!(requests.len(), 10);
 
         // Check the requests.
@@ -1173,7 +1181,7 @@ mod tests {
         sync.update_peer_locators(sample_peer_ip(1), sample_block_locators(10)).unwrap();
 
         // Prepare the block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
         assert_eq!(requests.len(), 10);
 
         for (height, (hash, previous_hash, sync_ips)) in requests.clone() {
@@ -1291,7 +1299,7 @@ mod tests {
         sync.update_peer_locators(peer_ip, sample_block_locators(10)).unwrap();
 
         // Prepare the block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
         assert_eq!(requests.len(), 10);
 
         for (height, (hash, previous_hash, sync_ips)) in requests.clone() {
@@ -1312,14 +1320,14 @@ mod tests {
         }
 
         // As there is no peer, it should not be possible to prepare block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
         assert_eq!(requests.len(), 0);
 
         // Add the peer again.
         sync.update_peer_locators(peer_ip, sample_block_locators(10)).unwrap();
 
         // Prepare the block requests.
-        let requests = sync.prepare_block_requests();
+        let (requests, _) = sync.prepare_block_requests();
         assert_eq!(requests.len(), 10);
 
         for (height, (hash, previous_hash, sync_ips)) in requests {
