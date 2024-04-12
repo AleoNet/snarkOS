@@ -773,7 +773,8 @@ impl<N: Network> BlockSync<N> {
         // Compute the start height for the block request.
         let start_height = latest_canon_height + 1;
         // Compute the end height for the block request.
-        let end_height = (min_common_ancestor + 1).min(start_height + MAX_BLOCK_REQUESTS as u32);
+        let max_blocks_to_request = MAX_BLOCK_REQUESTS as u32 * DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32;
+        let end_height = (min_common_ancestor + 1).min(start_height + max_blocks_to_request);
 
         let mut request_hashes = IndexMap::with_capacity((start_height..end_height).len());
         let mut max_num_sync_ips = 1;
