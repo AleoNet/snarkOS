@@ -22,7 +22,7 @@ use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use parking_lot::{Mutex, RwLock};
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
@@ -402,7 +402,7 @@ impl<N: Network> BlockSync<N> {
 
 impl<N: Network> BlockSync<N> {
     /// Returns a list of block requests, if the node needs to sync.
-    fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
+    fn prepare_block_requests(&self) -> IndexMap<u32, SyncRequest<N>> {
         // Remove timed out block requests.
         self.remove_timed_out_block_requests();
         // Prepare the block requests.
@@ -417,7 +417,7 @@ impl<N: Network> BlockSync<N> {
             // Update the state of `is_block_synced` for the sync module.
             self.update_is_block_synced(0, MAX_BLOCKS_BEHIND);
             // Return an empty list of block requests.
-            Vec::new()
+            Default::default()
         }
     }
 
@@ -734,13 +734,13 @@ impl<N: Network> BlockSync<N> {
         sync_peers: IndexMap<SocketAddr, BlockLocators<N>>,
         min_common_ancestor: u32,
         rng: &mut R,
-    ) -> Vec<(u32, SyncRequest<N>)> {
+    ) -> IndexMap<u32, SyncRequest<N>> {
         // Retrieve the latest canon height.
         let latest_canon_height = self.canon.latest_block_height();
 
         // If the minimum common ancestor is at or below the latest canon height, then return early.
         if min_common_ancestor <= latest_canon_height {
-            return vec![];
+            return Default::default();
         }
 
         // Compute the start height for the block request.
@@ -748,12 +748,13 @@ impl<N: Network> BlockSync<N> {
         // Compute the end height for the block request.
         let end_height = (min_common_ancestor + 1).min(start_height + MAX_BLOCK_REQUESTS as u32);
 
-        let mut requests = Vec::with_capacity((start_height..end_height).len());
+        let mut request_hashes = IndexMap::with_capacity((start_height..end_height).len());
+        let mut max_num_sync_ips = 1;
 
         for height in start_height..end_height {
             // Ensure the current height is not canonized or already requested.
             if self.check_block_request(height).is_err() {
-                continue;
+                break;
             }
 
             // Construct the block request.
@@ -769,14 +770,22 @@ impl<N: Network> BlockSync<N> {
                 }
             }
 
-            // Pick the sync peers.
-            let sync_ips = sync_peers.keys().copied().choose_multiple(rng, num_sync_ips);
+            // Update the maximum number of sync IPs.
+            max_num_sync_ips = max_num_sync_ips.max(num_sync_ips);
 
             // Append the request.
-            requests.push((height, (hash, previous_hash, sync_ips.into_iter().collect())));
+            request_hashes.insert(height, (hash, previous_hash));
         }
 
-        requests
+        // Pick the sync peers.
+        let sync_ips: IndexSet<_> =
+            sync_peers.keys().copied().choose_multiple(rng, max_num_sync_ips).into_iter().collect();
+
+        // Construct the requests with the same sync ips.
+        request_hashes
+            .into_iter()
+            .map(|(height, (hash, previous_hash))| (height, (hash, previous_hash, sync_ips.clone())))
+            .collect()
     }
 }
 
