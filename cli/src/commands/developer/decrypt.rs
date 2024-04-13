@@ -43,8 +43,8 @@ impl Decrypt {
     pub fn parse(self) -> Result<String> {
         // Decrypt the ciphertext for the given network.
         match self.network {
-            0 => Self::decrypt_ciphertext::<MainnetV0>(&self.ciphertext, &self.view_key),
-            1 => Self::decrypt_ciphertext::<TestnetV0>(&self.ciphertext, &self.view_key),
+            MainnetV0::ID => Self::decrypt_ciphertext::<MainnetV0>(&self.ciphertext, &self.view_key),
+            TestnetV0::ID => Self::decrypt_ciphertext::<TestnetV0>(&self.ciphertext, &self.view_key),
             _ => bail!("Unsupported network ID"),
         }
     }

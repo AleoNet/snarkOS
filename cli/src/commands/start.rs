@@ -163,7 +163,7 @@ impl Start {
             let mut cli = self.clone();
             // Parse the network.
             match cli.network {
-                0 => {
+                MainnetV0::ID => {
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<MainnetV0>().await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
@@ -172,7 +172,7 @@ impl Start {
                         Display::start(node, log_receiver).expect("Failed to initialize the display");
                     }
                 }
-                1 => {
+                TestnetV0::ID => {
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<TestnetV0>().await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.

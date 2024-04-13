@@ -91,8 +91,8 @@ impl TransferPrivate {
 
         // Construct the transfer for the specified network.
         match self.network {
-            0 => self.construct_transfer_private::<MainnetV0>(),
-            1 => self.construct_transfer_private::<TestnetV0>(),
+            MainnetV0::ID => self.construct_transfer_private::<MainnetV0>(),
+            TestnetV0::ID => self.construct_transfer_private::<TestnetV0>(),
             _ => bail!("Unsupported network ID"),
         }
     }

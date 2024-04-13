@@ -69,8 +69,8 @@ impl Scan {
     pub fn parse(self) -> Result<String> {
         // Scan for records on the given network.
         match self.network {
-            0 => self.scan_records::<MainnetV0>(),
-            1 => self.scan_records::<TestnetV0>(),
+            MainnetV0::ID => self.scan_records::<MainnetV0>(),
+            TestnetV0::ID => self.scan_records::<TestnetV0>(),
             _ => bail!("Unsupported network ID"),
         }
     }
@@ -133,8 +133,8 @@ impl Scan {
     fn parse_block_range(&self) -> Result<(u32, u32)> {
         // Get the network name.
         let network = match self.network {
-            0 => "mainnet",
-            1 => "testnet",
+            MainnetV0::ID => "mainnet",
+            TestnetV0::ID => "testnet",
             _ => bail!("Unsupported network ID"),
         };
 
@@ -184,8 +184,8 @@ impl Scan {
 
         // Get the network name.
         let network = match N::ID {
-            0 => "mainnet",
-            1 => "testnet",
+            MainnetV0::ID => "mainnet",
+            TestnetV0::ID => "testnet",
             _ => bail!("Unsupported network ID"),
         };
 
@@ -362,8 +362,8 @@ impl Scan {
 
             // Get the network name.
             let network = match N::ID {
-                0 => "mainnet",
-                1 => "testnet",
+                MainnetV0::ID => "mainnet",
+                TestnetV0::ID => "testnet",
                 _ => bail!("Unsupported network ID"),
             };
 

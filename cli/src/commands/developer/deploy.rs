@@ -91,8 +91,8 @@ impl Deploy {
 
         // Construct the deployment for the specified network.
         match self.network {
-            0 => self.construct_deployment::<MainnetV0, AleoV0>(),
-            1 => self.construct_deployment::<TestnetV0, AleoTestnetV0>(),
+            MainnetV0::ID => self.construct_deployment::<MainnetV0, AleoV0>(),
+            TestnetV0::ID => self.construct_deployment::<TestnetV0, AleoTestnetV0>(),
             _ => bail!("Unsupported network ID"),
         }
     }

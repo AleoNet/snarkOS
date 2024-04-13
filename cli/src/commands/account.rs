@@ -111,14 +111,14 @@ impl Account {
                 match vanity {
                     // Generate a vanity account for the specified network.
                     Some(vanity) => match network {
-                        0 => Self::new_vanity::<MainnetV0>(vanity.as_str(), discreet),
-                        1 => Self::new_vanity::<TestnetV0>(vanity.as_str(), discreet),
+                        MainnetV0::ID => Self::new_vanity::<MainnetV0>(vanity.as_str(), discreet),
+                        TestnetV0::ID => Self::new_vanity::<TestnetV0>(vanity.as_str(), discreet),
                         _ => bail!("Unsupported network ID"),
                     },
                     // Generate a seeded account for the specified network.
                     None => match network {
-                        0 => Self::new_seeded::<MainnetV0>(seed, discreet),
-                        1 => Self::new_seeded::<TestnetV0>(seed, discreet),
+                        MainnetV0::ID => Self::new_seeded::<MainnetV0>(seed, discreet),
+                        TestnetV0::ID => Self::new_seeded::<TestnetV0>(seed, discreet),
                         _ => bail!("Unsupported network ID"),
                     },
                 }
@@ -138,16 +138,16 @@ impl Account {
 
                 // Sign the message for the specified network.
                 match network {
-                    0 => Self::sign::<MainnetV0>(key, message, seed, raw),
-                    1 => Self::sign::<TestnetV0>(key, message, seed, raw),
+                    MainnetV0::ID => Self::sign::<MainnetV0>(key, message, seed, raw),
+                    TestnetV0::ID => Self::sign::<TestnetV0>(key, message, seed, raw),
                     _ => bail!("Unsupported network ID"),
                 }
             }
             Self::Verify { network, address, signature, message, raw } => {
                 // Verify the signature for the specified network.
                 match network {
-                    0 => Self::verify::<MainnetV0>(address, signature, message, raw),
-                    1 => Self::verify::<TestnetV0>(address, signature, message, raw),
+                    MainnetV0::ID => Self::verify::<MainnetV0>(address, signature, message, raw),
+                    TestnetV0::ID => Self::verify::<TestnetV0>(address, signature, message, raw),
                     _ => bail!("Unsupported network ID"),
                 }
             }
