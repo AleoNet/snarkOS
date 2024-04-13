@@ -487,8 +487,8 @@ impl<N: Network> Primary<N> {
         let transmission_ids = transmissions.keys().copied().collect();
         // Prepare the previous batch certificate IDs.
         let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
-        // Sign the batch header.
-        let batch_header = spawn_blocking!(BatchHeader::new(
+        // Sign the batch header and construct the proposal.
+        let (batch_header, proposal) = spawn_blocking!(BatchHeader::new(
             &private_key,
             round,
             current_timestamp,
@@ -496,9 +496,18 @@ impl<N: Network> Primary<N> {
             transmission_ids,
             previous_certificate_ids,
             &mut rand::thread_rng()
-        ))?;
-        // Construct the proposal.
-        let proposal = Proposal::new(committee_lookback, batch_header.clone(), transmissions)?;
+        ))
+        .and_then(|batch_header| {
+            Proposal::new(committee_lookback, batch_header.clone(), transmissions.clone())
+                .map(|proposal| (batch_header, proposal))
+        })
+        .map_err(|err| {
+            // On error, reinsert the transmissions and then propagate the error.
+            if let Err(e) = self.reinsert_transmissions_into_workers(transmissions) {
+                error!("Failed to reinsert transmissions: {e:?}");
+            }
+            err
+        })?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the timestamp of the latest proposed batch.
