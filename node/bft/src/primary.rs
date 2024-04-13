@@ -2513,7 +2513,7 @@ mod tests {
         let mut aborted_transmissions = HashSet::new();
         let mut transmissions_without_aborted = HashMap::new();
         for (transmission_id, transmission) in transmissions.clone() {
-            match rng.gen::<bool>() {
+            match rng.gen::<bool>() || aborted_transmissions.is_empty() {
                 true => {
                     // Insert the aborted transmission.
                     aborted_transmissions.insert(transmission_id);
