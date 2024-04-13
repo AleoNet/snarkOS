@@ -404,8 +404,6 @@ impl<N: Network> Primary<N> {
         let num_transmissions_per_worker = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         // Initialize the map of transmissions.
         let mut transmissions: IndexMap<_, _> = Default::default();
-        // Initialize a tracker for the number of transactions.
-        let mut num_transactions = 0;
         // Take the transmissions from the workers.
         for worker in self.workers.iter() {
             // Initialize a tracker for included transmissions for the current worker.
@@ -450,8 +448,6 @@ impl<N: Network> Primary<N> {
                                 trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
                                 continue 'inner;
                             }
-                            // Increment the number of transactions.
-                            num_transactions += 1;
                         }
                         // Note: We explicitly forbid including ratifications,
                         // as the protocol currently does not support ratifications.
@@ -465,16 +461,6 @@ impl<N: Network> Primary<N> {
                 }
             }
         }
-        // If there are no unconfirmed transmissions to propose, return early.
-        if transmissions.is_empty() {
-            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transmissions)".dimmed());
-            return Ok(());
-        }
-        // If there are no unconfirmed transactions to propose, return early.
-        if num_transactions == 0 {
-            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transactions)".dimmed());
-            return Ok(());
-        }
         // Ditto if the batch had already been proposed and not expired.
         ensure!(round > 0, "Round 0 cannot have transaction batches");
         // Determine the current timestamp.
@@ -483,6 +469,8 @@ impl<N: Network> Primary<N> {
         let is_expired = is_proposal_expired(current_timestamp, lock_guard.1);
         if lock_guard.0 == round && !is_expired {
             warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
+            // Reinsert the transmissions back into the ready queue for the next proposal.
+            self.reinsert_transmissions_into_workers(transmissions)?;
             return Ok(());
         }
 
@@ -499,8 +487,8 @@ impl<N: Network> Primary<N> {
         let transmission_ids = transmissions.keys().copied().collect();
         // Prepare the previous batch certificate IDs.
         let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
-        // Sign the batch header.
-        let batch_header = spawn_blocking!(BatchHeader::new(
+        // Sign the batch header and construct the proposal.
+        let (batch_header, proposal) = spawn_blocking!(BatchHeader::new(
             &private_key,
             round,
             current_timestamp,
@@ -508,9 +496,18 @@ impl<N: Network> Primary<N> {
             transmission_ids,
             previous_certificate_ids,
             &mut rand::thread_rng()
-        ))?;
-        // Construct the proposal.
-        let proposal = Proposal::new(committee_lookback, batch_header.clone(), transmissions)?;
+        ))
+        .and_then(|batch_header| {
+            Proposal::new(committee_lookback, batch_header.clone(), transmissions.clone())
+                .map(|proposal| (batch_header, proposal))
+        })
+        .map_err(|err| {
+            // On error, reinsert the transmissions and then propagate the error.
+            if let Err(e) = self.reinsert_transmissions_into_workers(transmissions) {
+                error!("Failed to reinsert transmissions: {e:?}");
+            }
+            err
+        })?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the timestamp of the latest proposed batch.
@@ -787,7 +784,7 @@ impl<N: Network> Primary<N> {
         // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
         if let Err(e) = self.store_and_broadcast_certificate(&proposal, &committee_lookback).await {
             // Reinsert the transmissions back into the ready queue for the next proposal.
-            self.reinsert_transmissions_into_workers(proposal)?;
+            self.reinsert_transmissions_into_workers(proposal.into_transmissions())?;
             return Err(e);
         }
 
@@ -1148,7 +1145,7 @@ impl<N: Network> Primary<N> {
             let proposal = self.proposed_batch.write().take();
             if let Some(proposal) = proposal {
                 debug!("Cleared expired proposal for round {}", proposal.round());
-                self.reinsert_transmissions_into_workers(proposal)?;
+                self.reinsert_transmissions_into_workers(proposal.into_transmissions())?;
             }
         }
         Ok(())
@@ -1297,15 +1294,14 @@ impl<N: Network> Primary<N> {
     }
 
     /// Re-inserts the transmissions from the proposal into the workers.
-    fn reinsert_transmissions_into_workers(&self, proposal: Proposal<N>) -> Result<()> {
+    fn reinsert_transmissions_into_workers(
+        &self,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<()> {
         // Re-insert the transmissions into the workers.
-        assign_to_workers(
-            &self.workers,
-            proposal.into_transmissions().into_iter(),
-            |worker, transmission_id, transmission| {
-                worker.reinsert(transmission_id, transmission);
-            },
-        )
+        assign_to_workers(&self.workers, transmissions.into_iter(), |worker, transmission_id, transmission| {
+            worker.reinsert(transmission_id, transmission);
+        })
     }
 
     /// Recursively stores a given batch certificate, after ensuring:
@@ -1806,11 +1802,6 @@ mod tests {
         // Check there is no batch currently proposed.
         assert!(primary.proposed_batch.read().is_none());
 
-        // Try to propose a batch. There are no transmissions in the workers so the method should
-        // just return without proposing a batch.
-        assert!(primary.propose_batch().await.is_ok());
-        assert!(primary.proposed_batch.read().is_none());
-
         // Generate a solution and a transaction.
         let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
@@ -1820,6 +1811,19 @@ mod tests {
         primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Try to propose a batch again. This time, it should succeed.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_with_no_transmissions() {
+        let mut rng = TestRng::default();
+        let (primary, _) = primary_without_handlers(&mut rng).await;
+
+        // Check there is no batch currently proposed.
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Try to propose a batch with no transmissions.
         assert!(primary.propose_batch().await.is_ok());
         assert!(primary.proposed_batch.read().is_some());
     }
@@ -1835,11 +1839,6 @@ mod tests {
 
         // Sleep for a while to ensure the primary is ready to propose the next round.
         tokio::time::sleep(Duration::from_secs(MIN_BATCH_DELAY_IN_SECS)).await;
-
-        // Try to propose a batch. There are no transmissions in the workers so the method should
-        // just return without proposing a batch.
-        assert!(primary.propose_batch().await.is_ok());
-        assert!(primary.proposed_batch.read().is_none());
 
         // Generate a solution and a transaction.
         let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
