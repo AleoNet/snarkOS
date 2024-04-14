@@ -511,9 +511,10 @@ impl<N: Network> Storage<N> {
         // Ensure the certificate round is above the GC round.
         ensure!(certificate.round() > self.gc_round(), "Certificate round is at or below the GC round");
         // Ensure the certificate and its transmissions are valid.
-        let missing_transmissions = self.check_certificate(&certificate, transmissions, aborted_transmissions)?;
+        let missing_transmissions =
+            self.check_certificate(&certificate, transmissions, aborted_transmissions.clone())?;
         // Insert the certificate into storage.
-        self.insert_certificate_atomic(certificate, missing_transmissions);
+        self.insert_certificate_atomic(certificate, aborted_transmissions, missing_transmissions);
         Ok(())
     }
 
@@ -525,6 +526,7 @@ impl<N: Network> Storage<N> {
     fn insert_certificate_atomic(
         &self,
         certificate: BatchCertificate<N>,
+        aborted_transmission_ids: HashSet<TransmissionID<N>>,
         missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
         // Retrieve the round.
@@ -545,7 +547,12 @@ impl<N: Network> Storage<N> {
         // Insert the batch ID.
         self.batch_ids.write().insert(batch_id, round);
         // Insert the certificate ID for each of the transmissions into storage.
-        self.transmissions.insert_transmissions(certificate_id, transmission_ids, missing_transmissions);
+        self.transmissions.insert_transmissions(
+            certificate_id,
+            transmission_ids,
+            aborted_transmission_ids,
+            missing_transmissions,
+        );
     }
 
     /// Removes the given `certificate ID` from storage.
