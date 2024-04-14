@@ -2545,9 +2545,17 @@ mod tests {
         );
 
         // Insert the certificate to storage.
-        primary.storage.insert_certificate(certificate, transmissions_without_aborted, aborted_transmissions).unwrap();
+        primary
+            .storage
+            .insert_certificate(certificate, transmissions_without_aborted, aborted_transmissions.clone())
+            .unwrap();
 
         // Ensure the certificate exists in storage.
         assert!(primary.storage.contains_certificate(certificate_id));
+        // Ensure that the aborted transmissions are exist in the storage.
+        for aborted_transmission_id in aborted_transmissions {
+            assert!(primary.storage.contains_transmission(aborted_transmission_id));
+            assert!(primary.storage.get_transmission(aborted_transmission_id).is_none());
+        }
     }
 }
