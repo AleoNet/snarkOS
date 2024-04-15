@@ -2552,7 +2552,7 @@ mod tests {
 
         // Ensure the certificate exists in storage.
         assert!(primary.storage.contains_certificate(certificate_id));
-        // Ensure that the aborted transmissions are exist in the storage.
+        // Ensure that the aborted transmission IDs exist in storage.
         for aborted_transmission_id in aborted_transmissions {
             assert!(primary.storage.contains_transmission(aborted_transmission_id));
             assert!(primary.storage.get_transmission(aborted_transmission_id).is_none());
