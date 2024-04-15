@@ -48,8 +48,6 @@ impl<N: Network> Proposal<N> {
         ensure!(batch_header.round() >= committee.starting_round(), "Batch round must be >= the committee round");
         // Ensure the batch author is a member of the committee.
         ensure!(committee.is_committee_member(batch_header.author()), "The batch author is not a committee member");
-        // Ensure the transmissions are not empty.
-        ensure!(!transmissions.is_empty(), "The transmissions are empty");
         // Ensure the transmission IDs match in the batch header and transmissions.
         ensure!(
             batch_header.transmission_ids().len() == transmissions.len(),

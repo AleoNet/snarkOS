@@ -19,7 +19,7 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey},
         algorithms::Hash,
-        network::{MainnetV0, Network},
+        network::{MainnetV0, Network, TestnetV0},
     },
     ledger::{
         block::Block,
@@ -163,9 +163,18 @@ impl Start {
             let mut cli = self.clone();
             // Parse the network.
             match cli.network {
-                0 => {
+                MainnetV0::ID => {
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<MainnetV0>().await.expect("Failed to parse the node");
+                    // If the display is enabled, render the display.
+                    if !cli.nodisplay {
+                        // Initialize the display.
+                        Display::start(node, log_receiver).expect("Failed to initialize the display");
+                    }
+                }
+                TestnetV0::ID => {
+                    // Parse the node from the configurations.
+                    let node = cli.parse_node::<TestnetV0>().await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
                     if !cli.nodisplay {
                         // Initialize the display.
@@ -625,6 +634,9 @@ fn load_or_compute_genesis<N: Network>(
 ) -> Result<Block<N>> {
     // Construct the preimage.
     let mut preimage = Vec::new();
+
+    // Input the network ID.
+    preimage.extend(&N::ID.to_le_bytes());
 
     // Input the genesis private key, committee, and public balances.
     preimage.extend(genesis_private_key.to_bytes_le()?);

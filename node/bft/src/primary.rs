@@ -404,8 +404,6 @@ impl<N: Network> Primary<N> {
         let num_transmissions_per_worker = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         // Initialize the map of transmissions.
         let mut transmissions: IndexMap<_, _> = Default::default();
-        // Initialize a tracker for the number of transactions.
-        let mut num_transactions = 0;
         // Take the transmissions from the workers.
         for worker in self.workers.iter() {
             // Initialize a tracker for included transmissions for the current worker.
@@ -450,8 +448,6 @@ impl<N: Network> Primary<N> {
                                 trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
                                 continue 'inner;
                             }
-                            // Increment the number of transactions.
-                            num_transactions += 1;
                         }
                         // Note: We explicitly forbid including ratifications,
                         // as the protocol currently does not support ratifications.
@@ -465,16 +461,6 @@ impl<N: Network> Primary<N> {
                 }
             }
         }
-        // If there are no unconfirmed transmissions to propose, return early.
-        if transmissions.is_empty() {
-            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transmissions)".dimmed());
-            return Ok(());
-        }
-        // If there are no unconfirmed transactions to propose, return early.
-        if num_transactions == 0 {
-            debug!("Primary is safely skipping a batch proposal {}", "(no unconfirmed transactions)".dimmed());
-            return Ok(());
-        }
         // Ditto if the batch had already been proposed and not expired.
         ensure!(round > 0, "Round 0 cannot have transaction batches");
         // Determine the current timestamp.
@@ -483,6 +469,8 @@ impl<N: Network> Primary<N> {
         let is_expired = is_proposal_expired(current_timestamp, lock_guard.1);
         if lock_guard.0 == round && !is_expired {
             warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
+            // Reinsert the transmissions back into the ready queue for the next proposal.
+            self.reinsert_transmissions_into_workers(transmissions)?;
             return Ok(());
         }
 
@@ -499,8 +487,8 @@ impl<N: Network> Primary<N> {
         let transmission_ids = transmissions.keys().copied().collect();
         // Prepare the previous batch certificate IDs.
         let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
-        // Sign the batch header.
-        let batch_header = spawn_blocking!(BatchHeader::new(
+        // Sign the batch header and construct the proposal.
+        let (batch_header, proposal) = spawn_blocking!(BatchHeader::new(
             &private_key,
             round,
             current_timestamp,
@@ -508,9 +496,18 @@ impl<N: Network> Primary<N> {
             transmission_ids,
             previous_certificate_ids,
             &mut rand::thread_rng()
-        ))?;
-        // Construct the proposal.
-        let proposal = Proposal::new(committee_lookback, batch_header.clone(), transmissions)?;
+        ))
+        .and_then(|batch_header| {
+            Proposal::new(committee_lookback, batch_header.clone(), transmissions.clone())
+                .map(|proposal| (batch_header, proposal))
+        })
+        .map_err(|err| {
+            // On error, reinsert the transmissions and then propagate the error.
+            if let Err(e) = self.reinsert_transmissions_into_workers(transmissions) {
+                error!("Failed to reinsert transmissions: {e:?}");
+            }
+            err
+        })?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the timestamp of the latest proposed batch.
@@ -647,7 +644,8 @@ impl<N: Network> Primary<N> {
 
         // Ensure the batch header from the peer is valid.
         let (storage, header) = (self.storage.clone(), batch_header.clone());
-        let missing_transmissions = spawn_blocking!(storage.check_batch_header(&header, transmissions))?;
+        let missing_transmissions =
+            spawn_blocking!(storage.check_batch_header(&header, transmissions, Default::default()))?;
         // Inserts the missing transmissions into the workers.
         self.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
 
@@ -786,7 +784,7 @@ impl<N: Network> Primary<N> {
         // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
         if let Err(e) = self.store_and_broadcast_certificate(&proposal, &committee_lookback).await {
             // Reinsert the transmissions back into the ready queue for the next proposal.
-            self.reinsert_transmissions_into_workers(proposal)?;
+            self.reinsert_transmissions_into_workers(proposal.into_transmissions())?;
             return Err(e);
         }
 
@@ -1147,7 +1145,7 @@ impl<N: Network> Primary<N> {
             let proposal = self.proposed_batch.write().take();
             if let Some(proposal) = proposal {
                 debug!("Cleared expired proposal for round {}", proposal.round());
-                self.reinsert_transmissions_into_workers(proposal)?;
+                self.reinsert_transmissions_into_workers(proposal.into_transmissions())?;
             }
         }
         Ok(())
@@ -1263,7 +1261,7 @@ impl<N: Network> Primary<N> {
         let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
         // Store the certified batch.
         let (storage, certificate_) = (self.storage.clone(), certificate.clone());
-        spawn_blocking!(storage.insert_certificate(certificate_, transmissions))?;
+        spawn_blocking!(storage.insert_certificate(certificate_, transmissions, Default::default()))?;
         debug!("Stored a batch certificate for round {}", certificate.round());
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
@@ -1296,15 +1294,14 @@ impl<N: Network> Primary<N> {
     }
 
     /// Re-inserts the transmissions from the proposal into the workers.
-    fn reinsert_transmissions_into_workers(&self, proposal: Proposal<N>) -> Result<()> {
+    fn reinsert_transmissions_into_workers(
+        &self,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<()> {
         // Re-insert the transmissions into the workers.
-        assign_to_workers(
-            &self.workers,
-            proposal.into_transmissions().into_iter(),
-            |worker, transmission_id, transmission| {
-                worker.reinsert(transmission_id, transmission);
-            },
-        )
+        assign_to_workers(&self.workers, transmissions.into_iter(), |worker, transmission_id, transmission| {
+            worker.reinsert(transmission_id, transmission);
+        })
     }
 
     /// Recursively stores a given batch certificate, after ensuring:
@@ -1343,7 +1340,7 @@ impl<N: Network> Primary<N> {
         if !self.storage.contains_certificate(certificate.id()) {
             // Store the batch certificate.
             let (storage, certificate_) = (self.storage.clone(), certificate.clone());
-            spawn_blocking!(storage.insert_certificate(certificate_, missing_transmissions))?;
+            spawn_blocking!(storage.insert_certificate(certificate_, missing_transmissions, Default::default()))?;
             debug!("Stored a batch certificate for round {batch_round} from '{peer_ip}'");
             // If a BFT sender was provided, send the round and certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
@@ -1777,7 +1774,7 @@ mod tests {
                     rng,
                 );
                 next_certificates.insert(certificate.id());
-                assert!(primary.storage.insert_certificate(certificate, transmissions).is_ok());
+                assert!(primary.storage.insert_certificate(certificate, transmissions, Default::default()).is_ok());
             }
 
             assert!(primary.storage.increment_to_next_round(cur_round).is_ok());
@@ -1805,11 +1802,6 @@ mod tests {
         // Check there is no batch currently proposed.
         assert!(primary.proposed_batch.read().is_none());
 
-        // Try to propose a batch. There are no transmissions in the workers so the method should
-        // just return without proposing a batch.
-        assert!(primary.propose_batch().await.is_ok());
-        assert!(primary.proposed_batch.read().is_none());
-
         // Generate a solution and a transaction.
         let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
@@ -1819,6 +1811,19 @@ mod tests {
         primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Try to propose a batch again. This time, it should succeed.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_with_no_transmissions() {
+        let mut rng = TestRng::default();
+        let (primary, _) = primary_without_handlers(&mut rng).await;
+
+        // Check there is no batch currently proposed.
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Try to propose a batch with no transmissions.
         assert!(primary.propose_batch().await.is_ok());
         assert!(primary.proposed_batch.read().is_some());
     }
@@ -1834,11 +1839,6 @@ mod tests {
 
         // Sleep for a while to ensure the primary is ready to propose the next round.
         tokio::time::sleep(Duration::from_secs(MIN_BATCH_DELAY_IN_SECS)).await;
-
-        // Try to propose a batch. There are no transmissions in the workers so the method should
-        // just return without proposing a batch.
-        assert!(primary.propose_batch().await.is_ok());
-        assert!(primary.proposed_batch.read().is_none());
 
         // Generate a solution and a transaction.
         let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
@@ -1900,7 +1900,7 @@ mod tests {
 
             // Insert the certificate to storage.
             num_transmissions_in_previous_round += transmissions.len();
-            primary.storage.insert_certificate(certificate, transmissions).unwrap();
+            primary.storage.insert_certificate(certificate, transmissions, Default::default()).unwrap();
         }
 
         // Sleep for a while to ensure the primary is ready to propose the next round.
@@ -2474,5 +2474,80 @@ mod tests {
         assert!(!primary.storage.contains_certificate_in_round_from(round, primary.gateway.account().address()));
         // Check the round was incremented.
         assert_eq!(primary.current_round(), round);
+    }
+
+    #[tokio::test]
+    async fn test_insert_certificate_with_aborted_transmissions() {
+        let round = 3;
+        let prev_round = round - 1;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+        let peer_account = &accounts[1];
+        let peer_ip = peer_account.0;
+
+        // Fill primary storage.
+        store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Get transmissions from previous certificates.
+        let previous_certificate_ids: IndexSet<_> =
+            primary.storage.get_certificates_for_round(prev_round).iter().map(|cert| cert.id()).collect();
+
+        // Generate a solution and a transaction.
+        let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Check that the worker has 2 transmissions.
+        assert_eq!(primary.workers[0].num_transmissions(), 2);
+
+        // Create certificates for the current round.
+        let account = accounts[0].1.clone();
+        let (certificate, transmissions) =
+            create_batch_certificate(account.address(), &accounts, round, previous_certificate_ids.clone(), &mut rng);
+        let certificate_id = certificate.id();
+
+        // Randomly abort some of the transmissions.
+        let mut aborted_transmissions = HashSet::new();
+        let mut transmissions_without_aborted = HashMap::new();
+        for (transmission_id, transmission) in transmissions.clone() {
+            match rng.gen::<bool>() || aborted_transmissions.is_empty() {
+                true => {
+                    // Insert the aborted transmission.
+                    aborted_transmissions.insert(transmission_id);
+                }
+                false => {
+                    // Insert the transmission without the aborted transmission.
+                    transmissions_without_aborted.insert(transmission_id, transmission);
+                }
+            };
+        }
+
+        // Add the non-aborted transmissions to the worker.
+        for (transmission_id, transmission) in transmissions_without_aborted.iter() {
+            primary.workers[0].process_transmission_from_peer(peer_ip, *transmission_id, transmission.clone());
+        }
+
+        // Check that inserting the transmission with missing transmissions fails.
+        assert!(
+            primary
+                .storage
+                .check_certificate(&certificate, transmissions_without_aborted.clone(), Default::default())
+                .is_err()
+        );
+        assert!(
+            primary
+                .storage
+                .insert_certificate(certificate.clone(), transmissions_without_aborted.clone(), Default::default())
+                .is_err()
+        );
+
+        // Insert the certificate to storage.
+        primary.storage.insert_certificate(certificate, transmissions_without_aborted, aborted_transmissions).unwrap();
+
+        // Ensure the certificate exists in storage.
+        assert!(primary.storage.contains_certificate(certificate_id));
     }
 }
