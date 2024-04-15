@@ -37,6 +37,13 @@ pub mod translucent;
 #[cfg(feature = "translucent")]
 pub use translucent::*;
 
+#[cfg(feature = "metrics")]
+use rayon::iter::ParallelIterator;
+#[cfg(feature = "metrics")]
+use snarkvm::prelude::{Block, Network};
+#[cfg(feature = "metrics")]
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 pub mod traits;
 pub use traits::*;
 
@@ -59,4 +66,39 @@ macro_rules! spawn_blocking {
             Err(error) => Err(snarkvm::prelude::anyhow!("[tokio::spawn_blocking] {error}")),
         }
     };
+}
+
+#[cfg(feature = "metrics")]
+fn update_block_metrics<N: Network>(block: &Block<N>) {
+    use snarkvm::ledger::ConfirmedTransaction;
+
+    let accepted_deploy = AtomicUsize::new(0);
+    let accepted_execute = AtomicUsize::new(0);
+    let rejected_deploy = AtomicUsize::new(0);
+    let rejected_execute = AtomicUsize::new(0);
+
+    // Add transaction to atomic counter based on enum type match.
+    block.transactions().par_iter().for_each(|tx| match tx {
+        ConfirmedTransaction::AcceptedDeploy(_, _, _) => {
+            accepted_deploy.fetch_add(1, Ordering::Relaxed);
+        }
+        ConfirmedTransaction::AcceptedExecute(_, _, _) => {
+            accepted_execute.fetch_add(1, Ordering::Relaxed);
+        }
+        ConfirmedTransaction::RejectedDeploy(_, _, _, _) => {
+            rejected_deploy.fetch_add(1, Ordering::Relaxed);
+        }
+        ConfirmedTransaction::RejectedExecute(_, _, _, _) => {
+            rejected_execute.fetch_add(1, Ordering::Relaxed);
+        }
+    });
+
+    metrics::increment_gauge(metrics::blocks::ACCEPTED_DEPLOY, accepted_deploy.load(Ordering::Relaxed) as f64);
+    metrics::increment_gauge(metrics::blocks::ACCEPTED_EXECUTE, accepted_execute.load(Ordering::Relaxed) as f64);
+    metrics::increment_gauge(metrics::blocks::REJECTED_DEPLOY, rejected_deploy.load(Ordering::Relaxed) as f64);
+    metrics::increment_gauge(metrics::blocks::REJECTED_EXECUTE, rejected_execute.load(Ordering::Relaxed) as f64);
+
+    // Update aborted transactions and solutions.
+    metrics::increment_gauge(metrics::blocks::ABORTED_TRANSACTIONS, block.aborted_transaction_ids().len() as f64);
+    metrics::increment_gauge(metrics::blocks::ABORTED_SOLUTIONS, block.aborted_solution_ids().len() as f64);
 }

@@ -51,6 +51,9 @@ optional = true
 version = "0.8"
 optional = true
 
+[dependencies.rayon]
+version = "1"
+
 [dependencies.snarkvm]
 workspace = true
 

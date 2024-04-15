@@ -25,11 +25,11 @@ use snarkvm::{
     prelude::{bail, Address, Field, Network, Result},
 };
 
+#[cfg(feature = "metrics")]
+use crate::update_block_metrics;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::{Mutex, RwLock};
-#[cfg(feature = "metrics")]
-use std::collections::HashMap;
 use std::{
     fmt,
     ops::Range,
@@ -345,49 +345,10 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             metrics::gauge(metrics::bft::LAST_COMMITTED_ROUND, block.round() as f64);
             metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
             metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
-            self.update_block_metrics(block);
+            update_block_metrics(block);
         }
 
         tracing::info!("\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());
         Ok(())
-    }
-
-    #[cfg(feature = "metrics")]
-    fn update_block_metrics(&self, block: &Block<N>) {
-        use snarkvm::ledger::ConfirmedTransaction;
-
-        // Count each type of transaction in the next block.
-        let metrics: HashMap<&'static str, usize> = block.transactions().iter().fold(
-            HashMap::from([
-                ("AcceptedDeploy", 0),
-                ("AcceptedExecute", 0),
-                ("RejectedDeploy", 0),
-                ("RejectedExecute", 0),
-            ]),
-            |mut transaction_types, tx| {
-                match tx {
-                    ConfirmedTransaction::AcceptedDeploy(_, _, _) => {
-                        *transaction_types.get_mut("AcceptedDeploy").unwrap() += 1;
-                    }
-                    ConfirmedTransaction::AcceptedExecute(_, _, _) => {
-                        *transaction_types.get_mut("AcceptedExecute").unwrap() += 1;
-                    }
-                    ConfirmedTransaction::RejectedDeploy(_, _, _, _) => {
-                        *transaction_types.get_mut("RejectedDeploy").unwrap() += 1;
-                    }
-                    ConfirmedTransaction::RejectedExecute(_, _, _, _) => {
-                        *transaction_types.get_mut("RejectedExecute").unwrap() += 1;
-                    }
-                }
-                transaction_types
-            },
-        );
-
-        metrics::increment_gauge(metrics::blocks::ACCEPTED_DEPLOY, *metrics.get("AcceptedDeploy").unwrap() as f64);
-        metrics::increment_gauge(metrics::blocks::ACCEPTED_EXECUTE, *metrics.get("AcceptedExecute").unwrap() as f64);
-        metrics::increment_gauge(metrics::blocks::REJECTED_DEPLOY, *metrics.get("RejectedDeploy").unwrap() as f64);
-        metrics::increment_gauge(metrics::blocks::REJECTED_EXECUTE, *metrics.get("RejectedExecute").unwrap() as f64);
-        metrics::increment_gauge(metrics::blocks::ABORTED_TRANSACTIONS, block.aborted_transaction_ids().len() as f64);
-        metrics::increment_gauge(metrics::blocks::ABORTED_SOLUTIONS, block.aborted_solution_ids().len() as f64);
     }
 }

@@ -132,7 +132,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "snarkos_blocks_height_total",
+          "expr": "snarkos_bft_height_total",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -203,7 +203,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  1 / rate(snarkos_blocks_height_total{}[1m])\n) < +inf",
+          "expr": "avg(\n  1 / rate(snarkos_bft_height_total{}[1m])\n) < +inf",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -305,7 +305,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "snarkos_blocks_height_total",
+          "expr": "snarkos_bft_height_total",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1342,7 +1342,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "snarkos_consensus_last_committed_round",
+          "expr": "snarkos_bft_last_committed_round",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
