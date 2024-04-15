@@ -220,6 +220,27 @@ impl<N: Network> Consensus<N> {
 }
 
 impl<N: Network> Consensus<N> {
+    /// Returns the solutions in the pending queue.
+    pub fn pending_queue_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
+        // Return an iterator over the solutions in the pending queue.
+        self.solutions_queue.lock().clone().into_iter().map(|(id, solution)| (id, Data::Object(solution)))
+    }
+
+    /// Returns the transactions in the pending queue.
+    pub fn pending_queue_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        // Acquire the lock on the transactions queue.
+        let tx_queue = self.transactions_queue.lock();
+        // Return an iterator over the deployment and execution transactions in the pending queue.
+        tx_queue
+            .deployments
+            .clone()
+            .into_iter()
+            .chain(tx_queue.executions.clone())
+            .map(|(id, tx)| (id, Data::Object(tx)))
+    }
+}
+
+impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: Solution<N>) -> Result<()> {
         #[cfg(feature = "metrics")]
