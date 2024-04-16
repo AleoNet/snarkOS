@@ -172,24 +172,24 @@ impl<N: Network> BFT<N> {
 }
 
 impl<N: Network> BFT<N> {
-    /// Returns the unconfirmed transmission IDs.
-    pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
-        self.primary.unconfirmed_transmission_ids()
+    /// Returns the worker transmission IDs.
+    pub fn worker_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.primary.worker_transmission_ids()
     }
 
-    /// Returns the unconfirmed transmissions.
-    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        self.primary.unconfirmed_transmissions()
+    /// Returns the worker transmissions.
+    pub fn worker_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.primary.worker_transmissions()
     }
 
-    /// Returns the unconfirmed solutions.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
-        self.primary.unconfirmed_solutions()
+    /// Returns the worker solutions.
+    pub fn worker_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
+        self.primary.worker_solutions()
     }
 
-    /// Returns the unconfirmed transactions.
-    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
-        self.primary.unconfirmed_transactions()
+    /// Returns the worker transactions.
+    pub fn worker_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.primary.worker_transactions()
     }
 }
 

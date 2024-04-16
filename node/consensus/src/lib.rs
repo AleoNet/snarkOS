@@ -200,43 +200,80 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Returns the unconfirmed transmission IDs.
     pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
-        self.bft.unconfirmed_transmission_ids()
+        self.bft.worker_transmission_ids().chain(self.inbound_transmission_ids())
     }
 
     /// Returns the unconfirmed transmissions.
     pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        self.bft.unconfirmed_transmissions()
+        self.bft.worker_transmissions().chain(self.inbound_transmissions())
     }
 
     /// Returns the unconfirmed solutions.
     pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
-        self.bft.unconfirmed_solutions()
+        self.bft.worker_solutions().chain(self.inbound_solutions())
     }
 
     /// Returns the unconfirmed transactions.
     pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
-        self.bft.unconfirmed_transactions()
+        self.bft.worker_transactions().chain(self.inbound_transactions())
     }
 }
 
 impl<N: Network> Consensus<N> {
-    /// Returns the solutions in the pending queue.
-    pub fn pending_queue_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
-        // Return an iterator over the solutions in the pending queue.
+    /// Returns the worker transmission IDs.
+    pub fn worker_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.bft.worker_transmission_ids()
+    }
+
+    /// Returns the worker transmissions.
+    pub fn worker_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.bft.worker_transmissions()
+    }
+
+    /// Returns the worker solutions.
+    pub fn worker_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
+        self.bft.worker_solutions()
+    }
+
+    /// Returns the worker transactions.
+    pub fn worker_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.bft.worker_transactions()
+    }
+}
+
+impl<N: Network> Consensus<N> {
+    /// Returns the transmission IDs in the inbound queue.
+    pub fn inbound_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.inbound_transmissions().map(|(id, _)| id)
+    }
+
+    /// Returns the solutions in the inbound queue.
+    pub fn inbound_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
+        // Return an iterator over the solutions in the inbound queue.
         self.solutions_queue.lock().clone().into_iter().map(|(id, solution)| (id, Data::Object(solution)))
     }
 
-    /// Returns the transactions in the pending queue.
-    pub fn pending_queue_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+    /// Returns the transactions in the inbound queue.
+    pub fn inbound_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
         // Acquire the lock on the transactions queue.
         let tx_queue = self.transactions_queue.lock();
-        // Return an iterator over the deployment and execution transactions in the pending queue.
+        // Return an iterator over the deployment and execution transactions in the inbound queue.
         tx_queue
             .deployments
             .clone()
             .into_iter()
             .chain(tx_queue.executions.clone())
             .map(|(id, tx)| (id, Data::Object(tx)))
+    }
+
+    /// Returns the transmissions in the inbound queue.
+    pub fn inbound_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.inbound_transactions()
+            .map(|(id, tx)| (TransmissionID::Transaction(id), Transmission::Transaction(tx)))
+            .chain(
+                self.inbound_solutions()
+                    .map(|(id, solution)| (TransmissionID::Solution(id), Transmission::Solution(solution))),
+            )
     }
 }
 

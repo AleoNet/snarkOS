@@ -187,12 +187,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // GET /<network>/memoryPool/solutions
     pub(crate) async fn get_memory_pool_solutions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(
-                consensus
-                    .unconfirmed_solutions()
-                    .chain(consensus.pending_queue_solutions())
-                    .collect::<IndexMap<_, _>>(),
-            )),
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_solutions().collect::<IndexMap<_, _>>())),
             None => Err(RestError("Route isn't available for this node type".to_string())),
         }
     }
@@ -200,12 +195,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // GET /<network>/memoryPool/transactions
     pub(crate) async fn get_memory_pool_transactions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(
-                consensus
-                    .unconfirmed_transactions()
-                    .chain(consensus.pending_queue_transactions())
-                    .collect::<IndexMap<_, _>>(),
-            )),
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_transactions().collect::<IndexMap<_, _>>())),
             None => Err(RestError("Route isn't available for this node type".to_string())),
         }
     }
