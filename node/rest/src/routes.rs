@@ -16,7 +16,7 @@ use super::*;
 use snarkos_node_router::messages::UnconfirmedSolution;
 use snarkvm::{
     ledger::puzzle::Solution,
-    prelude::{block::Transaction, Identifier, Plaintext},
+    prelude::{block::Transaction, Address, Identifier, Plaintext},
 };
 
 use indexmap::IndexMap;
@@ -254,6 +254,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // GET /<network>/committee/latest
     pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
+    }
+
+    // GET /<network>/delegators/{validator}
+    pub(crate) async fn get_delegators_for_validator(
+        State(rest): State<Self>,
+        Path(validator): Path<Address<N>>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_delegators_for_validator(&validator)?))
     }
 
     // GET /<network>/peers/count
