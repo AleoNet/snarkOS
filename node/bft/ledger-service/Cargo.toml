@@ -53,6 +53,7 @@ optional = true
 
 [dependencies.rayon]
 version = "1"
+optional = true
 
 [dependencies.snarkvm]
 workspace = true
