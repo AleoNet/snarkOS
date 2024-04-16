@@ -326,7 +326,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.find_transition_id(&input_or_output_id)?))
     }
 
-    // GET /<network>/find/blockHeight/stateRoot/{stateRoot}
+    // GET /<network>/find/blockHeight/{stateRoot}
     pub(crate) async fn find_block_height_from_state_root(
         State(rest): State<Self>,
         Path(state_root): Path<N::StateRoot>,
