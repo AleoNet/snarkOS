@@ -40,7 +40,7 @@ pub use translucent::*;
 #[cfg(feature = "metrics")]
 use rayon::iter::ParallelIterator;
 #[cfg(feature = "metrics")]
-use snarkvm::prelude::{Block, Network};
+use snarkvm::prelude::{cfg_iter, Block, Network};
 #[cfg(feature = "metrics")]
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -78,7 +78,7 @@ fn update_block_metrics<N: Network>(block: &Block<N>) {
     let rejected_execute = AtomicUsize::new(0);
 
     // Add transaction to atomic counter based on enum type match.
-    block.transactions().par_iter().for_each(|tx| match tx {
+    cfg_iter!(block.transactions()).for_each(|tx| match tx {
         ConfirmedTransaction::AcceptedDeploy(_, _, _) => {
             accepted_deploy.fetch_add(1, Ordering::Relaxed);
         }
