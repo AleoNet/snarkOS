@@ -44,19 +44,37 @@ use tracing::error;
 pub struct BFTPersistentStorage<N: Network> {
     /// The map of `transmission ID` to `(transmission, certificate IDs)` entries.
     transmissions: DataMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>,
+    /// The map of `aborted transmission ID` to `certificate IDs` entries.
+    aborted_transmission_ids: DataMap<TransmissionID<N>, IndexSet<Field<N>>>,
 }
 
 impl<N: Network> BFTPersistentStorage<N> {
     /// Initializes a new BFT persistent storage service.
     pub fn open(storage_mode: StorageMode) -> Result<Self> {
-        Ok(Self { transmissions: internal::RocksDB::open_map(N::ID, storage_mode, MapID::BFT(BFTMap::Transmissions))? })
+        Ok(Self {
+            transmissions: internal::RocksDB::open_map(N::ID, storage_mode.clone(), MapID::BFT(BFTMap::Transmissions))?,
+            aborted_transmission_ids: internal::RocksDB::open_map(
+                N::ID,
+                storage_mode,
+                MapID::BFT(BFTMap::AbortedTransmissionIDs),
+            )?,
+        })
     }
 
     /// Initializes a new BFT persistent storage service.
     #[cfg(any(test, feature = "test"))]
     pub fn open_testing(temp_dir: std::path::PathBuf, dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            transmissions: internal::RocksDB::open_map_testing(temp_dir, dev, MapID::BFT(BFTMap::Transmissions))?,
+            transmissions: internal::RocksDB::open_map_testing(
+                temp_dir.clone(),
+                dev,
+                MapID::BFT(BFTMap::Transmissions),
+            )?,
+            aborted_transmission_ids: internal::RocksDB::open_map_testing(
+                temp_dir,
+                dev,
+                MapID::BFT(BFTMap::AbortedTransmissionIDs),
+            )?,
         })
     }
 }
@@ -65,13 +83,19 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     /// Returns `true` if the storage contains the specified `transmission ID`.
     fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
         // Check if the transmission ID exists in storage.
-        let result = self.transmissions.contains_key_confirmed(&transmission_id);
-        // If the result is an error, log the error.
-        if let Err(error) = &result {
-            error!("Failed to check if transmission ID exists in storage - {error}");
+        match self.transmissions.contains_key_confirmed(&transmission_id) {
+            Ok(true) => return true,
+            Ok(false) => (),
+            Err(error) => error!("Failed to check if transmission ID exists in confirmed storage - {error}"),
         }
-        // Return the result.
-        result.unwrap_or(false)
+        // Check if the transmission ID is in aborted storage.
+        match self.aborted_transmission_ids.contains_key_confirmed(&transmission_id) {
+            Ok(result) => result,
+            Err(error) => {
+                error!("Failed to check if aborted transmission ID exists in storage - {error}");
+                false
+            }
+        }
     }
 
     /// Returns the transmission for the given `transmission ID`.
@@ -125,6 +149,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
         &self,
         certificate_id: Field<N>,
         transmission_ids: IndexSet<TransmissionID<N>>,
+        aborted_transmission_ids: HashSet<TransmissionID<N>>,
         mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
         // Inserts the following:
@@ -146,7 +171,9 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                 Ok(None) => {
                     // Retrieve the missing transmission.
                     let Some(transmission) = missing_transmissions.remove(&transmission_id) else {
-                        error!("Failed to provide a missing transmission {transmission_id}");
+                        if !aborted_transmission_ids.contains(&transmission_id) {
+                            error!("Failed to provide a missing transmission {transmission_id}");
+                        }
                         continue 'outer;
                     };
                     // Prepare the set of certificate IDs.
@@ -163,6 +190,34 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                 }
             }
         }
+        // Inserts the aborted transmission IDs.
+        for aborted_transmission_id in aborted_transmission_ids {
+            // Retrieve the transmission entry.
+            match self.aborted_transmission_ids.get_confirmed(&aborted_transmission_id) {
+                Ok(Some(entry)) => {
+                    let mut certificate_ids = cow_to_cloned!(entry);
+                    // Insert the certificate ID into the set.
+                    certificate_ids.insert(certificate_id);
+                    // Update the transmission entry.
+                    if let Err(e) = self.aborted_transmission_ids.insert(aborted_transmission_id, certificate_ids) {
+                        error!("Failed to insert aborted transmission ID {aborted_transmission_id} into storage - {e}");
+                    }
+                }
+                Ok(None) => {
+                    // Prepare the set of certificate IDs.
+                    let certificate_ids = indexset! { certificate_id };
+                    // Insert the transmission and a new set with the certificate ID.
+                    if let Err(e) = self.aborted_transmission_ids.insert(aborted_transmission_id, certificate_ids) {
+                        error!("Failed to insert aborted transmission ID {aborted_transmission_id} into storage - {e}");
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to process the 'insert' for aborted transmission ID {aborted_transmission_id} into storage - {e}"
+                    );
+                }
+            }
+        }
     }
 
     /// Removes the certificate ID for the transmissions from storage.
@@ -170,7 +225,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
     fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>) {
         // If this is the last certificate ID for the transmission ID, remove the transmission.
-        'outer: for transmission_id in transmission_ids {
+        for transmission_id in transmission_ids {
             // Retrieve the transmission entry.
             match self.transmissions.get_confirmed(transmission_id) {
                 Ok(Some(entry)) => {
@@ -182,7 +237,6 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                         // Remove the transmission entry.
                         if let Err(e) = self.transmissions.remove(transmission_id) {
                             error!("Failed to remove transmission {transmission_id} (now empty) from storage - {e}");
-                            continue 'outer;
                         }
                     }
                     // Otherwise, update the transmission entry.
@@ -192,14 +246,44 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                             error!(
                                 "Failed to remove transmission {transmission_id} for certificate {certificate_id} from storage - {e}"
                             );
-                            continue 'outer;
                         }
                     }
                 }
                 Ok(None) => { /* no-op */ }
                 Err(e) => {
                     error!("Failed to process the 'remove' for transmission {transmission_id} from storage - {e}");
-                    continue 'outer;
+                }
+            }
+            // Retrieve the aborted transmission ID entry.
+            match self.aborted_transmission_ids.get_confirmed(transmission_id) {
+                Ok(Some(entry)) => {
+                    let mut certificate_ids = cow_to_cloned!(entry);
+                    // Insert the certificate ID into the set.
+                    certificate_ids.swap_remove(certificate_id);
+                    // If there are no more certificate IDs for the transmission ID, remove the transmission.
+                    if certificate_ids.is_empty() {
+                        // Remove the transmission entry.
+                        if let Err(e) = self.aborted_transmission_ids.remove(transmission_id) {
+                            error!(
+                                "Failed to remove aborted transmission ID {transmission_id} (now empty) from storage - {e}"
+                            );
+                        }
+                    }
+                    // Otherwise, update the transmission entry.
+                    else {
+                        // Update the transmission entry.
+                        if let Err(e) = self.aborted_transmission_ids.insert(*transmission_id, certificate_ids) {
+                            error!(
+                                "Failed to remove aborted transmission ID {transmission_id} for certificate {certificate_id} from storage - {e}"
+                            );
+                        }
+                    }
+                }
+                Ok(None) => { /* no-op */ }
+                Err(e) => {
+                    error!(
+                        "Failed to process the 'remove' for aborted transmission ID {transmission_id} from storage - {e}"
+                    );
                 }
             }
         }
