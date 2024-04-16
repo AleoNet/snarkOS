@@ -200,22 +200,22 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Returns the unconfirmed transmission IDs.
     pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
-        self.bft.worker_transmission_ids().chain(self.inbound_transmission_ids())
+        self.worker_transmission_ids().chain(self.inbound_transmission_ids())
     }
 
     /// Returns the unconfirmed transmissions.
     pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        self.bft.worker_transmissions().chain(self.inbound_transmissions())
+        self.worker_transmissions().chain(self.inbound_transmissions())
     }
 
     /// Returns the unconfirmed solutions.
     pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
-        self.bft.worker_solutions().chain(self.inbound_solutions())
+        self.worker_solutions().chain(self.inbound_solutions())
     }
 
     /// Returns the unconfirmed transactions.
     pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
-        self.bft.worker_transactions().chain(self.inbound_transactions())
+        self.worker_transactions().chain(self.inbound_transactions())
     }
 }
 
