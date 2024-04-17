@@ -505,7 +505,7 @@ impl Start {
             false => None
         };
         // Parse the REST IP.
-            let rest_ip = match self.norest {
+        let rest_ip = match self.norest {
             true => None,
             false => self.rest,
         };
