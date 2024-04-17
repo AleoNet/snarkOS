@@ -106,8 +106,8 @@ pub struct Start {
     pub allow_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
-    #[clap(default_value = "0.0.0.0:3030", long = "rest")]
-    pub rest: SocketAddr,
+    #[clap(long = "rest")]
+    pub rest: Option<SocketAddr>,
     /// Specify the requests per second (RPS) rate limit per IP for the REST server
     #[clap(default_value = "10", long = "rest-rps")]
     pub rest_rps: u32,
@@ -320,12 +320,10 @@ impl Start {
             if self.node.is_none() {
                 self.node = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?);
             }
-            // If the `norest` flag is not set, and the `bft` flag was not overridden,
-            // then set the REST IP to `3030 + dev`.
-            //
-            // Note: the `bft` flag is an option to detect remote devnet testing.
-            if !self.norest && self.bft.is_none() {
-                self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
+
+            // If the `norest` flag is not set and the REST IP is not already specified set the REST IP to `3030 + dev`.
+            if !self.norest && self.rest.is_none() {
+                self.rest = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev)).unwrap());
             }
         }
         Ok(())
