@@ -37,7 +37,7 @@ pub mod translucent;
 #[cfg(feature = "translucent")]
 pub use translucent::*;
 
-#[cfg(feature = "metrics")]
+#[cfg(all(not(feature = "serial"), feature = "metrics"))]
 use rayon::iter::ParallelIterator;
 #[cfg(feature = "metrics")]
 use snarkvm::prelude::{cfg_iter, Block, Network};
@@ -69,7 +69,7 @@ macro_rules! spawn_blocking {
 }
 
 #[cfg(feature = "metrics")]
-fn update_block_metrics<N: Network>(block: &Block<N>) {
+pub fn update_block_metrics<N: Network>(block: &Block<N>) {
     use snarkvm::ledger::ConfirmedTransaction;
 
     let accepted_deploy = AtomicUsize::new(0);

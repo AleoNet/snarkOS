@@ -20,9 +20,10 @@ edition = "2021"
 default = [ ]
 ledger = [ "lru", "parking_lot", "rand", "tokio", "tracing" ]
 ledger-write = [ ]
-metrics = ["dep:metrics", "snarkvm/metrics"]
+metrics = ["dep:metrics", "snarkvm/metrics", "rayon"]
 mock = [ "parking_lot", "tracing" ]
 prover = [ ]
+serial = [ ]
 test = [ "mock", "translucent" ]
 translucent = [ "ledger" ]
 
