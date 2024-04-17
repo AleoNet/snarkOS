@@ -18,7 +18,10 @@ use snarkvm::{
 };
 
 use indexmap::IndexSet;
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
 
 pub trait StorageService<N: Network>: Debug + Send + Sync {
     /// Returns `true` if the storage contains the specified `transmission ID`.
@@ -33,6 +36,7 @@ pub trait StorageService<N: Network>: Debug + Send + Sync {
         &self,
         batch_header: &BatchHeader<N>,
         transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+        aborted_transmissions: HashSet<TransmissionID<N>>,
     ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>>;
 
     /// Inserts the given certificate ID for each of the transmission IDs, using the missing transmissions map, into storage.
@@ -40,6 +44,7 @@ pub trait StorageService<N: Network>: Debug + Send + Sync {
         &self,
         certificate_id: Field<N>,
         transmission_ids: IndexSet<TransmissionID<N>>,
+        aborted_transmission_ids: HashSet<TransmissionID<N>>,
         missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     );
 
