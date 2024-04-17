@@ -506,8 +506,8 @@ impl Start {
         };
         // Parse the REST IP.
             let rest_ip = match self.norest {
-                true => None,
-                false => self.rest,
+            true => None,
+            false => self.rest,
         };
 
         // If the display is not enabled, render the welcome message.
@@ -856,7 +856,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let expected_genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4130").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3030").unwrap()));
         assert_eq!(trusted_peers.len(), 0);
         assert_eq!(trusted_validators.len(), 1);
         assert!(!config.validator);
@@ -871,7 +871,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4131").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3031").unwrap()));
         assert_eq!(trusted_peers.len(), 1);
         assert_eq!(trusted_validators.len(), 1);
         assert!(config.validator);
@@ -886,7 +886,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4132").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3032").unwrap()));
         assert_eq!(trusted_peers.len(), 2);
         assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
@@ -901,7 +901,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4133").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3033").unwrap()));
         assert_eq!(trusted_peers.len(), 3);
         assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
