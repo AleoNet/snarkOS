@@ -505,9 +505,9 @@ impl Start {
             false => None
         };
         // Parse the REST IP.
-        let rest_ip = match self.norest {
-            true => None,
-            false => Some(self.rest),
+            let rest_ip = match self.norest {
+                true => None,
+                false => self.rest,
         };
 
         // If the display is not enabled, render the welcome message.
