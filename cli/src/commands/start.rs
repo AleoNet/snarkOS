@@ -836,6 +836,25 @@ mod tests {
     }
 
     #[test]
+    fn test_rest_ip_behavior() {
+        // Test default REST IP when not specified in dev mode
+        let config = Start::try_parse_from(["snarkos", "--dev", "1"].iter()).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3030").unwrap()));
+
+        // Test specified REST IP when passed in dev mode
+        let config = Start::try_parse_from(["snarkos", "--dev", "1", "--rest", "127.0.0.1:8080"].iter()).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("127.0.0.1:8080").unwrap()));
+
+        // Test default REST IP when REST flag is not passed in prod mode
+        let config = Start::try_parse_from(["snarkos"].iter()).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3030").unwrap()));
+
+        // Test specified REST IP when passed in prod mode
+        let config = Start::try_parse_from(["snarkos", "--rest", "192.168.1.1:8080"].iter()).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("192.168.1.1:8080").unwrap()));
+    }
+
+    #[test]
     fn test_parse_development_and_genesis() {
         let prod_genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
 
