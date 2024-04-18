@@ -149,6 +149,11 @@ impl<N: Network> Outbound<N> for TestRouter<N> {
     fn router(&self) -> &Router<N> {
         &self.0
     }
+
+    /// Returns `true` if the node is synced up to the latest block (within the given tolerance).
+    fn is_block_synced(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait]
