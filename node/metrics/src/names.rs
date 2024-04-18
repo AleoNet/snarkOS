@@ -14,7 +14,7 @@
 
 pub(super) const COUNTER_NAMES: [&str; 2] = [bft::LEADERS_ELECTED, consensus::STALE_UNCONFIRMED_TRANSMISSIONS];
 
-pub(super) const GAUGE_NAMES: [&str; 19] = [
+pub(super) const GAUGE_NAMES: [&str; 21] = [
     bft::CONNECTED,
     bft::CONNECTING,
     bft::LAST_STORED_ROUND,
@@ -30,6 +30,8 @@ pub(super) const GAUGE_NAMES: [&str; 19] = [
     consensus::COMMITTED_CERTIFICATES,
     consensus::UNCONFIRMED_SOLUTIONS,
     consensus::UNCONFIRMED_TRANSACTIONS,
+    router::UNCONFIRMED_SOLUTIONS_CLIENT,
+    router::UNCONFIRMED_TRANSACTIONS_CLIENT,
     router::CONNECTED,
     router::CANDIDATE,
     router::RESTRICTED,
@@ -73,6 +75,8 @@ pub mod router {
     pub const CONNECTED: &str = "snarkos_router_connected_total";
     pub const CANDIDATE: &str = "snarkos_router_candidate_total";
     pub const RESTRICTED: &str = "snarkos_router_restricted_total";
+    pub const UNCONFIRMED_SOLUTIONS_CLIENT: &str = "snarkos_client_router_unconfirmed_solutions";
+    pub const UNCONFIRMED_TRANSACTIONS_CLIENT: &str = "snarkos_client_router_unconfirmed_transactions";
 }
 
 pub mod tcp {

@@ -280,6 +280,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
                     let message = Message::UnconfirmedSolution(serialized);
                     // Propagate the "UnconfirmedSolution".
                     self.propagate(message, &[peer_ip]);
+                    metrics::increment_gauge(metrics::router::UNCONFIRMED_SOLUTIONS_CLIENT, 1f64);
                 }
                 Ok(Err(_)) => {
                     trace!("Invalid solution '{}' for the proof target.", solution.id())
@@ -310,6 +311,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         if self.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok() {
             // Propagate the `UnconfirmedTransaction`.
             self.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+            metrics::increment_gauge(metrics::router::UNCONFIRMED_TRANSACTIONS_CLIENT, 1f64);
         }
         true
     }
