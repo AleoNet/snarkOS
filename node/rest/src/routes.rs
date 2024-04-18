@@ -350,9 +350,13 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
                 let proof_target = rest.ledger.latest_proof_target();
                 // Ensure that the solution is valid for the given epoch.
                 let puzzle = rest.ledger.puzzle().clone();
-                // Verify the solution.
-                if let Err(err) = puzzle.check_solution(&solution, epoch_hash, proof_target) {
-                    return Err(RestError(format!("Invalid solution `{}` - {err}", solution.id())));
+                // Verify the solution in a blocking task.
+                match tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target))
+                    .await
+                {
+                    Ok(Ok(())) => {}
+                    Ok(Err(err)) => return Err(RestError(format!("Invalid solution `{}` - {err}", solution.id()))),
+                    Err(err) => return Err(RestError(format!("Invalid solution `{}` - {err}", solution.id()))),
                 }
             }
         }
