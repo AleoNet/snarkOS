@@ -338,9 +338,23 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
         // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
-        if let Some(consensus) = rest.consensus {
+        // Otherwise, verify it prior to broadcasting.
+        match rest.consensus {
             // Add the unconfirmed solution to the memory pool.
-            consensus.add_unconfirmed_solution(solution).await?;
+            Some(consensus) => consensus.add_unconfirmed_solution(solution).await?,
+            // Verify the solution.
+            None => {
+                // Compute the current epoch hash.
+                let epoch_hash = rest.ledger.latest_epoch_hash()?;
+                // Retrieve the current proof target.
+                let proof_target = rest.ledger.latest_proof_target();
+                // Ensure that the solution is valid for the given epoch.
+                let puzzle = rest.ledger.puzzle().clone();
+                // Verify the solution.
+                if let Err(err) = puzzle.check_solution(&solution, epoch_hash, proof_target) {
+                    return Err(RestError(format!("Invalid solution `{}` - {err}", solution.id())));
+                }
+            }
         }
 
         let solution_id = solution.id();
