@@ -22,7 +22,7 @@ use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use parking_lot::{Mutex, RwLock};
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
@@ -45,7 +45,6 @@ const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
 const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 600; // 600 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
-const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
 /// The maximum number of blocks tolerated before the primary is considered behind its peers.
 pub const MAX_BLOCKS_BEHIND: u32 = 1; // blocks
@@ -104,9 +103,6 @@ pub struct BlockSync<N: Network> {
     /// The map of block height to the timestamp of the last time the block was requested.
     /// This map is used to determine which requests to remove if they have been pending for too long.
     request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
-    /// The map of (timed out) peer IPs to their request timestamps.
-    /// This map is used to determine which peers to remove if they have timed out too many times.
-    request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
     /// The boolean indicator of whether the node is synced up to the latest block (within the given tolerance).
     is_block_synced: Arc<AtomicBool>,
     /// The lock to guarantee advance_with_sync_blocks() is called only once at a time.
@@ -124,7 +120,6 @@ impl<N: Network> BlockSync<N> {
             requests: Default::default(),
             responses: Default::default(),
             request_timestamps: Default::default(),
-            request_timeouts: Default::default(),
             is_block_synced: Default::default(),
             advance_with_sync_blocks_lock: Default::default(),
         }
@@ -427,8 +422,6 @@ impl<N: Network> BlockSync<N> {
         self.locators.write().swap_remove(peer_ip);
         // Remove all block requests to the peer.
         self.remove_block_requests_to_peer(peer_ip);
-        // Remove the timeouts for the peer.
-        self.request_timeouts.write().swap_remove(peer_ip);
     }
 }
 
@@ -653,8 +646,6 @@ impl<N: Network> BlockSync<N> {
         // Retrieve the current time.
         let now = Instant::now();
 
-        // Track each unique peer IP that has timed out.
-        let mut timeout_ips = IndexSet::new();
         // Track the number of timed out block requests.
         let mut num_timed_out_block_requests = 0;
 
@@ -671,10 +662,7 @@ impl<N: Network> BlockSync<N> {
             // If the request has timed out, then remove it.
             if is_timeout {
                 // Remove the request entry for the given height.
-                if let Some((_, _, sync_ips)) = requests.remove(height) {
-                    // Add each sync IP to the timeout IPs.
-                    timeout_ips.extend(sync_ips);
-                }
+                requests.remove(height);
                 // Remove the response entry for the given height.
                 responses.remove(height);
                 // Increment the number of timed out block requests.
@@ -683,16 +671,6 @@ impl<N: Network> BlockSync<N> {
             // Retain if this is not a timeout.
             !is_timeout
         });
-
-        // If there are timeout IPs, then add them to the request timeouts map.
-        if !timeout_ips.is_empty() {
-            // Acquire the write lock on the request timeouts map.
-            let mut request_timeouts = self.request_timeouts.write();
-            // Add each timeout IP to the request timeouts map.
-            for timeout_ip in timeout_ips {
-                request_timeouts.entry(timeout_ip).or_default().push(now);
-            }
-        }
 
         num_timed_out_block_requests
     }
@@ -704,21 +682,12 @@ impl<N: Network> BlockSync<N> {
         // Retrieve the latest canon height.
         let latest_canon_height = self.canon.latest_block_height();
 
-        // Compute the timeout frequency of each peer.
-        let timeouts = self
-            .request_timeouts
-            .read()
-            .iter()
-            .map(|(peer_ip, timestamps)| (*peer_ip, timestamps.len()))
-            .collect::<IndexMap<_, _>>();
-
         // Pick a set of peers above the latest canon height, and include their locators.
         let candidate_locators: IndexMap<_, _> = self
             .locators
             .read()
             .iter()
             .filter(|(_, locators)| locators.latest_locator_height() > latest_canon_height)
-            .filter(|(ip, _)| timeouts.get(*ip).map(|count| *count < MAX_BLOCK_REQUEST_TIMEOUTS).unwrap_or(true))
             .sorted_by(|(_, a), (_, b)| b.latest_locator_height().cmp(&a.latest_locator_height()))
             .take(NUM_SYNC_CANDIDATE_PEERS)
             .map(|(peer_ip, locators)| (*peer_ip, locators.clone()))
@@ -780,6 +749,9 @@ impl<N: Network> BlockSync<N> {
         }
 
         info!("Time to find sync peers: {:?}ns", timer.elapsed().as_nanos());
+        // Shuffle the sync peers prior to returning. This ensures the rest of the stack
+        // does not rely on the order of the sync peers, and that the sync peers are not biased.
+        let sync_peers = shuffle_indexmap(sync_peers, &mut rand::thread_rng());
 
         Some((sync_peers, min_common_ancestor))
     }
@@ -915,6 +887,18 @@ fn construct_request<N: Network>(
     (hash, previous_hash, num_sync_ips, is_honest)
 }
 
+/// Shuffles a given `IndexMap` using the given random number generator.
+fn shuffle_indexmap<K, V, R: Rng + CryptoRng>(mut map: IndexMap<K, V>, rng: &mut R) -> IndexMap<K, V>
+where
+    K: core::hash::Hash + Eq + Clone,
+    V: Clone,
+{
+    use rand::seq::SliceRandom;
+    let mut pairs: Vec<_> = map.drain(..).collect(); // Drain elements to a vector
+    pairs.shuffle(rng); // Shuffle the vector of tuples
+    pairs.into_iter().collect() // Collect back into an IndexMap
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -926,7 +910,7 @@ mod tests {
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::prelude::{Field, TestRng};
 
-    use indexmap::indexset;
+    use indexmap::{indexset, IndexSet};
     use snarkvm::ledger::committee::Committee;
     use std::net::{IpAddr, Ipv4Addr};
 

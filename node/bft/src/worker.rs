@@ -33,6 +33,7 @@ use snarkvm::{
 
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
+use rand::seq::IteratorRandom;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
@@ -223,7 +224,8 @@ impl<N: Network> Worker<N> {
             .ready
             .transmission_ids()
             .into_iter()
-            .take(Self::MAX_TRANSMISSIONS_PER_WORKER_PING)
+            .choose_multiple(&mut rand::thread_rng(), Self::MAX_TRANSMISSIONS_PER_WORKER_PING)
+            .into_iter()
             .collect::<IndexSet<_>>();
 
         // Broadcast the ping event.
