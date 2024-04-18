@@ -237,6 +237,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::UnconfirmedTransaction(message) => {
+                // Do not process unconfirmed transactions if the node is syncing.
+                if !self.is_block_synced() {
+                    trace!("Skipped processing unconfirmed transaction '{}' (node is syncing)", message.transaction_id);
+                    return Ok(());
+                }
                 // Update the timestamp for the unconfirmed transaction.
                 let seen_before =
                     self.router().cache.insert_inbound_transaction(peer_ip, message.transaction_id).is_some();
