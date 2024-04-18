@@ -25,8 +25,6 @@ use snarkvm::{
     prelude::{bail, Address, Field, Network, Result},
 };
 
-#[cfg(feature = "metrics")]
-use crate::update_block_metrics;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::{Mutex, RwLock};
@@ -345,7 +343,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             metrics::gauge(metrics::bft::LAST_COMMITTED_ROUND, block.round() as f64);
             metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
             metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
-            update_block_metrics(block);
+            metrics::update_block_metrics(block);
         }
 
         tracing::info!("\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());

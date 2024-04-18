@@ -3131,7 +3131,6 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rand",
- "rayon",
  "snarkos-account",
  "snarkos-node-bft",
  "snarkos-node-bft-ledger-service",
@@ -3148,7 +3147,10 @@ name = "snarkos-node-metrics"
 version = "2.2.7"
 dependencies = [
  "metrics-exporter-prometheus",
+ "parking_lot",
+ "rayon",
  "snarkvm",
+ "time",
  "tokio",
 ]
 
