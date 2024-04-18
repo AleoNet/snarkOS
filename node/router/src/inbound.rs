@@ -207,6 +207,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::UnconfirmedSolution(message) => {
+                // Do not process unconfirmed solutions if the node is syncing.
+                if !self.is_block_synced() {
+                    trace!("Skipped processing unconfirmed solution '{}' (node is syncing)", message.solution_id);
+                    return Ok(());
+                }
                 // Update the timestamp for the unconfirmed solution.
                 let seen_before = self.router().cache.insert_inbound_solution(peer_ip, message.solution_id).is_some();
                 // Determine whether to propagate the solution.
