@@ -14,7 +14,7 @@
 
 pub(super) const COUNTER_NAMES: [&str; 2] = [bft::LEADERS_ELECTED, consensus::STALE_UNCONFIRMED_TRANSMISSIONS];
 
-pub(super) const GAUGE_NAMES: [&str; 19] = [
+pub(super) const GAUGE_NAMES: [&str; 25] = [
     bft::CONNECTED,
     bft::CONNECTING,
     bft::LAST_STORED_ROUND,
@@ -24,6 +24,12 @@ pub(super) const GAUGE_NAMES: [&str; 19] = [
     bft::LAST_COMMITTED_ROUND,
     blocks::SOLUTIONS,
     blocks::TRANSACTIONS,
+    blocks::ACCEPTED_DEPLOY,
+    blocks::ACCEPTED_EXECUTE,
+    blocks::REJECTED_DEPLOY,
+    blocks::REJECTED_EXECUTE,
+    blocks::ABORTED_TRANSACTIONS,
+    blocks::ABORTED_SOLUTIONS,
     blocks::PROOF_TARGET,
     blocks::COINBASE_TARGET,
     blocks::CUMULATIVE_PROOF_TARGET,
@@ -54,6 +60,12 @@ pub mod bft {
 pub mod blocks {
     pub const TRANSACTIONS: &str = "snarkos_blocks_transactions_total";
     pub const SOLUTIONS: &str = "snarkos_blocks_solutions_total";
+    pub const ACCEPTED_DEPLOY: &str = "snarkos_blocks_accepted_deploy";
+    pub const ACCEPTED_EXECUTE: &str = "snarkos_blocks_accepted_execute";
+    pub const REJECTED_DEPLOY: &str = "snarkos_blocks_rejected_deploy";
+    pub const REJECTED_EXECUTE: &str = "snarkos_blocks_rejected_execute";
+    pub const ABORTED_TRANSACTIONS: &str = "snarkos_blocks_aborted_transactions";
+    pub const ABORTED_SOLUTIONS: &str = "snarkos_blocks_aborted_solutions";
     pub const PROOF_TARGET: &str = "snarkos_blocks_proof_target";
     pub const COINBASE_TARGET: &str = "snarkos_blocks_coinbase_target";
     pub const CUMULATIVE_PROOF_TARGET: &str = "snarkos_blocks_cumulative_proof_target";

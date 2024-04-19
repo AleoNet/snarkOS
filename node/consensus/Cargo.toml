@@ -48,9 +48,6 @@ version = "0.12"
 [dependencies.rand]
 version = "0.8"
 
-[dependencies.rayon]
-version = "1"
-
 [dependencies.snarkos-account]
 path = "../../account"
 version = "=2.2.7"
