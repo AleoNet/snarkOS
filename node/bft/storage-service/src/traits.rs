@@ -44,6 +44,7 @@ pub trait StorageService<N: Network>: Debug + Send + Sync {
         &self,
         certificate_id: Field<N>,
         transmission_ids: IndexSet<TransmissionID<N>>,
+        aborted_transmission_ids: HashSet<TransmissionID<N>>,
         missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     );
 
