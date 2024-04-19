@@ -253,23 +253,23 @@ impl<N: Network> Primary<N> {
 }
 
 impl<N: Network> Primary<N> {
-    /// Returns the unconfirmed transmission IDs.
-    pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+    /// Returns the worker transmission IDs.
+    pub fn worker_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
         self.workers.iter().flat_map(|worker| worker.transmission_ids())
     }
 
-    /// Returns the unconfirmed transmissions.
-    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+    /// Returns the worker transmissions.
+    pub fn worker_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
         self.workers.iter().flat_map(|worker| worker.transmissions())
     }
 
-    /// Returns the unconfirmed solutions.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
+    /// Returns the worker solutions.
+    pub fn worker_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
         self.workers.iter().flat_map(|worker| worker.solutions())
     }
 
-    /// Returns the unconfirmed transactions.
-    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+    /// Returns the worker transactions.
+    pub fn worker_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
         self.workers.iter().flat_map(|worker| worker.transactions())
     }
 }

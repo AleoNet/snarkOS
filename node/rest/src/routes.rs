@@ -97,7 +97,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Path(height_or_hash): Path<String>,
     ) -> Result<ErasedJson, RestError> {
-        // Manually parse the height or the height or the hash, axum doesn't support different types
+        // Manually parse the height or the height of the hash, axum doesn't support different types
         // for the same path param.
         let block = if let Ok(height) = height_or_hash.parse::<u32>() {
             rest.ledger.get_block(height)?
@@ -150,7 +150,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_height(&hash)?))
     }
 
-    // GET /<NETWORK>/block/{height}/transactions
+    // GET /<network>/block/{height}/transactions
     pub(crate) async fn get_block_transactions(
         State(rest): State<Self>,
         Path(height): Path<u32>,
@@ -251,6 +251,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         ErasedJson::pretty(rest.ledger.latest_state_root())
     }
 
+    // GET /<network>/stateRoot/{height}
+    pub(crate) async fn get_state_root(
+        State(rest): State<Self>,
+        Path(height): Path<u32>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_state_root(height)?))
+    }
+
     // GET /<network>/committee/latest
     pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
@@ -282,6 +290,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Path(tx_id): Path<N::TransactionID>,
     ) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.find_block_hash(&tx_id)?))
+    }
+
+    // GET /<network>/find/blockHeight/{stateRoot}
+    pub(crate) async fn find_block_height_from_state_root(
+        State(rest): State<Self>,
+        Path(state_root): Path<N::StateRoot>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.find_block_height_from_state_root(state_root)?))
     }
 
     // GET /<network>/find/transactionID/deployment/{programID}
