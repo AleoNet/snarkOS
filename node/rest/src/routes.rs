@@ -292,6 +292,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.find_block_hash(&tx_id)?))
     }
 
+    // GET /<network>/find/blockHeight/{stateRoot}
+    pub(crate) async fn find_block_height_from_state_root(
+        State(rest): State<Self>,
+        Path(state_root): Path<N::StateRoot>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.find_block_height_from_state_root(state_root)?))
+    }
+
     // GET /<network>/find/transactionID/deployment/{programID}
     pub(crate) async fn find_transaction_id_from_program_id(
         State(rest): State<Self>,
@@ -314,14 +322,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Path(input_or_output_id): Path<Field<N>>,
     ) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.find_transition_id(&input_or_output_id)?))
-    }
-
-    // GET /<network>/find/blockHeight/{stateRoot}
-    pub(crate) async fn find_block_height_from_state_root(
-        State(rest): State<Self>,
-        Path(state_root): Path<N::StateRoot>,
-    ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.find_block_height_from_state_root(state_root)?))
     }
 
     // POST /<network>/transaction/broadcast
