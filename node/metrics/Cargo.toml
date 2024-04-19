@@ -35,9 +35,9 @@ optional = true
 workspace = true
 features = [ "metrics" ]
 
+[dependencies.time]
+version = "0.3"
+
 [dependencies.tokio]
 version = "1.28"
 features = [ "rt" ]
-
-[dependencies.time]
-version = "0.3"

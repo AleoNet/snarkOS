@@ -23,7 +23,6 @@ ledger-write = [ ]
 metrics = ["dep:metrics", "snarkvm/metrics"]
 mock = [ "parking_lot", "tracing" ]
 prover = [ ]
-serial = [ ]
 test = [ "mock", "translucent" ]
 translucent = [ "ledger" ]
 
@@ -50,10 +49,6 @@ optional = true
 
 [dependencies.rand]
 version = "0.8"
-optional = true
-
-[dependencies.rayon]
-version = "1"
 optional = true
 
 [dependencies.snarkvm]

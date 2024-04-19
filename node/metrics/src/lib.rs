@@ -17,6 +17,7 @@ mod names;
 // Expose the names at the crate level for easy access.
 pub use names::*;
 use parking_lot::Mutex;
+
 // Re-export the snarkVM metrics.
 #[cfg(not(feature = "serial"))]
 use rayon::prelude::*;

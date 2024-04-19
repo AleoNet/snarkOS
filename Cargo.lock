@@ -3081,7 +3081,6 @@ dependencies = [
  "lru",
  "parking_lot",
  "rand",
- "rayon",
  "snarkos-node-metrics",
  "snarkvm",
  "tokio",
