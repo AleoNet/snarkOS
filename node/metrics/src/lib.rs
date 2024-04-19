@@ -16,12 +16,14 @@ mod names;
 
 // Expose the names at the crate level for easy access.
 pub use names::*;
-use parking_lot::Mutex;
 
 // Re-export the snarkVM metrics.
+pub use snarkvm::metrics::*;
+
 #[cfg(not(feature = "serial"))]
 use rayon::prelude::*;
-pub use snarkvm::metrics::*;
+
+use parking_lot::Mutex;
 use snarkvm::{
     ledger::narwhal::TransmissionID,
     prelude::{cfg_iter, Block, Network},
