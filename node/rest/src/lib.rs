@@ -188,8 +188,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route(&format!("/{network}/memoryPool/solutions"), get(Self::get_memory_pool_solutions))
             .route(&format!("/{network}/memoryPool/transactions"), get(Self::get_memory_pool_transactions))
             .route(&format!("/{network}/statePath/:commitment"), get(Self::get_state_path_for_commitment))
-            .route(&format!("/{network}/stateRoot/:height"), get(Self::get_state_root))
             .route(&format!("/{network}/stateRoot/latest"), get(Self::get_state_root_latest))
+            .route(&format!("/{network}/stateRoot/:height"), get(Self::get_state_root))
             .route(&format!("/{network}/committee/latest"), get(Self::get_committee_latest))
 
             // Pass in `Rest` to make things convenient.

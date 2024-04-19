@@ -246,17 +246,17 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_state_path_for_commitment(&commitment)?))
     }
 
+    // GET /<network>/stateRoot/latest
+    pub(crate) async fn get_state_root_latest(State(rest): State<Self>) -> ErasedJson {
+        ErasedJson::pretty(rest.ledger.latest_state_root())
+    }
+
     // GET /<network>/stateRoot/{height}
     pub(crate) async fn get_state_root(
         State(rest): State<Self>,
         Path(height): Path<u32>,
     ) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.get_state_root(height)?))
-    }
-
-    // GET /<network>/stateRoot/latest
-    pub(crate) async fn get_state_root_latest(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.ledger.latest_state_root())
     }
 
     // GET /<network>/committee/latest

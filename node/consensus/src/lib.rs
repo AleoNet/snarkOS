@@ -247,6 +247,16 @@ impl<N: Network> Consensus<N> {
         self.inbound_transmissions().map(|(id, _)| id)
     }
 
+    /// Returns the transmissions in the inbound queue.
+    pub fn inbound_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.inbound_transactions()
+            .map(|(id, tx)| (TransmissionID::Transaction(id), Transmission::Transaction(tx)))
+            .chain(
+                self.inbound_solutions()
+                    .map(|(id, solution)| (TransmissionID::Solution(id), Transmission::Solution(solution))),
+            )
+    }
+
     /// Returns the solutions in the inbound queue.
     pub fn inbound_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
         // Return an iterator over the solutions in the inbound queue.
@@ -264,16 +274,6 @@ impl<N: Network> Consensus<N> {
             .into_iter()
             .chain(tx_queue.executions.clone())
             .map(|(id, tx)| (id, Data::Object(tx)))
-    }
-
-    /// Returns the transmissions in the inbound queue.
-    pub fn inbound_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        self.inbound_transactions()
-            .map(|(id, tx)| (TransmissionID::Transaction(id), Transmission::Transaction(tx)))
-            .chain(
-                self.inbound_solutions()
-                    .map(|(id, solution)| (TransmissionID::Solution(id), Transmission::Solution(solution))),
-            )
     }
 }
 
