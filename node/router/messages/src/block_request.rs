@@ -18,7 +18,7 @@ use snarkvm::prelude::{FromBytes, ToBytes};
 
 use std::borrow::Cow;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct BlockRequest {
     /// The starting block height (inclusive).
     pub start_height: u32,

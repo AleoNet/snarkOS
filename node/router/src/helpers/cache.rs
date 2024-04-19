@@ -40,8 +40,8 @@ pub struct Cache<N: Network> {
     seen_inbound_messages: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
     /// The map of peer IPs to their recent timestamps.
     seen_inbound_puzzle_requests: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
-    /// The map of peer IPs to their recent timestamps.
-    seen_inbound_block_requests: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
+    /// The map of peer IPs to their recent timestamps and requested block heights.
+    seen_inbound_block_requests: RwLock<HashMap<SocketAddr, VecDeque<(OffsetDateTime, BlockRequest)>>>,
     /// The map of solution IDs to their last seen timestamp.
     seen_inbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
@@ -103,9 +103,14 @@ impl<N: Network> Cache<N> {
         Self::retain_and_insert(&self.seen_inbound_puzzle_requests, peer_ip, Self::INBOUND_PUZZLE_REQUEST_INTERVAL)
     }
 
-    /// Inserts a new timestamp for the given peer IP, returning the number of recent block requests.
-    pub fn insert_inbound_block_request(&self, peer_ip: SocketAddr) -> usize {
-        Self::retain_and_insert(&self.seen_inbound_block_requests, peer_ip, Self::INBOUND_BLOCK_REQUEST_INTERVAL)
+    /// Inserts a new timestamp and height range for the given peer IP, returning the number of recent requests and whether heights are higher than before.
+    pub fn insert_inbound_block_request(&self, peer_ip: SocketAddr, heights: BlockRequest) -> (usize, bool) {
+        Self::retain_incrementing_requests_and_insert(
+            &self.seen_inbound_block_requests,
+            peer_ip,
+            heights,
+            Self::INBOUND_BLOCK_REQUEST_INTERVAL,
+        )
     }
 
     /// Inserts a solution ID into the cache, returning the previously seen timestamp if it existed.
@@ -221,9 +226,36 @@ impl<N: Network> Cache<N> {
         timestamps.len()
     }
 
+    /// Insert a new timestamp for the given key, returning the number of recent entries and whether the request is higher than the last.
+    fn retain_incrementing_requests_and_insert<K: Eq + Hash + Clone>(
+        map: &RwLock<HashMap<K, VecDeque<(OffsetDateTime, BlockRequest)>>>,
+        key: K,
+        request: BlockRequest,
+        interval_in_secs: i64,
+    ) -> (usize, bool) {
+        // Fetch the current timestamp.
+        let now = OffsetDateTime::now_utc();
+
+        let mut map_write = map.write();
+        // Load the entry for the key.
+        let timestamps = map_write.entry(key).or_default();
+        // Retain only the timestamps that are within the recent interval.
+        while timestamps.front().map_or(false, |(t, _)| now - *t > Duration::seconds(interval_in_secs)) {
+            timestamps.pop_front();
+        }
+        // Check whether the request is higher than the last.
+        let incrementing = timestamps.back().map(|(_, last)| request.start_height > last.end_height).unwrap_or(true);
+        // Insert the new timestamp and request if its higher than the last.
+        if incrementing {
+            timestamps.push_back((now, request));
+        }
+        // Return the frequency of recent requests and whether the most recent one is higher than before.
+        (timestamps.len(), incrementing)
+    }
+
     /// Returns the number of recent entries.
     fn retain<K: Eq + Hash + Clone>(
-        map: &RwLock<HashMap<K, VecDeque<OffsetDateTime>>>,
+        map: &RwLock<HashMap<K, VecDeque<(OffsetDateTime, BlockRequest)>>>,
         key: K,
         interval_in_secs: i64,
     ) -> usize {
@@ -234,7 +266,7 @@ impl<N: Network> Cache<N> {
         // Load the entry for the key.
         let timestamps = map_write.entry(key).or_default();
         // Retain only the timestamps that are within the recent interval.
-        while timestamps.front().map_or(false, |t| now - *t > Duration::seconds(interval_in_secs)) {
+        while timestamps.front().map_or(false, |(t, _)| now - *t > Duration::seconds(interval_in_secs)) {
             timestamps.pop_front();
         }
         // Return the frequency of recent requests.
@@ -307,16 +339,39 @@ mod tests {
         // Check that the cache is empty.
         assert_eq!(cache.seen_inbound_block_requests.read().len(), 0);
 
-        // Insert a block request..
-        assert_eq!(cache.insert_inbound_block_request(peer_ip), 1);
-
+        // Insert a block request.
+        let request = BlockRequest { start_height: 1, end_height: 1 };
+        assert_eq!(cache.insert_inbound_block_request(peer_ip, request), (1, true));
         // Check that the cache contains the block request.
         assert!(cache.contains_inbound_block_request(&peer_ip));
 
         // Insert another block request for the same peer.
-        assert_eq!(cache.insert_inbound_block_request(peer_ip), 2);
-
+        let request = BlockRequest { start_height: 2, end_height: 3 };
+        assert_eq!(cache.insert_inbound_block_request(peer_ip, request), (2, true));
         // Check that the cache contains the block requests.
+        assert!(cache.contains_inbound_block_request(&peer_ip));
+
+        // Insert another block request for the same peer with a lower start height.
+        let request = BlockRequest { start_height: 1, end_height: 3 };
+        assert_eq!(cache.insert_inbound_block_request(peer_ip, request), (2, false));
+        // Check that the cache does contains the block requests.
+        assert!(cache.contains_inbound_block_request(&peer_ip));
+
+        // Insert another block request for the same peer with a low start height.
+        let request = BlockRequest { start_height: 1, end_height: 1 };
+        assert_eq!(cache.insert_inbound_block_request(peer_ip, request), (2, false));
+        // Check that the cache does contains the block requests.
+        assert!(cache.contains_inbound_block_request(&peer_ip));
+
+        // Wait for INBOUND_BLOCK_REQUEST_INTERVAL to allow new requests.
+        std::thread::sleep(std::time::Duration::from_secs(
+            Cache::<CurrentNetwork>::INBOUND_BLOCK_REQUEST_INTERVAL as u64,
+        ));
+
+        // Insert another block request for the same peer with a low start height.
+        let request = BlockRequest { start_height: 1, end_height: 1 };
+        assert_eq!(cache.insert_inbound_block_request(peer_ip, request), (1, true));
+        // Check that the cache does contains the block requests.
         assert!(cache.contains_inbound_block_request(&peer_ip));
     }
 

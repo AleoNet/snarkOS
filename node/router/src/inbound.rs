@@ -78,10 +78,14 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
                 // Insert the block request for the peer, and fetch the recent frequency.
-                let frequency = self.router().cache.insert_inbound_block_request(peer_ip);
+                let (frequency, increasing_height) = self.router().cache.insert_inbound_block_request(peer_ip, message);
                 // Check if the number of block requests is within the limit.
                 if frequency > Self::MAXIMUM_BLOCK_REQUESTS_PER_INTERVAL {
                     bail!("Peer '{peer_ip}' is not following the protocol (excessive block requests)")
+                }
+                // Check if the requested height is higher than the last request.
+                if !increasing_height {
+                    bail!("Peer '{peer_ip}' is not following the protocol (block request heights not increasing)")
                 }
                 // Ensure the block request is well-formed.
                 if start_height >= end_height {
