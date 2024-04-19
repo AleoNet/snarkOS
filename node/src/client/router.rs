@@ -163,6 +163,11 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Client<N, C> {
     fn router(&self) -> &Router<N> {
         &self.router
     }
+
+    /// Returns `true` if the node is synced up to the latest block (within the given tolerance).
+    fn is_block_synced(&self) -> bool {
+        self.sync.is_block_synced()
+    }
 }
 
 #[async_trait]

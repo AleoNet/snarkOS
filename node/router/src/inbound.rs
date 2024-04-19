@@ -46,6 +46,8 @@ const MAX_PEERS_TO_SEND: usize = u8::MAX as usize;
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// The maximum number of puzzle requests per interval.
     const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
+    /// The maximum number of block requests per interval.
+    const MAXIMUM_BLOCK_REQUESTS_PER_INTERVAL: usize = 256;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
     const PING_SLEEP_IN_SECS: u64 = 20; // 20 seconds
     /// The time frame to enforce the `MESSAGE_LIMIT`.
@@ -75,7 +77,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         match message {
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
-
+                // Insert the block request for the peer, and fetch the recent frequency.
+                let frequency = self.router().cache.insert_inbound_block_request(peer_ip);
+                // Check if the number of block requests is within the limit.
+                if frequency > Self::MAXIMUM_BLOCK_REQUESTS_PER_INTERVAL {
+                    bail!("Peer '{peer_ip}' is not following the protocol (excessive block requests)")
+                }
                 // Ensure the block request is well-formed.
                 if start_height >= end_height {
                     bail!("Block request from '{peer_ip}' has an invalid range ({start_height}..{end_height})")
