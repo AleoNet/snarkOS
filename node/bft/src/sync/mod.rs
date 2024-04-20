@@ -321,6 +321,10 @@ impl<N: Network> Sync<N> {
             // Sync the round with the block.
             self_.storage.sync_round_with_block(block.round());
 
+            // Update the `SYNCED` metric.
+            #[cfg(feature = "metrics")]
+            metrics::increment_gauge(metrics::bft::SYNCED, 1);
+
             Ok(())
         })
         .await?
@@ -371,6 +375,10 @@ impl<N: Network> Sync<N> {
             self_.storage.sync_height_with_block(block.height());
             // Sync the round with the block.
             self_.storage.sync_round_with_block(block.round());
+
+            // Update the `SYNCED` metric.
+            #[cfg(feature = "metrics")]
+            metrics::increment_gauge(metrics::bft::SYNCED, 1);
 
             Ok(())
         })

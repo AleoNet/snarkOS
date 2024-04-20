@@ -17,7 +17,6 @@ use crate::{
     locators::BlockLocators,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_metrics as metrics;
 use snarkos_node_router::messages::DataBlocks;
 use snarkos_node_sync_communication_service::CommunicationService;
 use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
@@ -347,6 +346,7 @@ impl<N: Network> BlockSync<N> {
             // Update the latest height.
             current_height = self.canon.latest_block_height();
             // Update the `SYNCED` metric.
+            #[cfg(feature = "metrics")]
             metrics::increment_gauge(metrics::bft::SYNCED, 1);
         }
     }

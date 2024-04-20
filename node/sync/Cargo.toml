@@ -18,6 +18,7 @@ edition = "2021"
 
 [features]
 default = [ ]
+metrics = [ "dep:metrics" ]
 test = [ "snarkos-node-sync-locators/test" ]
 
 [dependencies.anyhow]
@@ -47,7 +48,8 @@ path = "../bft/ledger-service"
 version = "=2.2.7"
 features = [ "ledger-write" ]
 
-[dependencies.snarkos-node-metrics]
+[dependencies.metrics]
+package = "snarkos-node-metrics"
 path = "../metrics"
 version = "=2.2.7"
 optional = true
