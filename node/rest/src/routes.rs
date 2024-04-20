@@ -16,13 +16,14 @@ use super::*;
 use snarkos_node_router::messages::UnconfirmedSolution;
 use snarkvm::{
     ledger::puzzle::Solution,
-    prelude::{block::Transaction, Identifier, Plaintext},
+    prelude::{block::Transaction, Identifier, Plaintext, ToBytes},
 };
 
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use snarkvm::prelude::LimitedWriter;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -329,6 +330,13 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
+        // If the transaction exceeds the transaction size limit, return an error.
+        // TODO: Should this be a blocking task?
+        let buffer = Vec::with_capacity(N::MAX_TRANSACTION_SIZE);
+        if tx.write_le(LimitedWriter::new(buffer, N::MAX_TRANSACTION_SIZE)).is_err() {
+            return Err(RestError("Transaction size exceeds the byte limit".to_string()));
+        }
+
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
