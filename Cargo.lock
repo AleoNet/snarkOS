@@ -3246,6 +3246,7 @@ dependencies = [
  "rand",
  "serde",
  "snarkos-node-bft-ledger-service",
+ "snarkos-node-metrics",
  "snarkos-node-router",
  "snarkos-node-sync-communication-service",
  "snarkos-node-sync-locators",

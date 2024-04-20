@@ -14,7 +14,7 @@
 
 pub(super) const COUNTER_NAMES: [&str; 2] = [bft::LEADERS_ELECTED, consensus::STALE_UNCONFIRMED_TRANSMISSIONS];
 
-pub(super) const GAUGE_NAMES: [&str; 25] = [
+pub(super) const GAUGE_NAMES: [&str; 26] = [
     bft::CONNECTED,
     bft::CONNECTING,
     bft::LAST_STORED_ROUND,
@@ -22,6 +22,7 @@ pub(super) const GAUGE_NAMES: [&str; 25] = [
     bft::CERTIFIED_BATCHES,
     bft::HEIGHT,
     bft::LAST_COMMITTED_ROUND,
+    bft::SYNCED,
     blocks::SOLUTIONS,
     blocks::TRANSACTIONS,
     blocks::ACCEPTED_DEPLOY,
@@ -55,6 +56,7 @@ pub mod bft {
     pub const CERTIFIED_BATCHES: &str = "snarkos_bft_primary_certified_batches";
     pub const HEIGHT: &str = "snarkos_bft_height_total";
     pub const LAST_COMMITTED_ROUND: &str = "snarkos_bft_last_committed_round";
+    pub const SYNCED: &str = "snarkos_bft_synced_total";
 }
 
 pub mod blocks {
