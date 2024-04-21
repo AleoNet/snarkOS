@@ -244,7 +244,7 @@ impl<N: Network> Cache<N> {
             timestamps.pop_front();
         }
         // Check whether the request is higher than the last.
-        let incrementing = timestamps.back().map(|(_, last)| request.start_height > last.end_height).unwrap_or(true);
+        let incrementing = timestamps.back().map(|(_, last)| request.start_height >= last.end_height).unwrap_or(true);
         // Insert the new timestamp and request if its higher than the last.
         if incrementing {
             timestamps.push_back((now, request));
@@ -340,7 +340,7 @@ mod tests {
         assert_eq!(cache.seen_inbound_block_requests.read().len(), 0);
 
         // Insert a block request.
-        let request = BlockRequest { start_height: 1, end_height: 1 };
+        let request = BlockRequest { start_height: 1, end_height: 2 };
         assert_eq!(cache.insert_inbound_block_request(peer_ip, request), (1, true));
         // Check that the cache contains the block request.
         assert!(cache.contains_inbound_block_request(&peer_ip));
@@ -352,13 +352,13 @@ mod tests {
         assert!(cache.contains_inbound_block_request(&peer_ip));
 
         // Insert another block request for the same peer with a lower start height.
-        let request = BlockRequest { start_height: 1, end_height: 3 };
+        let request = BlockRequest { start_height: 2, end_height: 3 };
         assert_eq!(cache.insert_inbound_block_request(peer_ip, request), (2, false));
         // Check that the cache does contains the block requests.
         assert!(cache.contains_inbound_block_request(&peer_ip));
 
         // Insert another block request for the same peer with a low start height.
-        let request = BlockRequest { start_height: 1, end_height: 1 };
+        let request = BlockRequest { start_height: 1, end_height: 2 };
         assert_eq!(cache.insert_inbound_block_request(peer_ip, request), (2, false));
         // Check that the cache does contains the block requests.
         assert!(cache.contains_inbound_block_request(&peer_ip));
@@ -369,7 +369,7 @@ mod tests {
         ));
 
         // Insert another block request for the same peer with a low start height.
-        let request = BlockRequest { start_height: 1, end_height: 1 };
+        let request = BlockRequest { start_height: 1, end_height: 2 };
         assert_eq!(cache.insert_inbound_block_request(peer_ip, request), (1, true));
         // Check that the cache does contains the block requests.
         assert!(cache.contains_inbound_block_request(&peer_ip));
