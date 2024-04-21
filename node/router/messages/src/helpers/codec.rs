@@ -103,3 +103,36 @@ impl<N: Network> Decoder for MessageCodec<N> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::{
+        unconfirmed_transaction::prop_tests::{any_large_unconfirmed_transaction, any_unconfirmed_transaction},
+        UnconfirmedTransaction,
+    };
+
+    use proptest::prelude::ProptestConfig;
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
+
+    #[proptest]
+    fn unconfirmed_transaction(#[strategy(any_unconfirmed_transaction())] tx: UnconfirmedTransaction<CurrentNetwork>) {
+        let mut bytes = BytesMut::new();
+        let mut codec = MessageCodec::<CurrentNetwork>::default();
+        assert!(codec.encode(Message::UnconfirmedTransaction(tx), &mut bytes).is_ok());
+        assert!(codec.decode(&mut bytes).is_ok());
+    }
+
+    #[proptest(ProptestConfig { cases : 10, ..ProptestConfig::default() })]
+    fn overly_large_unconfirmed_transaction(
+        #[strategy(any_large_unconfirmed_transaction())] tx: UnconfirmedTransaction<CurrentNetwork>,
+    ) {
+        let mut bytes = BytesMut::new();
+        let mut codec = MessageCodec::<CurrentNetwork>::default();
+        assert!(codec.encode(Message::UnconfirmedTransaction(tx), &mut bytes).is_ok());
+        assert!(matches!(codec.decode(&mut bytes), Err(err) if err.kind() == std::io::ErrorKind::InvalidData));
+    }
+}
