@@ -345,9 +345,6 @@ impl<N: Network> BlockSync<N> {
             }
             // Update the latest height.
             current_height = self.canon.latest_block_height();
-            // Update the `SYNCED` metric.
-            #[cfg(feature = "metrics")]
-            metrics::increment_gauge(metrics::bft::SYNCED, 1);
         }
     }
 }
@@ -464,6 +461,9 @@ impl<N: Network> BlockSync<N> {
         let is_synced = num_blocks_behind <= max_blocks_behind;
         // Update the sync status.
         self.is_block_synced.store(is_synced, Ordering::SeqCst);
+        // Update the `IS_SYNCED` metric.
+        #[cfg(feature = "metrics")]
+        metrics::gauge(metrics::bft::IS_SYNCED, is_synced);
     }
 
     /// Inserts a block request for the given height.

@@ -22,7 +22,7 @@ pub(super) const GAUGE_NAMES: [&str; 26] = [
     bft::CERTIFIED_BATCHES,
     bft::HEIGHT,
     bft::LAST_COMMITTED_ROUND,
-    bft::SYNCED,
+    bft::IS_SYNCED,
     blocks::SOLUTIONS,
     blocks::TRANSACTIONS,
     blocks::ACCEPTED_DEPLOY,
@@ -56,7 +56,7 @@ pub mod bft {
     pub const CERTIFIED_BATCHES: &str = "snarkos_bft_primary_certified_batches";
     pub const HEIGHT: &str = "snarkos_bft_height_total";
     pub const LAST_COMMITTED_ROUND: &str = "snarkos_bft_last_committed_round";
-    pub const SYNCED: &str = "snarkos_bft_synced_total";
+    pub const IS_SYNCED: &str = "snarkos_bft_is_synced";
 }
 
 pub mod blocks {
