@@ -293,11 +293,69 @@ impl<N: Network> Sync<N> {
             }
         }
 
+        // Track the previous block.
+        let mut previous_block = None;
         // Try to advance the ledger with sync blocks.
         while let Some(block) = self.block_sync.process_next_block(current_height) {
             info!("Syncing the BFT to block {}...", block.height());
             // Sync the storage with the block.
-            self.sync_storage_with_block(block).await?;
+            self.sync_storage_with_block(&block).await?;
+
+            // Check if the previous block is ready to be added to the ledger.
+            // Ensure that the previous block's leader certificate meets the quorum threshold based
+            // on the certificates in the current block.
+            // Note: We do not advance to the last block in the loop because we would be unable to
+            // validate if the leader certificate in the block has been certified properly.
+            if let Some(previous_block) = previous_block.replace(block) {
+                // Retrieve the subdag from the block.
+                let Authority::Quorum(subdag) = previous_block.authority() else {
+                    bail!("Received a block with an unexpected authority type");
+                };
+
+                // Fetch the leader certificate and the relevant rounds.
+                let leader_certificate = subdag.leader_certificate();
+                let commit_round = leader_certificate.round();
+                let certificate_round = commit_round.saturating_add(1);
+
+                // Get the committee lookback for the commit round.
+                let committee_lookback = self.ledger.get_committee_lookback_for_round(commit_round)?;
+                // Retrieve all of the certificates for the **certificate** round.
+                let certificates = self.storage.get_certificates_for_round(certificate_round);
+                // Construct a set over the authors who included the leader's certificate in the certificate round.
+                let authors = certificates
+                    .iter()
+                    .filter_map(|c| match c.previous_certificate_ids().contains(&leader_certificate.id()) {
+                        true => Some(c.author()),
+                        false => None,
+                    })
+                    .collect();
+
+                // Check if the leader is ready to be committed.
+                match committee_lookback.is_quorum_threshold_reached(&authors) {
+                    // Advance to the next block if quorum threshold was reached.
+                    true => {
+                        let self_ = self.clone();
+                        tokio::task::spawn_blocking(move || {
+                            // Check the next block.
+                            self_.ledger.check_next_block(&previous_block)?;
+                            // Attempt to advance to the next block.
+                            self_.ledger.advance_to_next_block(&previous_block)?;
+
+                            // Sync the height with the block.
+                            self_.storage.sync_height_with_block(previous_block.height());
+                            // Sync the round with the block.
+                            self_.storage.sync_round_with_block(previous_block.round());
+
+                            Ok::<(), anyhow::Error>(())
+                        })
+                        .await??;
+                    }
+                    false => {
+                        bail!("Quorum was not reached for block {} at round {commit_round}", previous_block.height())
+                    }
+                }
+            }
+
             // Update the current height.
             current_height += 1;
         }
@@ -327,7 +385,7 @@ impl<N: Network> Sync<N> {
     }
 
     /// Syncs the storage with the given blocks.
-    pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
+    pub async fn sync_storage_with_block(&self, block: &Block<N>) -> Result<()> {
         // Acquire the sync lock.
         let _lock = self.sync_lock.lock().await;
 
@@ -344,7 +402,7 @@ impl<N: Network> Sync<N> {
             for certificates in subdag.values().cloned() {
                 cfg_into_iter!(certificates.clone()).for_each(|certificate| {
                     // Sync the batch certificate with the block.
-                    self.storage.sync_certificate_with_block(&block, certificate.clone(), &unconfirmed_transactions);
+                    self.storage.sync_certificate_with_block(block, certificate.clone(), &unconfirmed_transactions);
                 });
 
                 // Sync the BFT DAG with the certificates.
@@ -360,21 +418,7 @@ impl<N: Network> Sync<N> {
             }
         }
 
-        let self_ = self.clone();
-        tokio::task::spawn_blocking(move || {
-            // Check the next block.
-            self_.ledger.check_next_block(&block)?;
-            // Attempt to advance to the next block.
-            self_.ledger.advance_to_next_block(&block)?;
-
-            // Sync the height with the block.
-            self_.storage.sync_height_with_block(block.height());
-            // Sync the round with the block.
-            self_.storage.sync_round_with_block(block.round());
-
-            Ok(())
-        })
-        .await?
+        Ok(())
     }
 }
 
