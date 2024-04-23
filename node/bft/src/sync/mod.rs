@@ -376,8 +376,10 @@ impl<N: Network> Sync<N> {
         // Note: We do not advance to the last block in the loop because we would be unable to
         // validate if the leader certificate in the block has been certified properly.
         if let Some(previous_block) = last_block_response.replace(block) {
-            // Return early if this block has already been processed.
-            if self.ledger.contains_block_height(previous_block.height()) {
+            // Return early if this block has already been processed or is not the next block to add.
+            if self.ledger.contains_block_height(previous_block.height())
+                || self.ledger.latest_block_height().saturating_add(1) != previous_block.height()
+            {
                 return Ok(());
             }
 
@@ -425,7 +427,8 @@ impl<N: Network> Sync<N> {
                     .await??;
                 }
                 false => {
-                    bail!("Quorum was not reached for block {} at round {commit_round}", previous_block.height())
+                    debug!("Quorum was not reached for block {} at round {commit_round}", previous_block.height());
+                    return Ok(());
                 }
             }
         }
