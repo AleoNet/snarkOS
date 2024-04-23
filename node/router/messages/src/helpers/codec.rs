@@ -75,22 +75,7 @@ impl<N: Network> Decoder for MessageCodec<N> {
             None => return Ok(None),
         };
 
-        // Store the length to be checked against the max message size for each variant.
-        let len = bytes.len();
-        if len < 2 {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid message"));
-        }
-
-        // Check the first two bytes for the message ID.
-        let id_bytes: [u8; 2] = (&bytes[..2])
-            .try_into()
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "id couldn't be deserialized"))?;
-        let id = u16::from_le_bytes(id_bytes);
-
-        // SPECIAL CASE: check the transaction message isn't too large.
-        if id == 12 && len > N::MAX_TRANSACTION_SIZE {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "transaction is too large"))?;
-        }
+        Self::Item::check_size(&bytes)?;
 
         // Convert the bytes to a message, or fail if it is not valid.
         let reader = bytes.reader();
