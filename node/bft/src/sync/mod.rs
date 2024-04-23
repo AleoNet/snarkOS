@@ -370,21 +370,23 @@ impl<N: Network> Sync<N> {
             }
         }
 
-        // Check if the previous block is ready to be added to the ledger.
-        // Ensure that the previous block's leader certificate meets the quorum threshold based
-        // on the certificates in the current block.
-        // Note: We do not advance to the last block in the loop because we would be unable to
+        // Check if the last block response is ready to be added to the ledger.
+        // Ensure that the previous block's leader certificate meets the availability threshold
+        // based on the certificates in the current block.
+        // Note: We do not advance to the most recent block response because we would be unable to
         // validate if the leader certificate in the block has been certified properly.
-        if let Some(previous_block) = last_block_response.replace(block) {
+        if let Some(last_block) = last_block_response.replace(block) {
+            // Retrieve the height of the last block.
+            let last_block_height = last_block.height();
             // Return early if this block has already been processed or is not the next block to add.
-            if self.ledger.contains_block_height(previous_block.height())
-                || self.ledger.latest_block_height().saturating_add(1) != previous_block.height()
+            if self.ledger.contains_block_height(last_block_height)
+                || self.ledger.latest_block_height().saturating_add(1) != last_block_height
             {
                 return Ok(());
             }
 
             // Retrieve the subdag from the block.
-            let Authority::Quorum(subdag) = previous_block.authority() else {
+            let Authority::Quorum(subdag) = last_block.authority() else {
                 bail!("Received a block with an unexpected authority type");
             };
 
@@ -407,27 +409,29 @@ impl<N: Network> Sync<N> {
                 .collect();
 
             // Check if the leader is ready to be committed.
-            match committee_lookback.is_quorum_threshold_reached(&authors) {
+            match committee_lookback.is_availability_threshold_reached(&authors) {
                 // Advance to the next block if quorum threshold was reached.
                 true => {
                     let self_ = self.clone();
                     tokio::task::spawn_blocking(move || {
                         // Check the next block.
-                        self_.ledger.check_next_block(&previous_block)?;
+                        self_.ledger.check_next_block(&last_block)?;
                         // Attempt to advance to the next block.
-                        self_.ledger.advance_to_next_block(&previous_block)?;
+                        self_.ledger.advance_to_next_block(&last_block)?;
 
                         // Sync the height with the block.
-                        self_.storage.sync_height_with_block(previous_block.height());
+                        self_.storage.sync_height_with_block(last_block.height());
                         // Sync the round with the block.
-                        self_.storage.sync_round_with_block(previous_block.round());
+                        self_.storage.sync_round_with_block(last_block.round());
 
                         Ok::<(), anyhow::Error>(())
                     })
                     .await??;
                 }
                 false => {
-                    debug!("Quorum was not reached for block {} at round {commit_round}", previous_block.height());
+                    debug!(
+                        "Availability threshold was not reached for block {last_block_height} at round {commit_round}",
+                    );
                     return Ok(());
                 }
             }
