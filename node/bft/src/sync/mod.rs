@@ -111,7 +111,7 @@ impl<N: Network> Sync<N> {
                     error!("Unable to sync storage with blocks - {e}");
                 }
 
-                // If the node is synced, clear the `latest_block_response`.
+                // If the node is synced, clear the `last_block_response`.
                 if self_.is_synced() {
                     *self_.last_block_response.lock().await = None;
                 }
@@ -338,8 +338,8 @@ impl<N: Network> Sync<N> {
     pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
         // Acquire the sync lock.
         let _lock = self.sync_lock.lock().await;
-        // Acquire the latest block response lock.
-        let mut latest_block_response = self.last_block_response.lock().await;
+        // Acquire the last block response lock.
+        let mut last_block_response = self.last_block_response.lock().await;
 
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
@@ -375,7 +375,7 @@ impl<N: Network> Sync<N> {
         // on the certificates in the current block.
         // Note: We do not advance to the last block in the loop because we would be unable to
         // validate if the leader certificate in the block has been certified properly.
-        if let Some(previous_block) = latest_block_response.replace(block) {
+        if let Some(previous_block) = last_block_response.replace(block) {
             // Return early if this block has already been processed.
             if self.ledger.contains_block_height(previous_block.height()) {
                 return Ok(());
