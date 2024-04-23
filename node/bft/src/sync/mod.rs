@@ -376,7 +376,7 @@ impl<N: Network> Sync<N> {
         // Note: We do not advance to the last block in the loop because we would be unable to
         // validate if the leader certificate in the block has been certified properly.
         if let Some(previous_block) = latest_block_response.replace(block) {
-            // Return early if this block has already been processed or is not the next block to add.
+            // Return early if this block has already been processed.
             if self.ledger.contains_block_height(previous_block.height()) {
                 return Ok(());
             }
