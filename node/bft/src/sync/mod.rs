@@ -57,8 +57,8 @@ pub struct Sync<N: Network> {
     response_lock: Arc<TMutex<()>>,
     /// The sync lock.
     sync_lock: Arc<TMutex<()>>,
-    /// The latest block received by a peer.
-    latest_block_response: Arc<TMutex<Option<Block<N>>>>,
+    /// The last block response.
+    last_block_response: Arc<TMutex<Option<Block<N>>>>,
 }
 
 impl<N: Network> Sync<N> {
@@ -77,7 +77,7 @@ impl<N: Network> Sync<N> {
             handles: Default::default(),
             response_lock: Default::default(),
             sync_lock: Default::default(),
-            latest_block_response: Default::default(),
+            last_block_response: Default::default(),
         }
     }
 
@@ -113,7 +113,7 @@ impl<N: Network> Sync<N> {
 
                 // If the node is synced, clear the `latest_block_response`.
                 if self_.is_synced() {
-                    *self_.latest_block_response.lock().await = None;
+                    *self_.last_block_response.lock().await = None;
                 }
             }
         }));
@@ -339,7 +339,7 @@ impl<N: Network> Sync<N> {
         // Acquire the sync lock.
         let _lock = self.sync_lock.lock().await;
         // Acquire the latest block response lock.
-        let mut latest_block_response = self.latest_block_response.lock().await;
+        let mut latest_block_response = self.last_block_response.lock().await;
 
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
@@ -376,7 +376,7 @@ impl<N: Network> Sync<N> {
         // Note: We do not advance to the last block in the loop because we would be unable to
         // validate if the leader certificate in the block has been certified properly.
         if let Some(previous_block) = latest_block_response.replace(block) {
-            // Return early if this block has already been processed.
+            // Return early if this block has already been processed or is not the next block to add.
             if self.ledger.contains_block_height(previous_block.height()) {
                 return Ok(());
             }
