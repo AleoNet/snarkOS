@@ -313,6 +313,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
+        // Do not process the transaction if the node is syncing.
+        if !rest.routing.is_block_synced() {
+            return Err(RestError(format!("Unable to broadcast transaction {} - node is syncing.", fmt_id(tx.id()))));
+        }
+
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
@@ -337,6 +342,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
+        // Do not process the solution if the node is syncing.
+        if !rest.routing.is_block_synced() {
+            return Err(RestError(format!(
+                "Unable to broadcast solution {} - node is syncing.",
+                fmt_id(solution.id())
+            )));
+        }
+
         // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
         // Otherwise, verify it prior to broadcasting.
         match rest.consensus {
@@ -355,8 +368,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
                     .await
                 {
                     Ok(Ok(())) => {}
-                    Ok(Err(err)) => return Err(RestError(format!("Invalid solution `{}` - {err}", solution.id()))),
-                    Err(err) => return Err(RestError(format!("Invalid solution `{}` - {err}", solution.id()))),
+                    Ok(Err(err)) => {
+                        return Err(RestError(format!("Invalid solution `{}` - {err}", fmt_id(solution.id()))));
+                    }
+                    Err(err) => return Err(RestError(format!("Invalid solution `{}` - {err}", fmt_id(solution.id())))),
                 }
             }
         }
