@@ -421,6 +421,7 @@ impl<N: Network> Sync<N> {
                 })
                 .collect();
 
+            debug!("Validating sync block {next_block_height} at round {commit_round}...");
             // Check if the leader is ready to be committed.
             if committee_lookback.is_availability_threshold_reached(&authors) {
                 // Initialize the current certificate.
@@ -442,6 +443,7 @@ impl<N: Network> Sync<N> {
                     };
                     // Determine if there is a path between the previous certificate and the current certificate.
                     if self.is_linked(previous_certificate.clone(), current_certificate.clone())? {
+                        debug!("Previous sync block {height} is linked to the current block {next_block_height}");
                         // Add the previous leader certificate to the list of certificates to commit.
                         blocks_to_add.insert(0, previous_block.clone());
                         // Update the current certificate to the previous leader certificate.
@@ -478,7 +480,9 @@ impl<N: Network> Sync<N> {
                     latest_block_responses.remove(&block_height);
                 }
             } else {
-                trace!("Availability threshold was not reached for block {next_block_height} at round {commit_round}");
+                debug!(
+                    "Availability threshold was not reached for block {next_block_height} at round {commit_round}. Checking next block..."
+                );
             }
         }
 
