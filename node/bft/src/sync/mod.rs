@@ -451,7 +451,14 @@ impl<N: Network> Sync<N> {
 
                 // Add the blocks to the ledger.
                 for block in blocks_to_add {
+                    // Check that the blocks are sequential and can be added to the ledger.
                     let block_height = block.height();
+                    if block_height != self.ledger.latest_block_height().saturating_add(1) {
+                        debug!("Removing block {block_height} from the latest block responses - not sequential.");
+                        latest_block_responses.remove(&block_height);
+                        continue;
+                    }
+
                     let self_ = self.clone();
                     tokio::task::spawn_blocking(move || {
                         // Check the next block.
