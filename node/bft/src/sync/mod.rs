@@ -57,8 +57,8 @@ pub struct Sync<N: Network> {
     response_lock: Arc<TMutex<()>>,
     /// The sync lock.
     sync_lock: Arc<TMutex<()>>,
-    /// The last block response.
-    last_block_response: Arc<TMutex<Option<Block<N>>>>,
+    /// The latest block responses.
+    latest_block_responses: Arc<TMutex<HashMap<u32, Block<N>>>>,
 }
 
 impl<N: Network> Sync<N> {
@@ -77,7 +77,7 @@ impl<N: Network> Sync<N> {
             handles: Default::default(),
             response_lock: Default::default(),
             sync_lock: Default::default(),
-            last_block_response: Default::default(),
+            latest_block_responses: Default::default(),
         }
     }
 
@@ -111,9 +111,9 @@ impl<N: Network> Sync<N> {
                     error!("Unable to sync storage with blocks - {e}");
                 }
 
-                // If the node is synced, clear the `last_block_response`.
+                // If the node is synced, clear the `latest_block_responses`.
                 if self_.is_synced() {
-                    *self_.last_block_response.lock().await = None;
+                    self_.latest_block_responses.lock().await.clear();
                 }
             }
         }));
@@ -338,8 +338,13 @@ impl<N: Network> Sync<N> {
     pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
         // Acquire the sync lock.
         let _lock = self.sync_lock.lock().await;
-        // Acquire the last block response lock.
-        let mut last_block_response = self.last_block_response.lock().await;
+        // Acquire the latest block responses lock.
+        let mut latest_block_responses = self.latest_block_responses.lock().await;
+
+        // If this block has already been processed, return early.
+        if self.ledger.contains_block_height(block.height()) || latest_block_responses.contains_key(&block.height()) {
+            return Ok(());
+        }
 
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
@@ -370,28 +375,35 @@ impl<N: Network> Sync<N> {
             }
         }
 
-        // Check if the last block response is ready to be added to the ledger.
+        // Fetch the latest block height.
+        let latest_block_height = self.ledger.latest_block_height();
+
+        // Insert the latest block response.
+        latest_block_responses.insert(block.height(), block);
+        // Clear the latest block responses of older blocks.
+        latest_block_responses.retain(|height, _| *height > latest_block_height);
+
+        // Get a list of contiguous blocks from the latest block responses.
+        let contiguous_blocks: Vec<Block<N>> = (latest_block_height.saturating_add(1)..)
+            .take_while(|&k| latest_block_responses.contains_key(&k))
+            .filter_map(|k| latest_block_responses.get(&k).cloned())
+            .collect();
+
+        // Check if the block response is ready to be added to the ledger.
         // Ensure that the previous block's leader certificate meets the availability threshold
         // based on the certificates in the current block.
+        // If the availability threshold is not met, process the next block and check if it is linked to the current block.
         // Note: We do not advance to the most recent block response because we would be unable to
         // validate if the leader certificate in the block has been certified properly.
-        if let Some(last_block) = last_block_response.replace(block) {
-            // Retrieve the height of the last block.
-            let last_block_height = last_block.height();
-            // Return early if this block has already been processed or is not the next block to add.
-            if self.ledger.contains_block_height(last_block_height)
-                || self.ledger.latest_block_height().saturating_add(1) != last_block_height
-            {
-                return Ok(());
-            }
-
-            // Retrieve the subdag from the block.
-            let Authority::Quorum(subdag) = last_block.authority() else {
-                bail!("Received a block with an unexpected authority type");
-            };
+        for next_block in contiguous_blocks.into_iter() {
+            // Retrieve the height of the next block.
+            let next_block_height = next_block.height();
 
             // Fetch the leader certificate and the relevant rounds.
-            let leader_certificate = subdag.leader_certificate();
+            let leader_certificate = match next_block.authority() {
+                Authority::Quorum(subdag) => subdag.leader_certificate().clone(),
+                _ => bail!("Received a block with an unexpected authority type."),
+            };
             let commit_round = leader_certificate.round();
             let certificate_round = commit_round.saturating_add(1);
 
@@ -408,36 +420,91 @@ impl<N: Network> Sync<N> {
                 })
                 .collect();
 
+            debug!("Validating sync block {next_block_height} at round {commit_round}...");
             // Check if the leader is ready to be committed.
-            match committee_lookback.is_availability_threshold_reached(&authors) {
-                // Advance to the next block if quorum threshold was reached.
-                true => {
+            if committee_lookback.is_availability_threshold_reached(&authors) {
+                // Initialize the current certificate.
+                let mut current_certificate = leader_certificate;
+                // Check if there are any linked blocks that need to be added.
+                let mut blocks_to_add = vec![next_block];
+
+                // Check if there are other blocks to process based on `is_linked`.
+                for height in (self.ledger.latest_block_height().saturating_add(1)..next_block_height).rev() {
+                    // Retrieve the previous block.
+                    let Some(previous_block) = latest_block_responses.get(&height) else {
+                        bail!("Block {height} is missing from the latest block responses.");
+                    };
+                    // Retrieve the previous certificate.
+                    let previous_certificate = match previous_block.authority() {
+                        Authority::Quorum(subdag) => subdag.leader_certificate().clone(),
+                        _ => bail!("Received a block with an unexpected authority type."),
+                    };
+                    // Determine if there is a path between the previous certificate and the current certificate.
+                    if self.is_linked(previous_certificate.clone(), current_certificate.clone())? {
+                        debug!("Previous sync block {height} is linked to the current block {next_block_height}");
+                        // Add the previous leader certificate to the list of certificates to commit.
+                        blocks_to_add.insert(0, previous_block.clone());
+                        // Update the current certificate to the previous leader certificate.
+                        current_certificate = previous_certificate;
+                    }
+                }
+
+                // Add the blocks to the ledger.
+                for block in blocks_to_add {
+                    // Check that the blocks are sequential and can be added to the ledger.
+                    let block_height = block.height();
+                    if block_height != self.ledger.latest_block_height().saturating_add(1) {
+                        warn!("Skipping block {block_height} from the latest block responses - not sequential.");
+                        continue;
+                    }
+
                     let self_ = self.clone();
                     tokio::task::spawn_blocking(move || {
                         // Check the next block.
-                        self_.ledger.check_next_block(&last_block)?;
+                        self_.ledger.check_next_block(&block)?;
                         // Attempt to advance to the next block.
-                        self_.ledger.advance_to_next_block(&last_block)?;
+                        self_.ledger.advance_to_next_block(&block)?;
 
                         // Sync the height with the block.
-                        self_.storage.sync_height_with_block(last_block.height());
+                        self_.storage.sync_height_with_block(block.height());
                         // Sync the round with the block.
-                        self_.storage.sync_round_with_block(last_block.round());
+                        self_.storage.sync_round_with_block(block.round());
 
                         Ok::<(), anyhow::Error>(())
                     })
                     .await??;
+                    // Remove the block height from the latest block responses.
+                    latest_block_responses.remove(&block_height);
                 }
-                false => {
-                    debug!(
-                        "Availability threshold was not reached for block {last_block_height} at round {commit_round}",
-                    );
-                    return Ok(());
-                }
+            } else {
+                debug!(
+                    "Availability threshold was not reached for block {next_block_height} at round {commit_round}. Checking next block..."
+                );
             }
         }
 
         Ok(())
+    }
+
+    /// Returns `true` if there is a path from the previous certificate to the current certificate.
+    fn is_linked(
+        &self,
+        previous_certificate: BatchCertificate<N>,
+        current_certificate: BatchCertificate<N>,
+    ) -> Result<bool> {
+        // Initialize the list containing the traversal.
+        let mut traversal = vec![current_certificate.clone()];
+        // Iterate over the rounds from the current certificate to the previous certificate.
+        for round in (previous_certificate.round()..current_certificate.round()).rev() {
+            // Retrieve all of the certificates for this past round.
+            let certificates = self.storage.get_certificates_for_round(round);
+            // Filter the certificates to only include those that are in the traversal.
+            traversal = certificates
+                .into_iter()
+                .filter(|p| traversal.iter().any(|c| c.previous_certificate_ids().contains(&p.id())))
+                .collect();
+        }
+        Ok(traversal.contains(&previous_certificate))
     }
 }
 
