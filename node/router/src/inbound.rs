@@ -214,8 +214,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::UnconfirmedSolution(message) => {
-                // Clone the serialized message.
-                let serialized = message.clone();
+                // Do not process unconfirmed solutions if the node is syncing.
+                if !self.is_block_synced() {
+                    trace!("Skipped processing unconfirmed solution '{}' (node is syncing)", message.solution_id);
+                    return Ok(());
+                }
                 // Update the timestamp for the unconfirmed solution.
                 let seen_before = self.router().cache.insert_inbound_solution(peer_ip, message.solution_id).is_some();
                 // Determine whether to propagate the solution.
@@ -223,6 +226,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
                     return Ok(());
                 }
+                // Clone the serialized message.
+                let serialized = message.clone();
                 // Perform the deferred non-blocking deserialization of the solution.
                 let solution = match message.solution.deserialize().await {
                     Ok(solution) => solution,
@@ -239,8 +244,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::UnconfirmedTransaction(message) => {
-                // Clone the serialized message.
-                let serialized = message.clone();
+                // Do not process unconfirmed transactions if the node is syncing.
+                if !self.is_block_synced() {
+                    trace!("Skipped processing unconfirmed transaction '{}' (node is syncing)", message.transaction_id);
+                    return Ok(());
+                }
                 // Update the timestamp for the unconfirmed transaction.
                 let seen_before =
                     self.router().cache.insert_inbound_transaction(peer_ip, message.transaction_id).is_some();
@@ -249,6 +257,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     trace!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'");
                     return Ok(());
                 }
+                // Clone the serialized message.
+                let serialized = message.clone();
                 // Perform the deferred non-blocking deserialization of the transaction.
                 let transaction = match message.transaction.deserialize().await {
                     Ok(transaction) => transaction,

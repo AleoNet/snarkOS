@@ -461,6 +461,9 @@ impl<N: Network> BlockSync<N> {
         let is_synced = num_blocks_behind <= max_blocks_behind;
         // Update the sync status.
         self.is_block_synced.store(is_synced, Ordering::SeqCst);
+        // Update the `IS_SYNCED` metric.
+        #[cfg(feature = "metrics")]
+        metrics::gauge(metrics::bft::IS_SYNCED, is_synced);
     }
 
     /// Inserts a block request for the given height.
