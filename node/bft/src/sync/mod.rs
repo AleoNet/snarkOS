@@ -377,7 +377,6 @@ impl<N: Network> Sync<N> {
 
         // Fetch the latest block height.
         let latest_block_height = self.ledger.latest_block_height();
-        let next_block_height = latest_block_height.saturating_add(1);
 
         // Insert the latest block response.
         latest_block_responses.insert(block.height(), block);
@@ -385,7 +384,7 @@ impl<N: Network> Sync<N> {
         latest_block_responses.retain(|height, _| *height > latest_block_height);
 
         // Get a list of contiguous blocks from the latest block responses.
-        let contiguous_blocks: Vec<Block<N>> = (next_block_height..)
+        let contiguous_blocks: Vec<Block<N>> = (latest_block_height.saturating_add(1)..)
             .take_while(|&k| latest_block_responses.contains_key(&k))
             .filter_map(|k| latest_block_responses.get(&k).cloned())
             .collect();
@@ -432,9 +431,8 @@ impl<N: Network> Sync<N> {
                 // Check if there are other blocks to process based on `is_linked`.
                 for height in (self.ledger.latest_block_height().saturating_add(1)..next_block_height).rev() {
                     // Retrieve the previous block.
-                    let previous_block = match latest_block_responses.get(&height) {
-                        Some(block) => block,
-                        None => bail!("Block {height} is missing from the latest block responses."),
+                    let Some(previous_block) = latest_block_responses.get(&height) else {
+                        bail!("Block {height} is missing from the latest block responses.");
                     };
                     // Retrieve the previous certificate.
                     let previous_certificate = match previous_block.authority() {
@@ -456,8 +454,7 @@ impl<N: Network> Sync<N> {
                     // Check that the blocks are sequential and can be added to the ledger.
                     let block_height = block.height();
                     if block_height != self.ledger.latest_block_height().saturating_add(1) {
-                        debug!("Removing block {block_height} from the latest block responses - not sequential.");
-                        latest_block_responses.remove(&block_height);
+                        warn!("Skipping block {block_height} from the latest block responses - not sequential.");
                         continue;
                     }
 
