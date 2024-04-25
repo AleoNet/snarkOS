@@ -103,12 +103,18 @@ workspace = true
 [dependencies.sys-info]
 version = "0.9"
 
+[dependencies.time]
+version = "0.3"
+
 [dependencies.thiserror]
 version = "1.0"
 
 [dependencies.tokio]
 version = "1.28"
 features = [ "rt" ]
+
+[dependencies.tracing]
+version = "0.1"
 
 [dependencies.tracing-subscriber]
 version = "0.3"
