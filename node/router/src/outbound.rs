@@ -31,7 +31,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     /// Returns `true` if the node is synced up to the latest block (within the given tolerance).
     fn is_block_synced(&self) -> bool;
 
-    /// Returns the number of blocks this node is behind its furthest peer.
+    /// Returns the number of blocks this node is behind the greatest peer height.
     fn num_blocks_behind(&self) -> u32;
 
     /// Sends a "Ping" message to the given peer.

@@ -143,7 +143,7 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {
         self.sync.is_block_synced()
     }
 
-    /// Returns the number of blocks this node is behind its furthest peer.
+    /// Returns the number of blocks this node is behind the greatest peer height.
     fn num_blocks_behind(&self) -> u32 {
         self.sync.num_blocks_behind()
     }
