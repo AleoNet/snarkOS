@@ -330,7 +330,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
         // Do not process the transaction if the node is too far behind.
-        if !rest.routing.num_blocks_behind() > SYNC_LENIENCY {
+        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
             return Err(RestError(format!("Unable to broadcast transaction '{}' (node is syncing)", fmt_id(tx.id()))));
         }
 
@@ -359,7 +359,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
         // Do not process the solution if the node is too far behind.
-        if !rest.routing.num_blocks_behind() > SYNC_LENIENCY {
+        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
             return Err(RestError(format!(
                 "Unable to broadcast solution '{}' (node is syncing)",
                 fmt_id(solution.id())
