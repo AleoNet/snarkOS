@@ -42,6 +42,10 @@ use tokio::task::spawn_blocking;
 /// The max number of peers to send in a `PeerResponse` message.
 const MAX_PEERS_TO_SEND: usize = u8::MAX as usize;
 
+/// The maximum number of blocks the client can be behind it's latest peer before it skips
+/// processing incoming transactions and solutions.
+pub const SYNC_LENIENCY: u32 = 10;
+
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// The maximum number of puzzle requests per interval.
@@ -214,8 +218,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::UnconfirmedSolution(message) => {
-                // Do not process unconfirmed solutions if the node is syncing.
-                if !self.is_block_synced() {
+                // Do not process unconfirmed solutions if the node is too far behind.
+                if self.num_blocks_behind() > SYNC_LENIENCY {
                     trace!("Skipped processing unconfirmed solution '{}' (node is syncing)", message.solution_id);
                     return Ok(());
                 }
@@ -244,8 +248,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::UnconfirmedTransaction(message) => {
-                // Do not process unconfirmed transactions if the node is syncing.
-                if !self.is_block_synced() {
+                // Do not process unconfirmed transactions if the node is too far behind.
+                if self.num_blocks_behind() > SYNC_LENIENCY {
                     trace!("Skipped processing unconfirmed transaction '{}' (node is syncing)", message.transaction_id);
                     return Ok(());
                 }

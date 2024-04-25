@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use snarkos_node_router::messages::UnconfirmedSolution;
+use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
 use snarkvm::{
     ledger::puzzle::Solution,
     prelude::{block::Transaction, Identifier, Plaintext},
@@ -38,10 +38,6 @@ pub(crate) struct BlockRange {
 pub(crate) struct Metadata {
     metadata: bool,
 }
-
-/// The maximum number of blocks the client can be behind it's latest peer before it skips
-/// processing incoming transactions and solutions.
-const SYNC_LENIENCY: u32 = 10;
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // ----------------- DEPRECATED FUNCTIONS -----------------
