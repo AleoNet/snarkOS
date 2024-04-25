@@ -39,6 +39,10 @@ pub(crate) struct Metadata {
     metadata: bool,
 }
 
+/// The maximum number of blocks the client can be behind it's latest peer before it skips
+/// processing incoming transactions and solutions.
+const SYNC_LENIENCY: u32 = 10;
+
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // ----------------- DEPRECATED FUNCTIONS -----------------
     // The functions below are associated with deprecated routes.
@@ -329,8 +333,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
-        // Do not process the transaction if the node is syncing.
-        if !rest.routing.is_block_synced() {
+        // Do not process the transaction if the node is too far behind.
+        if !rest.routing.num_blocks_behind() > SYNC_LENIENCY {
             return Err(RestError(format!("Unable to broadcast transaction '{}' (node is syncing)", fmt_id(tx.id()))));
         }
 
@@ -358,8 +362,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
-        // Do not process the solution if the node is syncing.
-        if !rest.routing.is_block_synced() {
+        // Do not process the solution if the node is too far behind.
+        if !rest.routing.num_blocks_behind() > SYNC_LENIENCY {
             return Err(RestError(format!(
                 "Unable to broadcast solution '{}' (node is syncing)",
                 fmt_id(solution.id())
