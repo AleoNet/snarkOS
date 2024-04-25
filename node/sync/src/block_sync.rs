@@ -31,7 +31,7 @@ use std::{
     collections::BTreeMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
     time::Instant,
@@ -106,6 +106,8 @@ pub struct BlockSync<N: Network> {
     request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
     /// The boolean indicator of whether the node is synced up to the latest block (within the given tolerance).
     is_block_synced: Arc<AtomicBool>,
+    /// The number of blocks the peer is behind the greatest peer height.
+    num_blocks_behind: Arc<AtomicU32>,
     /// The lock to guarantee advance_with_sync_blocks() is called only once at a time.
     advance_with_sync_blocks_lock: Arc<Mutex<()>>,
 }
@@ -122,6 +124,7 @@ impl<N: Network> BlockSync<N> {
             responses: Default::default(),
             request_timestamps: Default::default(),
             is_block_synced: Default::default(),
+            num_blocks_behind: Default::default(),
             advance_with_sync_blocks_lock: Default::default(),
         }
     }
@@ -136,6 +139,12 @@ impl<N: Network> BlockSync<N> {
     #[inline]
     pub fn is_block_synced(&self) -> bool {
         self.is_block_synced.load(Ordering::SeqCst)
+    }
+
+    /// Returns the number of blocks the node is behind the greatest peer height.
+    #[inline]
+    pub fn num_blocks_behind(&self) -> u32 {
+        self.num_blocks_behind.load(Ordering::SeqCst)
     }
 }
 
@@ -459,6 +468,8 @@ impl<N: Network> BlockSync<N> {
         let num_blocks_behind = greatest_peer_height.saturating_sub(canon_height);
         // Determine if the primary is synced.
         let is_synced = num_blocks_behind <= max_blocks_behind;
+        // Update the num blocks behind.
+        self.num_blocks_behind.store(num_blocks_behind, Ordering::SeqCst);
         // Update the sync status.
         self.is_block_synced.store(is_synced, Ordering::SeqCst);
         // Update the `IS_SYNCED` metric.

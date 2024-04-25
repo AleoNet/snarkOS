@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use snarkos_node_router::messages::UnconfirmedSolution;
+use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
 use snarkvm::{
     ledger::puzzle::Solution,
     prelude::{block::Transaction, Identifier, Plaintext},
@@ -329,8 +329,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
-        // Do not process the transaction if the node is syncing.
-        if !rest.routing.is_block_synced() {
+        // Do not process the transaction if the node is too far behind.
+        if !rest.routing.num_blocks_behind() > SYNC_LENIENCY {
             return Err(RestError(format!("Unable to broadcast transaction '{}' (node is syncing)", fmt_id(tx.id()))));
         }
 
@@ -358,8 +358,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
-        // Do not process the solution if the node is syncing.
-        if !rest.routing.is_block_synced() {
+        // Do not process the solution if the node is too far behind.
+        if !rest.routing.num_blocks_behind() > SYNC_LENIENCY {
             return Err(RestError(format!(
                 "Unable to broadcast solution '{}' (node is syncing)",
                 fmt_id(solution.id())

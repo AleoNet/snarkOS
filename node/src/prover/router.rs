@@ -140,6 +140,11 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Prover<N, C> {
     fn is_block_synced(&self) -> bool {
         true
     }
+
+    /// Returns the number of blocks this node is behind the greatest peer height.
+    fn num_blocks_behind(&self) -> u32 {
+        0
+    }
 }
 
 #[async_trait]
