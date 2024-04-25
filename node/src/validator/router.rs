@@ -142,6 +142,11 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {
     fn is_block_synced(&self) -> bool {
         self.sync.is_block_synced()
     }
+
+    /// Returns the number of blocks this node is behind its furthest peer.
+    fn num_blocks_behind(&self) -> u32 {
+        self.sync.num_blocks_behind()
+    }
 }
 
 #[async_trait]

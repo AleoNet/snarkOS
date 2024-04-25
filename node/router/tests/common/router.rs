@@ -154,6 +154,11 @@ impl<N: Network> Outbound<N> for TestRouter<N> {
     fn is_block_synced(&self) -> bool {
         true
     }
+
+    /// Returns the number of blocks this node is behind its furthest peer.
+    fn num_blocks_behind(&self) -> u32 {
+        0
+    }
 }
 
 #[async_trait]
