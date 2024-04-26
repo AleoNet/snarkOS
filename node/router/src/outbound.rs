@@ -31,6 +31,9 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     /// Returns `true` if the node is synced up to the latest block (within the given tolerance).
     fn is_block_synced(&self) -> bool;
 
+    /// Returns the number of blocks this node is behind the greatest peer height.
+    fn num_blocks_behind(&self) -> u32;
+
     /// Sends a "Ping" message to the given peer.
     fn send_ping(&self, peer_ip: SocketAddr, block_locators: Option<BlockLocators<N>>) {
         self.send(peer_ip, Message::Ping(Ping::new(self.router().node_type(), block_locators)));
