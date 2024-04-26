@@ -381,11 +381,11 @@ impl<N: Network> BlockSync<N> {
 
         // Compute the common ancestor with this node.
         let mut ancestor = 0;
-        for (height, hash) in locators.clone().into_iter() {
+        for (height, hash) in locators.clone().into_iter().rev() {
             if let Ok(canon_hash) = self.canon.get_block_hash(height) {
-                match canon_hash == hash {
-                    true => ancestor = height,
-                    false => break, // fork
+                if canon_hash == hash {
+                    ancestor = height;
+                    break;
                 }
             }
         }
