@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use super::*;
-use snarkos_node_router::messages::UnconfirmedSolution;
+use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
 use snarkvm::{
-    ledger::coinbase::ProverSolution,
+    ledger::puzzle::Solution,
     prelude::{block::Transaction, Identifier, Plaintext},
 };
 
@@ -45,59 +45,59 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // Please use the recommended alternatives when implementing new features or refactoring.
 
     // Deprecated: Use `get_block_height_latest` instead.
-    // GET /mainnet/latest/height
+    // GET /<network>/latest/height
     pub(crate) async fn latest_height(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_height())
     }
 
     // Deprecated: Use `get_block_hash_latest` instead.
-    // GET /mainnet/latest/hash
+    // GET /<network>/latest/hash
     pub(crate) async fn latest_hash(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_hash())
     }
 
     // Deprecated: Use `get_block_latest` instead.
-    // GET /mainnet/latest/block
+    // GET /<network>/latest/block
     pub(crate) async fn latest_block(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_block())
     }
 
     // Deprecated: Use `get_state_root_latest` instead.
-    // GET /mainnet/latest/stateRoot
+    // GET /<network>/latest/stateRoot
     pub(crate) async fn latest_state_root(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_state_root())
     }
 
     // Deprecated: Use `get_committee_latest` instead.
-    // GET /mainnet/latest/committee
+    // GET /<network>/latest/committee
     pub(crate) async fn latest_committee(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
     // ---------------------------------------------------------
 
-    // GET /mainnet/block/height/latest
+    // GET /<network>/block/height/latest
     pub(crate) async fn get_block_height_latest(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_height())
     }
 
-    // GET /mainnet/block/hash/latest
+    // GET /<network>/block/hash/latest
     pub(crate) async fn get_block_hash_latest(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_hash())
     }
 
-    // GET /mainnet/block/latest
+    // GET /<network>/block/latest
     pub(crate) async fn get_block_latest(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_block())
     }
 
-    // GET /mainnet/block/{height}
-    // GET /mainnet/block/{blockHash}
+    // GET /<network>/block/{height}
+    // GET /<network>/block/{blockHash}
     pub(crate) async fn get_block(
         State(rest): State<Self>,
         Path(height_or_hash): Path<String>,
     ) -> Result<ErasedJson, RestError> {
-        // Manually parse the height or the height or the hash, axum doesn't support different types
+        // Manually parse the height or the height of the hash, axum doesn't support different types
         // for the same path param.
         let block = if let Ok(height) = height_or_hash.parse::<u32>() {
             rest.ledger.get_block(height)?
@@ -112,7 +112,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(block))
     }
 
-    // GET /mainnet/blocks?start={start_height}&end={end_height}
+    // GET /<network>/blocks?start={start_height}&end={end_height}
     pub(crate) async fn get_blocks(
         State(rest): State<Self>,
         Query(block_range): Query<BlockRange>,
@@ -142,7 +142,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(blocks))
     }
 
-    // GET /mainnet/height/{blockHash}
+    // GET /<network>/height/{blockHash}
     pub(crate) async fn get_height(
         State(rest): State<Self>,
         Path(hash): Path<N::BlockHash>,
@@ -150,7 +150,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_height(&hash)?))
     }
 
-    // GET /mainnet/block/{height}/transactions
+    // GET /<network>/block/{height}/transactions
     pub(crate) async fn get_block_transactions(
         State(rest): State<Self>,
         Path(height): Path<u32>,
@@ -158,7 +158,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_transactions(height)?))
     }
 
-    // GET /mainnet/transaction/{transactionID}
+    // GET /<network>/transaction/{transactionID}
     pub(crate) async fn get_transaction(
         State(rest): State<Self>,
         Path(tx_id): Path<N::TransactionID>,
@@ -166,7 +166,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_transaction(tx_id)?))
     }
 
-    // GET /mainnet/transaction/confirmed/{transactionID}
+    // GET /<network>/transaction/confirmed/{transactionID}
     pub(crate) async fn get_confirmed_transaction(
         State(rest): State<Self>,
         Path(tx_id): Path<N::TransactionID>,
@@ -174,7 +174,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_confirmed_transaction(tx_id)?))
     }
 
-    // GET /mainnet/memoryPool/transmissions
+    // GET /<network>/memoryPool/transmissions
     pub(crate) async fn get_memory_pool_transmissions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
             Some(consensus) => {
@@ -184,7 +184,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
     }
 
-    // GET /mainnet/memoryPool/solutions
+    // GET /<network>/memoryPool/solutions
     pub(crate) async fn get_memory_pool_solutions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
             Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_solutions().collect::<IndexMap<_, _>>())),
@@ -192,7 +192,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
     }
 
-    // GET /mainnet/memoryPool/transactions
+    // GET /<network>/memoryPool/transactions
     pub(crate) async fn get_memory_pool_transactions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
             Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_transactions().collect::<IndexMap<_, _>>())),
@@ -200,7 +200,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
     }
 
-    // GET /mainnet/program/{programID}
+    // GET /<network>/program/{programID}
     pub(crate) async fn get_program(
         State(rest): State<Self>,
         Path(id): Path<ProgramID<N>>,
@@ -208,7 +208,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_program(id)?))
     }
 
-    // GET /mainnet/program/{programID}/mappings
+    // GET /<network>/program/{programID}/mappings
     pub(crate) async fn get_mapping_names(
         State(rest): State<Self>,
         Path(id): Path<ProgramID<N>>,
@@ -216,8 +216,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_mapping_names_confirmed(&id)?))
     }
 
-    // GET /mainnet/program/{programID}/mapping/{mappingName}/{mappingKey}
-    // GET /mainnet/program/{programID}/mapping/{mappingName}/{mappingKey}?metadata={true}
+    // GET /<network>/program/{programID}/mapping/{mappingName}/{mappingKey}
+    // GET /<network>/program/{programID}/mapping/{mappingName}/{mappingKey}?metadata={true}
     pub(crate) async fn get_mapping_value(
         State(rest): State<Self>,
         Path((id, name, key)): Path<(ProgramID<N>, Identifier<N>, Plaintext<N>)>,
@@ -238,7 +238,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(mapping_value))
     }
 
-    // GET /mainnet/statePath/{commitment}
+    // GET /<network>/statePath/{commitment}
     pub(crate) async fn get_state_path_for_commitment(
         State(rest): State<Self>,
         Path(commitment): Path<Field<N>>,
@@ -246,37 +246,45 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_state_path_for_commitment(&commitment)?))
     }
 
-    // GET /mainnet/stateRoot/latest
+    // GET /<network>/stateRoot/latest
     pub(crate) async fn get_state_root_latest(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_state_root())
     }
 
-    // GET /mainnet/committee/latest
+    // GET /<network>/stateRoot/{height}
+    pub(crate) async fn get_state_root(
+        State(rest): State<Self>,
+        Path(height): Path<u32>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_state_root(height)?))
+    }
+
+    // GET /<network>/committee/latest
     pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
-    // GET /mainnet/peers/count
+    // GET /<network>/peers/count
     pub(crate) async fn get_peers_count(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.routing.router().number_of_connected_peers())
     }
 
-    // GET /mainnet/peers/all
+    // GET /<network>/peers/all
     pub(crate) async fn get_peers_all(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.routing.router().connected_peers())
     }
 
-    // GET /mainnet/peers/all/metrics
+    // GET /<network>/peers/all/metrics
     pub(crate) async fn get_peers_all_metrics(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.routing.router().connected_metrics())
     }
 
-    // GET /mainnet/node/address
+    // GET /<network>/node/address
     pub(crate) async fn get_node_address(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.routing.router().address())
     }
 
-    // GET /mainnet/find/blockHash/{transactionID}
+    // GET /<network>/find/blockHash/{transactionID}
     pub(crate) async fn find_block_hash(
         State(rest): State<Self>,
         Path(tx_id): Path<N::TransactionID>,
@@ -284,7 +292,15 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.find_block_hash(&tx_id)?))
     }
 
-    // GET /mainnet/find/transactionID/deployment/{programID}
+    // GET /<network>/find/blockHeight/{stateRoot}
+    pub(crate) async fn find_block_height_from_state_root(
+        State(rest): State<Self>,
+        Path(state_root): Path<N::StateRoot>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.find_block_height_from_state_root(state_root)?))
+    }
+
+    // GET /<network>/find/transactionID/deployment/{programID}
     pub(crate) async fn find_transaction_id_from_program_id(
         State(rest): State<Self>,
         Path(program_id): Path<ProgramID<N>>,
@@ -292,7 +308,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.find_transaction_id_from_program_id(&program_id)?))
     }
 
-    // GET /mainnet/find/transactionID/{transitionID}
+    // GET /<network>/find/transactionID/{transitionID}
     pub(crate) async fn find_transaction_id_from_transition_id(
         State(rest): State<Self>,
         Path(transition_id): Path<N::TransitionID>,
@@ -300,7 +316,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.find_transaction_id_from_transition_id(&transition_id)?))
     }
 
-    // GET /mainnet/find/transitionID/{inputOrOutputID}
+    // GET /<network>/find/transitionID/{inputOrOutputID}
     pub(crate) async fn find_transition_id(
         State(rest): State<Self>,
         Path(input_or_output_id): Path<Field<N>>,
@@ -308,11 +324,16 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.find_transition_id(&input_or_output_id)?))
     }
 
-    // POST /mainnet/transaction/broadcast
+    // POST /<network>/transaction/broadcast
     pub(crate) async fn transaction_broadcast(
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
+        // Do not process the transaction if the node is too far behind.
+        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
+            return Err(RestError(format!("Unable to broadcast transaction '{}' (node is syncing)", fmt_id(tx.id()))));
+        }
+
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
@@ -332,27 +353,53 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(tx_id))
     }
 
-    // POST /mainnet/solution/broadcast
+    // POST /<network>/solution/broadcast
     pub(crate) async fn solution_broadcast(
         State(rest): State<Self>,
-        Json(prover_solution): Json<ProverSolution<N>>,
+        Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
-        // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
-        if let Some(consensus) = rest.consensus {
-            // Add the unconfirmed solution to the memory pool.
-            consensus.add_unconfirmed_solution(prover_solution).await?;
+        // Do not process the solution if the node is too far behind.
+        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
+            return Err(RestError(format!(
+                "Unable to broadcast solution '{}' (node is syncing)",
+                fmt_id(solution.id())
+            )));
         }
 
-        let commitment = prover_solution.commitment();
+        // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
+        // Otherwise, verify it prior to broadcasting.
+        match rest.consensus {
+            // Add the unconfirmed solution to the memory pool.
+            Some(consensus) => consensus.add_unconfirmed_solution(solution).await?,
+            // Verify the solution.
+            None => {
+                // Compute the current epoch hash.
+                let epoch_hash = rest.ledger.latest_epoch_hash()?;
+                // Retrieve the current proof target.
+                let proof_target = rest.ledger.latest_proof_target();
+                // Ensure that the solution is valid for the given epoch.
+                let puzzle = rest.ledger.puzzle().clone();
+                // Verify the solution in a blocking task.
+                match tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target))
+                    .await
+                {
+                    Ok(Ok(())) => {}
+                    Ok(Err(err)) => {
+                        return Err(RestError(format!("Invalid solution '{}' - {err}", fmt_id(solution.id()))));
+                    }
+                    Err(err) => return Err(RestError(format!("Invalid solution '{}' - {err}", fmt_id(solution.id())))),
+                }
+            }
+        }
+
+        let solution_id = solution.id();
         // Prepare the unconfirmed solution message.
-        let message = Message::UnconfirmedSolution(UnconfirmedSolution {
-            solution_id: commitment,
-            solution: Data::Object(prover_solution),
-        });
+        let message =
+            Message::UnconfirmedSolution(UnconfirmedSolution { solution_id, solution: Data::Object(solution) });
 
         // Broadcast the unconfirmed solution message.
         rest.routing.propagate(message, &[]);
 
-        Ok(ErasedJson::pretty(commitment))
+        Ok(ErasedJson::pretty(solution_id))
     }
 }

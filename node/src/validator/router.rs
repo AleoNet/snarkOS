@@ -27,7 +27,7 @@ use snarkos_node_router::messages::{
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Transaction, coinbase::EpochChallenge, error, Network},
+    prelude::{block::Transaction, error, Network},
 };
 
 use std::{io, net::SocketAddr, time::Duration};
@@ -137,6 +137,16 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {
     fn router(&self) -> &Router<N> {
         &self.router
     }
+
+    /// Returns `true` if the node is synced up to the latest block (within the given tolerance).
+    fn is_block_synced(&self) -> bool {
+        self.sync.is_block_synced()
+    }
+
+    /// Returns the number of blocks this node is behind the greatest peer height.
+    fn num_blocks_behind(&self) -> u32 {
+        self.sync.num_blocks_behind()
+    }
 }
 
 #[async_trait]
@@ -209,11 +219,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         true
     }
 
-    /// Retrieves the latest epoch challenge and latest block header, and returns the puzzle response to the peer.
+    /// Retrieves the latest epoch hash and latest block header, and returns the puzzle response to the peer.
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
-        // Retrieve the latest epoch challenge.
-        let epoch_challenge = match self.ledger.latest_epoch_challenge() {
-            Ok(epoch_challenge) => epoch_challenge,
+        // Retrieve the latest epoch hash.
+        let epoch_hash = match self.ledger.latest_epoch_hash() {
+            Ok(epoch_hash) => epoch_hash,
             Err(error) => {
                 error!("Failed to prepare a puzzle request for '{peer_ip}': {error}");
                 return false;
@@ -222,12 +232,12 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         // Retrieve the latest block header.
         let block_header = Data::Object(self.ledger.latest_header());
         // Send the `PuzzleResponse` message to the peer.
-        Outbound::send(self, peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
+        Outbound::send(self, peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_hash, block_header }));
         true
     }
 
     /// Disconnects on receipt of a `PuzzleResponse` message.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_hash: N::BlockHash, _header: Header<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }
@@ -237,7 +247,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
-        solution: ProverSolution<N>,
+        solution: Solution<N>,
     ) -> bool {
         // Add the unconfirmed solution to the memory pool.
         if let Err(error) = self.consensus.add_unconfirmed_solution(solution).await {

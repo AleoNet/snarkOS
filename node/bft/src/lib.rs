@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![forbid(unsafe_code)]
+#![allow(clippy::blocks_in_conditions)]
 #![allow(clippy::type_complexity)]
 
 #[macro_use]
@@ -48,6 +49,8 @@ pub const MEMORY_POOL_PORT: u16 = 5000; // port
 
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
+/// The minimum number of seconds to wait before proposing a batch.
+pub const MIN_BATCH_DELAY_IN_SECS: u64 = 1; // seconds
 /// The maximum number of milliseconds to wait before timing out on a fetch.
 pub const MAX_FETCH_TIMEOUT_IN_MS: u64 = 3 * MAX_BATCH_DELAY_IN_MS; // ms
 /// The maximum number of seconds allowed for the leader to send their certificate.
@@ -56,6 +59,14 @@ pub const MAX_LEADER_CERTIFICATE_DELAY_IN_SECS: i64 = 2 * MAX_BATCH_DELAY_IN_MS 
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of workers that can be spawned.
 pub const MAX_WORKERS: u8 = 1; // worker(s)
+
+/// The number of seconds a proposal is valid for before it expires.
+#[cfg(not(any(test, feature = "test")))]
+pub const PROPOSAL_EXPIRATION_IN_SECS: i64 = 60; // seconds
+/// The number of seconds a proposal is valid for before it expires.
+/// This is set to a deliberately low value (5) for testing purposes only.
+#[cfg(any(test, feature = "test"))]
+pub const PROPOSAL_EXPIRATION_IN_SECS: i64 = 5; // seconds
 
 /// The frequency at which each primary broadcasts a ping to every other node.
 /// Note: If this is updated, be sure to update `MAX_BLOCKS_BEHIND` to correspond properly.

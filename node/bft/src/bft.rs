@@ -33,9 +33,9 @@ use snarkvm::{
     console::account::Address,
     ledger::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
     prelude::{bail, ensure, Field, Network, Result},
 };
@@ -172,24 +172,24 @@ impl<N: Network> BFT<N> {
 }
 
 impl<N: Network> BFT<N> {
-    /// Returns the unconfirmed transmission IDs.
-    pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
-        self.primary.unconfirmed_transmission_ids()
+    /// Returns the worker transmission IDs.
+    pub fn worker_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.primary.worker_transmission_ids()
     }
 
-    /// Returns the unconfirmed transmissions.
-    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        self.primary.unconfirmed_transmissions()
+    /// Returns the worker transmissions.
+    pub fn worker_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.primary.worker_transmissions()
     }
 
-    /// Returns the unconfirmed solutions.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
-        self.primary.unconfirmed_solutions()
+    /// Returns the worker solutions.
+    pub fn worker_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
+        self.primary.worker_solutions()
     }
 
-    /// Returns the unconfirmed transactions.
-    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
-        self.primary.unconfirmed_transactions()
+    /// Returns the worker transactions.
+    pub fn worker_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.primary.worker_transactions()
     }
 }
 
@@ -226,7 +226,7 @@ impl<N: Network> BFT<N> {
             if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
                 // Ensure the state of the leader certificate is consistent with the BFT being ready.
                 if !is_ready {
-                    error!(is_ready, "BFT - A leader certificate was found, but 'is_ready' is false");
+                    trace!(is_ready, "BFT - A leader certificate was found, but 'is_ready' is false");
                 }
                 // Log the leader election.
                 let leader_round = leader_certificate.round();
@@ -298,11 +298,22 @@ impl<N: Network> BFT<N> {
             }
         };
         // Determine the leader of the current round.
-        let leader = match committee_lookback.get_leader(current_round) {
-            Ok(leader) => leader,
-            Err(e) => {
-                error!("BFT failed to compute the leader for the even round {current_round} - {e}");
-                return false;
+        let leader = match self.ledger().latest_leader() {
+            Some((cached_round, cached_leader)) if cached_round == current_round => cached_leader,
+            _ => {
+                // Compute the leader for the current round.
+                let computed_leader = match committee_lookback.get_leader(current_round) {
+                    Ok(leader) => leader,
+                    Err(e) => {
+                        error!("BFT failed to compute the leader for the even round {current_round} - {e}");
+                        return false;
+                    }
+                };
+
+                // Cache the computed leader.
+                self.ledger().update_latest_leader(current_round, computed_leader);
+
+                computed_leader
             }
         };
         // Find and set the leader certificate, if the leader was present in the current even round.
@@ -312,16 +323,22 @@ impl<N: Network> BFT<N> {
         self.is_even_round_ready_for_next_round(current_certificates, committee_lookback, current_round)
     }
 
-    /// Returns 'true' under one of the following conditions:
-    ///  - If the leader certificate is set for the current even round,
-    ///  - The timer for the leader certificate has expired, and we can
-    ///    achieve quorum threshold (2f + 1) without the leader.
+    /// Returns 'true' if the quorum threshold `(2f + 1)` is reached for this round under one of the following conditions:
+    ///  - If the leader certificate is set for the current even round.
+    ///  - The timer for the leader certificate has expired.
     fn is_even_round_ready_for_next_round(
         &self,
         certificates: IndexSet<BatchCertificate<N>>,
         committee: Committee<N>,
         current_round: u64,
     ) -> bool {
+        // Retrieve the authors for the current round.
+        let authors = certificates.into_iter().map(|c| c.author()).collect();
+        // Check if quorum threshold is reached.
+        if !committee.is_quorum_threshold_reached(&authors) {
+            trace!("BFT failed to reach quorum threshold in even round {current_round}");
+            return false;
+        }
         // If the leader certificate is set for the current even round, return 'true'.
         if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
             if leader_certificate.round() == current_round {
@@ -330,11 +347,8 @@ impl<N: Network> BFT<N> {
         }
         // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
         if self.is_timer_expired() {
-            debug!("BFT (timer expired) - Checking for quorum threshold (without the leader)");
-            // Retrieve the certificate authors.
-            let authors = certificates.into_iter().map(|c| c.author()).collect();
-            // Determine if the quorum threshold is reached.
-            return committee.is_quorum_threshold_reached(&authors);
+            debug!("BFT (timer expired) - Advancing from round {current_round} to the next round (without the leader)");
+            return true;
         }
         // Otherwise, return 'false'.
         false
@@ -345,9 +359,8 @@ impl<N: Network> BFT<N> {
         self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY_IN_SECS <= now()
     }
 
-    /// Returns 'true' if any of the following conditions hold:
-    ///  - The leader certificate is 'None'.
-    ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round).
+    /// Returns 'true' if the quorum threshold `(2f + 1)` is reached for this round under one of the following conditions:
+    ///  - The leader certificate is `None`.
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.
     fn is_leader_quorum_or_nonleaders_available(&self, odd_round: u64) -> bool {
@@ -363,14 +376,6 @@ impl<N: Network> BFT<N> {
             error!("BFT does not compute stakes for the leader certificate in an even round");
             return false;
         }
-
-        // Retrieve the leader certificate.
-        let Some(leader_certificate) = self.leader_certificate.read().clone() else {
-            // If there is no leader certificate for the previous round, return 'true'.
-            return true;
-        };
-        // Retrieve the leader certificate ID.
-        let leader_certificate_id = leader_certificate.id();
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
         // Retrieve the committee lookback for the current round.
@@ -381,10 +386,24 @@ impl<N: Network> BFT<N> {
                 return false;
             }
         };
-
+        // Retrieve the authors of the current certificates.
+        let authors = current_certificates.clone().into_iter().map(|c| c.author()).collect();
+        // Check if quorum threshold is reached.
+        if !committee_lookback.is_quorum_threshold_reached(&authors) {
+            trace!("BFT failed reach quorum threshold in odd round {current_round}. ");
+            return false;
+        }
+        // Retrieve the leader certificate.
+        let Some(leader_certificate) = self.leader_certificate.read().clone() else {
+            // If there is no leader certificate for the previous round, return 'true'.
+            return true;
+        };
         // Compute the stake for the leader certificate.
-        let (stake_with_leader, stake_without_leader) =
-            self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &committee_lookback);
+        let (stake_with_leader, stake_without_leader) = self.compute_stake_for_leader_certificate(
+            leader_certificate.id(),
+            current_certificates,
+            &committee_lookback,
+        );
         // Return 'true' if any of the following conditions hold:
         stake_with_leader >= committee_lookback.availability_threshold()
             || stake_without_leader >= committee_lookback.quorum_threshold()
@@ -426,7 +445,10 @@ impl<N: Network> BFT<N> {
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    async fn update_dag<const ALLOW_LEDGER_ACCESS: bool>(&self, certificate: BatchCertificate<N>) -> Result<()> {
+    async fn update_dag<const ALLOW_LEDGER_ACCESS: bool, const IS_SYNCING: bool>(
+        &self,
+        certificate: BatchCertificate<N>,
+    ) -> Result<()> {
         // Acquire the BFT lock.
         let _lock = self.lock.lock().await;
 
@@ -453,10 +475,23 @@ impl<N: Network> BFT<N> {
         let Ok(committee_lookback) = self.ledger().get_committee_lookback_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee with lag for commit round {commit_round}");
         };
-        // Compute the leader for the commit round.
-        let Ok(leader) = committee_lookback.get_leader(commit_round) else {
-            bail!("BFT failed to compute the leader for commit round {commit_round}");
+
+        // Either retrieve the cached leader or compute it.
+        let leader = match self.ledger().latest_leader() {
+            Some((cached_round, cached_leader)) if cached_round == commit_round => cached_leader,
+            _ => {
+                // Compute the leader for the commit round.
+                let Ok(computed_leader) = committee_lookback.get_leader(commit_round) else {
+                    bail!("BFT failed to compute the leader for commit round {commit_round}");
+                };
+
+                // Cache the computed leader.
+                self.ledger().update_latest_leader(commit_round, computed_leader);
+
+                computed_leader
+            }
         };
+
         // Retrieve the leader certificate for the commit round.
         let Some(leader_certificate) = self.dag.read().get_certificate_for_round_with_author(commit_round, leader)
         else {
@@ -487,7 +522,7 @@ impl<N: Network> BFT<N> {
         info!("Proceeding to commit round {commit_round} with leader '{}'", fmt_id(leader));
 
         // Commit the leader certificate, and all previous leader certificates since the last committed round.
-        self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, false>(leader_certificate).await
+        self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, IS_SYNCING>(leader_certificate).await
     }
 
     /// Commits the leader certificate, and all previous leader certificates since the last committed round.
@@ -514,11 +549,22 @@ impl<N: Network> BFT<N> {
                         bail!("BFT failed to retrieve a previous committee lookback for the even round {round} - {e}");
                     }
                 };
-                // Compute the leader address for the leader round.
-                let leader = match previous_committee_lookback.get_leader(round) {
-                    Ok(leader) => leader,
-                    Err(e) => {
-                        bail!("BFT failed to compute the leader for the even round {round} - {e}");
+                // Either retrieve the cached leader or compute it.
+                let leader = match self.ledger().latest_leader() {
+                    Some((cached_round, cached_leader)) if cached_round == round => cached_leader,
+                    _ => {
+                        // Compute the leader for the commit round.
+                        let computed_leader = match previous_committee_lookback.get_leader(round) {
+                            Ok(leader) => leader,
+                            Err(e) => {
+                                bail!("BFT failed to compute the leader for the even round {round} - {e}");
+                            }
+                        };
+
+                        // Cache the computed leader.
+                        self.ledger().update_latest_leader(round, computed_leader);
+
+                        computed_leader
                     }
                 };
                 // Retrieve the previous leader certificate.
@@ -545,39 +591,36 @@ impl<N: Network> BFT<N> {
                 Ok(subdag) => subdag,
                 Err(e) => bail!("BFT failed to order the DAG with DFS - {e}"),
             };
-            // Initialize a map for the deduped transmissions.
-            let mut transmissions = IndexMap::new();
-            // Start from the oldest leader certificate.
-            for certificate in commit_subdag.values().flatten() {
-                // Update the DAG.
-                if IS_SYNCING {
-                    self.dag.write().commit(certificate, self.storage().max_gc_rounds());
-                }
-                // Retrieve the transmissions.
-                for transmission_id in certificate.transmission_ids() {
-                    // If the transmission already exists in the map, skip it.
-                    if transmissions.contains_key(transmission_id) {
-                        continue;
-                    }
-                    // If the transmission already exists in the ledger, skip it.
-                    // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
-                    if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
-                        continue;
-                    }
-                    // Retrieve the transmission.
-                    let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
-                        bail!(
-                            "BFT failed to retrieve transmission '{}' from round {}",
-                            fmt_id(transmission_id),
-                            certificate.round()
-                        );
-                    };
-                    // Add the transmission to the set.
-                    transmissions.insert(*transmission_id, transmission);
-                }
-            }
             // If the node is not syncing, trigger consensus, as this will build a new block for the ledger.
             if !IS_SYNCING {
+                // Initialize a map for the deduped transmissions.
+                let mut transmissions = IndexMap::new();
+                // Start from the oldest leader certificate.
+                for certificate in commit_subdag.values().flatten() {
+                    // Retrieve the transmissions.
+                    for transmission_id in certificate.transmission_ids() {
+                        // If the transmission already exists in the map, skip it.
+                        if transmissions.contains_key(transmission_id) {
+                            continue;
+                        }
+                        // If the transmission already exists in the ledger, skip it.
+                        // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
+                        if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
+                            continue;
+                        }
+                        // Retrieve the transmission.
+                        let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
+                            bail!(
+                                "BFT failed to retrieve transmission '{}' from round {}",
+                                fmt_id(transmission_id),
+                                certificate.round()
+                            );
+                        };
+                        // Add the transmission to the set.
+                        transmissions.insert(*transmission_id, transmission);
+                    }
+                }
+                // Trigger consensus, as this will build a new block for the ledger.
                 // Construct the subdag.
                 let subdag = Subdag::from(commit_subdag.clone())?;
                 // Retrieve the anchor round.
@@ -616,18 +659,17 @@ impl<N: Network> BFT<N> {
                 info!(
                     "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
                 );
-                // Update the DAG, as the subdag was successfully included into a block.
-                let mut dag_write = self.dag.write();
-                for certificate in commit_subdag.values().flatten() {
-                    dag_write.commit(certificate, self.storage().max_gc_rounds());
-                }
+            }
+
+            // Update the DAG, as the subdag was successfully included into a block.
+            let mut dag_write = self.dag.write();
+            for certificate in commit_subdag.values().flatten() {
+                dag_write.commit(certificate, self.storage().max_gc_rounds());
             }
         }
 
-        // Perform garbage collection based on the latest committed leader round if the node is not syncing.
-        if !IS_SYNCING {
-            self.storage().garbage_collect_certificates(latest_leader_round);
-        }
+        // Perform garbage collection based on the latest committed leader round.
+        self.storage().garbage_collect_certificates(latest_leader_round);
 
         Ok(())
     }
@@ -665,6 +707,11 @@ impl<N: Network> BFT<N> {
                 if self.dag.read().is_recently_committed(previous_round, *previous_certificate_id) {
                     continue;
                 }
+                // If the previous certificate already exists in the ledger, continue.
+                if ALLOW_LEDGER_ACCESS && self.ledger().contains_certificate(previous_certificate_id).unwrap_or(false) {
+                    continue;
+                }
+
                 // Retrieve the previous certificate.
                 let previous_certificate = {
                     // Start by retrieving the previous certificate from the DAG.
@@ -675,28 +722,11 @@ impl<N: Network> BFT<N> {
                         None => match self.storage().get_certificate(*previous_certificate_id) {
                             // If the previous certificate is found, return it.
                             Some(previous_certificate) => previous_certificate,
-                            // Otherwise, retrieve the previous certificate from the ledger.
-                            None => {
-                                if ALLOW_LEDGER_ACCESS {
-                                    match self.ledger().get_batch_certificate(previous_certificate_id) {
-                                        // If the previous certificate is found, return it.
-                                        Ok(previous_certificate) => previous_certificate,
-                                        // Otherwise, the previous certificate is missing, and throw an error.
-                                        Err(e) => {
-                                            bail!(
-                                                "Missing previous certificate {} for round {previous_round} - {e}",
-                                                fmt_id(previous_certificate_id)
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    // Otherwise, the previous certificate is missing, and throw an error.
-                                    bail!(
-                                        "Missing previous certificate {} for round {previous_round}",
-                                        fmt_id(previous_certificate_id)
-                                    )
-                                }
-                            }
+                            // Otherwise, the previous certificate is missing, and throw an error.
+                            None => bail!(
+                                "Missing previous certificate {} for round {previous_round}",
+                                fmt_id(previous_certificate_id)
+                            ),
                         },
                     }
                 };
@@ -761,7 +791,7 @@ impl<N: Network> BFT<N> {
         self.spawn(async move {
             while let Some((certificate, callback)) = rx_primary_certificate.recv().await {
                 // Update the DAG with the certificate.
-                let result = self_.update_dag::<true>(certificate).await;
+                let result = self_.update_dag::<true, false>(certificate).await;
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(result).ok();
@@ -771,8 +801,8 @@ impl<N: Network> BFT<N> {
         // Process the request to sync the BFT DAG at bootup.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((leader_certificates, certificates)) = rx_sync_bft_dag_at_bootup.recv().await {
-                self_.sync_bft_dag_at_bootup(leader_certificates, certificates).await;
+            while let Some(certificates) = rx_sync_bft_dag_at_bootup.recv().await {
+                self_.sync_bft_dag_at_bootup(certificates).await;
             }
         });
 
@@ -781,7 +811,7 @@ impl<N: Network> BFT<N> {
         self.spawn(async move {
             while let Some((certificate, callback)) = rx_sync_bft.recv().await {
                 // Update the DAG with the certificate.
-                let result = self_.update_dag::<true>(certificate).await;
+                let result = self_.update_dag::<true, true>(certificate).await;
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(result).ok();
@@ -789,51 +819,19 @@ impl<N: Network> BFT<N> {
         });
     }
 
-    /// Syncs the BFT DAG with the given leader certificates and batch certificates.
+    /// Syncs the BFT DAG with the given batch certificates. These batch certificates **must**
+    /// already exist in the ledger.
     ///
-    /// This method starts by inserting all certificates (except the latest leader certificate)
-    /// into the DAG. Then, it commits all leader certificates (except the latest leader certificate).
-    /// Finally, it updates the DAG with the latest leader certificate.
-    async fn sync_bft_dag_at_bootup(
-        &self,
-        leader_certificates: Vec<BatchCertificate<N>>,
-        certificates: Vec<BatchCertificate<N>>,
-    ) {
-        // Split the leader certificates into past leader certificates and the latest leader certificate.
-        let (past_leader_certificates, leader_certificate) = {
-            // Compute the penultimate index.
-            let index = leader_certificates.len().saturating_sub(1);
-            // Split the leader certificates.
-            let (past, latest) = leader_certificates.split_at(index);
-            debug_assert!(latest.len() == 1, "There should only be one latest leader certificate");
-            // Retrieve the latest leader certificate.
-            match latest.first() {
-                Some(leader_certificate) => (past, leader_certificate.clone()),
-                // If there is no latest leader certificate, return early.
-                None => return,
-            }
-        };
-        {
-            // Acquire the BFT write lock.
-            let mut dag = self.dag.write();
-            // Iterate over the certificates.
-            for certificate in certificates {
-                // If the certificate is not the latest leader certificate, insert it.
-                if leader_certificate.id() != certificate.id() {
-                    // Insert the certificate into the DAG.
-                    dag.insert(certificate);
-                }
-            }
+    /// This method commits all the certificates into the DAG.
+    /// Note that there is no need to insert the certificates into the DAG, because these certificates
+    /// already exist in the ledger and therefore do not need to be re-ordered into future committed subdags.
+    async fn sync_bft_dag_at_bootup(&self, certificates: Vec<BatchCertificate<N>>) {
+        // Acquire the BFT write lock.
+        let mut dag = self.dag.write();
 
-            // Iterate over the leader certificates.
-            for leader_certificate in past_leader_certificates {
-                // Commit the leader certificate.
-                dag.commit(leader_certificate, self.storage().max_gc_rounds());
-            }
-        }
-        // Commit the latest leader certificate.
-        if let Err(e) = self.commit_leader_certificate::<true, true>(leader_certificate).await {
-            error!("BFT failed to update the DAG with the latest leader certificate - {e}");
+        // Commit all the certificates excluding the latest leader certificate.
+        for certificate in certificates {
+            dag.commit(&certificate, self.storage().max_gc_rounds());
         }
     }
 
@@ -856,14 +854,12 @@ impl<N: Network> BFT<N> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        helpers::{now, Storage},
-        BFT,
-    };
+    use crate::{helpers::Storage, BFT, MAX_LEADER_CERTIFICATE_DELAY_IN_SECS};
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
+        console::account::{Address, PrivateKey},
         ledger::{
             committee::Committee,
             narwhal::batch_certificate::test_helpers::{sample_batch_certificate, sample_batch_certificate_for_round},
@@ -872,8 +868,8 @@ mod tests {
     };
 
     use anyhow::Result;
-    use indexmap::IndexSet;
-    use std::sync::{atomic::Ordering, Arc};
+    use indexmap::{IndexMap, IndexSet};
+    use std::sync::Arc;
 
     type CurrentNetwork = snarkvm::console::network::MainnetV0;
 
@@ -905,34 +901,52 @@ mod tests {
     fn test_is_leader_quorum_odd() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        // Sample the test instance.
-        let (_, account, ledger, storage) = sample_test_instance(None, 10, rng);
-        assert_eq!(storage.max_gc_rounds(), 10);
+        // Sample batch certificates.
+        let mut certificates = IndexSet::new();
+        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng));
+        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng));
+        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng));
+        certificates.insert(snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round_with_previous_certificate_ids(1, IndexSet::new(), rng));
 
+        // Initialize the committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+            1,
+            vec![
+                certificates[0].author(),
+                certificates[1].author(),
+                certificates[2].author(),
+                certificates[3].author(),
+            ],
+            rng,
+        );
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
+        // Initialize the account.
+        let account = Account::new(rng)?;
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
-        assert!(bft.is_timer_expired()); // 0 + 5 < now()
-
+        let bft = BFT::new(account.clone(), storage.clone(), ledger.clone(), None, &[], None)?;
+        assert!(bft.is_timer_expired());
+        // Ensure this call succeeds on an odd round.
+        let result = bft.is_leader_quorum_or_nonleaders_available(1);
+        // If timer has expired but quorum threshold is not reached, return 'false'.
+        assert!(!result);
+        // Insert certificates into storage.
+        for certificate in certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
         assert!(result); // no previous leader certificate
-
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate(rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
-
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
         assert!(result); // should now fall through to the end of function
 
-        // Set the timer to now().
-        bft.leader_certificate_timer.store(now(), Ordering::SeqCst);
-        assert!(!bft.is_timer_expired());
-
-        // Ensure this call succeeds on an odd round.
-        let result = bft.is_leader_quorum_or_nonleaders_available(1);
-        // Should now return false, as the timer is not expired.
-        assert!(!result); // should now fall through to end of function
         Ok(())
     }
 
@@ -984,25 +998,62 @@ mod tests {
     fn test_is_even_round_ready() -> Result<()> {
         let rng = &mut TestRng::default();
 
-        // Sample the test instance.
-        let (committee, account, ledger, storage) = sample_test_instance(Some(2), 10, rng);
-        assert_eq!(committee.starting_round(), 2);
-        assert_eq!(storage.current_round(), 2);
-        assert_eq!(storage.max_gc_rounds(), 10);
+        // Sample batch certificates.
+        let mut certificates = IndexSet::new();
+        certificates.insert(sample_batch_certificate_for_round(2, rng));
+        certificates.insert(sample_batch_certificate_for_round(2, rng));
+        certificates.insert(sample_batch_certificate_for_round(2, rng));
+        certificates.insert(sample_batch_certificate_for_round(2, rng));
 
+        // Initialize the committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+            2,
+            vec![
+                certificates[0].author(),
+                certificates[1].author(),
+                certificates[2].author(),
+                certificates[3].author(),
+            ],
+            rng,
+        );
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
+        // Initialize the account.
+        let account = Account::new(rng)?;
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
-
-        let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee.clone(), 2);
-        assert!(!result);
-
+        let bft = BFT::new(account.clone(), storage.clone(), ledger.clone(), None, &[], None)?;
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate_for_round(2, rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
-
-        let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee, 2);
-        // If leader certificate is set, we should be ready for next round.
+        let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee.clone(), 2);
+        // If leader certificate is set but quorum threshold is not reached, we are not ready for the next round.
+        assert!(!result);
+        // Once quorum threshold is reached, we are ready for the next round.
+        let result = bft.is_even_round_ready_for_next_round(certificates.clone(), committee.clone(), 2);
         assert!(result);
+
+        // Initialize a new BFT.
+        let bft_timer = BFT::new(account.clone(), storage.clone(), ledger.clone(), None, &[], None)?;
+        // If the leader certificate is not set and the timer has not expired, we are not ready for the next round.
+        let result = bft_timer.is_even_round_ready_for_next_round(certificates.clone(), committee.clone(), 2);
+        if !bft_timer.is_timer_expired() {
+            assert!(!result);
+        }
+        // Wait for the timer to expire.
+        let leader_certificate_timeout =
+            std::time::Duration::from_millis(MAX_LEADER_CERTIFICATE_DELAY_IN_SECS as u64 * 1000);
+        std::thread::sleep(leader_certificate_timeout);
+        // Once the leader certificate timer has expired and quorum threshold is reached, we are ready to advance to the next round.
+        let result = bft_timer.is_even_round_ready_for_next_round(certificates.clone(), committee.clone(), 2);
+        if bft_timer.is_timer_expired() {
+            assert!(result);
+        } else {
+            assert!(!result);
+        }
+
         Ok(())
     }
 
@@ -1131,7 +1182,7 @@ mod tests {
 
             // Insert the previous certificates into the BFT.
             for certificate in previous_certificates.clone() {
-                assert!(bft.update_dag::<false>(certificate).await.is_ok());
+                assert!(bft.update_dag::<false, false>(certificate).await.is_ok());
             }
 
             // Ensure this call succeeds and returns all given certificates.
@@ -1161,7 +1212,7 @@ mod tests {
 
             // Insert the previous certificates into the BFT.
             for certificate in previous_certificates.clone() {
-                assert!(bft.update_dag::<false>(certificate).await.is_ok());
+                assert!(bft.update_dag::<false, false>(certificate).await.is_ok());
             }
 
             // Ensure this call succeeds and returns all given certificates.
@@ -1282,7 +1333,7 @@ mod tests {
 
         // Insert the certificates into the BFT.
         for certificate in certificates {
-            assert!(bft.update_dag::<false>(certificate).await.is_ok());
+            assert!(bft.update_dag::<false, false>(certificate).await.is_ok());
         }
 
         // Commit the leader certificate.
@@ -1291,6 +1342,462 @@ mod tests {
         // Ensure that the `gc_round` has been updated.
         assert_eq!(bft.storage().gc_round(), commit_round - max_gc_rounds);
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_sync_bft_dag_at_bootup() -> Result<()> {
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters.
+        let max_gc_rounds = 1;
+        let committee_round = 0;
+        let commit_round = 2;
+        let current_round = commit_round + 1;
+
+        // Sample the current certificate and previous certificates.
+        let (_, certificates) = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate_with_previous_certificates(
+            current_round,
+            rng,
+        );
+
+        // Initialize the committee.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+            committee_round,
+            vec![
+                certificates[0].author(),
+                certificates[1].author(),
+                certificates[2].author(),
+                certificates[3].author(),
+            ],
+            rng,
+        );
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Insert the certificates into the storage.
+        for certificate in certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+
+        // Get the leader certificate.
+        let leader = committee.get_leader(commit_round).unwrap();
+        let leader_certificate = storage.get_certificate_for_round_with_author(commit_round, leader).unwrap();
+
+        // Initialize the BFT.
+        let account = Account::new(rng)?;
+        let bft = BFT::new(account.clone(), storage, ledger.clone(), None, &[], None)?;
+
+        // Insert a mock DAG in the BFT.
+        *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(commit_round);
+
+        // Insert the previous certificates into the BFT.
+        for certificate in certificates.clone() {
+            assert!(bft.update_dag::<false, false>(certificate).await.is_ok());
+        }
+
+        // Commit the leader certificate.
+        bft.commit_leader_certificate::<false, false>(leader_certificate.clone()).await.unwrap();
+
+        // Simulate a bootup of the BFT.
+
+        // Initialize a new instance of storage.
+        let storage_2 = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Initialize a new instance of BFT.
+        let bootup_bft = BFT::new(account, storage_2, ledger, None, &[], None)?;
+
+        // Sync the BFT DAG at bootup.
+        bootup_bft.sync_bft_dag_at_bootup(certificates.clone()).await;
+
+        // Check that the BFT starts from the same last committed round.
+        assert_eq!(bft.dag.read().last_committed_round(), bootup_bft.dag.read().last_committed_round());
+
+        // Ensure that both BFTs have committed the leader certificate.
+        assert!(bft.dag.read().is_recently_committed(leader_certificate.round(), leader_certificate.id()));
+        assert!(bootup_bft.dag.read().is_recently_committed(leader_certificate.round(), leader_certificate.id()));
+
+        // Check the state of the bootup BFT.
+        for certificate in certificates {
+            let certificate_round = certificate.round();
+            let certificate_id = certificate.id();
+            // Check that the bootup BFT has committed the certificates.
+            assert!(bootup_bft.dag.read().is_recently_committed(certificate_round, certificate_id));
+            // Check that the bootup BFT does not contain the certificates in its graph, because
+            // it should not need to order them again in subsequent subdags.
+            assert!(!bootup_bft.dag.read().contains_certificate_in_round(certificate_round, certificate_id));
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_sync_bft_dag_at_bootup_shutdown() -> Result<()> {
+        /*
+        1. Run one uninterrupted BFT on a set of certificates for 2 leader commits.
+        2. Run a separate bootup BFT that syncs with a set of pre shutdown certificates, and then commits a second leader normally over a set of post shutdown certificates.
+        3. Observe that the uninterrupted BFT and the bootup BFT end in the same state.
+        */
+
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters.
+        let max_gc_rounds = snarkvm::ledger::narwhal::BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
+        let committee_round = 0;
+        let commit_round = 2;
+        let current_round = commit_round + 1;
+        let next_round = current_round + 1;
+
+        // Sample 5 rounds of batch certificates starting at the genesis round from a static set of 4 authors.
+        let (round_to_certificates_map, committee) = {
+            let private_keys = vec![
+                PrivateKey::new(rng).unwrap(),
+                PrivateKey::new(rng).unwrap(),
+                PrivateKey::new(rng).unwrap(),
+                PrivateKey::new(rng).unwrap(),
+            ];
+            let addresses = vec![
+                Address::try_from(private_keys[0])?,
+                Address::try_from(private_keys[1])?,
+                Address::try_from(private_keys[2])?,
+                Address::try_from(private_keys[3])?,
+            ];
+            let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+                committee_round,
+                addresses,
+                rng,
+            );
+            // Initialize a mapping from the round number to the set of batch certificates in the round.
+            let mut round_to_certificates_map: IndexMap<
+                u64,
+                IndexSet<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>>,
+            > = IndexMap::new();
+            let mut previous_certificates = IndexSet::with_capacity(4);
+            // Initialize the genesis batch certificates.
+            for _ in 0..4 {
+                previous_certificates.insert(sample_batch_certificate(rng));
+            }
+            for round in 0..commit_round + 3 {
+                let mut current_certificates = IndexSet::new();
+                let previous_certificate_ids: IndexSet<_> = if round == 0 || round == 1 {
+                    IndexSet::new()
+                } else {
+                    previous_certificates.iter().map(|c| c.id()).collect()
+                };
+                let transmission_ids =
+                    snarkvm::ledger::narwhal::transmission_id::test_helpers::sample_transmission_ids(rng)
+                        .into_iter()
+                        .collect::<IndexSet<_>>();
+                let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+                let committee_id = committee.id();
+                for (i, private_key_1) in private_keys.iter().enumerate() {
+                    let batch_header = snarkvm::ledger::narwhal::BatchHeader::new(
+                        private_key_1,
+                        round,
+                        timestamp,
+                        committee_id,
+                        transmission_ids.clone(),
+                        previous_certificate_ids.clone(),
+                        rng,
+                    )
+                    .unwrap();
+                    let mut signatures = IndexSet::with_capacity(4);
+                    for (j, private_key_2) in private_keys.iter().enumerate() {
+                        if i != j {
+                            signatures.insert(private_key_2.sign(&[batch_header.batch_id()], rng).unwrap());
+                        }
+                    }
+                    let certificate =
+                        snarkvm::ledger::narwhal::BatchCertificate::from(batch_header, signatures).unwrap();
+                    current_certificates.insert(certificate);
+                }
+                // Update the mapping.
+                round_to_certificates_map.insert(round, current_certificates.clone());
+                previous_certificates = current_certificates.clone();
+            }
+            (round_to_certificates_map, committee)
+        };
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Get the leaders for the next 2 commit rounds.
+        let leader = committee.get_leader(commit_round).unwrap();
+        let next_leader = committee.get_leader(next_round).unwrap();
+        // Insert the pre shutdown certificates into the storage.
+        let mut pre_shutdown_certificates: Vec<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>> = Vec::new();
+        for i in 1..=commit_round {
+            let certificates = (*round_to_certificates_map.get(&i).unwrap()).clone();
+            if i == commit_round {
+                // Only insert the leader certificate for the commit round.
+                let leader_certificate = certificates.iter().find(|certificate| certificate.author() == leader);
+                if let Some(c) = leader_certificate {
+                    pre_shutdown_certificates.push(c.clone());
+                }
+                continue;
+            }
+            pre_shutdown_certificates.extend(certificates);
+        }
+        for certificate in pre_shutdown_certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+        // Insert the post shutdown certificates into the storage.
+        let mut post_shutdown_certificates: Vec<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>> =
+            Vec::new();
+        for j in commit_round..=commit_round + 2 {
+            let certificate = (*round_to_certificates_map.get(&j).unwrap()).clone();
+            post_shutdown_certificates.extend(certificate);
+        }
+        for certificate in post_shutdown_certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+        // Get the leader certificates.
+        let leader_certificate = storage.get_certificate_for_round_with_author(commit_round, leader).unwrap();
+        let next_leader_certificate = storage.get_certificate_for_round_with_author(next_round, next_leader).unwrap();
+
+        // Initialize the BFT without bootup.
+        let account = Account::new(rng)?;
+        let bft = BFT::new(account.clone(), storage, ledger.clone(), None, &[], None)?;
+
+        // Insert a mock DAG in the BFT without bootup.
+        *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(0);
+
+        // Insert the certificates into the BFT without bootup.
+        for certificate in pre_shutdown_certificates.clone() {
+            assert!(bft.update_dag::<false, false>(certificate).await.is_ok());
+        }
+
+        // Insert the post shutdown certificates into the BFT without bootup.
+        for certificate in post_shutdown_certificates.clone() {
+            assert!(bft.update_dag::<false, false>(certificate).await.is_ok());
+        }
+        // Commit the second leader certificate.
+        let commit_subdag = bft.order_dag_with_dfs::<false>(next_leader_certificate.clone()).unwrap();
+        let commit_subdag_metadata = commit_subdag.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
+        bft.commit_leader_certificate::<false, false>(next_leader_certificate.clone()).await.unwrap();
+
+        // Simulate a bootup of the BFT.
+
+        // Initialize a new instance of storage.
+        let bootup_storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+
+        // Initialize a new instance of BFT with bootup.
+        let bootup_bft = BFT::new(account, bootup_storage.clone(), ledger.clone(), None, &[], None)?;
+
+        // Sync the BFT DAG at bootup.
+        bootup_bft.sync_bft_dag_at_bootup(pre_shutdown_certificates.clone()).await;
+
+        // Insert the post shutdown certificates to the storage and BFT with bootup.
+        for certificate in post_shutdown_certificates.iter() {
+            bootup_bft.storage().testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+        for certificate in post_shutdown_certificates.clone() {
+            assert!(bootup_bft.update_dag::<false, false>(certificate).await.is_ok());
+        }
+        // Commit the second leader certificate.
+        let commit_subdag_bootup = bootup_bft.order_dag_with_dfs::<false>(next_leader_certificate.clone()).unwrap();
+        let commit_subdag_metadata_bootup =
+            commit_subdag_bootup.iter().map(|(round, c)| (*round, c.len())).collect::<Vec<_>>();
+        let committed_certificates_bootup = commit_subdag_bootup.values().flatten();
+        bootup_bft.commit_leader_certificate::<false, false>(next_leader_certificate.clone()).await.unwrap();
+
+        // Check that the final state of both BFTs is the same.
+
+        // Check that both BFTs start from the same last committed round.
+        assert_eq!(bft.dag.read().last_committed_round(), bootup_bft.dag.read().last_committed_round());
+
+        // Ensure that both BFTs have committed the leader certificates.
+        assert!(bft.dag.read().is_recently_committed(leader_certificate.round(), leader_certificate.id()));
+        assert!(bft.dag.read().is_recently_committed(next_leader_certificate.round(), next_leader_certificate.id()));
+        assert!(bootup_bft.dag.read().is_recently_committed(leader_certificate.round(), leader_certificate.id()));
+        assert!(
+            bootup_bft.dag.read().is_recently_committed(next_leader_certificate.round(), next_leader_certificate.id())
+        );
+
+        // Check that the bootup BFT has committed the pre shutdown certificates.
+        for certificate in pre_shutdown_certificates.clone() {
+            let certificate_round = certificate.round();
+            let certificate_id = certificate.id();
+            // Check that both BFTs have committed the certificates.
+            assert!(bft.dag.read().is_recently_committed(certificate_round, certificate_id));
+            assert!(bootup_bft.dag.read().is_recently_committed(certificate_round, certificate_id));
+            // Check that the bootup BFT does not contain the certificates in its graph, because
+            // it should not need to order them again in subsequent subdags.
+            assert!(!bft.dag.read().contains_certificate_in_round(certificate_round, certificate_id));
+            assert!(!bootup_bft.dag.read().contains_certificate_in_round(certificate_round, certificate_id));
+        }
+
+        // Check that that the bootup BFT has committed the subdag stemming from the second leader certificate in consensus.
+        for certificate in committed_certificates_bootup.clone() {
+            let certificate_round = certificate.round();
+            let certificate_id = certificate.id();
+            // Check that the both BFTs have committed the certificates.
+            assert!(bft.dag.read().is_recently_committed(certificate_round, certificate_id));
+            assert!(bootup_bft.dag.read().is_recently_committed(certificate_round, certificate_id));
+            // Check that the bootup BFT does not contain the certificates in its graph, because
+            // it should not need to order them again in subsequent subdags.
+            assert!(!bft.dag.read().contains_certificate_in_round(certificate_round, certificate_id));
+            assert!(!bootup_bft.dag.read().contains_certificate_in_round(certificate_round, certificate_id));
+        }
+
+        // Check that the commit subdag metadata for the second leader is the same for both BFTs.
+        assert_eq!(commit_subdag_metadata_bootup, commit_subdag_metadata);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_sync_bft_dag_at_bootup_dfs() -> Result<()> {
+        /*
+        1. Run a bootup BFT that syncs with a set of pre shutdown certificates.
+        2. Add post shutdown certificates to the bootup BFT.
+        2. Observe that in the commit subdag of the second leader certificate, there are no repeated vertices from the pre shutdown certificates.
+        */
+
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters.
+        let max_gc_rounds = snarkvm::ledger::narwhal::BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
+        let committee_round = 0;
+        let commit_round = 2;
+        let current_round = commit_round + 1;
+        let next_round = current_round + 1;
+
+        // Sample 5 rounds of batch certificates starting at the genesis round from a static set of 4 authors.
+        let (round_to_certificates_map, committee) = {
+            let private_keys = vec![
+                PrivateKey::new(rng).unwrap(),
+                PrivateKey::new(rng).unwrap(),
+                PrivateKey::new(rng).unwrap(),
+                PrivateKey::new(rng).unwrap(),
+            ];
+            let addresses = vec![
+                Address::try_from(private_keys[0])?,
+                Address::try_from(private_keys[1])?,
+                Address::try_from(private_keys[2])?,
+                Address::try_from(private_keys[3])?,
+            ];
+            let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_members(
+                committee_round,
+                addresses,
+                rng,
+            );
+            // Initialize a mapping from the round number to the set of batch certificates in the round.
+            let mut round_to_certificates_map: IndexMap<
+                u64,
+                IndexSet<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>>,
+            > = IndexMap::new();
+            let mut previous_certificates = IndexSet::with_capacity(4);
+            // Initialize the genesis batch certificates.
+            for _ in 0..4 {
+                previous_certificates.insert(sample_batch_certificate(rng));
+            }
+            for round in 0..=commit_round + 2 {
+                let mut current_certificates = IndexSet::new();
+                let previous_certificate_ids: IndexSet<_> = if round == 0 || round == 1 {
+                    IndexSet::new()
+                } else {
+                    previous_certificates.iter().map(|c| c.id()).collect()
+                };
+                let transmission_ids =
+                    snarkvm::ledger::narwhal::transmission_id::test_helpers::sample_transmission_ids(rng)
+                        .into_iter()
+                        .collect::<IndexSet<_>>();
+                let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+                let committee_id = committee.id();
+                for (i, private_key_1) in private_keys.iter().enumerate() {
+                    let batch_header = snarkvm::ledger::narwhal::BatchHeader::new(
+                        private_key_1,
+                        round,
+                        timestamp,
+                        committee_id,
+                        transmission_ids.clone(),
+                        previous_certificate_ids.clone(),
+                        rng,
+                    )
+                    .unwrap();
+                    let mut signatures = IndexSet::with_capacity(4);
+                    for (j, private_key_2) in private_keys.iter().enumerate() {
+                        if i != j {
+                            signatures.insert(private_key_2.sign(&[batch_header.batch_id()], rng).unwrap());
+                        }
+                    }
+                    let certificate =
+                        snarkvm::ledger::narwhal::BatchCertificate::from(batch_header, signatures).unwrap();
+                    current_certificates.insert(certificate);
+                }
+                // Update the mapping.
+                round_to_certificates_map.insert(round, current_certificates.clone());
+                previous_certificates = current_certificates.clone();
+            }
+            (round_to_certificates_map, committee)
+        };
+
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Get the leaders for the next 2 commit rounds.
+        let leader = committee.get_leader(commit_round).unwrap();
+        let next_leader = committee.get_leader(next_round).unwrap();
+        // Insert the pre shutdown certificates into the storage.
+        let mut pre_shutdown_certificates: Vec<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>> = Vec::new();
+        for i in 1..=commit_round {
+            let certificates = (*round_to_certificates_map.get(&i).unwrap()).clone();
+            if i == commit_round {
+                // Only insert the leader certificate for the commit round.
+                let leader_certificate = certificates.iter().find(|certificate| certificate.author() == leader);
+                if let Some(c) = leader_certificate {
+                    pre_shutdown_certificates.push(c.clone());
+                }
+                continue;
+            }
+            pre_shutdown_certificates.extend(certificates);
+        }
+        for certificate in pre_shutdown_certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+        // Initialize the bootup BFT.
+        let account = Account::new(rng)?;
+        let bootup_bft = BFT::new(account.clone(), storage.clone(), ledger.clone(), None, &[], None)?;
+        // Insert a mock DAG in the BFT without bootup.
+        *bootup_bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(0);
+        // Sync the BFT DAG at bootup.
+        bootup_bft.sync_bft_dag_at_bootup(pre_shutdown_certificates.clone()).await;
+
+        // Insert the post shutdown certificates into the storage.
+        let mut post_shutdown_certificates: Vec<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>> =
+            Vec::new();
+        for j in commit_round..=commit_round + 2 {
+            let certificate = (*round_to_certificates_map.get(&j).unwrap()).clone();
+            post_shutdown_certificates.extend(certificate);
+        }
+        for certificate in post_shutdown_certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+
+        // Insert the post shutdown certificates into the DAG.
+        for certificate in post_shutdown_certificates.clone() {
+            assert!(bootup_bft.update_dag::<false, false>(certificate).await.is_ok());
+        }
+
+        // Get the next leader certificate to commit.
+        let next_leader_certificate = storage.get_certificate_for_round_with_author(next_round, next_leader).unwrap();
+        let commit_subdag = bootup_bft.order_dag_with_dfs::<false>(next_leader_certificate).unwrap();
+        let committed_certificates = commit_subdag.values().flatten();
+
+        // Check that none of the certificates synced from the bootup appear in the subdag for the next commit round.
+        for pre_shutdown_certificate in pre_shutdown_certificates.clone() {
+            for committed_certificate in committed_certificates.clone() {
+                assert_ne!(pre_shutdown_certificate.id(), committed_certificate.id());
+            }
+        }
         Ok(())
     }
 }

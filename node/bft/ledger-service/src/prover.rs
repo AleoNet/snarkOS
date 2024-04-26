@@ -16,11 +16,11 @@ use crate::LedgerService;
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, Address, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
@@ -56,6 +56,16 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         unreachable!("Latest block does not exist in prover")
     }
 
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        unreachable!("Latest leader does not exist in prover");
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, _round: u64, _leader: Address<N>) {
+        unreachable!("Latest leader does not exist in prover");
+    }
+
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, _height: u32) -> bool {
         false
@@ -71,6 +81,11 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Block {height} does not exist in prover")
     }
 
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        bail!("Block {height} does not exist in prover")
+    }
+
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>> {
         bail!("Block {height} does not exist in prover")
@@ -83,7 +98,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         bail!("Solution '{solution_id}' does not exist in prover")
     }
 
@@ -134,11 +149,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        _puzzle_commitment: PuzzleCommitment<N>,
-        _solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, _solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
         Ok(())
     }
 

@@ -23,10 +23,7 @@ use tracing::*;
 /// The maximum size of an event that can be transmitted during the handshake.
 const MAX_HANDSHAKE_SIZE: usize = 1024 * 1024; // 1 MiB
 /// The maximum size of an event that can be transmitted in the network.
-const MAX_EVENT_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
-
-/// The type of noise handshake to use for network encryption.
-pub const NOISE_HANDSHAKE_TYPE: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
+const MAX_EVENT_SIZE: usize = 256 * 1024 * 1024; // 256 MiB
 
 /// The codec used to decode and encode network `Event`s.
 pub struct EventCodec<N: Network> {

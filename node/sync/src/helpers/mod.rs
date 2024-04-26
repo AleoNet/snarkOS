@@ -18,6 +18,9 @@ use core::hash::Hash;
 use indexmap::IndexSet;
 use std::net::SocketAddr;
 
+/// A tuple of the block hash (optional), previous block hash (optional), and the number of sync IPS to request from.
+pub type PrepareSyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, usize);
+
 /// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
 pub type SyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
 

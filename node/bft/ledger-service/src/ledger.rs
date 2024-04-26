@@ -16,18 +16,18 @@ use crate::{fmt_id, spawn_blocking, LedgerService};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{CoinbaseVerifyingKey, ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
         store::ConsensusStorage,
         Ledger,
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{bail, Address, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
 use lru::LruCache;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use std::{
     fmt,
     ops::Range,
@@ -37,23 +37,23 @@ use std::{
     },
 };
 
-/// The capacity of the LRU holiding the recently queried committees.
+/// The capacity of the LRU holding the recently queried committees.
 const COMMITTEE_CACHE_SIZE: usize = 16;
 
 /// A core ledger service.
+#[allow(clippy::type_complexity)]
 pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
-    coinbase_verifying_key: Arc<CoinbaseVerifyingKey<N>>,
     committee_cache: Arc<Mutex<LruCache<u64, Committee<N>>>>,
+    latest_leader: Arc<RwLock<Option<(u64, Address<N>)>>>,
     shutdown: Arc<AtomicBool>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
     pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
-        let coinbase_verifying_key = Arc::new(ledger.coinbase_puzzle().coinbase_verifying_key().clone());
         let committee_cache = Arc::new(Mutex::new(LruCache::new(COMMITTEE_CACHE_SIZE.try_into().unwrap())));
-        Self { ledger, coinbase_verifying_key, committee_cache, shutdown }
+        Self { ledger, committee_cache, latest_leader: Default::default(), shutdown }
     }
 }
 
@@ -81,6 +81,16 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         self.ledger.latest_block()
     }
 
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        *self.latest_leader.read()
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, round: u64, leader: Address<N>) {
+        *self.latest_leader.write() = Some((round, leader));
+    }
+
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, height: u32) -> bool {
         self.ledger.contains_block_height(height).unwrap_or(false)
@@ -96,6 +106,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         self.ledger.get_hash(height)
     }
 
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        self.ledger.get_block(height).map(|block| block.round())
+    }
+
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>> {
         self.ledger.get_block(height)
@@ -108,7 +123,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         self.ledger.get_solution(solution_id)
     }
 
@@ -186,7 +201,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         match transmission_id {
             TransmissionID::Ratification => Ok(false),
-            TransmissionID::Solution(puzzle_commitment) => self.ledger.contains_puzzle_commitment(puzzle_commitment),
+            TransmissionID::Solution(solution_id) => self.ledger.contains_solution_id(solution_id),
             TransmissionID::Transaction(transaction_id) => self.ledger.contains_transaction_id(transaction_id),
         }
     }
@@ -224,14 +239,14 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                     }
                 }
             }
-            (TransmissionID::Solution(expected_commitment), Transmission::Solution(solution_data)) => {
+            (TransmissionID::Solution(expected_solution_id), Transmission::Solution(solution_data)) => {
                 match solution_data.clone().deserialize_blocking() {
                     Ok(solution) => {
-                        if solution.commitment() != expected_commitment {
+                        if solution.id() != expected_solution_id {
                             bail!(
                                 "Received mismatching solution ID - expected {}, found {}",
-                                fmt_id(expected_commitment),
-                                fmt_id(solution.commitment()),
+                                fmt_id(expected_solution_id),
+                                fmt_id(solution.id()),
                             );
                         }
 
@@ -252,30 +267,25 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        puzzle_commitment: PuzzleCommitment<N>,
-        solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, solution_id: SolutionID<N>, solution: Data<Solution<N>>) -> Result<()> {
         // Deserialize the solution.
         let solution = spawn_blocking!(solution.deserialize_blocking())?;
-        // Ensure the puzzle commitment matches in the solution.
-        if puzzle_commitment != solution.commitment() {
-            bail!("Invalid solution - expected {puzzle_commitment}, found {}", solution.commitment());
+        // Ensure the solution ID matches in the solution.
+        if solution_id != solution.id() {
+            bail!("Invalid solution - expected {solution_id}, found {}", solution.id());
         }
 
-        // Retrieve the coinbase verifying key.
-        let coinbase_verifying_key = self.coinbase_verifying_key.clone();
-        // Compute the current epoch challenge.
-        let epoch_challenge = self.ledger.latest_epoch_challenge()?;
+        // Compute the current epoch hash.
+        let epoch_hash = self.ledger.latest_epoch_hash()?;
         // Retrieve the current proof target.
         let proof_target = self.ledger.latest_proof_target();
 
-        // Ensure that the prover solution is valid for the given epoch.
-        if !spawn_blocking!(solution.verify(&coinbase_verifying_key, &epoch_challenge, proof_target))? {
-            bail!("Invalid prover solution '{puzzle_commitment}' for the current epoch.");
+        // Ensure that the solution is valid for the given epoch.
+        let puzzle = self.ledger.puzzle().clone();
+        match spawn_blocking!(puzzle.check_solution(&solution, epoch_hash, proof_target)) {
+            Ok(()) => Ok(()),
+            Err(e) => bail!("Invalid solution '{}' for the current epoch - {e}", fmt_id(solution_id)),
         }
-        Ok(())
     }
 
     /// Checks the given transaction is well-formed and unique.
@@ -311,7 +321,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<Block<N>> {
-        self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)
+        self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions, &mut rand::thread_rng())
     }
 
     /// Adds the given block as the next block in the ledger.
@@ -323,6 +333,19 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         }
         // Advance to the next block.
         self.ledger.advance_to_next_block(block)?;
+        // Update BFT metrics.
+        #[cfg(feature = "metrics")]
+        {
+            let num_sol = block.solutions().len();
+            let num_tx = block.transactions().len();
+
+            metrics::gauge(metrics::bft::HEIGHT, block.height() as f64);
+            metrics::gauge(metrics::bft::LAST_COMMITTED_ROUND, block.round() as f64);
+            metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
+            metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
+            metrics::update_block_metrics(block);
+        }
+
         tracing::info!("\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());
         Ok(())
     }

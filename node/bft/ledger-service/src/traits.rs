@@ -15,11 +15,11 @@
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
-    prelude::{Field, Network, Result},
+    prelude::{Address, Field, Network, Result},
 };
 
 use indexmap::IndexMap;
@@ -36,6 +36,12 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// Returns the latest block in the ledger.
     fn latest_block(&self) -> Block<N>;
 
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)>;
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, round: u64, leader: Address<N>);
+
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, height: u32) -> bool;
 
@@ -45,6 +51,9 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// Returns the block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
 
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64>;
+
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>>;
 
@@ -53,7 +62,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>>;
 
     /// Returns the unconfirmed transaction for the given transaction ID.
     fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
@@ -86,11 +95,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     ) -> Result<()>;
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        puzzle_commitment: PuzzleCommitment<N>,
-        solution: Data<ProverSolution<N>>,
-    ) -> Result<()>;
+    async fn check_solution_basic(&self, solution_id: SolutionID<N>, solution: Data<Solution<N>>) -> Result<()>;
 
     /// Checks the given transaction is well-formed and unique.
     async fn check_transaction_basic(
