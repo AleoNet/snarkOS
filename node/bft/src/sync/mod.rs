@@ -57,6 +57,8 @@ pub struct Sync<N: Network> {
     response_lock: Arc<TMutex<()>>,
     /// The sync lock.
     sync_lock: Arc<TMutex<()>>,
+    /// The latest block responses.
+    latest_block_responses: Arc<TMutex<HashMap<u32, Block<N>>>>,
 }
 
 impl<N: Network> Sync<N> {
@@ -75,6 +77,7 @@ impl<N: Network> Sync<N> {
             handles: Default::default(),
             response_lock: Default::default(),
             sync_lock: Default::default(),
+            latest_block_responses: Default::default(),
         }
     }
 
@@ -106,6 +109,11 @@ impl<N: Network> Sync<N> {
                 // Sync the storage with the blocks.
                 if let Err(e) = self_.sync_storage_with_blocks().await {
                     error!("Unable to sync storage with blocks - {e}");
+                }
+
+                // If the node is synced, clear the `latest_block_responses`.
+                if self_.is_synced() {
+                    self_.latest_block_responses.lock().await.clear();
                 }
             }
         }));
@@ -330,6 +338,13 @@ impl<N: Network> Sync<N> {
     pub async fn sync_storage_with_block(&self, block: Block<N>) -> Result<()> {
         // Acquire the sync lock.
         let _lock = self.sync_lock.lock().await;
+        // Acquire the latest block responses lock.
+        let mut latest_block_responses = self.latest_block_responses.lock().await;
+
+        // If this block has already been processed, return early.
+        if self.ledger.contains_block_height(block.height()) || latest_block_responses.contains_key(&block.height()) {
+            return Ok(());
+        }
 
         // If the block authority is a subdag, then sync the batch certificates with the block.
         if let Authority::Quorum(subdag) = block.authority() {
@@ -360,21 +375,136 @@ impl<N: Network> Sync<N> {
             }
         }
 
-        let self_ = self.clone();
-        tokio::task::spawn_blocking(move || {
-            // Check the next block.
-            self_.ledger.check_next_block(&block)?;
-            // Attempt to advance to the next block.
-            self_.ledger.advance_to_next_block(&block)?;
+        // Fetch the latest block height.
+        let latest_block_height = self.ledger.latest_block_height();
 
-            // Sync the height with the block.
-            self_.storage.sync_height_with_block(block.height());
-            // Sync the round with the block.
-            self_.storage.sync_round_with_block(block.round());
+        // Insert the latest block response.
+        latest_block_responses.insert(block.height(), block);
+        // Clear the latest block responses of older blocks.
+        latest_block_responses.retain(|height, _| *height > latest_block_height);
 
-            Ok(())
-        })
-        .await?
+        // Get a list of contiguous blocks from the latest block responses.
+        let contiguous_blocks: Vec<Block<N>> = (latest_block_height.saturating_add(1)..)
+            .take_while(|&k| latest_block_responses.contains_key(&k))
+            .filter_map(|k| latest_block_responses.get(&k).cloned())
+            .collect();
+
+        // Check if the block response is ready to be added to the ledger.
+        // Ensure that the previous block's leader certificate meets the availability threshold
+        // based on the certificates in the current block.
+        // If the availability threshold is not met, process the next block and check if it is linked to the current block.
+        // Note: We do not advance to the most recent block response because we would be unable to
+        // validate if the leader certificate in the block has been certified properly.
+        for next_block in contiguous_blocks.into_iter() {
+            // Retrieve the height of the next block.
+            let next_block_height = next_block.height();
+
+            // Fetch the leader certificate and the relevant rounds.
+            let leader_certificate = match next_block.authority() {
+                Authority::Quorum(subdag) => subdag.leader_certificate().clone(),
+                _ => bail!("Received a block with an unexpected authority type."),
+            };
+            let commit_round = leader_certificate.round();
+            let certificate_round = commit_round.saturating_add(1);
+
+            // Get the committee lookback for the commit round.
+            let committee_lookback = self.ledger.get_committee_lookback_for_round(commit_round)?;
+            // Retrieve all of the certificates for the **certificate** round.
+            let certificates = self.storage.get_certificates_for_round(certificate_round);
+            // Construct a set over the authors who included the leader's certificate in the certificate round.
+            let authors = certificates
+                .iter()
+                .filter_map(|c| match c.previous_certificate_ids().contains(&leader_certificate.id()) {
+                    true => Some(c.author()),
+                    false => None,
+                })
+                .collect();
+
+            debug!("Validating sync block {next_block_height} at round {commit_round}...");
+            // Check if the leader is ready to be committed.
+            if committee_lookback.is_availability_threshold_reached(&authors) {
+                // Initialize the current certificate.
+                let mut current_certificate = leader_certificate;
+                // Check if there are any linked blocks that need to be added.
+                let mut blocks_to_add = vec![next_block];
+
+                // Check if there are other blocks to process based on `is_linked`.
+                for height in (self.ledger.latest_block_height().saturating_add(1)..next_block_height).rev() {
+                    // Retrieve the previous block.
+                    let Some(previous_block) = latest_block_responses.get(&height) else {
+                        bail!("Block {height} is missing from the latest block responses.");
+                    };
+                    // Retrieve the previous certificate.
+                    let previous_certificate = match previous_block.authority() {
+                        Authority::Quorum(subdag) => subdag.leader_certificate().clone(),
+                        _ => bail!("Received a block with an unexpected authority type."),
+                    };
+                    // Determine if there is a path between the previous certificate and the current certificate.
+                    if self.is_linked(previous_certificate.clone(), current_certificate.clone())? {
+                        debug!("Previous sync block {height} is linked to the current block {next_block_height}");
+                        // Add the previous leader certificate to the list of certificates to commit.
+                        blocks_to_add.insert(0, previous_block.clone());
+                        // Update the current certificate to the previous leader certificate.
+                        current_certificate = previous_certificate;
+                    }
+                }
+
+                // Add the blocks to the ledger.
+                for block in blocks_to_add {
+                    // Check that the blocks are sequential and can be added to the ledger.
+                    let block_height = block.height();
+                    if block_height != self.ledger.latest_block_height().saturating_add(1) {
+                        warn!("Skipping block {block_height} from the latest block responses - not sequential.");
+                        continue;
+                    }
+
+                    let self_ = self.clone();
+                    tokio::task::spawn_blocking(move || {
+                        // Check the next block.
+                        self_.ledger.check_next_block(&block)?;
+                        // Attempt to advance to the next block.
+                        self_.ledger.advance_to_next_block(&block)?;
+
+                        // Sync the height with the block.
+                        self_.storage.sync_height_with_block(block.height());
+                        // Sync the round with the block.
+                        self_.storage.sync_round_with_block(block.round());
+
+                        Ok::<(), anyhow::Error>(())
+                    })
+                    .await??;
+                    // Remove the block height from the latest block responses.
+                    latest_block_responses.remove(&block_height);
+                }
+            } else {
+                debug!(
+                    "Availability threshold was not reached for block {next_block_height} at round {commit_round}. Checking next block..."
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns `true` if there is a path from the previous certificate to the current certificate.
+    fn is_linked(
+        &self,
+        previous_certificate: BatchCertificate<N>,
+        current_certificate: BatchCertificate<N>,
+    ) -> Result<bool> {
+        // Initialize the list containing the traversal.
+        let mut traversal = vec![current_certificate.clone()];
+        // Iterate over the rounds from the current certificate to the previous certificate.
+        for round in (previous_certificate.round()..current_certificate.round()).rev() {
+            // Retrieve all of the certificates for this past round.
+            let certificates = self.storage.get_certificates_for_round(round);
+            // Filter the certificates to only include those that are in the traversal.
+            traversal = certificates
+                .into_iter()
+                .filter(|p| traversal.iter().any(|c| c.previous_certificate_ids().contains(&p.id())))
+                .collect();
+        }
+        Ok(traversal.contains(&previous_certificate))
     }
 }
 
@@ -483,5 +613,241 @@ impl<N: Network> Sync<N> {
         let _lock = self.sync_lock.lock().await;
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::{helpers::now, ledger_service::CoreLedgerService, storage_service::BFTMemoryService};
+    use snarkos_account::Account;
+    use snarkvm::{
+        console::{
+            account::{Address, PrivateKey},
+            network::MainnetV0,
+        },
+        ledger::{
+            narwhal::{BatchCertificate, BatchHeader, Subdag},
+            store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        },
+        prelude::{Ledger, VM},
+        utilities::TestRng,
+    };
+
+    use aleo_std::StorageMode;
+    use indexmap::IndexSet;
+    use rand::Rng;
+    use std::collections::BTreeMap;
+
+    type CurrentNetwork = MainnetV0;
+    type CurrentLedger = Ledger<CurrentNetwork, ConsensusMemory<CurrentNetwork>>;
+    type CurrentConsensusStore = ConsensusStore<CurrentNetwork, ConsensusMemory<CurrentNetwork>>;
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_commit_via_is_linked() -> anyhow::Result<()> {
+        let rng = &mut TestRng::default();
+        // Initialize the round parameters.
+        let max_gc_rounds = BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
+        let commit_round = 2;
+
+        // Initialize the store.
+        let store = CurrentConsensusStore::open(None).unwrap();
+        let account: Account<CurrentNetwork> = Account::new(rng)?;
+
+        // Create a genesis block with a seeded RNG to reproduce the same genesis private keys.
+        let seed: u64 = rng.gen();
+        let genesis_rng = &mut TestRng::from_seed(seed);
+        let genesis = VM::from(store).unwrap().genesis_beacon(account.private_key(), genesis_rng).unwrap();
+
+        // Extract the private keys from the genesis committee by using the same RNG to sample private keys.
+        let genesis_rng = &mut TestRng::from_seed(seed);
+        let private_keys = [
+            *account.private_key(),
+            PrivateKey::new(genesis_rng)?,
+            PrivateKey::new(genesis_rng)?,
+            PrivateKey::new(genesis_rng)?,
+        ];
+
+        // Initialize the ledger with the genesis block.
+        let ledger = CurrentLedger::load(genesis.clone(), StorageMode::Production).unwrap();
+        // Initialize the ledger.
+        let core_ledger = Arc::new(CoreLedgerService::new(ledger.clone(), Default::default()));
+
+        // Sample 5 rounds of batch certificates starting at the genesis round from a static set of 4 authors.
+        let (round_to_certificates_map, committee) = {
+            let addresses = vec![
+                Address::try_from(private_keys[0])?,
+                Address::try_from(private_keys[1])?,
+                Address::try_from(private_keys[2])?,
+                Address::try_from(private_keys[3])?,
+            ];
+
+            let committee = ledger.latest_committee().unwrap();
+
+            // Initialize a mapping from the round number to the set of batch certificates in the round.
+            let mut round_to_certificates_map: HashMap<u64, IndexSet<BatchCertificate<CurrentNetwork>>> =
+                HashMap::new();
+            let mut previous_certificates: IndexSet<BatchCertificate<CurrentNetwork>> = IndexSet::with_capacity(4);
+
+            for round in 0..=commit_round + 8 {
+                let mut current_certificates = IndexSet::new();
+                let previous_certificate_ids: IndexSet<_> = if round == 0 || round == 1 {
+                    IndexSet::new()
+                } else {
+                    previous_certificates.iter().map(|c| c.id()).collect()
+                };
+                let committee_id = committee.id();
+
+                // Create a certificate for the leader.
+                if round <= 5 {
+                    let leader = committee.get_leader(round).unwrap();
+                    let i = addresses.iter().position(|&address| address == leader).unwrap();
+                    let batch_header = BatchHeader::new(
+                        &private_keys[i],
+                        round,
+                        now(),
+                        committee_id,
+                        Default::default(),
+                        previous_certificate_ids.clone(),
+                        rng,
+                    )
+                    .unwrap();
+                    // Sign the batch header.
+                    let mut signatures = IndexSet::with_capacity(4);
+                    for (j, private_key_2) in private_keys.iter().enumerate() {
+                        if i != j {
+                            signatures.insert(private_key_2.sign(&[batch_header.batch_id()], rng).unwrap());
+                        }
+                    }
+                    current_certificates.insert(BatchCertificate::from(batch_header, signatures).unwrap());
+                }
+
+                // Create a certificate for each validator.
+                if round > 5 {
+                    for (i, private_key_1) in private_keys.iter().enumerate() {
+                        let batch_header = BatchHeader::new(
+                            private_key_1,
+                            round,
+                            now(),
+                            committee_id,
+                            Default::default(),
+                            previous_certificate_ids.clone(),
+                            rng,
+                        )
+                        .unwrap();
+                        // Sign the batch header.
+                        let mut signatures = IndexSet::with_capacity(4);
+                        for (j, private_key_2) in private_keys.iter().enumerate() {
+                            if i != j {
+                                signatures.insert(private_key_2.sign(&[batch_header.batch_id()], rng).unwrap());
+                            }
+                        }
+                        current_certificates.insert(BatchCertificate::from(batch_header, signatures).unwrap());
+                    }
+                }
+                // Update the map of certificates.
+                round_to_certificates_map.insert(round, current_certificates.clone());
+                previous_certificates = current_certificates.clone();
+            }
+            (round_to_certificates_map, committee)
+        };
+
+        // Initialize the storage.
+        let storage = Storage::new(core_ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Insert certificates into storage.
+        let mut certificates: Vec<BatchCertificate<CurrentNetwork>> = Vec::new();
+        for i in 1..=commit_round + 8 {
+            let c = (*round_to_certificates_map.get(&i).unwrap()).clone();
+            certificates.extend(c);
+        }
+        for certificate in certificates.clone().iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+
+        // Create block 1.
+        let leader_round_1 = commit_round;
+        let leader_1 = committee.get_leader(leader_round_1).unwrap();
+        let leader_certificate = storage.get_certificate_for_round_with_author(commit_round, leader_1).unwrap();
+        let block_1 = {
+            let mut subdag_map: BTreeMap<u64, IndexSet<BatchCertificate<CurrentNetwork>>> = BTreeMap::new();
+            let mut leader_cert_map = IndexSet::new();
+            leader_cert_map.insert(leader_certificate.clone());
+            let mut previous_cert_map = IndexSet::new();
+            for cert in storage.get_certificates_for_round(commit_round - 1) {
+                previous_cert_map.insert(cert);
+            }
+            subdag_map.insert(commit_round, leader_cert_map.clone());
+            subdag_map.insert(commit_round - 1, previous_cert_map.clone());
+            let subdag = Subdag::from(subdag_map.clone())?;
+            core_ledger.prepare_advance_to_next_quorum_block(subdag, Default::default())?
+        };
+        // Insert block 1.
+        core_ledger.advance_to_next_block(&block_1)?;
+
+        // Create block 2.
+        let leader_round_2 = commit_round + 2;
+        let leader_2 = committee.get_leader(leader_round_2).unwrap();
+        let leader_certificate_2 = storage.get_certificate_for_round_with_author(leader_round_2, leader_2).unwrap();
+        let block_2 = {
+            let mut subdag_map_2: BTreeMap<u64, IndexSet<BatchCertificate<CurrentNetwork>>> = BTreeMap::new();
+            let mut leader_cert_map_2 = IndexSet::new();
+            leader_cert_map_2.insert(leader_certificate_2.clone());
+            let mut previous_cert_map_2 = IndexSet::new();
+            for cert in storage.get_certificates_for_round(leader_round_2 - 1) {
+                previous_cert_map_2.insert(cert);
+            }
+            subdag_map_2.insert(leader_round_2, leader_cert_map_2.clone());
+            subdag_map_2.insert(leader_round_2 - 1, previous_cert_map_2.clone());
+            let subdag_2 = Subdag::from(subdag_map_2.clone())?;
+            core_ledger.prepare_advance_to_next_quorum_block(subdag_2, Default::default())?
+        };
+        // Insert block 2.
+        core_ledger.advance_to_next_block(&block_2)?;
+
+        // Create block 3
+        let leader_round_3 = commit_round + 4;
+        let leader_3 = committee.get_leader(leader_round_3).unwrap();
+        let leader_certificate_3 = storage.get_certificate_for_round_with_author(leader_round_3, leader_3).unwrap();
+        let block_3 = {
+            let mut subdag_map_3: BTreeMap<u64, IndexSet<BatchCertificate<CurrentNetwork>>> = BTreeMap::new();
+            let mut leader_cert_map_3 = IndexSet::new();
+            leader_cert_map_3.insert(leader_certificate_3.clone());
+            let mut previous_cert_map_3 = IndexSet::new();
+            for cert in storage.get_certificates_for_round(leader_round_3 - 1) {
+                previous_cert_map_3.insert(cert);
+            }
+            subdag_map_3.insert(leader_round_3, leader_cert_map_3.clone());
+            subdag_map_3.insert(leader_round_3 - 1, previous_cert_map_3.clone());
+            let subdag_3 = Subdag::from(subdag_map_3.clone())?;
+            core_ledger.prepare_advance_to_next_quorum_block(subdag_3, Default::default())?
+        };
+        // Insert block 3.
+        core_ledger.advance_to_next_block(&block_3)?;
+
+        // Initialize the syncing ledger.
+        let syncing_ledger = Arc::new(CoreLedgerService::new(
+            CurrentLedger::load(genesis, StorageMode::Production).unwrap(),
+            Default::default(),
+        ));
+        // Initialize the gateway.
+        let gateway = Gateway::new(account.clone(), storage.clone(), syncing_ledger.clone(), None, &[], None)?;
+        // Initialize the sync module.
+        let sync = Sync::new(gateway.clone(), storage.clone(), syncing_ledger.clone());
+        // Try to sync block 1.
+        sync.sync_storage_with_block(block_1).await?;
+        // Ensure that the sync ledger has not advanced.
+        assert_eq!(syncing_ledger.latest_block_height(), 0);
+        // Try to sync block 2.
+        sync.sync_storage_with_block(block_2).await?;
+        // Ensure that the sync ledger has not advanced.
+        assert_eq!(syncing_ledger.latest_block_height(), 0);
+        // Try to sync block 3.
+        sync.sync_storage_with_block(block_3).await?;
+        // Ensure blocks 1 and 2 were added to the ledger.
+        assert!(syncing_ledger.contains_block_height(1));
+        assert!(syncing_ledger.contains_block_height(2));
+
+        Ok(())
     }
 }
