@@ -28,7 +28,7 @@ use tokio::sync::oneshot;
 
 /// The maximum number of seconds to wait before expiring a callback.
 /// We ensure that we don't truncate `MAX_FETCH_TIMEOUT_IN_MS` when converting to seconds.
-const CALLBACK_EXPIRATION_IN_SECS: i64 = (MAX_FETCH_TIMEOUT_IN_MS as i64 + (1000 - 1)) / 1000;
+const CALLBACK_EXPIRATION_IN_SECS: i64 = MAX_FETCH_TIMEOUT_IN_MS.div_ceil(1000) as i64;
 
 /// Returns the maximum number of redundant requests for the number of validators in the specified round.
 pub fn max_redundant_requests<N: Network>(ledger: Arc<dyn LedgerService<N>>, round: u64) -> usize {
@@ -106,7 +106,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         self.clear_expired_callbacks_for_item(item);
         // Return the number of live callbacks.
         self.pending
-            .write()
+            .read()
             .get(&item)
             .map_or(0, |peers| peers.values().flatten().filter(|(_, _, request_sent)| *request_sent).count())
     }
