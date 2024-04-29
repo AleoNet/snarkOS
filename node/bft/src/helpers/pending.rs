@@ -135,7 +135,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
             let entry = pending.entry(item).or_default();
 
             // Check if the peer IP is already present in the entry.
-            let is_new_peer = entry.contains_key(&peer_ip);
+            let is_new_peer = !entry.contains_key(&peer_ip);
 
             // Get the entry for the peer IP.
             let peer_entry = entry.entry(peer_ip).or_default();
@@ -248,10 +248,15 @@ mod tests {
         let addr_2 = SocketAddr::from(([127, 0, 0, 1], 2345));
         let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
 
+        // Initialize the callbacks.
+        let (callback_sender_1, _) = oneshot::channel();
+        let (callback_sender_2, _) = oneshot::channel();
+        let (callback_sender_3, _) = oneshot::channel();
+
         // Insert the solution IDs.
-        assert!(pending.insert(solution_id_1, addr_1, None));
-        assert!(pending.insert(solution_id_2, addr_2, None));
-        assert!(pending.insert(solution_id_3, addr_3, None));
+        assert!(pending.insert(solution_id_1, addr_1, Some((callback_sender_1, true))));
+        assert!(pending.insert(solution_id_2, addr_2, Some((callback_sender_2, true))));
+        assert!(pending.insert(solution_id_3, addr_3, Some((callback_sender_3, true))));
 
         // Check the number of SocketAddrs.
         assert_eq!(pending.len(), 3);
@@ -434,7 +439,12 @@ mod prop_tests {
         pub fn to_pending(&self) -> Pending<Item, ()> {
             let pending = Pending::<Item, ()>::new();
             for i in 0..self.count {
-                pending.insert(Item { id: i }, SocketAddr::from(([127, 0, 0, 1], i as u16)), None);
+                let (callback_sender_1, _) = oneshot::channel();
+                pending.insert(
+                    Item { id: i },
+                    SocketAddr::from(([127, 0, 0, 1], i as u16)),
+                    Some((callback_sender_1, true)),
+                );
             }
             pending
         }
