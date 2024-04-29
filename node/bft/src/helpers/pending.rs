@@ -439,11 +439,10 @@ mod prop_tests {
         pub fn to_pending(&self) -> Pending<Item, ()> {
             let pending = Pending::<Item, ()>::new();
             for i in 0..self.count {
-                let (callback_sender_1, _) = oneshot::channel();
                 pending.insert(
                     Item { id: i },
                     SocketAddr::from(([127, 0, 0, 1], i as u16)),
-                    Some((callback_sender_1, true)),
+                    Some((oneshot::channel().0, true)),
                 );
             }
             pending
