@@ -852,6 +852,14 @@ mod tests {
         // Test specified REST IP when passed in prod mode
         let config = Start::try_parse_from(["snarkos", "--rest", "192.168.1.1:8080"].iter()).unwrap();
         assert_eq!(config.rest, Some(SocketAddr::from_str("192.168.1.1:8080").unwrap()));
+
+        // Test default REST IP when no rest flag is passed in dev mode
+        let config = Start::try_parse_from(["snarkos", "--dev", "1", "--norest"].iter()).unwrap();
+        assert!(config.rest.is_none());
+
+        // Test default REST IP when no rest flag is passed in prod mode
+        let config = Start::try_parse_from(["snarkos", "--norest"].iter()).unwrap();
+        assert!(config.rest.is_none());
     }
 
     #[test]
