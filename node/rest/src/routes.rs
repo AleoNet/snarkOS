@@ -16,13 +16,14 @@ use super::*;
 use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
 use snarkvm::{
     ledger::puzzle::Solution,
-    prelude::{block::Transaction, Identifier, Plaintext},
+    prelude::{block::Transaction, Identifier, Plaintext, ToBytes},
 };
 
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use snarkvm::prelude::LimitedWriter;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -332,6 +333,13 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         // Do not process the transaction if the node is too far behind.
         if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
             return Err(RestError(format!("Unable to broadcast transaction '{}' (node is syncing)", fmt_id(tx.id()))));
+        }
+
+        // If the transaction exceeds the transaction size limit, return an error.
+        // TODO: Should this be a blocking task?
+        let buffer = Vec::with_capacity(N::MAX_TRANSACTION_SIZE);
+        if tx.write_le(LimitedWriter::new(buffer, N::MAX_TRANSACTION_SIZE)).is_err() {
+            return Err(RestError("Transaction size exceeds the byte limit".to_string()));
         }
 
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.

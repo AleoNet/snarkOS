@@ -22,7 +22,7 @@ use snarkvm::{
         store::ConsensusStorage,
         Ledger,
     },
-    prelude::{bail, Address, Field, Network, Result},
+    prelude::{bail, Address, Field, FromBytes, Network, Result},
 };
 
 use indexmap::IndexMap;
@@ -30,6 +30,7 @@ use lru::LruCache;
 use parking_lot::{Mutex, RwLock};
 use std::{
     fmt,
+    io::Read,
     ops::Range,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -294,8 +295,13 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         transaction_id: N::TransactionID,
         transaction: Data<Transaction<N>>,
     ) -> Result<()> {
-        // Deserialize the transaction.
-        let transaction = spawn_blocking!(transaction.deserialize_blocking())?;
+        // Deserialize the transaction. If the transaction exceeds the maximum size, then return an error.
+        let transaction = spawn_blocking!({
+            match transaction {
+                Data::Object(transaction) => Ok(transaction),
+                Data::Buffer(bytes) => Ok(Transaction::<N>::read_le(&mut bytes.take(N::MAX_TRANSACTION_SIZE as u64))?),
+            }
+        })?;
         // Ensure the transaction ID matches in the transaction.
         if transaction_id != transaction.id() {
             bail!("Invalid transaction - expected {transaction_id}, found {}", transaction.id());
