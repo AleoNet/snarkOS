@@ -267,10 +267,10 @@ mod tests {
         assert!(!pending.contains(unknown_id));
 
         // Check get.
-        assert_eq!(pending.get(solution_id_1), Some(HashSet::from([addr_1])));
-        assert_eq!(pending.get(solution_id_2), Some(HashSet::from([addr_2])));
-        assert_eq!(pending.get(solution_id_3), Some(HashSet::from([addr_3])));
-        assert_eq!(pending.get(unknown_id), None);
+        assert_eq!(pending.get_peers(solution_id_1), Some(HashSet::from([addr_1])));
+        assert_eq!(pending.get_peers(solution_id_2), Some(HashSet::from([addr_2])));
+        assert_eq!(pending.get_peers(solution_id_3), Some(HashSet::from([addr_3])));
+        assert_eq!(pending.get_peers(unknown_id), None);
 
         // Check remove.
         assert!(pending.remove(solution_id_1, None).is_some());
@@ -373,9 +373,9 @@ mod tests {
         assert!(pending.is_empty());
         assert_eq!(pending.len(), 0);
 
-        // Initialize the commitments.
-        let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
-        let commitment_2 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        // Initialize the solution IDs.
+        let solution_id_1 = TransmissionID::Solution(rng.gen::<u64>().into());
+        let solution_id_2 = TransmissionID::Solution(rng.gen::<u64>().into());
 
         // Initialize the SocketAddrs.
         let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -388,13 +388,13 @@ mod tests {
         let (callback_sender_3, _) = oneshot::channel();
 
         // Insert the commitments.
-        assert!(pending.insert(commitment_1, addr_1, Some((callback_sender_1, true))));
-        assert!(pending.insert(commitment_1, addr_2, Some((callback_sender_2, true))));
-        assert!(pending.insert(commitment_2, addr_3, Some((callback_sender_3, true))));
+        assert!(pending.insert(solution_id_1, addr_1, Some((callback_sender_1, true))));
+        assert!(pending.insert(solution_id_1, addr_2, Some((callback_sender_2, true))));
+        assert!(pending.insert(solution_id_2, addr_3, Some((callback_sender_3, true))));
 
         // Ensure that the items have not been expired yet.
-        assert_eq!(pending.num_callbacks(commitment_1), 2);
-        assert_eq!(pending.num_callbacks(commitment_2), 1);
+        assert_eq!(pending.num_callbacks(solution_id_1), 2);
+        assert_eq!(pending.num_callbacks(solution_id_2), 1);
         assert_eq!(pending.len(), 2);
 
         // Wait for ` CALLBACK_EXPIRATION_IN_SECS + 1` seconds.
@@ -404,8 +404,8 @@ mod tests {
         pending.clear_expired_callbacks();
 
         // Ensure that the items have been expired.
-        assert_eq!(pending.num_callbacks(commitment_1), 0);
-        assert_eq!(pending.num_callbacks(commitment_2), 0);
+        assert_eq!(pending.num_callbacks(solution_id_1), 0);
+        assert_eq!(pending.num_callbacks(solution_id_2), 0);
         assert_eq!(pending.len(), 0);
     }
 }
