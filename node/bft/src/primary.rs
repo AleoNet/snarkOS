@@ -26,6 +26,7 @@ use crate::{
         PrimaryReceiver,
         PrimarySender,
         Proposal,
+        SignedProposals,
         Storage,
     },
     spawn_blocking,
@@ -45,7 +46,6 @@ use snarkos_node_bft_events::PrimaryPing;
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::{
-        account::Signature,
         prelude::*,
         types::{Address, Field},
     },
@@ -113,7 +113,7 @@ pub struct Primary<N: Network> {
     /// The timestamp of the most recent proposed batch.
     latest_proposed_batch_timestamp: Arc<RwLock<i64>>,
     /// The recently-signed batch proposals (a map from the address to the round, timestamp, batch ID, and signature).
-    signed_proposals: Arc<RwLock<HashMap<Address<N>, (u64, i64, Field<N>, Signature<N>)>>>,
+    signed_proposals: Arc<RwLock<SignedProposals<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The lock for propose_batch.
@@ -618,7 +618,7 @@ impl<N: Network> Primary<N> {
                 // Check if the proposal has expired.
                 match is_proposal_expired(now(), timestamp) {
                     // If the proposal has expired, then remove the cached signature.
-                    true => self.signed_proposals.write().remove(&batch_author),
+                    true => self.signed_proposals.write().0.remove(&batch_author),
                     // If the proposal has not expired, then disconnect the validator.
                     false => {
                         self.gateway.disconnect(peer_ip);
@@ -695,7 +695,7 @@ impl<N: Network> Primary<N> {
         // Note: Due to the need to sync the batch header with the peer, it is possible
         // for the primary to receive the same 'BatchPropose' event again, whereby only
         // one instance of this handler should sign the batch. This check guarantees this.
-        match self.signed_proposals.write().entry(batch_author) {
+        match self.signed_proposals.write().0.entry(batch_author) {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 // If the validator has already signed a batch for this round, then return early,
                 // since, if the peer still has not received the signature, they will request it again,
