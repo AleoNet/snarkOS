@@ -253,23 +253,23 @@ impl<N: Network> Primary<N> {
 }
 
 impl<N: Network> Primary<N> {
-    /// Returns the unconfirmed transmission IDs.
-    pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+    /// Returns the worker transmission IDs.
+    pub fn worker_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
         self.workers.iter().flat_map(|worker| worker.transmission_ids())
     }
 
-    /// Returns the unconfirmed transmissions.
-    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+    /// Returns the worker transmissions.
+    pub fn worker_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
         self.workers.iter().flat_map(|worker| worker.transmissions())
     }
 
-    /// Returns the unconfirmed solutions.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
+    /// Returns the worker solutions.
+    pub fn worker_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
         self.workers.iter().flat_map(|worker| worker.solutions())
     }
 
-    /// Returns the unconfirmed transactions.
-    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+    /// Returns the worker transactions.
+    pub fn worker_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
         self.workers.iter().flat_map(|worker| worker.transactions())
     }
 }
@@ -2545,9 +2545,17 @@ mod tests {
         );
 
         // Insert the certificate to storage.
-        primary.storage.insert_certificate(certificate, transmissions_without_aborted, aborted_transmissions).unwrap();
+        primary
+            .storage
+            .insert_certificate(certificate, transmissions_without_aborted, aborted_transmissions.clone())
+            .unwrap();
 
         // Ensure the certificate exists in storage.
         assert!(primary.storage.contains_certificate(certificate_id));
+        // Ensure that the aborted transmission IDs exist in storage.
+        for aborted_transmission_id in aborted_transmissions {
+            assert!(primary.storage.contains_transmission(aborted_transmission_id));
+            assert!(primary.storage.get_transmission(aborted_transmission_id).is_none());
+        }
     }
 }

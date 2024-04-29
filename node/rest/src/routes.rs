@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use snarkos_node_router::messages::UnconfirmedSolution;
+use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
 use snarkvm::{
     ledger::puzzle::Solution,
     prelude::{block::Transaction, Address, Identifier, Plaintext},
@@ -97,7 +97,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Path(height_or_hash): Path<String>,
     ) -> Result<ErasedJson, RestError> {
-        // Manually parse the height or the height or the hash, axum doesn't support different types
+        // Manually parse the height or the height of the hash, axum doesn't support different types
         // for the same path param.
         let block = if let Ok(height) = height_or_hash.parse::<u32>() {
             rest.ledger.get_block(height)?
@@ -150,7 +150,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_height(&hash)?))
     }
 
-    // GET /<NETWORK>/block/{height}/transactions
+    // GET /<network>/block/{height}/transactions
     pub(crate) async fn get_block_transactions(
         State(rest): State<Self>,
         Path(height): Path<u32>,
@@ -251,6 +251,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         ErasedJson::pretty(rest.ledger.latest_state_root())
     }
 
+    // GET /<network>/stateRoot/{height}
+    pub(crate) async fn get_state_root(
+        State(rest): State<Self>,
+        Path(height): Path<u32>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_state_root(height)?))
+    }
+
     // GET /<network>/committee/latest
     pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
@@ -292,6 +300,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.find_block_hash(&tx_id)?))
     }
 
+    // GET /<network>/find/blockHeight/{stateRoot}
+    pub(crate) async fn find_block_height_from_state_root(
+        State(rest): State<Self>,
+        Path(state_root): Path<N::StateRoot>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.find_block_height_from_state_root(state_root)?))
+    }
+
     // GET /<network>/find/transactionID/deployment/{programID}
     pub(crate) async fn find_transaction_id_from_program_id(
         State(rest): State<Self>,
@@ -321,6 +337,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
+        // Do not process the transaction if the node is too far behind.
+        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
+            return Err(RestError(format!("Unable to broadcast transaction '{}' (node is syncing)", fmt_id(tx.id()))));
+        }
+
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
@@ -345,10 +366,38 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
+        // Do not process the solution if the node is too far behind.
+        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
+            return Err(RestError(format!(
+                "Unable to broadcast solution '{}' (node is syncing)",
+                fmt_id(solution.id())
+            )));
+        }
+
         // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
-        if let Some(consensus) = rest.consensus {
+        // Otherwise, verify it prior to broadcasting.
+        match rest.consensus {
             // Add the unconfirmed solution to the memory pool.
-            consensus.add_unconfirmed_solution(solution).await?;
+            Some(consensus) => consensus.add_unconfirmed_solution(solution).await?,
+            // Verify the solution.
+            None => {
+                // Compute the current epoch hash.
+                let epoch_hash = rest.ledger.latest_epoch_hash()?;
+                // Retrieve the current proof target.
+                let proof_target = rest.ledger.latest_proof_target();
+                // Ensure that the solution is valid for the given epoch.
+                let puzzle = rest.ledger.puzzle().clone();
+                // Verify the solution in a blocking task.
+                match tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target))
+                    .await
+                {
+                    Ok(Ok(())) => {}
+                    Ok(Err(err)) => {
+                        return Err(RestError(format!("Invalid solution '{}' - {err}", fmt_id(solution.id()))));
+                    }
+                    Err(err) => return Err(RestError(format!("Invalid solution '{}' - {err}", fmt_id(solution.id())))),
+                }
+            }
         }
 
         let solution_id = solution.id();

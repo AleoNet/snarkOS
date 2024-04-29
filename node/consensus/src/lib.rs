@@ -55,8 +55,6 @@ use tokio::{
 };
 
 #[cfg(feature = "metrics")]
-use rayon::prelude::*;
-#[cfg(feature = "metrics")]
 use std::collections::HashMap;
 
 /// The capacity of the queue reserved for deployments.
@@ -200,22 +198,80 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Returns the unconfirmed transmission IDs.
     pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
-        self.bft.unconfirmed_transmission_ids()
+        self.worker_transmission_ids().chain(self.inbound_transmission_ids())
     }
 
     /// Returns the unconfirmed transmissions.
     pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        self.bft.unconfirmed_transmissions()
+        self.worker_transmissions().chain(self.inbound_transmissions())
     }
 
     /// Returns the unconfirmed solutions.
     pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
-        self.bft.unconfirmed_solutions()
+        self.worker_solutions().chain(self.inbound_solutions())
     }
 
     /// Returns the unconfirmed transactions.
     pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
-        self.bft.unconfirmed_transactions()
+        self.worker_transactions().chain(self.inbound_transactions())
+    }
+}
+
+impl<N: Network> Consensus<N> {
+    /// Returns the worker transmission IDs.
+    pub fn worker_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.bft.worker_transmission_ids()
+    }
+
+    /// Returns the worker transmissions.
+    pub fn worker_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.bft.worker_transmissions()
+    }
+
+    /// Returns the worker solutions.
+    pub fn worker_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
+        self.bft.worker_solutions()
+    }
+
+    /// Returns the worker transactions.
+    pub fn worker_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.bft.worker_transactions()
+    }
+}
+
+impl<N: Network> Consensus<N> {
+    /// Returns the transmission IDs in the inbound queue.
+    pub fn inbound_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.inbound_transmissions().map(|(id, _)| id)
+    }
+
+    /// Returns the transmissions in the inbound queue.
+    pub fn inbound_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.inbound_transactions()
+            .map(|(id, tx)| (TransmissionID::Transaction(id), Transmission::Transaction(tx)))
+            .chain(
+                self.inbound_solutions()
+                    .map(|(id, solution)| (TransmissionID::Solution(id), Transmission::Solution(solution))),
+            )
+    }
+
+    /// Returns the solutions in the inbound queue.
+    pub fn inbound_solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
+        // Return an iterator over the solutions in the inbound queue.
+        self.solutions_queue.lock().clone().into_iter().map(|(id, solution)| (id, Data::Object(solution)))
+    }
+
+    /// Returns the transactions in the inbound queue.
+    pub fn inbound_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        // Acquire the lock on the transactions queue.
+        let tx_queue = self.transactions_queue.lock();
+        // Return an iterator over the deployment and execution transactions in the inbound queue.
+        tx_queue
+            .deployments
+            .clone()
+            .into_iter()
+            .chain(tx_queue.executions.clone())
+            .map(|(id, tx)| (id, Data::Object(tx)))
     }
 }
 
@@ -437,7 +493,7 @@ impl<N: Network> Consensus<N> {
             let coinbase_target = next_block.header().coinbase_target();
             let cumulative_proof_target = next_block.header().cumulative_proof_target();
 
-            self.add_transmission_latency_metric(&next_block);
+            metrics::add_transmission_latency_metric(&self.transmissions_queue_timestamps, &next_block);
 
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
@@ -483,60 +539,6 @@ impl<N: Network> Consensus<N> {
         }
         // Await the callback.
         callback_receiver.await?
-    }
-
-    #[cfg(feature = "metrics")]
-    fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
-        const AGE_THRESHOLD_SECONDS: i32 = 30 * 60; // 30 minutes set as stale transmission threshold
-
-        // Retrieve the solution IDs.
-        let solution_ids: std::collections::HashSet<_> =
-            next_block.solutions().solution_ids().chain(next_block.aborted_solution_ids()).collect();
-
-        // Retrieve the transaction IDs.
-        let transaction_ids: std::collections::HashSet<_> =
-            next_block.transaction_ids().chain(next_block.aborted_transaction_ids()).collect();
-
-        let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
-        let ts_now = snarkos_node_bft::helpers::now();
-
-        // Determine which keys to remove.
-        let keys_to_remove = cfg_iter!(transmission_queue_timestamps)
-            .flat_map(|(key, timestamp)| {
-                let elapsed_time = std::time::Duration::from_secs((ts_now - *timestamp) as u64);
-
-                if elapsed_time.as_secs() > AGE_THRESHOLD_SECONDS as u64 {
-                    // This entry is stale-- remove it from transmission queue and record it as a stale transmission.
-                    metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
-                    Some(*key)
-                } else {
-                    let transmission_type = match key {
-                        TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
-                        TransmissionID::Transaction(transaction_id) if transaction_ids.contains(transaction_id) => {
-                            Some("transaction")
-                        }
-                        _ => None,
-                    };
-
-                    if let Some(transmission_type_string) = transmission_type {
-                        metrics::histogram_label(
-                            metrics::consensus::TRANSMISSION_LATENCY,
-                            "transmission_type",
-                            transmission_type_string.to_owned(),
-                            elapsed_time.as_secs_f64(),
-                        );
-                        Some(*key)
-                    } else {
-                        None
-                    }
-                }
-            })
-            .collect::<Vec<_>>();
-
-        // Remove keys of stale or seen transmissions.
-        for key in keys_to_remove {
-            transmission_queue_timestamps.remove(&key);
-        }
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.

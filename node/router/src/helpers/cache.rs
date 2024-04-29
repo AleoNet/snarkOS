@@ -40,6 +40,8 @@ pub struct Cache<N: Network> {
     seen_inbound_messages: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
     /// The map of peer IPs to their recent timestamps.
     seen_inbound_puzzle_requests: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
+    /// The map of peer IPs to their recent timestamps.
+    seen_inbound_block_requests: RwLock<HashMap<SocketAddr, VecDeque<OffsetDateTime>>>,
     /// The map of solution IDs to their last seen timestamp.
     seen_inbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
@@ -64,12 +66,16 @@ impl<N: Network> Default for Cache<N> {
 }
 
 impl<N: Network> Cache<N> {
+    const INBOUND_BLOCK_REQUEST_INTERVAL: i64 = 60;
+    const INBOUND_PUZZLE_REQUEST_INTERVAL: i64 = 60;
+
     /// Initializes a new instance of the cache.
     pub fn new() -> Self {
         Self {
             seen_inbound_connections: Default::default(),
             seen_inbound_messages: Default::default(),
             seen_inbound_puzzle_requests: Default::default(),
+            seen_inbound_block_requests: Default::default(),
             seen_inbound_solutions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
             seen_inbound_transactions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
             seen_outbound_block_requests: Default::default(),
@@ -94,7 +100,12 @@ impl<N: Network> Cache<N> {
 
     /// Inserts a new timestamp for the given peer IP, returning the number of recent requests.
     pub fn insert_inbound_puzzle_request(&self, peer_ip: SocketAddr) -> usize {
-        Self::retain_and_insert(&self.seen_inbound_puzzle_requests, peer_ip, 60)
+        Self::retain_and_insert(&self.seen_inbound_puzzle_requests, peer_ip, Self::INBOUND_PUZZLE_REQUEST_INTERVAL)
+    }
+
+    /// Inserts a new timestamp for the given peer IP, returning the number of recent block requests.
+    pub fn insert_inbound_block_request(&self, peer_ip: SocketAddr) -> usize {
+        Self::retain_and_insert(&self.seen_inbound_block_requests, peer_ip, Self::INBOUND_BLOCK_REQUEST_INTERVAL)
     }
 
     /// Inserts a solution ID into the cache, returning the previously seen timestamp if it existed.
@@ -113,6 +124,16 @@ impl<N: Network> Cache<N> {
 }
 
 impl<N: Network> Cache<N> {
+    /// Returns `true` if the cache contains the block request for the given peer.
+    pub fn contains_inbound_block_request(&self, peer_ip: &SocketAddr) -> bool {
+        Self::retain(&self.seen_inbound_block_requests, *peer_ip, Self::INBOUND_BLOCK_REQUEST_INTERVAL) > 0
+    }
+
+    /// Returns the number of recent block requests for the given peer.
+    pub fn num_outbound_block_requests(&self, peer_ip: &SocketAddr) -> usize {
+        self.seen_outbound_block_requests.read().get(peer_ip).map(|r| r.len()).unwrap_or(0)
+    }
+
     /// Returns `true` if the cache contains the block request for the given peer.
     pub fn contains_outbound_block_request(&self, peer_ip: &SocketAddr, request: &BlockRequest) -> bool {
         self.seen_outbound_block_requests.read().get(peer_ip).map(|r| r.contains(request)).unwrap_or(false)
@@ -200,6 +221,26 @@ impl<N: Network> Cache<N> {
         timestamps.len()
     }
 
+    /// Returns the number of recent entries.
+    fn retain<K: Eq + Hash + Clone>(
+        map: &RwLock<HashMap<K, VecDeque<OffsetDateTime>>>,
+        key: K,
+        interval_in_secs: i64,
+    ) -> usize {
+        // Fetch the current timestamp.
+        let now = OffsetDateTime::now_utc();
+
+        let mut map_write = map.write();
+        // Load the entry for the key.
+        let timestamps = map_write.entry(key).or_default();
+        // Retain only the timestamps that are within the recent interval.
+        while timestamps.front().map_or(false, |t| now - *t > Duration::seconds(interval_in_secs)) {
+            timestamps.pop_front();
+        }
+        // Return the frequency of recent requests.
+        timestamps.len()
+    }
+
     /// Increments the key's counter in the map, returning the updated counter.
     fn increment_counter<K: Hash + Eq>(map: &RwLock<HashMap<K, u32>>, key: K) -> u32 {
         let mut map_write = map.write();
@@ -257,6 +298,27 @@ mod tests {
     use std::net::Ipv4Addr;
 
     type CurrentNetwork = MainnetV0;
+
+    #[test]
+    fn test_inbound_block_request() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let peer_ip = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1234);
+
+        // Check that the cache is empty.
+        assert_eq!(cache.seen_inbound_block_requests.read().len(), 0);
+
+        // Insert a block request..
+        assert_eq!(cache.insert_inbound_block_request(peer_ip), 1);
+
+        // Check that the cache contains the block request.
+        assert!(cache.contains_inbound_block_request(&peer_ip));
+
+        // Insert another block request for the same peer.
+        assert_eq!(cache.insert_inbound_block_request(peer_ip), 2);
+
+        // Check that the cache contains the block requests.
+        assert!(cache.contains_inbound_block_request(&peer_ip));
+    }
 
     #[test]
     fn test_inbound_solution() {

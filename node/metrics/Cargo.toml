@@ -17,14 +17,26 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
+default = [ "rayon", "snarkvm/metrics"]
 metrics = [ "snarkvm/metrics" ]
+serial = ["snarkvm/metrics"]
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.13"
 
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.rayon]
+version = "1"
+optional = true
+
 [dependencies.snarkvm]
 workspace = true
 features = [ "metrics" ]
+
+[dependencies.time]
+version = "0.3"
 
 [dependencies.tokio]
 version = "1.28"

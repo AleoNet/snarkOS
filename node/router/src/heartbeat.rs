@@ -123,6 +123,8 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             .get_connected_peers()
             .iter()
             .filter(|peer| !trusted.contains(&peer.ip()) && !bootstrap.contains(&peer.ip()))
+            .filter(|peer| !self.router().cache.contains_inbound_block_request(&peer.ip())) // Skip if the peer is syncing.
+            .filter(|peer| self.is_block_synced() || self.router().cache.num_outbound_block_requests(&peer.ip()) == 0) // Skip if you are syncing from this peer.
             .min_by_key(|peer| peer.last_seen())
             .map(|peer| peer.ip());
 

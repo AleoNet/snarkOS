@@ -166,6 +166,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
             // GET ../find/..
             .route(&format!("/{network}/find/blockHash/:tx_id"), get(Self::find_block_hash))
+            .route(&format!("/{network}/find/blockHeight/:state_root"), get(Self::find_block_height_from_state_root))
             .route(&format!("/{network}/find/transactionID/deployment/:program_id"), get(Self::find_transaction_id_from_program_id))
             .route(&format!("/{network}/find/transactionID/:transition_id"), get(Self::find_transaction_id_from_transition_id))
             .route(&format!("/{network}/find/transitionID/:input_or_output_id"), get(Self::find_transition_id))
@@ -188,6 +189,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route(&format!("/{network}/memoryPool/transactions"), get(Self::get_memory_pool_transactions))
             .route(&format!("/{network}/statePath/:commitment"), get(Self::get_state_path_for_commitment))
             .route(&format!("/{network}/stateRoot/latest"), get(Self::get_state_root_latest))
+            .route(&format!("/{network}/stateRoot/:height"), get(Self::get_state_root))
             .route(&format!("/{network}/committee/latest"), get(Self::get_committee_latest))
             .route(&format!("/{network}/delegators/:validator"), get(Self::get_delegators_for_validator))
 
@@ -224,4 +226,14 @@ async fn log_middleware(
     info!("Received '{} {}' from '{addr}'", request.method(), request.uri());
 
     Ok(next.run(request).await)
+}
+
+/// Formats an ID into a truncated identifier (for logging purposes).
+pub fn fmt_id(id: impl ToString) -> String {
+    let id = id.to_string();
+    let mut formatted_id = id.chars().take(16).collect::<String>();
+    if id.chars().count() > 16 {
+        formatted_id.push_str("..");
+    }
+    formatted_id
 }
