@@ -93,8 +93,9 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     /// Returns the number of pending callbacks for the specified `item`.
     pub fn num_callbacks(&self, item: impl Into<T>) -> usize {
         let item = item.into();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
         // Clear the callbacks that have expired.
-        self.clear_expired_callbacks_for_item(item);
+        self.clear_expired_callbacks_for_item(now, item);
         // Return the number of live callbacks.
         self.pending.read().get(&item).map_or(0, |peers| peers.values().flatten().count())
     }
@@ -102,8 +103,9 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     /// Returns the number of pending sent requests for the specified `item`.
     pub fn num_sent_requests(&self, item: impl Into<T>) -> usize {
         let item = item.into();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
         // Clear the callbacks that have expired.
-        self.clear_expired_callbacks_for_item(item);
+        self.clear_expired_callbacks_for_item(now, item);
         // Return the number of live callbacks.
         self.pending
             .read()
@@ -123,6 +125,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         callback: Option<(oneshot::Sender<V>, bool)>,
     ) -> bool {
         let item = item.into();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
         // Insert the peer IP and optional callback into the pending queue.
         let result = {
             // Acquire the pending lock.
@@ -139,14 +142,14 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
 
             // If a callback is provided, insert it into the callback queue.
             if let Some((callback, request_sent)) = callback {
-                peer_entry.push((callback, OffsetDateTime::now_utc().unix_timestamp(), request_sent));
+                peer_entry.push((callback, now, request_sent));
             }
 
             is_new_peer
         };
 
         // Clear the callbacks that have expired.
-        self.clear_expired_callbacks_for_item(item);
+        self.clear_expired_callbacks_for_item(now, item);
 
         // Return the result.
         result
@@ -177,9 +180,8 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     }
 
     /// Removes the callbacks for the specified `item` that have expired.
-    pub fn clear_expired_callbacks_for_item(&self, item: impl Into<T>) {
+    pub fn clear_expired_callbacks_for_item(&self, now: i64, item: impl Into<T>) {
         let item = item.into();
-        let now = OffsetDateTime::now_utc().unix_timestamp();
 
         // Acquire the pending lock.
         let mut pending = self.pending.write();
@@ -204,8 +206,9 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     /// Removes the callbacks for all items have that expired.
     pub fn clear_expired_callbacks(&self) {
         let items = self.pending.read().keys().copied().collect::<Vec<T>>();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
         for item in items.into_iter() {
-            self.clear_expired_callbacks_for_item(item);
+            self.clear_expired_callbacks_for_item(now, item);
         }
     }
 }
