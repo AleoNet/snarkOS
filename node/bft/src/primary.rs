@@ -311,6 +311,21 @@ impl<N: Network> Primary<N> {
         // If there is a batch being proposed already,
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
+            // Ensure that the storage is caught up to the proposal before proceeding to rebroadcast this.
+            if self.current_round() < proposal.round()
+                || proposal
+                    .batch_header()
+                    .previous_certificate_ids()
+                    .iter()
+                    .any(|id| !self.storage.contains_certificate(*id))
+            {
+                // TODO (raychu86): Explicitly request the missing certificates from peers.
+                debug!(
+                    "Cannot propose a batch for round {} - the current storage is not caught up to the proposed batch.",
+                    proposal.round()
+                );
+                return Ok(());
+            }
             // Construct the event.
             // TODO(ljedrz): the BatchHeader should be serialized only once in advance before being sent to non-signers.
             let event = Event::BatchPropose(proposal.batch_header().clone().into());
