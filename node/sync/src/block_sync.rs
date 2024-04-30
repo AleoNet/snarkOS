@@ -381,14 +381,32 @@ impl<N: Network> BlockSync<N> {
 
         // Compute the common ancestor with this node.
         let mut ancestor = 0;
-        for (height, hash) in locators.clone().into_iter().rev() {
-            if let Ok(canon_hash) = self.canon.get_block_hash(height) {
-                if canon_hash == hash {
-                    ancestor = height;
-                    break;
+
+        // The unwrap is safe, as `ensure_is_valid` guarantees that `recents` is not empty.
+        let (latest_locator_height, latest_locator_hash) = locators.recents.last().unwrap();
+
+        // Check if the latest locator matches the canon to quickly determine if it's a fork.
+        // This is an optimization that allows us to skip the traversal of all the locators in
+        // case it's a match.
+        if let Ok(canon_hash) = self.canon.get_block_hash(*latest_locator_height) {
+            if *latest_locator_hash == canon_hash {
+                ancestor = *latest_locator_height;
+            }
+        }
+
+        // If the ancestor is still 0, this implies a fork; find its height. This logic
+        // shouldn't be removed, as we want to know the details of any forks we encounter.
+        if *latest_locator_height != 0 && ancestor == 0 {
+            for (height, hash) in locators.clone().into_iter() {
+                if let Ok(canon_hash) = self.canon.get_block_hash(height) {
+                    match canon_hash == hash {
+                        true => ancestor = height,
+                        false => break, // fork
+                    }
                 }
             }
         }
+
         // Update the common ancestor entry for this node.
         self.common_ancestors.write().insert(PeerPair(DUMMY_SELF_IP, peer_ip), ancestor);
 
