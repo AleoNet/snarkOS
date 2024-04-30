@@ -30,6 +30,9 @@ pub use pending::*;
 pub mod proposal;
 pub use proposal::*;
 
+pub mod proposal_cache;
+pub use proposal_cache::*;
+
 pub mod ready;
 pub use ready::*;
 

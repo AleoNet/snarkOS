@@ -18,10 +18,10 @@ use snarkvm::{
         network::Network,
         types::Field,
     },
-    prelude::{FromBytes, ToBytes},
+    prelude::{error, FromBytes, IoResult, Read, ToBytes, Write},
 };
 
-use std::{collections::HashMap, io, ops::Deref};
+use std::{collections::HashMap, ops::Deref};
 
 /// A helper type for the signed proposals.
 #[derive(Clone, PartialEq, Eq)]
@@ -35,9 +35,9 @@ impl<N: Network> SignedProposals<N> {
 }
 
 impl<N: Network> ToBytes for SignedProposals<N> {
-    fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         // Write the number of signed proposals.
-        u32::try_from(self.0.len()).map_err(|_| io::ErrorKind::Other)?.write_le(&mut writer)?;
+        u32::try_from(self.0.len()).map_err(error)?.write_le(&mut writer)?;
         // Serialize the signed proposals.
         for (address, (round, timestamp, batch_id, signature)) in &self.0 {
             // Write the address.
@@ -57,7 +57,7 @@ impl<N: Network> ToBytes for SignedProposals<N> {
 }
 
 impl<N: Network> FromBytes for SignedProposals<N> {
-    fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         // Read the number of signed proposals.
         let num_signed_proposals = u32::read_le(&mut reader)?;
         // Deserialize the signed proposals.
