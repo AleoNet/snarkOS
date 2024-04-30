@@ -18,10 +18,7 @@ use snarkos_node::{Client, Prover, Validator};
 use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, MainnetV0 as CurrentNetwork};
 
 use aleo_std::StorageMode;
-use std::{
-    str::FromStr,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::str::FromStr;
 
 pub async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
     Client::new(
@@ -33,7 +30,7 @@ pub async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
         sample_genesis_block(),
         None, // No CDN.
         StorageMode::Production,
-        Arc::new(AtomicBool::new(false)),
+        Default::default(),
     )
     .await
     .expect("couldn't create client instance")
@@ -46,7 +43,7 @@ pub async fn prover() -> Prover<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
         &[],
         sample_genesis_block(),
         StorageMode::Production,
-        Arc::new(AtomicBool::new(false)),
+        Default::default(),
     )
     .await
     .expect("couldn't create prover instance")
@@ -66,7 +63,7 @@ pub async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNet
         StorageMode::Production,
         true,  // This test requires validators to connect to peers.
         false, // No dev traffic in production mode.
-        Arc::new(AtomicBool::new(false)),
+        Default::default(),
     )
     .await
     .expect("couldn't create validator instance")

@@ -488,7 +488,7 @@ mod tests {
             storage_mode,
             false,
             dev_txs,
-            Arc::new(AtomicBool::new(false)),
+            Default::default(),
         )
         .await
         .unwrap();

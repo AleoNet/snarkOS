@@ -27,9 +27,11 @@ use tracing_subscriber::{
     registry::LookupSpan,
 };
 
+/// A formatter that can switch between the default formatter and the DIM style.
 pub struct DynamicFormatter {
     dim_format: DimFormat,
     default_format: tracing_subscriber::fmt::format::Format,
+    // This is the shutdown flag. When set to true, switch to the DIM format.
     dim: Arc<AtomicBool>,
 }
 
@@ -59,6 +61,9 @@ struct DimFormat {
     fmt: OwnedFormatItem,
 }
 
+/// A custom format for the DIM style.
+/// This formatter is quite basic and does not support all the features of the default formatter.
+/// It does support all the default fields of the default formatter.
 impl DimFormat {
     fn new() -> Self {
         let format =
@@ -73,8 +78,9 @@ where
     S: Subscriber + for<'a> LookupSpan<'a>,
     N: for<'a> FormatFields<'a> + 'static,
 {
+    /// Format like the `Full` format, but using the DIM tty style.
     fn format_event(&self, ctx: &FmtContext<'_, S, N>, mut writer: Writer<'_>, event: &Event<'_>) -> std::fmt::Result {
-        // set the DIM style
+        // set the DIM style if we are in TTY mode
         if writer.has_ansi_escapes() {
             write!(writer, "\x1b[2m")?;
         }
