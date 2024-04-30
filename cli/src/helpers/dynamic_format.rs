@@ -17,20 +17,23 @@ use std::sync::{
     Arc,
 };
 
-use time::format_description::{self, BorrowedFormatItem};
+use time::{
+    format_description::{self, OwnedFormatItem},
+    OffsetDateTime,
+};
 use tracing::{Event, Subscriber};
 use tracing_subscriber::{
     fmt::{format::Writer, FmtContext, FormatEvent, FormatFields},
     registry::LookupSpan,
 };
 
-pub struct DynamicFormatter<'b> {
-    dim_format: DimFormat<'b>,
+pub struct DynamicFormatter {
+    dim_format: DimFormat,
     default_format: tracing_subscriber::fmt::format::Format,
     dim: Arc<AtomicBool>,
 }
 
-impl<'b, S, N> FormatEvent<S, N> for DynamicFormatter<'b>
+impl<S, N> FormatEvent<S, N> for DynamicFormatter
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
     N: for<'a> FormatFields<'a> + 'static,
@@ -44,7 +47,7 @@ where
     }
 }
 
-impl<'b> DynamicFormatter<'b> {
+impl DynamicFormatter {
     pub fn new(dim: Arc<AtomicBool>) -> Self {
         let dim_format = DimFormat::new();
         let default_format = tracing_subscriber::fmt::format::Format::default();
@@ -52,19 +55,20 @@ impl<'b> DynamicFormatter<'b> {
     }
 }
 
-struct DimFormat<'b> {
-    fmt: Vec<BorrowedFormatItem<'b>>,
+struct DimFormat {
+    fmt: OwnedFormatItem,
 }
 
-impl<'b> DimFormat<'b> {
+impl DimFormat {
     fn new() -> Self {
-        let format = format_description::parse("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:6]Z")
-            .expect("failed to set timestampt format");
+        let format =
+            format_description::parse_owned::<2>("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:6]Z")
+                .expect("failed to set timestampt format");
         Self { fmt: format }
     }
 }
 
-impl<'b, S, N> FormatEvent<S, N> for DimFormat<'b>
+impl<S, N> FormatEvent<S, N> for DimFormat
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
     N: for<'a> FormatFields<'a> + 'static,
@@ -75,7 +79,7 @@ where
             write!(writer, "\x1b[2m")?;
         }
 
-        let date_time = time::OffsetDateTime::now_utc();
+        let date_time = OffsetDateTime::now_utc();
         write!(writer, "{}  ", date_time.format(&self.fmt).map_err(|_| std::fmt::Error)?)?;
 
         let meta = event.metadata();
