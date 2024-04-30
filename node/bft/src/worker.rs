@@ -487,6 +487,7 @@ impl<N: Network> Worker<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::helpers::CALLBACK_EXPIRATION_IN_SECS;
     use snarkos_node_bft_ledger_service::LedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
@@ -865,7 +866,7 @@ mod tests {
         assert_eq!(worker.pending.num_callbacks(transmission_id), num_flood_requests);
 
         // Let all the requests expire.
-        tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS + 1000)).await;
+        tokio::time::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64 + 1)).await;
         assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
         assert_eq!(worker.pending.num_callbacks(transmission_id), 0);
 
