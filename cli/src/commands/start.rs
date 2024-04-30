@@ -835,32 +835,26 @@ mod tests {
         assert!(config.parse_cdn().is_none());
     }
 
-    #[test]
-    fn test_rest_ip_behavior() {
-        // Test default REST IP when not specified in dev mode
-        let config = Start::try_parse_from(["snarkos", "--dev", "1"].iter()).unwrap();
-        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3030").unwrap()));
 
-        // Test specified REST IP when passed in dev mode
-        let config = Start::try_parse_from(["snarkos", "--dev", "1", "--rest", "127.0.0.1:8080"].iter()).unwrap();
-        assert_eq!(config.rest, Some(SocketAddr::from_str("127.0.0.1:8080").unwrap()));
+    #[tokio::test]
+    async fn test_rest_ip_behavior_in_production() {
 
         // Test default REST IP when REST flag is not passed in prod mode
-        let config = Start::try_parse_from(["snarkos"].iter()).unwrap();
+        let mut config = Start::try_parse_from(["snarkos", "--private-key", "aleo1xx"].iter()).unwrap();
+        let _ = config.parse_node::<CurrentNetwork>().await.expect("Failed to parse the node with default settings");
         assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3030").unwrap()));
 
         // Test specified REST IP when passed in prod mode
-        let config = Start::try_parse_from(["snarkos", "--rest", "192.168.1.1:8080"].iter()).unwrap();
+        let mut config = Start::try_parse_from(["snarkos", "--rest", "192.168.1.1:8080", "--private-key", "aleo1xx"].iter()).unwrap();
+        let _ = config.parse_node::<CurrentNetwork>().await.expect("Failed to parse the node with specified REST IP");
         assert_eq!(config.rest, Some(SocketAddr::from_str("192.168.1.1:8080").unwrap()));
 
-        // Test default REST IP when no rest flag is passed in dev mode
-        let config = Start::try_parse_from(["snarkos", "--dev", "1", "--norest"].iter()).unwrap();
-        assert!(config.rest.is_none());
-
-        // Test default REST IP when no rest flag is passed in prod mode
-        let config = Start::try_parse_from(["snarkos", "--norest"].iter()).unwrap();
+        // Test behavior when REST flag is not passed and REST is disabled in prod mode
+        let mut config = Start::try_parse_from(["snarkos", "--norest", "--private-key", "aleo1xx"].iter()).unwrap();
+        let _ = config.parse_node::<CurrentNetwork>().await.expect("Failed to parse the node with REST disabled");
         assert!(config.rest.is_none());
     }
+
 
     #[test]
     fn test_parse_development_and_genesis() {
@@ -876,6 +870,24 @@ mod tests {
         assert_eq!(candidate_genesis, prod_genesis);
 
         let _config = Start::try_parse_from(["snarkos", "--dev", ""].iter()).unwrap_err();
+
+        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
+        let mut config = Start::try_parse_from(["snarkos", "--dev", "1"].iter()).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3031").unwrap()));
+
+        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
+        let mut config = Start::try_parse_from(["snarkos", "--dev", "1", "--rest", "127.0.0.1:8080"].iter()).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("127.0.0.1:8080").unwrap()));
+
+        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
+        let mut config = Start::try_parse_from(["snarkos", "--dev", "1", "--norest"].iter()).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        assert!(config.rest.is_none());
 
         let mut trusted_peers = vec![];
         let mut trusted_validators = vec![];
