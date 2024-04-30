@@ -97,7 +97,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         // Clear the callbacks that have expired.
         self.clear_expired_callbacks_for_item(now, item);
         // Return the number of live callbacks.
-        self.pending.read().get(&item).map_or(0, |peers| peers.values().flatten().count())
+        self.pending.read().get(&item).map_or(0, |peers| peers.values().fold(0, |acc, v| acc.saturating_add(v.len())))
     }
 
     /// Returns the number of pending sent requests for the specified `item`.
@@ -414,7 +414,7 @@ mod tests {
         // Ensure that the items have been expired.
         assert_eq!(pending.num_callbacks(solution_id_1), 0);
         assert_eq!(pending.num_callbacks(solution_id_2), 0);
-        assert_eq!(pending.len(), 0);
+        assert!(pending.is_empty());
     }
 }
 

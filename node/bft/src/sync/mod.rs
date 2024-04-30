@@ -14,6 +14,7 @@
 
 use crate::{
     helpers::{fmt_id, max_redundant_requests, BFTSender, Pending, Storage, SyncReceiver},
+    spawn_blocking,
     Gateway,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -126,7 +127,11 @@ impl<N: Network> Sync<N> {
                 tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
 
                 // Remove the expired pending transmission requests.
-                self_.pending.clear_expired_callbacks();
+                let self__ = self_.clone();
+                let _ = spawn_blocking!({
+                    self__.pending.clear_expired_callbacks();
+                    Ok(())
+                });
             }
         });
 
