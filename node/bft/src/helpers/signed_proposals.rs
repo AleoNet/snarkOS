@@ -23,14 +23,15 @@ use snarkvm::{
 
 use std::{collections::HashMap, ops::Deref};
 
-/// A helper type for the signed proposals.
+/// The recently-signed batch proposals.
+/// A map of `address` to (`round`, `batch ID`, `signature`).
 #[derive(Clone, PartialEq, Eq)]
-pub struct SignedProposals<N: Network>(pub HashMap<Address<N>, (u64, i64, Field<N>, Signature<N>)>);
+pub struct SignedProposals<N: Network>(pub HashMap<Address<N>, (u64, Field<N>, Signature<N>)>);
 
 impl<N: Network> SignedProposals<N> {
     /// Ensure that every signed proposal is associated with the `expected_signer`.
     pub fn is_valid(&self, expected_signer: Address<N>) -> bool {
-        self.0.iter().all(|(_, (_, _, _, signature))| signature.to_address() == expected_signer)
+        self.0.iter().all(|(_, (_, _, signature))| signature.to_address() == expected_signer)
     }
 }
 
@@ -39,13 +40,11 @@ impl<N: Network> ToBytes for SignedProposals<N> {
         // Write the number of signed proposals.
         u32::try_from(self.0.len()).map_err(error)?.write_le(&mut writer)?;
         // Serialize the signed proposals.
-        for (address, (round, timestamp, batch_id, signature)) in &self.0 {
+        for (address, (round, batch_id, signature)) in &self.0 {
             // Write the address.
             address.write_le(&mut writer)?;
             // Write the round.
             round.write_le(&mut writer)?;
-            // Write the timestamp.
-            timestamp.write_le(&mut writer)?;
             // Write the batch id.
             batch_id.write_le(&mut writer)?;
             // Write the signature.
@@ -67,14 +66,12 @@ impl<N: Network> FromBytes for SignedProposals<N> {
             let address = FromBytes::read_le(&mut reader)?;
             // Read the round.
             let round = FromBytes::read_le(&mut reader)?;
-            // Read the timestamp.
-            let timestamp = FromBytes::read_le(&mut reader)?;
             // Read the batch id.
             let batch_id = FromBytes::read_le(&mut reader)?;
             // Read the signature.
             let signature = FromBytes::read_le(&mut reader)?;
             // Insert the signed proposal.
-            signed_proposals.insert(address, (round, timestamp, batch_id, signature));
+            signed_proposals.insert(address, (round, batch_id, signature));
         }
 
         Ok(Self(signed_proposals))
@@ -82,7 +79,7 @@ impl<N: Network> FromBytes for SignedProposals<N> {
 }
 
 impl<N: Network> Deref for SignedProposals<N> {
-    type Target = HashMap<Address<N>, (u64, i64, Field<N>, Signature<N>)>;
+    type Target = HashMap<Address<N>, (u64, Field<N>, Signature<N>)>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
