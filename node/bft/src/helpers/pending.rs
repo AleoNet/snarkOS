@@ -205,11 +205,23 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
 
     /// Removes the callbacks for all items have that expired.
     pub fn clear_expired_callbacks(&self) {
-        let items = self.pending.read().keys().copied().collect::<Vec<T>>();
         let now = OffsetDateTime::now_utc().unix_timestamp();
-        for item in items.into_iter() {
-            self.clear_expired_callbacks_for_item(now, item);
-        }
+        // Acquire the pending lock once for write access.
+        let mut pending = self.pending.write();
+
+        // Iterate over all items in pending to modify the data structure in-place.
+        pending.retain(|_, peer_map| {
+            // Iterate over each peer IP for the item and filter out expired callbacks.
+            for (_, callbacks) in peer_map.iter_mut() {
+                callbacks.retain(|(_, timestamp, _)| now - *timestamp <= CALLBACK_EXPIRATION_IN_SECS);
+            }
+
+            // Remove peer IPs that no longer have any callbacks.
+            peer_map.retain(|_, callbacks| !callbacks.is_empty());
+
+            // Keep the item in the pending map only if there are callbacks left.
+            !peer_map.is_empty()
+        });
     }
 }
 
