@@ -56,6 +56,30 @@ impl<N: Network> FromBytes for UnconfirmedTransaction<N> {
     }
 }
 
+impl<N: Network> UnconfirmedTransaction<N> {
+    /// Checks the message byte length. To be used before deserialization.
+    pub fn check_size(bytes: &[u8]) -> io::Result<()> {
+        // Store the length to be checked against the max message size for each variant.
+        let len = bytes.len();
+        if len < 2 {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid message"));
+        }
+
+        // Check the first two bytes for the message ID.
+        let id_bytes: [u8; 2] = (&bytes[..2])
+            .try_into()
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "id couldn't be deserialized"))?;
+        let id = u16::from_le_bytes(id_bytes);
+
+        // SPECIAL CASE: check the transaction message isn't too large.
+        if id == 12 && len > N::MAX_TRANSACTION_SIZE {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "transaction is too large"))?;
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{Transaction, UnconfirmedTransaction};

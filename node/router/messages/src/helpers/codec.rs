@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Message;
+use crate::{Message, UnconfirmedTransaction};
 use snarkvm::prelude::{FromBytes, Network, ToBytes};
 
 use ::bytes::{Buf, BufMut, BytesMut};
@@ -75,7 +75,7 @@ impl<N: Network> Decoder for MessageCodec<N> {
             None => return Ok(None),
         };
 
-        Self::Item::check_size(&bytes)?;
+        UnconfirmedTransaction::<N>::check_size(&bytes)?;
 
         // Convert the bytes to a message, or fail if it is not valid.
         let reader = bytes.reader();
