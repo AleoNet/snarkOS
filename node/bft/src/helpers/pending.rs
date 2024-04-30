@@ -164,7 +164,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         match self.pending.write().remove(&item) {
             Some(callbacks) => {
                 // Get the peer IPs.
-                let peer_ips = callbacks.keys().cloned().collect();
+                let peer_ips = callbacks.keys().copied().collect();
                 // Process the callbacks.
                 if let Some(callback_value) = callback_value {
                     // Send a notification to the callback.
