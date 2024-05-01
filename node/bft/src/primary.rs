@@ -1102,6 +1102,46 @@ impl<N: Network> Primary<N> {
             }
         });
 
+        // Periodically try to increment to the next round.
+        // Note: This is necessary to ensure that the primary is not stuck on a previous round
+        // despite having received enough certificates to advance to the next round.
+        let self_ = self.clone();
+        self.spawn(async move {
+            loop {
+                // Sleep briefly.
+                tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
+                // If the primary is not synced, then do not increment to the next round.
+                if !self_.sync.is_synced() {
+                    trace!("Skipping round increment {}", "(node is syncing)".dimmed());
+                    continue;
+                }
+                // Attempt to increment to the next round.
+                let next_round = self_.current_round().saturating_add(1);
+                // Determine if the quorum threshold is reached for the current round.
+                let is_quorum_threshold_reached = {
+                    // Retrieve the certificates for the next round.
+                    let certificates = self_.storage.get_certificates_for_round(next_round);
+                    // If there are no certificates, then skip this check.
+                    if certificates.is_empty() {
+                        continue;
+                    }
+                    let authors = certificates.iter().map(BatchCertificate::author).collect();
+                    let Ok(committee_lookback) = self_.ledger.get_committee_lookback_for_round(next_round) else {
+                        warn!("Failed to retrieve the committee lookback for round {next_round}");
+                        continue;
+                    };
+                    committee_lookback.is_quorum_threshold_reached(&authors)
+                };
+                // Attempt to increment to the next round if the quorum threshold is reached.
+                if is_quorum_threshold_reached {
+                    debug!("Quorum threshold reached for round {}", next_round);
+                    if let Err(e) = self_.try_increment_to_the_next_round(next_round).await {
+                        warn!("Failed to increment to the next round - {e}");
+                    }
+                }
+            }
+        });
+
         // Process the unconfirmed solutions.
         let self_ = self.clone();
         self.spawn(async move {
