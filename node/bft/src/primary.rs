@@ -308,11 +308,16 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
+        // Retrieve the current round.
+        let round = self.current_round();
+        // Compute the previous round.
+        let previous_round = round.saturating_sub(1);
+
         // If there is a batch being proposed already,
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
             // Ensure that the storage is caught up to the proposal before proceeding to rebroadcast this.
-            if self.current_round() < proposal.round()
+            if round < proposal.round()
                 || proposal
                     .batch_header()
                     .previous_certificate_ids()
@@ -321,9 +326,8 @@ impl<N: Network> Primary<N> {
             {
                 // TODO (raychu86): Explicitly request the missing certificates from peers.
                 debug!(
-                    "Cannot propose a batch for round {} - the current storage {} is not caught up to the proposed batch.",
+                    "Cannot propose a batch for round {} - the current storage (round {round}) is not caught up to the proposed batch.",
                     proposal.round(),
-                    self.current_round(),
                 );
                 return Ok(());
             }
@@ -351,11 +355,6 @@ impl<N: Network> Primary<N> {
             debug!("Proposed batch for round {} is still valid", proposal.round());
             return Ok(());
         }
-
-        // Retrieve the current round.
-        let round = self.current_round();
-        // Compute the previous round.
-        let previous_round = round.saturating_sub(1);
 
         #[cfg(feature = "metrics")]
         metrics::gauge(metrics::bft::PROPOSAL_ROUND, round as f64);
