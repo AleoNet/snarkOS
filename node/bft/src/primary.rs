@@ -321,8 +321,9 @@ impl<N: Network> Primary<N> {
             {
                 // TODO (raychu86): Explicitly request the missing certificates from peers.
                 debug!(
-                    "Cannot propose a batch for round {} - the current storage is not caught up to the proposed batch.",
-                    proposal.round()
+                    "Cannot propose a batch for round {} - the current storage {} is not caught up to the proposed batch.",
+                    proposal.round(),
+                    self.current_round(),
                 );
                 return Ok(());
             }
@@ -611,16 +612,12 @@ impl<N: Network> Primary<N> {
         {
             // If the signed round is ahead of the peer's batch round, then the validator is malicious.
             if signed_round > batch_header.round() {
-                // Proceed to disconnect the validator.
-                self.gateway.disconnect(peer_ip);
-                bail!("Malicious peer - proposed a batch for a previous round ({})", batch_header.round());
+                bail!("Peer ({batch_author}) proposed a batch for a previous round ({})", batch_header.round());
             }
 
             // If the round matches and the batch ID differs, then the validator is malicious.
             if signed_round == batch_header.round() && signed_batch_id != batch_header.batch_id() {
-                // Proceed to disconnect the validator.
-                self.gateway.disconnect(peer_ip);
-                bail!("Malicious peer - proposed another batch for the same round ({signed_round})");
+                bail!("Peer ({batch_author}) proposed another batch for the same round ({signed_round})");
             }
             // If the round and batch ID matches, then skip signing the batch a second time.
             // Instead, rebroadcast the cached signature to the peer.

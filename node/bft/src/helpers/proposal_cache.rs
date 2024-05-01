@@ -63,17 +63,16 @@ impl<N: Network> ProposalCache<N> {
     /// Load the proposal cache from the file system and ensure that the proposal cache is valid.
     pub fn load(expected_signer: Address<N>, dev: Option<u16>) -> Result<Self> {
         // Load the proposal cache from the file system.
-        let proposal_path = proposal_cache_path(N::ID, dev);
+        let path = proposal_cache_path(N::ID, dev);
+        info!("Loading the proposal cache from {}...", path.display(),);
 
         // Deserialize the proposal cache from the file system.
-        let proposal_cache = match fs::read(&proposal_path) {
+        let proposal_cache = match fs::read(&path) {
             Ok(bytes) => match Self::from_bytes_le(&bytes) {
                 Ok(proposal_cache) => proposal_cache,
-                Err(_) => bail!("Couldn't deserialize the proposal stored at {}", proposal_path.display()),
+                Err(_) => bail!("Couldn't deserialize the proposal stored at {}", path.display()),
             },
-            Err(_) => {
-                bail!("Couldn't read the proposal stored at {}", proposal_path.display());
-            }
+            Err(_) => bail!("Couldn't read the proposal stored at {}", path.display()),
         };
 
         // Ensure the proposal cache is valid.
