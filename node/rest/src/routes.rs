@@ -16,14 +16,13 @@ use super::*;
 use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
 use snarkvm::{
     ledger::puzzle::Solution,
-    prelude::{block::Transaction, Identifier, Plaintext, ToBytes},
+    prelude::{block::Transaction, Identifier, LimitedWriter, Plaintext, ToBytes},
 };
 
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use snarkvm::prelude::LimitedWriter;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
