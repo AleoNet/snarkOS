@@ -216,29 +216,26 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         match (transmission_id, transmission) {
             (TransmissionID::Ratification, Transmission::Ratification) => {}
             (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction_data)) => {
-                match transaction_data.clone().deserialize_blocking() {
-                    Ok(transaction) => {
-                        // Ensure the transaction ID matches the expected transaction ID.
-                        if transaction.id() != expected_transaction_id {
-                            bail!(
-                                "Received mismatching transaction ID  - expected {}, found {}",
-                                fmt_id(expected_transaction_id),
-                                fmt_id(transaction.id()),
-                            );
-                        }
-
-                        // Ensure the transaction is not a fee transaction.
-                        if transaction.is_fee() {
-                            bail!("Received a fee transaction in a transmission");
-                        }
-
-                        // Update the transmission with the deserialized transaction.
-                        *transaction_data = Data::Object(transaction);
-                    }
-                    Err(err) => {
-                        bail!("Failed to deserialize transaction: {err}");
-                    }
+                // Deserialize the transaction. If the transaction exceeds the maximum size, then return an error.
+                let transaction = match transaction_data.clone() {
+                    Data::Object(transaction) => transaction,
+                    Data::Buffer(bytes) => Transaction::<N>::read_le(&mut bytes.take(N::MAX_TRANSACTION_SIZE as u64))?,
+                };
+                // Ensure the transaction ID matches the expected transaction ID.
+                if transaction.id() != expected_transaction_id {
+                    bail!(
+                        "Received mismatching transaction ID  - expected {}, found {}",
+                        fmt_id(expected_transaction_id),
+                        fmt_id(transaction.id()),
+                    );
                 }
+                // Ensure the transaction is not a fee transaction.
+                if transaction.is_fee() {
+                    bail!("Received a fee transaction in a transmission");
+                }
+
+                // Update the transmission with the deserialized transaction.
+                *transaction_data = Data::Object(transaction);
             }
             (TransmissionID::Solution(expected_solution_id), Transmission::Solution(solution_data)) => {
                 match solution_data.clone().deserialize_blocking() {
