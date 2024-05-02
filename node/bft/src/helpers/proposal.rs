@@ -28,6 +28,7 @@ use snarkvm::{
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashSet;
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Proposal<N: Network> {
     /// The proposed batch header.
     batch_header: BatchHeader<N>,
@@ -200,6 +201,40 @@ impl<N: Network> FromBytes for Proposal<N> {
         }
 
         Ok(Self { batch_header, transmissions, signatures })
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::helpers::storage::tests::sample_transmissions;
+    use snarkvm::{console::network::MainnetV0, utilities::TestRng};
+
+    type CurrentNetwork = MainnetV0;
+
+    const ITERATIONS: usize = 100;
+
+    pub(crate) fn sample_proposal(rng: &mut TestRng) -> Proposal<CurrentNetwork> {
+        let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
+        let (_, transmissions) = sample_transmissions(&certificate, rng);
+
+        let transmissions = transmissions.into_iter().map(|(id, (t, _))| (id, t)).collect::<IndexMap<_, _>>();
+        let batch_header = certificate.batch_header().clone();
+        let signatures = certificate.signatures().copied().collect();
+
+        Proposal { batch_header, transmissions, signatures }
+    }
+
+    #[test]
+    fn test_bytes() {
+        let rng = &mut TestRng::default();
+
+        for _ in 0..ITERATIONS {
+            let expected = sample_proposal(rng);
+            // Check the byte representation.
+            let expected_bytes = expected.to_bytes_le().unwrap();
+            assert_eq!(expected, Proposal::read_le(&expected_bytes[..]).unwrap());
+        }
     }
 }
 

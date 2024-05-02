@@ -25,7 +25,7 @@ use std::{collections::HashMap, ops::Deref};
 
 /// The recently-signed batch proposals.
 /// A map of `address` to (`round`, `batch ID`, `signature`).
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SignedProposals<N: Network>(pub HashMap<Address<N>, (u64, Field<N>, Signature<N>)>);
 
 impl<N: Network> SignedProposals<N> {
@@ -90,5 +90,65 @@ impl<N: Network> Default for SignedProposals<N> {
     /// Initializes a new instance of the signed proposals.
     fn default() -> Self {
         Self(Default::default())
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use snarkvm::{
+        console::{account::PrivateKey, network::MainnetV0},
+        utilities::{TestRng, Uniform},
+    };
+
+    use rand::Rng;
+
+    type CurrentNetwork = MainnetV0;
+
+    const ITERATIONS: usize = 100;
+
+    pub(crate) fn sample_signed_proposals(
+        signer: &PrivateKey<CurrentNetwork>,
+        rng: &mut TestRng,
+    ) -> SignedProposals<CurrentNetwork> {
+        let mut signed_proposals: HashMap<_, _> = Default::default();
+        for _ in 0..CurrentNetwork::MAX_CERTIFICATES {
+            let private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
+            let address = Address::try_from(&private_key).unwrap();
+
+            // Add the signed proposal to the map.
+            let round = rng.gen();
+            let batch_id = Field::rand(rng);
+            let signature = signer.sign(&[batch_id], rng).unwrap();
+            signed_proposals.insert(address, (round, batch_id, signature));
+        }
+
+        SignedProposals(signed_proposals)
+    }
+
+    #[test]
+    fn test_bytes() {
+        let rng = &mut TestRng::default();
+        let singer_private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
+
+        for _ in 0..ITERATIONS {
+            let expected = sample_signed_proposals(&singer_private_key, rng);
+            // Check the byte representation.
+            let expected_bytes = expected.to_bytes_le().unwrap();
+            assert_eq!(expected, SignedProposals::read_le(&expected_bytes[..]).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_is_valid() {
+        let rng = &mut TestRng::default();
+
+        for _ in 0..ITERATIONS {
+            let singer_private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
+            let singer_address = Address::try_from(&singer_private_key).unwrap();
+            let signed_proposals = sample_signed_proposals(&singer_private_key, rng);
+            // Ensure that the signed proposals are valid.
+            assert!(signed_proposals.is_valid(singer_address));
+        }
     }
 }

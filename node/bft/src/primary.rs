@@ -311,9 +311,9 @@ impl<N: Network> Primary<N> {
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
 
-        // If the current storage round is below the current latest round, then return early.
+        // If the current storage round is below the latest proposal round, then return early.
         if round < *lock_guard {
-            debug!("Cannot propose a batch for round {round} - the latest proposal cache round is {}", *lock_guard);
+            warn!("Cannot propose a batch for round {round} - the latest proposal cache round is {}", *lock_guard);
             return Ok(());
         }
 
@@ -328,7 +328,7 @@ impl<N: Network> Primary<N> {
                     .iter()
                     .any(|id| !self.storage.contains_certificate(*id))
             {
-                debug!(
+                warn!(
                     "Cannot propose a batch for round {} - the current storage (round {round}) is not caught up to the proposed batch.",
                     proposal.round(),
                 );
@@ -2206,6 +2206,68 @@ mod tests {
         assert!(
             primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_with_storage_round_behind_proposal_lock() {
+        let round = 3;
+        let mut rng = TestRng::default();
+        let (primary, _) = primary_without_handlers(&mut rng).await;
+
+        // Check there is no batch currently proposed.
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Generate a solution and a transaction.
+        let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_id, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Set the proposal lock to a round ahead of the storage.
+        let old_proposal_lock_round = *primary.propose_lock.lock().await;
+        *primary.propose_lock.lock().await = round + 1;
+
+        // Propose a batch and enforce that it fails.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Set the proposal lock back to the old round.
+        *primary.propose_lock.lock().await = old_proposal_lock_round;
+
+        // Try to propose a batch again. This time, it should succeed.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_with_storage_round_behind_proposal() {
+        let round = 5;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Generate previous certificates.
+        let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Create a valid proposal.
+        let timestamp = now();
+        let proposal = create_test_proposal(
+            primary.gateway.account(),
+            primary.ledger.current_committee().unwrap(),
+            round + 1,
+            previous_certificates,
+            timestamp,
+            &mut rng,
+        );
+
+        // Store the proposal on the primary.
+        *primary.proposed_batch.write() = Some(proposal);
+
+        // Try to propose a batch will terminate early because the storage is behind the proposal.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_some());
+        assert!(primary.proposed_batch.read().as_ref().unwrap().round() > primary.current_round());
     }
 
     #[tokio::test(flavor = "multi_thread")]

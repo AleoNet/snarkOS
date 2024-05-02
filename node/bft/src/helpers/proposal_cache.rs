@@ -38,6 +38,7 @@ pub fn proposal_cache_path(network: u16, dev: Option<u16>) -> PathBuf {
 }
 
 /// A helper type for the cache of proposal and signed proposals.
+#[derive(Debug, PartialEq, Eq)]
 pub struct ProposalCache<N: Network> {
     /// The latest round this node was on prior to the reboot.
     latest_round: u64,
@@ -150,5 +151,43 @@ impl<N: Network> Default for ProposalCache<N> {
     /// Initializes a new instance of the proposal cache.
     fn default() -> Self {
         Self::new(0, None, Default::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::helpers::{proposal::tests::sample_proposal, signed_proposals::tests::sample_signed_proposals};
+    use snarkvm::{
+        console::{account::PrivateKey, network::MainnetV0},
+        utilities::TestRng,
+    };
+
+    type CurrentNetwork = MainnetV0;
+
+    const ITERATIONS: usize = 100;
+
+    pub(crate) fn sample_proposal_cache(
+        signer: &PrivateKey<CurrentNetwork>,
+        rng: &mut TestRng,
+    ) -> ProposalCache<CurrentNetwork> {
+        let proposal = sample_proposal(rng);
+        let signed_proposals = sample_signed_proposals(signer, rng);
+        let round = proposal.round();
+
+        ProposalCache::new(round, Some(proposal), signed_proposals)
+    }
+
+    #[test]
+    fn test_bytes() {
+        let rng = &mut TestRng::default();
+        let singer_private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
+
+        for _ in 0..ITERATIONS {
+            let expected = sample_proposal_cache(&singer_private_key, rng);
+            // Check the byte representation.
+            let expected_bytes = expected.to_bytes_le().unwrap();
+            assert_eq!(expected, ProposalCache::read_le(&expected_bytes[..]).unwrap());
+        }
     }
 }
