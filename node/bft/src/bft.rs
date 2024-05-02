@@ -199,7 +199,9 @@ impl<N: Network> BFT<N> {
         // Ensure the current round is at least the storage round (this is a sanity check).
         let storage_round = self.storage().current_round();
         if current_round < storage_round {
-            warn!("BFT is safely skipping an update for round {current_round}, as storage is at round {storage_round}");
+            debug!(
+                "BFT is safely skipping an update for round {current_round}, as storage is at round {storage_round}"
+            );
             return false;
         }
 
