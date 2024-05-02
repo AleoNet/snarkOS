@@ -14,6 +14,7 @@
 
 use crate::{
     helpers::{fmt_id, max_redundant_requests, BFTSender, Pending, Storage, SyncReceiver},
+    spawn_blocking,
     Gateway,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -31,7 +32,7 @@ use snarkvm::{
 use anyhow::{bail, Result};
 use parking_lot::Mutex;
 use rayon::prelude::*;
-use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::{oneshot, Mutex as TMutex, OnceCell},
     task::JoinHandle,
@@ -100,7 +101,7 @@ impl<N: Network> Sync<N> {
         self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // Sleep briefly to avoid triggering spam detection.
-                tokio::time::sleep(std::time::Duration::from_millis(PRIMARY_PING_IN_MS)).await;
+                tokio::time::sleep(Duration::from_millis(PRIMARY_PING_IN_MS)).await;
                 // Perform the sync routine.
                 let communication = &self_.gateway;
                 // let communication = &node.router;
@@ -117,6 +118,22 @@ impl<N: Network> Sync<N> {
                 }
             }
         }));
+
+        // Start the pending queue expiration loop.
+        let self_ = self.clone();
+        self.spawn(async move {
+            loop {
+                // Sleep briefly.
+                tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
+
+                // Remove the expired pending transmission requests.
+                let self__ = self_.clone();
+                let _ = spawn_blocking!({
+                    self__.pending.clear_expired_callbacks();
+                    Ok(())
+                });
+            }
+        });
 
         // Retrieve the sync receiver.
         let SyncReceiver {
@@ -567,8 +584,7 @@ impl<N: Network> Sync<N> {
             );
         }
         // Wait for the certificate to be fetched.
-        match tokio::time::timeout(core::time::Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await
-        {
+        match tokio::time::timeout(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS), callback_receiver).await {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
@@ -593,7 +609,7 @@ impl<N: Network> Sync<N> {
     fn finish_certificate_request(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) {
         let certificate = response.certificate;
         // Check if the peer IP exists in the pending queue for the given certificate ID.
-        let exists = self.pending.get(certificate.id()).unwrap_or_default().contains(&peer_ip);
+        let exists = self.pending.get_peers(certificate.id()).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
             // TODO: Validate the certificate.
