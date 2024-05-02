@@ -1607,7 +1607,7 @@ impl<N: Network> Primary<N> {
         let proposal_cache = {
             let proposal = self.proposed_batch.write().take();
             let signed_proposals = self.signed_proposals.write().clone();
-            let latest_round = proposal.as_ref().map(Proposal::round).unwrap_or(self.storage.current_round());
+            let latest_round = proposal.as_ref().map(Proposal::round).unwrap_or(*self.propose_lock.lock().await);
             ProposalCache::new(latest_round, proposal, signed_proposals)
         };
         if let Err(err) = proposal_cache.store(self.gateway.dev()) {
