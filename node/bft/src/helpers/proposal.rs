@@ -195,6 +195,10 @@ impl<N: Network> FromBytes for Proposal<N> {
         let batch_header = FromBytes::read_le(&mut reader)?;
         // Read the number of transmissions.
         let num_transmissions = u32::read_le(&mut reader)?;
+        // Ensure the number of transmissions is within bounds (this is an early safety check).
+        if num_transmissions as usize > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
+            return Err(error("Invalid number of transmissions in the proposal"));
+        }
         // Read the transmissions.
         let mut transmissions = IndexMap::default();
         for _ in 0..num_transmissions {
@@ -204,6 +208,10 @@ impl<N: Network> FromBytes for Proposal<N> {
         }
         // Read the number of signatures.
         let num_signatures = u32::read_le(&mut reader)?;
+        // Ensure the number of signatures is within bounds (this is an early safety check).
+        if num_signatures as usize > Committee::<N>::MAX_COMMITTEE_SIZE as usize {
+            return Err(error("Invalid number of signatures in the proposal"));
+        }
         // Read the signatures.
         let mut signatures = IndexSet::default();
         for _ in 0..num_signatures {

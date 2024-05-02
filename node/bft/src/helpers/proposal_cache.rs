@@ -74,7 +74,7 @@ impl<N: Network> ProposalCache<N> {
 
     /// Load the proposal cache from the file system and ensure that the proposal cache is valid.
     pub fn load(expected_signer: Address<N>, dev: Option<u16>) -> Result<Self> {
-        // Load the proposal cache from the file system.
+        // Construct the proposal cache file system path.
         let path = proposal_cache_path(N::ID, dev);
 
         // Deserialize the proposal cache from the file system.

@@ -1128,11 +1128,11 @@ impl<N: Network> Primary<N> {
                     if certificates.is_empty() {
                         continue;
                     }
-                    let authors = certificates.iter().map(BatchCertificate::author).collect();
                     let Ok(committee_lookback) = self_.ledger.get_committee_lookback_for_round(next_round) else {
                         warn!("Failed to retrieve the committee lookback for round {next_round}");
                         continue;
                     };
+                    let authors = certificates.iter().map(BatchCertificate::author).collect();
                     committee_lookback.is_quorum_threshold_reached(&authors)
                 };
                 // Attempt to increment to the next round if the quorum threshold is reached.
@@ -1606,7 +1606,7 @@ impl<N: Network> Primary<N> {
         // Save the current proposal cache to disk.
         let proposal_cache = {
             let proposal = self.proposed_batch.write().take();
-            let signed_proposals = self.signed_proposals.write().clone();
+            let signed_proposals = self.signed_proposals.read().clone();
             let latest_round = proposal.as_ref().map(Proposal::round).unwrap_or(*self.propose_lock.lock().await);
             ProposalCache::new(latest_round, proposal, signed_proposals)
         };
