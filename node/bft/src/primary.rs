@@ -131,9 +131,7 @@ impl<N: Network> Primary<N> {
             false => ProposalCache::default(),
         };
         // Extract the proposal and signed proposals.
-        let (proposed_batch, signed_proposals) = proposal_cache.into();
-        // Construct the propose lock based on the proposed batch round.
-        let propose_lock = Arc::new(TMutex::new(proposed_batch.as_ref().map(Proposal::round).unwrap_or(0)));
+        let (latest_certificate_round, proposed_batch, signed_proposals) = proposal_cache.into();
 
         // Initialize the primary instance.
         Ok(Self {
@@ -147,7 +145,7 @@ impl<N: Network> Primary<N> {
             latest_proposed_batch_timestamp: Default::default(),
             signed_proposals: Arc::new(RwLock::new(signed_proposals)),
             handles: Default::default(),
-            propose_lock,
+            propose_lock: Arc::new(TMutex::new(latest_certificate_round)),
         })
     }
 
@@ -313,6 +311,12 @@ impl<N: Network> Primary<N> {
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
 
+        // If the current storage round is below the current latest round, then return early.
+        if round < *lock_guard {
+            debug!("Cannot propose a batch for round {round} - the latest proposal cache round is {}", *lock_guard);
+            return Ok(());
+        }
+
         // If there is a batch being proposed already,
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
@@ -324,7 +328,6 @@ impl<N: Network> Primary<N> {
                     .iter()
                     .any(|id| !self.storage.contains_certificate(*id))
             {
-                // TODO (raychu86): Explicitly request the missing certificates from peers.
                 debug!(
                     "Cannot propose a batch for round {} - the current storage (round {round}) is not caught up to the proposed batch.",
                     proposal.round(),
@@ -1601,8 +1604,12 @@ impl<N: Network> Primary<N> {
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
         // Save the current proposal cache to disk.
-        let proposal_cache =
-            ProposalCache::new(self.proposed_batch.write().take(), self.signed_proposals.write().clone());
+        let proposal_cache = {
+            let proposal = self.proposed_batch.write().take();
+            let signed_proposals = self.signed_proposals.write().clone();
+            let latest_round = proposal.as_ref().map(Proposal::round).unwrap_or(self.storage.current_round());
+            ProposalCache::new(latest_round, proposal, signed_proposals)
+        };
         if let Err(err) = proposal_cache.store(self.gateway.dev()) {
             error!("Failed to store the current proposal cache: {err}");
         }

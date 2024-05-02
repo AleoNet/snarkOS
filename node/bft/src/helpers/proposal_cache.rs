@@ -39,19 +39,28 @@ pub fn proposal_cache_path(network: u16, dev: Option<u16>) -> PathBuf {
 
 /// A helper type for the cache of proposal and signed proposals.
 pub struct ProposalCache<N: Network> {
+    /// The latest round this node was on prior to the reboot.
+    latest_round: u64,
+    /// The latest proposal this node has created.
     proposal: Option<Proposal<N>>,
+    /// The signed proposals this node has received.
     signed_proposals: SignedProposals<N>,
 }
 
 impl<N: Network> ProposalCache<N> {
     /// Initializes a new instance of the proposal cache.
-    pub fn new(proposal: Option<Proposal<N>>, signed_proposals: SignedProposals<N>) -> Self {
-        Self { proposal, signed_proposals }
+    pub fn new(latest_round: u64, proposal: Option<Proposal<N>>, signed_proposals: SignedProposals<N>) -> Self {
+        Self { latest_round, proposal, signed_proposals }
     }
 
     /// Ensure that the proposal and every signed proposal is associated with the `expected_signer`.
     pub fn is_valid(&self, expected_signer: Address<N>) -> bool {
-        self.proposal.as_ref().map(|proposal| proposal.batch_header().author() == expected_signer).unwrap_or(true)
+        self.proposal
+            .as_ref()
+            .map(|proposal| {
+                proposal.batch_header().author() == expected_signer && self.latest_round == proposal.round()
+            })
+            .unwrap_or(true)
             && self.signed_proposals.is_valid(expected_signer)
     }
 
@@ -64,7 +73,6 @@ impl<N: Network> ProposalCache<N> {
     pub fn load(expected_signer: Address<N>, dev: Option<u16>) -> Result<Self> {
         // Load the proposal cache from the file system.
         let path = proposal_cache_path(N::ID, dev);
-        info!("Loading the proposal cache from {}...", path.display(),);
 
         // Deserialize the proposal cache from the file system.
         let proposal_cache = match fs::read(&path) {
@@ -79,6 +87,8 @@ impl<N: Network> ProposalCache<N> {
         if !proposal_cache.is_valid(expected_signer) {
             bail!("The proposal cache is invalid for the given address {expected_signer}");
         }
+
+        info!("Loaded the proposal cache from {} at round {}", path.display(), proposal_cache.latest_round);
 
         Ok(proposal_cache)
     }
@@ -97,14 +107,16 @@ impl<N: Network> ProposalCache<N> {
         Ok(())
     }
 
-    /// Returns the proposal and signed proposals.
-    pub fn into(self) -> (Option<Proposal<N>>, SignedProposals<N>) {
-        (self.proposal, self.signed_proposals)
+    /// Returns the latest round, proposal and signed proposals.
+    pub fn into(self) -> (u64, Option<Proposal<N>>, SignedProposals<N>) {
+        (self.latest_round, self.proposal, self.signed_proposals)
     }
 }
 
 impl<N: Network> ToBytes for ProposalCache<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Serialize the `latest_round`.
+        self.latest_round.write_le(&mut writer)?;
         // Serialize the `proposal`.
         self.proposal.is_some().write_le(&mut writer)?;
         if let Some(proposal) = &self.proposal {
@@ -119,6 +131,8 @@ impl<N: Network> ToBytes for ProposalCache<N> {
 
 impl<N: Network> FromBytes for ProposalCache<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Deserialize `latest_round`.
+        let latest_round = u64::read_le(&mut reader)?;
         // Deserialize `proposal`.
         let has_proposal: bool = FromBytes::read_le(&mut reader)?;
         let proposal = match has_proposal {
@@ -128,13 +142,13 @@ impl<N: Network> FromBytes for ProposalCache<N> {
         // Deserialize `signed_proposals`.
         let signed_proposals = SignedProposals::read_le(&mut reader)?;
 
-        Ok(Self::new(proposal, signed_proposals))
+        Ok(Self::new(latest_round, proposal, signed_proposals))
     }
 }
 
 impl<N: Network> Default for ProposalCache<N> {
     /// Initializes a new instance of the proposal cache.
     fn default() -> Self {
-        Self::new(None, Default::default())
+        Self::new(0, None, Default::default())
     }
 }
