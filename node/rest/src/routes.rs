@@ -335,8 +335,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
 
         // If the transaction exceeds the transaction size limit, return an error.
+        // The buffer is initially roughly sized to hold a `transfer_public`,
+        // most transactions will be smaller and this reduces unnecessary allocations.
         // TODO: Should this be a blocking task?
-        let buffer = Vec::with_capacity(N::MAX_TRANSACTION_SIZE);
+        let buffer = Vec::with_capacity(3000);
         if tx.write_le(LimitedWriter::new(buffer, N::MAX_TRANSACTION_SIZE)).is_err() {
             return Err(RestError("Transaction size exceeds the byte limit".to_string()));
         }
