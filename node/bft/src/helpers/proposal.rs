@@ -170,13 +170,18 @@ impl<N: Network> Proposal<N> {
 
 impl<N: Network> ToBytes for Proposal<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Write the batch header.
         self.batch_header.write_le(&mut writer)?;
+        // Write the number of transmissions.
         u32::try_from(self.transmissions.len()).map_err(error)?.write_le(&mut writer)?;
+        // Write the transmissions.
         for (transmission_id, transmission) in &self.transmissions {
             transmission_id.write_le(&mut writer)?;
             transmission.write_le(&mut writer)?;
         }
+        // Write the number of signatures.
         u32::try_from(self.signatures.len()).map_err(error)?.write_le(&mut writer)?;
+        // Write the signatures.
         for signature in &self.signatures {
             signature.write_le(&mut writer)?;
         }
@@ -186,15 +191,20 @@ impl<N: Network> ToBytes for Proposal<N> {
 
 impl<N: Network> FromBytes for Proposal<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Read the batch header.
         let batch_header = FromBytes::read_le(&mut reader)?;
+        // Read the number of transmissions.
         let num_transmissions = u32::read_le(&mut reader)?;
+        // Read the transmissions.
         let mut transmissions = IndexMap::default();
         for _ in 0..num_transmissions {
             let transmission_id = FromBytes::read_le(&mut reader)?;
             let transmission = FromBytes::read_le(&mut reader)?;
             transmissions.insert(transmission_id, transmission);
         }
+        // Read the number of signatures.
         let num_signatures = u32::read_le(&mut reader)?;
+        // Read the signatures.
         let mut signatures = IndexSet::default();
         for _ in 0..num_signatures {
             signatures.insert(FromBytes::read_le(&mut reader)?);
