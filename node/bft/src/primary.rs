@@ -384,7 +384,8 @@ impl<N: Network> Primary<N> {
                     }
                 }
             }
-            bail!("Primary is safely skipping {}", format!("(round {round} was already certified)").dimmed());
+            debug!("Primary is safely skipping {}", format!("(round {round} was already certified)").dimmed());
+            return Ok(());
         }
 
         // Retrieve the committee to check against.
@@ -638,6 +639,16 @@ impl<N: Network> Primary<N> {
             }
         }
 
+        // Ensure that the batch header doesn't already exist in storage.
+        // Note this is already checked in `check_batch_header`, however we can return early here without creating a blocking task.
+        if self.storage.contains_batch(batch_header.batch_id()) {
+            debug!(
+                "Primary is safely skipping a batch proposal from '{peer_ip}' - {}",
+                format!("batch for round {batch_round} already exists in storage").dimmed()
+            );
+            return Ok(());
+        }
+
         // Compute the previous round.
         let previous_round = batch_round.saturating_sub(1);
         // Ensure that the peer did not propose a batch too quickly.
@@ -762,7 +773,15 @@ impl<N: Network> Primary<N> {
                     // Ensure the batch ID matches the currently proposed batch ID.
                     if proposal.batch_id() != batch_id {
                         match self_.storage.contains_batch(batch_id) {
-                            true => bail!("This batch was already certified"),
+                            // If this batch was already certified, return early.
+                            true => {
+                                debug!(
+                                    "Primary is safely skipping a a batch signature from {peer_ip} for round {} - batch is already certified",
+                                    proposal.round()
+                                );
+                                return Ok(None);
+                            }
+                            // If the batch ID is unknown, return an error.
                             false => bail!(
                                 "Unknown batch ID '{batch_id}', expected '{}' for round {}",
                                 proposal.batch_id(),
