@@ -795,7 +795,7 @@ impl<N: Network> Storage<N> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;
@@ -841,7 +841,7 @@ mod tests {
     }
 
     /// Samples the random transmissions, returning the missing transmissions and the transmissions.
-    fn sample_transmissions(
+    pub(crate) fn sample_transmissions(
         certificate: &BatchCertificate<CurrentNetwork>,
         rng: &mut TestRng,
     ) -> (
