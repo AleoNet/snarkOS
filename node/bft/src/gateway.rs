@@ -261,6 +261,11 @@ impl<N: Network> Gateway<N> {
         &self.account
     }
 
+    /// Returns the dev identifier of the node.
+    pub const fn dev(&self) -> Option<u16> {
+        self.dev
+    }
+
     /// Returns the IP address of this node.
     pub fn local_ip(&self) -> SocketAddr {
         self.tcp.listening_addr().expect("The TCP listener is not enabled")

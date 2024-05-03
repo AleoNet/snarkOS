@@ -200,8 +200,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .layer(middleware::from_fn(log_middleware))
             // Enable CORS.
             .layer(cors)
-            // Cap body size at 10MB.
-            .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
+            // Cap body size at 512KiB.
+            .layer(DefaultBodyLimit::max(512 * 1024))
             .layer(GovernorLayer {
                 // We can leak this because it is created only once and it persists.
                 config: Box::leak(governor_config),

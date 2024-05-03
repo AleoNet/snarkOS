@@ -61,7 +61,7 @@ async fn test_resend_transmission_request() {
     assert!(pending.contains(transmission_id), "Missing a transmission in the pending queue");
     // Ensure the peer IP is in the pending queue for the transmission ID.
     assert!(pending.contains_peer(transmission_id, peer_ip), "Missing a peer IP for transmission in the pending queue");
-    assert_eq!(pending.get(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
+    assert_eq!(pending.get_peers(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
     // Ensure the number of callbacks is correct.
     assert_eq!(pending.num_callbacks(transmission_id), 1, "Incorrect number of callbacks for transmission");
     // Ensure the number of sent requests is correct.
@@ -78,7 +78,7 @@ async fn test_resend_transmission_request() {
         assert!(pending.contains(transmission_id), "Missing a transmission in the pending queue");
         // Ensure the peer IP is in the pending queue for the transmission ID.
         assert!(pending.contains_peer(transmission_id, peer_ip), "Missing a peer IP for transmission in the pending queue");
-        assert_eq!(pending.get(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
+        assert_eq!(pending.get_peers(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
         // Ensure the number of callbacks is correct.
         assert_eq!(pending.num_callbacks(transmission_id), 1 + i, "Incorrect number of callbacks for transmission");
         // Ensure the number of sent requests is correct.
@@ -124,7 +124,7 @@ async fn test_flood_transmission_requests() {
     assert!(pending.contains(transmission_id), "Missing a transmission in the pending queue");
     // Ensure the peer IP is in the pending queue for the transmission ID.
     assert!(pending.contains_peer(transmission_id, peer_ip), "Missing a peer IP for transmission in the pending queue");
-    assert_eq!(pending.get(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
+    assert_eq!(pending.get_peers(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
     // Ensure the number of callbacks is correct.
     assert_eq!(pending.num_callbacks(transmission_id), max_redundancy, "Incorrect number of callbacks for transmission");
     // Ensure the number of sent requests is correct.
@@ -141,7 +141,7 @@ async fn test_flood_transmission_requests() {
         assert!(pending.contains(transmission_id), "Missing a transmission in the pending queue");
         // Ensure the peer IP is in the pending queue for the transmission ID.
         assert!(pending.contains_peer(transmission_id, peer_ip), "Missing a peer IP for transmission in the pending queue");
-        assert_eq!(pending.get(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
+        assert_eq!(pending.get_peers(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
         // Ensure the number of callbacks is correct.
         assert_eq!(pending.num_callbacks(transmission_id), max_redundancy + i, "Incorrect number of callbacks for transmission");
         // Ensure the number of sent requests is correct.
