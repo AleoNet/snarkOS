@@ -269,7 +269,17 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Path(validator): Path<Address<N>>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.get_delegators_for_validator(&validator)?))
+        // Do not process the request if the node is too far behind to avoid sending outdated data.
+        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
+            return Err(RestError("Unable to  request delegators (node is syncing)".to_string()));
+        }
+
+        // Return the delegators for the given validator.
+        match tokio::task::spawn_blocking(move || rest.ledger.get_delegators_for_validator(&validator)).await {
+            Ok(Ok(delegators)) => Ok(ErasedJson::pretty(delegators)),
+            Ok(Err(err)) => Err(RestError(format!("Unable to request delegators - {err}"))),
+            Err(err) => Err(RestError(format!("Unable to request delegators - {err}"))),
+        }
     }
 
     // GET /<network>/peers/count
