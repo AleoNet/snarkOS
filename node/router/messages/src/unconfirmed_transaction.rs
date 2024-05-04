@@ -60,7 +60,10 @@ impl<N: Network> FromBytes for UnconfirmedTransaction<N> {
 pub mod prop_tests {
     use crate::{Transaction, UnconfirmedTransaction};
     use snarkvm::{
-        ledger::{ledger_test_helpers::sample_fee_public_transaction, narwhal::Data},
+        ledger::{
+            ledger_test_helpers::{sample_fee_public_transaction, sample_large_execution_transaction},
+            narwhal::Data,
+        },
         prelude::{FromBytes, TestRng, ToBytes},
     };
 
@@ -79,8 +82,23 @@ pub mod prop_tests {
             .boxed()
     }
 
+    pub fn any_large_transaction() -> BoxedStrategy<Transaction<CurrentNetwork>> {
+        any::<u64>()
+            .prop_map(|seed| {
+                let mut rng = TestRng::fixed(seed);
+                sample_large_execution_transaction(&mut rng)
+            })
+            .boxed()
+    }
+
     pub fn any_unconfirmed_transaction() -> BoxedStrategy<UnconfirmedTransaction<CurrentNetwork>> {
         any_transaction()
+            .prop_map(|tx| UnconfirmedTransaction { transaction_id: tx.id(), transaction: Data::Object(tx) })
+            .boxed()
+    }
+
+    pub fn any_large_unconfirmed_transaction() -> BoxedStrategy<UnconfirmedTransaction<CurrentNetwork>> {
+        any_large_transaction()
             .prop_map(|tx| UnconfirmedTransaction { transaction_id: tx.id(), transaction: Data::Object(tx) })
             .boxed()
     }

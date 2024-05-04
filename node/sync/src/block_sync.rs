@@ -389,6 +389,9 @@ impl<N: Network> BlockSync<N> {
         self.locators.write().insert(peer_ip, locators.clone());
 
         // Compute the common ancestor with this node.
+        // Attention: Please do not optimize this loop, as it performs fork-detection. In addition,
+        // by iterating upwards, it also early-terminates malicious block locators at the *first* point
+        // of bifurcation in their ledger history, which is a critical safety guarantee provided here.
         let mut ancestor = 0;
         for (height, hash) in locators.clone().into_iter() {
             if let Ok(canon_hash) = self.canon.get_block_hash(height) {
