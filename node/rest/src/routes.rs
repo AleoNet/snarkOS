@@ -23,6 +23,7 @@ use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tokio::task::spawn_blocking;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -135,9 +136,17 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             )));
         }
 
-        let blocks = cfg_into_iter!((start_height..end_height))
-            .map(|height| rest.ledger.get_block(height))
-            .collect::<Result<Vec<_>, _>>()?;
+        let blocks = match spawn_blocking(move || {
+            cfg_into_iter!((start_height..end_height))
+                .map(|height| rest.ledger.get_block(height))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .await
+        {
+            Ok(Ok(blocks)) => blocks,
+            Ok(Err(err)) => return Err(RestError(format!("Couldn't find block: {err}"))),
+            Err(err) => return Err(RestError(format!("Couldn't find block: {err}"))),
+        };
 
         Ok(ErasedJson::pretty(blocks))
     }
