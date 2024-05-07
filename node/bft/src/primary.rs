@@ -150,10 +150,7 @@ impl<N: Network> Primary<N> {
             false => return Ok(()),
         };
         // Extract the proposal and signed proposals.
-        let (latest_certificate_round, proposed_batch, signed_proposals) = proposal_cache.into();
-
-        // Update the storage with the pending certificates.
-        // The Storage should have been initialized with the latest certificate round.
+        let (latest_certificate_round, proposed_batch, signed_proposals, pending_certificates) = proposal_cache.into();
 
         // Write the proposed batch.
         *self.proposed_batch.write() = proposed_batch;
@@ -164,16 +161,15 @@ impl<N: Network> Primary<N> {
 
         // Update the storage with the pending certificates.
         // The Storage should have been initialized with the latest certificate round.
-        // TODO (raychu86): Uncomment this section.
-        // for certificate in pending_certificates {
-        //     let batch_id = certificate.batch_id();
-        //     // We use a dummy IP because the node should not need to request from any peers.
-        //     // The storage should have stored all the transmissions in the BFT persistent storage. Otherwise, we
-        //     // skip the certificate.
-        //     if let Err(err) = self.sync_with_certificate_from_peer(DUMMY_SELF_IP, certificate) {
-        //         warn!("Failed to load stored certificate {} - {err}", fmt_id(batch_id));
-        //     }
-        // }
+        for certificate in pending_certificates {
+            let batch_id = certificate.batch_id();
+            // We use a dummy IP because the node should not need to request from any peers.
+            // The storage should have stored all the transmissions in the BFT persistent storage. Otherwise, we
+            // skip the certificate.
+            if let Err(err) = self.sync_with_certificate_from_peer(DUMMY_SELF_IP, certificate).await {
+                warn!("Failed to load stored certificate {} - {err}", fmt_id(batch_id));
+            }
+        }
 
         Ok(())
     }
@@ -1658,7 +1654,8 @@ impl<N: Network> Primary<N> {
             let proposal = self.proposed_batch.write().take();
             let signed_proposals = self.signed_proposals.read().clone();
             let latest_round = proposal.as_ref().map(Proposal::round).unwrap_or(*self.propose_lock.lock().await);
-            ProposalCache::new(latest_round, proposal, signed_proposals)
+            let pending_certificates = self.storage.get_pending_certificates();
+            ProposalCache::new(latest_round, proposal, signed_proposals, pending_certificates)
         };
         if let Err(err) = proposal_cache.store(self.gateway.dev()) {
             error!("Failed to store the current proposal cache: {err}");
