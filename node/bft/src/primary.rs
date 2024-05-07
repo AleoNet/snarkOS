@@ -43,6 +43,7 @@ use crate::{
 use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
 use snarkos_node_bft_ledger_service::LedgerService;
+use snarkos_node_sync::DUMMY_SELF_IP;
 use snarkvm::{
     console::{
         prelude::*,
@@ -120,19 +121,6 @@ impl<N: Network> Primary<N> {
         // Initialize the sync module.
         let sync = Sync::new(gateway.clone(), storage.clone(), ledger.clone());
 
-        // Fetch the signed proposals from the file system if it exists.
-        let proposal_cache = match ProposalCache::<N>::exists(dev) {
-            true => match ProposalCache::<N>::load(gateway.account().address(), dev) {
-                Ok(proposal) => proposal,
-                Err(err) => {
-                    bail!("Failed to read the signed proposals from the file system - {err}.");
-                }
-            },
-            false => ProposalCache::default(),
-        };
-        // Extract the proposal and signed proposals.
-        let (latest_certificate_round, proposed_batch, signed_proposals) = proposal_cache.into();
-
         // Initialize the primary instance.
         Ok(Self {
             sync,
@@ -141,12 +129,53 @@ impl<N: Network> Primary<N> {
             ledger,
             workers: Arc::from(vec![]),
             bft_sender: Default::default(),
-            proposed_batch: Arc::new(RwLock::new(proposed_batch)),
+            proposed_batch: Default::default(),
             latest_proposed_batch_timestamp: Default::default(),
-            signed_proposals: Arc::new(RwLock::new(signed_proposals)),
+            signed_proposals: Default::default(),
             handles: Default::default(),
-            propose_lock: Arc::new(TMutex::new(latest_certificate_round)),
+            propose_lock: Default::default(),
         })
+    }
+
+    /// Load the proposal cache file and update the Primary state with the stored data.
+    async fn load_proposal_cache(&self) -> Result<()> {
+        // Fetch the signed proposals from the file system if it exists.
+        let proposal_cache = match ProposalCache::<N>::exists(self.gateway.dev()) {
+            true => match ProposalCache::<N>::load(self.gateway.account().address(), self.gateway.dev()) {
+                Ok(proposal) => proposal,
+                Err(err) => {
+                    bail!("Failed to read the signed proposals from the file system - {err}.");
+                }
+            },
+            false => return Ok(()),
+        };
+        // Extract the proposal and signed proposals.
+        let (latest_certificate_round, proposed_batch, signed_proposals) = proposal_cache.into();
+
+        // Update the storage with the pending certificates.
+        // The Storage should have been initialized with the latest certificate round.
+
+        // Write the proposed batch.
+        *self.proposed_batch.write() = proposed_batch;
+        // Write the signed proposals.
+        *self.signed_proposals.write() = signed_proposals;
+        // Writ the propose lock.
+        *self.propose_lock.lock().await = latest_certificate_round;
+
+        // Update the storage with the pending certificates.
+        // The Storage should have been initialized with the latest certificate round.
+        // TODO (raychu86): Uncomment this section.
+        // for certificate in pending_certificates {
+        //     let batch_id = certificate.batch_id();
+        //     // We use a dummy IP because the node should not need to request from any peers.
+        //     // The storage should have stored all the transmissions in the BFT persistent storage. Otherwise, we
+        //     // skip the certificate.
+        //     if let Err(err) = self.sync_with_certificate_from_peer(DUMMY_SELF_IP, certificate) {
+        //         warn!("Failed to load stored certificate {} - {err}", fmt_id(batch_id));
+        //     }
+        // }
+
+        Ok(())
     }
 
     /// Run the primary instance.
@@ -194,6 +223,8 @@ impl<N: Network> Primary<N> {
         let (sync_sender, sync_receiver) = init_sync_channels();
         // Next, initialize the sync module.
         self.sync.run(bft_sender, sync_receiver).await?;
+        // Load the proposal cache.
+        self.load_proposal_cache().await?;
         // Next, initialize the gateway.
         self.gateway.run(primary_sender, worker_senders, Some(sync_sender)).await;
         // Lastly, start the primary handlers.
