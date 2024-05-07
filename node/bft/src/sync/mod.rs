@@ -82,8 +82,8 @@ impl<N: Network> Sync<N> {
         }
     }
 
-    /// Starts the sync module.
-    pub async fn run(&self, bft_sender: Option<BFTSender<N>>, sync_receiver: SyncReceiver<N>) -> Result<()> {
+    /// Initializes the sync module and sync the storage with the ledger at bootup.
+    pub async fn initialize(&self, bft_sender: Option<BFTSender<N>>) -> Result<()> {
         // If a BFT sender was provided, set it.
         if let Some(bft_sender) = bft_sender {
             self.bft_sender.set(bft_sender).expect("BFT sender already set in gateway");
@@ -92,8 +92,11 @@ impl<N: Network> Sync<N> {
         info!("Syncing storage with the ledger...");
 
         // Sync the storage with the ledger.
-        self.sync_storage_with_ledger_at_bootup().await?;
+        self.sync_storage_with_ledger_at_bootup().await
+    }
 
+    /// Starts the sync module.
+    pub async fn run(&self, sync_receiver: SyncReceiver<N>) -> Result<()> {
         info!("Starting the sync module...");
 
         // Start the block sync loop.
