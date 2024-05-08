@@ -148,7 +148,6 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Returns the committee for the given round.
-    /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
         // Check if the committee is already in the cache.
         if let Some(committee) = self.committee_cache.lock().get(&round) {
@@ -163,12 +162,12 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                 // Return the committee.
                 Ok(committee)
             }
-            // Return the current committee if the round is in the future.
+            // Return the current committee if the round is equivalent.
             None => {
                 // Retrieve the current committee.
                 let current_committee = self.current_committee()?;
-                // Return the current committee if the round is in the future.
-                match current_committee.starting_round() <= round {
+                // Return the current committee if the round is equivalent.
+                match current_committee.starting_round() == round {
                     true => Ok(current_committee),
                     false => bail!("No committee found for round {round} in the ledger"),
                 }
@@ -177,7 +176,6 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Returns the committee lookback for the given round.
-    /// If the committee lookback round is in the future, then the current committee is returned.
     fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>> {
         // Get the round number for the previous committee. Note, we subtract 2 from odd rounds,
         // because committees are updated in even rounds.

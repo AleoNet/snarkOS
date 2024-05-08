@@ -74,11 +74,9 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     fn current_committee(&self) -> Result<Committee<N>>;
 
     /// Returns the committee for the given round.
-    /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
 
     /// Returns the committee lookback for the given round.
-    /// If the committee lookback round is in the future, then the current committee is returned.
     fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>>;
 
     /// Returns `true` if the ledger contains the given certificate ID.
