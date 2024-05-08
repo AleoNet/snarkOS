@@ -906,7 +906,7 @@ mod tests {
         let core_ledger = Arc::new(CoreLedgerService::new(ledger.clone(), Default::default()));
         // Sample rounds of batch certificates starting at the genesis round from a static set of 4 authors.
         let (round_to_certificates_map, committee) = {
-            // Initialize the committee. 
+            // Initialize the committee.
             let committee = ledger.latest_committee().unwrap();
             // Initialize a mapping from the round number to the set of batch certificates in the round.
             let mut round_to_certificates_map: HashMap<u64, IndexSet<BatchCertificate<CurrentNetwork>>> =
@@ -946,7 +946,6 @@ mod tests {
                 // Update the map of certificates.
                 round_to_certificates_map.insert(round, current_certificates.clone());
                 previous_certificates = current_certificates.clone();
-
             }
             (round_to_certificates_map, committee)
         };
@@ -1024,16 +1023,16 @@ mod tests {
 
         /*
             Check that the pending certificates are computed correctly.
-        */  
-        
-        // Retrieve the pending certificates. 
-        let pending_certificates = storage.get_pending_certificates(); 
-        // Check that all of the pending certificates are not contained in the ledger. 
+        */
+
+        // Retrieve the pending certificates.
+        let pending_certificates = storage.get_pending_certificates();
+        // Check that all of the pending certificates are not contained in the ledger.
         for certificate in pending_certificates.clone() {
-            assert!(!core_ledger.contains_certificate(&certificate.id()).unwrap_or(false)); 
+            assert!(!core_ledger.contains_certificate(&certificate.id()).unwrap_or(false));
         }
-        // Initialize an empty set to be populated with the committed certificates in the block subdags. 
-        let mut committed_certificates: IndexSet<BatchCertificate<CurrentNetwork>> = IndexSet::new(); 
+        // Initialize an empty set to be populated with the committed certificates in the block subdags.
+        let mut committed_certificates: IndexSet<BatchCertificate<CurrentNetwork>> = IndexSet::new();
         {
             let subdag_maps = [&subdag_map, &subdag_map_2, &subdag_map_3];
             for subdag in subdag_maps.iter() {
@@ -1041,15 +1040,15 @@ mod tests {
                     committed_certificates.extend(subdag_certificates.iter().cloned());
                 }
             }
-        }; 
-        // Create the set of candidate pending certificates as the set of all certificates minus the set of the committed certificates. 
-        let mut candidate_pending_certificates: IndexSet<BatchCertificate<CurrentNetwork>> = IndexSet::new(); 
-        for certificate in certificates.clone(){
-            if !committed_certificates.contains(&certificate){
-                candidate_pending_certificates.insert(certificate); 
+        };
+        // Create the set of candidate pending certificates as the set of all certificates minus the set of the committed certificates.
+        let mut candidate_pending_certificates: IndexSet<BatchCertificate<CurrentNetwork>> = IndexSet::new();
+        for certificate in certificates.clone() {
+            if !committed_certificates.contains(&certificate) {
+                candidate_pending_certificates.insert(certificate);
             }
         }
-        // Check that the set of pending certificates is equal to the set of candidate pending certificates. 
+        // Check that the set of pending certificates is equal to the set of candidate pending certificates.
         assert_eq!(pending_certificates, candidate_pending_certificates);
         Ok(())
     }
