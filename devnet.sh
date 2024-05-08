@@ -32,7 +32,7 @@ if [[ $clear_ledger == "y" ]]; then
 
   for ((index = 0; index < $((total_validators + total_clients)); index++)); do
     # Run 'snarkos clean' for each node in the background
-    snarkos clean --dev $index &
+    snarkos clean --network $network_id --dev $index &
 
     # Store the process ID of the background task
     clean_processes+=($!)
