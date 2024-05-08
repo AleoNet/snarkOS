@@ -264,6 +264,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
+    // GET /<network>/committee/{height}
+    pub(crate) async fn get_committee(
+        State(rest): State<Self>,
+        Path(height): Path<u32>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_committee(height)?))
+    }
+
     // GET /<network>/peers/count
     pub(crate) async fn get_peers_count(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.routing.router().number_of_connected_peers())
