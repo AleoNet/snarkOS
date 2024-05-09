@@ -92,10 +92,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
         storage_mode: StorageMode,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
-        // Prepare the shutdown flag.
-        let shutdown: Arc<AtomicBool> = Default::default();
-
         // Initialize the signal handler.
         let signal_node = Self::handle_signals(shutdown.clone());
 

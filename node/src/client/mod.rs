@@ -83,10 +83,8 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         genesis: Block<N>,
         cdn: Option<String>,
         storage_mode: StorageMode,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
-        // Prepare the shutdown flag.
-        let shutdown: Arc<AtomicBool> = Default::default();
-
         // Initialize the signal handler.
         let signal_node = Self::handle_signals(shutdown.clone());
 

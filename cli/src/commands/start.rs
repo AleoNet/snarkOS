@@ -40,7 +40,11 @@ use indexmap::IndexMap;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, path::PathBuf};
+use std::{
+    net::SocketAddr,
+    path::PathBuf,
+    sync::{atomic::AtomicBool, Arc},
+};
 use tokio::runtime::{self, Runtime};
 
 /// The recommended minimum number of 'open files' limit for a validator.
@@ -155,8 +159,12 @@ pub struct Start {
 impl Start {
     /// Starts the snarkOS node.
     pub fn parse(self) -> Result<String> {
+        // Prepare the shutdown flag.
+        let shutdown: Arc<AtomicBool> = Default::default();
+
         // Initialize the logger.
-        let log_receiver = crate::helpers::initialize_logger(self.verbosity, self.nodisplay, self.logfile.clone());
+        let log_receiver =
+            crate::helpers::initialize_logger(self.verbosity, self.nodisplay, self.logfile.clone(), shutdown.clone());
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
@@ -165,7 +173,7 @@ impl Start {
             match cli.network {
                 MainnetV0::ID => {
                     // Parse the node from the configurations.
-                    let node = cli.parse_node::<MainnetV0>().await.expect("Failed to parse the node");
+                    let node = cli.parse_node::<MainnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
                     if !cli.nodisplay {
                         // Initialize the display.
@@ -174,7 +182,7 @@ impl Start {
                 }
                 TestnetV0::ID => {
                     // Parse the node from the configurations.
-                    let node = cli.parse_node::<TestnetV0>().await.expect("Failed to parse the node");
+                    let node = cli.parse_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
                     if !cli.nodisplay {
                         // Initialize the display.
@@ -475,7 +483,7 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn parse_node<N: Network>(&mut self) -> Result<Node<N>> {
+    async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Node<N>> {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
 
@@ -569,9 +577,9 @@ impl Start {
 
         // Initialize the node.
         match node_type {
-            NodeType::Validator => Node::new_validator(node_ip, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs).await,
-            NodeType::Prover => Node::new_prover(node_ip, account, &trusted_peers, genesis, storage_mode).await,
-            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
+            NodeType::Validator => Node::new_validator(node_ip, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs, shutdown.clone()).await,
+            NodeType::Prover => Node::new_prover(node_ip, account, &trusted_peers, genesis, storage_mode, shutdown.clone()).await,
+            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, shutdown).await,
         }
     }
 
