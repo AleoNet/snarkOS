@@ -15,14 +15,16 @@
 use crate::helpers::{Proposal, SignedProposals};
 
 use snarkvm::{
-    console::{account::Address, network::Network},
-    prelude::{anyhow, bail, FromBytes, IoResult, Read, Result, ToBytes, Write},
+    console::{account::Address, network::Network, program::SUBDAG_CERTIFICATES_DEPTH},
+    ledger::narwhal::BatchCertificate,
+    prelude::{anyhow, bail, error, FromBytes, IoResult, Read, Result, ToBytes, Write},
 };
 
 use aleo_std::{aleo_ledger_dir, StorageMode};
+use indexmap::IndexSet;
 use std::{fs, path::PathBuf};
 
-// Returns the path where a proposal cache file may be stored.
+/// Returns the path where a proposal cache file may be stored.
 pub fn proposal_cache_path(network: u16, dev: Option<u16>) -> PathBuf {
     const PROPOSAL_CACHE_FILE_NAME: &str = "current-proposal-cache";
 
@@ -48,12 +50,19 @@ pub struct ProposalCache<N: Network> {
     proposal: Option<Proposal<N>>,
     /// The signed proposals this node has received.
     signed_proposals: SignedProposals<N>,
+    /// The pending certificates in storage that have not been included in the ledger.
+    pending_certificates: IndexSet<BatchCertificate<N>>,
 }
 
 impl<N: Network> ProposalCache<N> {
     /// Initializes a new instance of the proposal cache.
-    pub fn new(latest_round: u64, proposal: Option<Proposal<N>>, signed_proposals: SignedProposals<N>) -> Self {
-        Self { latest_round, proposal, signed_proposals }
+    pub fn new(
+        latest_round: u64,
+        proposal: Option<Proposal<N>>,
+        signed_proposals: SignedProposals<N>,
+        pending_certificates: IndexSet<BatchCertificate<N>>,
+    ) -> Self {
+        Self { latest_round, proposal, signed_proposals, pending_certificates }
     }
 
     /// Ensure that the proposal and every signed proposal is associated with the `expected_signer`.
@@ -110,9 +119,9 @@ impl<N: Network> ProposalCache<N> {
         Ok(())
     }
 
-    /// Returns the latest round, proposal and signed proposals.
-    pub fn into(self) -> (u64, Option<Proposal<N>>, SignedProposals<N>) {
-        (self.latest_round, self.proposal, self.signed_proposals)
+    /// Returns the latest round, proposal, signed proposals, and pending certificates.
+    pub fn into(self) -> (u64, Option<Proposal<N>>, SignedProposals<N>, IndexSet<BatchCertificate<N>>) {
+        (self.latest_round, self.proposal, self.signed_proposals, self.pending_certificates)
     }
 }
 
@@ -127,6 +136,12 @@ impl<N: Network> ToBytes for ProposalCache<N> {
         }
         // Serialize the `signed_proposals`.
         self.signed_proposals.write_le(&mut writer)?;
+        // Write the number of pending certificates.
+        u32::try_from(self.pending_certificates.len()).map_err(error)?.write_le(&mut writer)?;
+        // Serialize the pending certificates.
+        for certificate in &self.pending_certificates {
+            certificate.write_le(&mut writer)?;
+        }
 
         Ok(())
     }
@@ -144,15 +159,27 @@ impl<N: Network> FromBytes for ProposalCache<N> {
         };
         // Deserialize `signed_proposals`.
         let signed_proposals = SignedProposals::read_le(&mut reader)?;
+        // Read the number of pending certificates.
+        let num_certificates = u32::read_le(&mut reader)?;
+        // Ensure the number of certificates is within bounds.
+        if num_certificates > 2u32.saturating_pow(SUBDAG_CERTIFICATES_DEPTH as u32) {
+            return Err(error(format!(
+                "Number of certificates ({num_certificates}) exceeds the maximum ({})",
+                2u32.saturating_pow(SUBDAG_CERTIFICATES_DEPTH as u32)
+            )));
+        };
+        // Deserialize the pending certificates.
+        let pending_certificates =
+            (0..num_certificates).map(|_| BatchCertificate::read_le(&mut reader)).collect::<IoResult<IndexSet<_>>>()?;
 
-        Ok(Self::new(latest_round, proposal, signed_proposals))
+        Ok(Self::new(latest_round, proposal, signed_proposals, pending_certificates))
     }
 }
 
 impl<N: Network> Default for ProposalCache<N> {
     /// Initializes a new instance of the proposal cache.
     fn default() -> Self {
-        Self::new(0, None, Default::default())
+        Self::new(0, None, Default::default(), Default::default())
     }
 }
 
@@ -162,6 +189,7 @@ mod tests {
     use crate::helpers::{proposal::tests::sample_proposal, signed_proposals::tests::sample_signed_proposals};
     use snarkvm::{
         console::{account::PrivateKey, network::MainnetV0},
+        ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificates,
         utilities::TestRng,
     };
 
@@ -176,8 +204,9 @@ mod tests {
         let proposal = sample_proposal(rng);
         let signed_proposals = sample_signed_proposals(signer, rng);
         let round = proposal.round();
+        let pending_certificates = sample_batch_certificates(rng);
 
-        ProposalCache::new(round, Some(proposal), signed_proposals)
+        ProposalCache::new(round, Some(proposal), signed_proposals, pending_certificates)
     }
 
     #[test]

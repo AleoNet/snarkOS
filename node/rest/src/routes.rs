@@ -16,7 +16,7 @@ use super::*;
 use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
 use snarkvm::{
     ledger::puzzle::Solution,
-    prelude::{block::Transaction, Identifier, LimitedWriter, Plaintext, ToBytes},
+    prelude::{block::Transaction, Address, Identifier, LimitedWriter, Plaintext, ToBytes},
 };
 
 use indexmap::IndexMap;
@@ -262,6 +262,32 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     // GET /<network>/committee/latest
     pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
+    }
+
+    // GET /<network>/committee/{height}
+    pub(crate) async fn get_committee(
+        State(rest): State<Self>,
+        Path(height): Path<u32>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_committee(height)?))
+    }
+
+    // GET /<network>/delegators/{validator}
+    pub(crate) async fn get_delegators_for_validator(
+        State(rest): State<Self>,
+        Path(validator): Path<Address<N>>,
+    ) -> Result<ErasedJson, RestError> {
+        // Do not process the request if the node is too far behind to avoid sending outdated data.
+        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
+            return Err(RestError("Unable to  request delegators (node is syncing)".to_string()));
+        }
+
+        // Return the delegators for the given validator.
+        match tokio::task::spawn_blocking(move || rest.ledger.get_delegators_for_validator(&validator)).await {
+            Ok(Ok(delegators)) => Ok(ErasedJson::pretty(delegators)),
+            Ok(Err(err)) => Err(RestError(format!("Unable to request delegators - {err}"))),
+            Err(err) => Err(RestError(format!("Unable to request delegators - {err}"))),
+        }
     }
 
     // GET /<network>/peers/count

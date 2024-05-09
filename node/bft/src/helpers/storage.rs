@@ -323,6 +323,35 @@ impl<N: Network> Storage<N> {
         }
     }
 
+    /// Returns the certificates that have not yet been included in the ledger.
+    /// Note that the order of this set is by round and then insertion.
+    pub(crate) fn get_pending_certificates(&self) -> IndexSet<BatchCertificate<N>> {
+        let mut pending_certificates = IndexSet::new();
+
+        // Obtain the read locks.
+        let rounds = self.rounds.read();
+        let certificates = self.certificates.read();
+
+        // Iterate over the rounds.
+        for (_, certificates_for_round) in rounds.clone().sorted_by(|a, _, b, _| a.cmp(b)) {
+            // Iterate over the certificates for the round.
+            for (certificate_id, _, _) in certificates_for_round {
+                // Skip the certificate if it already exists in the ledger.
+                if self.ledger.contains_certificate(&certificate_id).unwrap_or(false) {
+                    continue;
+                }
+
+                // Add the certificate to the pending certificates.
+                match certificates.get(&certificate_id).cloned() {
+                    Some(certificate) => pending_certificates.insert(certificate),
+                    None => continue,
+                };
+            }
+        }
+
+        pending_certificates
+    }
+
     /// Checks the given `batch_header` for validity, returning the missing transmissions from storage.
     ///
     /// This method ensures the following invariants:
