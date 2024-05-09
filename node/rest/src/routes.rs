@@ -264,6 +264,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
+    // GET /<network>/committee/{height}
+    pub(crate) async fn get_committee(
+        State(rest): State<Self>,
+        Path(height): Path<u32>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_committee(height)?))
+    }
+
     // GET /<network>/delegators/{validator}
     pub(crate) async fn get_delegators_for_validator(
         State(rest): State<Self>,
