@@ -191,6 +191,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route(&format!("/{network}/stateRoot/latest"), get(Self::get_state_root_latest))
             .route(&format!("/{network}/stateRoot/:height"), get(Self::get_state_root))
             .route(&format!("/{network}/committee/latest"), get(Self::get_committee_latest))
+            .route(&format!("/{network}/delegators/:validator"), get(Self::get_delegators_for_validator))
 
             // Pass in `Rest` to make things convenient.
             .with_state(self.clone())
