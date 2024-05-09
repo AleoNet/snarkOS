@@ -15,7 +15,7 @@
 use crate::helpers::{Proposal, SignedProposals};
 
 use snarkvm::{
-    console::{account::Address, network::Network},
+    console::{account::Address, network::Network, program::SUBDAG_CERTIFICATES_DEPTH},
     ledger::narwhal::BatchCertificate,
     prelude::{anyhow, bail, error, FromBytes, IoResult, Read, Result, ToBytes, Write},
 };
@@ -161,6 +161,13 @@ impl<N: Network> FromBytes for ProposalCache<N> {
         let signed_proposals = SignedProposals::read_le(&mut reader)?;
         // Read the number of pending certificates.
         let num_certificates = u32::read_le(&mut reader)?;
+        // Ensure the number of certificates is within bounds.
+        if num_certificates > 2u32.saturating_pow(SUBDAG_CERTIFICATES_DEPTH as u32) {
+            return Err(error(format!(
+                "Number of certificates ({num_certificates}) exceeds the maximum ({})",
+                2u32.saturating_pow(SUBDAG_CERTIFICATES_DEPTH as u32)
+            )));
+        };
         // Deserialize the pending certificates.
         let pending_certificates =
             (0..num_certificates).map(|_| BatchCertificate::read_le(&mut reader)).collect::<IoResult<IndexSet<_>>>()?;
