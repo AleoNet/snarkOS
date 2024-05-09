@@ -12,10 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::LogWriter;
+use crate::helpers::{DynamicFormatter, LogWriter};
 
 use crossterm::tty::IsTty;
-use std::{fs::File, io, path::Path};
+use std::{
+    fs::File,
+    io,
+    path::Path,
+    sync::{atomic::AtomicBool, Arc},
+};
 use tokio::sync::mpsc;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -34,7 +39,12 @@ use tracing_subscriber::{
 /// 5 => info, debug, trace, snarkos_node_router=trace
 /// 6 => info, debug, trace, snarkos_node_tcp=trace
 /// ```
-pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile: P) -> mpsc::Receiver<Vec<u8>> {
+pub fn initialize_logger<P: AsRef<Path>>(
+    verbosity: u8,
+    nodisplay: bool,
+    logfile: P,
+    shutdown: Arc<AtomicBool>,
+) -> mpsc::Receiver<Vec<u8>> {
     match verbosity {
         0 => std::env::set_var("RUST_LOG", "info"),
         1 => std::env::set_var("RUST_LOG", "debug"),
@@ -111,6 +121,7 @@ pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile
                 .with_ansi(log_sender.is_none() && io::stdout().is_tty())
                 .with_writer(move || LogWriter::new(&log_sender))
                 .with_target(verbosity > 2)
+                .event_format(DynamicFormatter::new(shutdown))
                 .with_filter(filter),
         )
         .with(

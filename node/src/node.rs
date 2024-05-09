@@ -26,7 +26,10 @@ use snarkvm::prelude::{
 
 use aleo_std::StorageMode;
 use anyhow::Result;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 pub enum Node<N: Network> {
     /// A validator is a full node, capable of validating blocks.
@@ -52,6 +55,7 @@ impl<N: Network> Node<N> {
         storage_mode: StorageMode,
         allow_external_peers: bool,
         dev_txs: bool,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
             Validator::new(
@@ -67,6 +71,7 @@ impl<N: Network> Node<N> {
                 storage_mode,
                 allow_external_peers,
                 dev_txs,
+                shutdown,
             )
             .await?,
         )))
@@ -79,8 +84,9 @@ impl<N: Network> Node<N> {
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
         storage_mode: StorageMode,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
-        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, storage_mode).await?)))
+        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, storage_mode, shutdown).await?)))
     }
 
     /// Initializes a new client node.
@@ -93,9 +99,11 @@ impl<N: Network> Node<N> {
         genesis: Block<N>,
         cdn: Option<String>,
         storage_mode: StorageMode,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         Ok(Self::Client(Arc::new(
-            Client::new(node_ip, rest_ip, rest_rps, account, trusted_peers, genesis, cdn, storage_mode).await?,
+            Client::new(node_ip, rest_ip, rest_rps, account, trusted_peers, genesis, cdn, storage_mode, shutdown)
+                .await?,
         )))
     }
 

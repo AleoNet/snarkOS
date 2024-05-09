@@ -85,10 +85,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         storage_mode: StorageMode,
         allow_external_peers: bool,
         dev_txs: bool,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
-        // Prepare the shutdown flag.
-        let shutdown: Arc<AtomicBool> = Default::default();
-
         // Initialize the signal handler.
         let signal_node = Self::handle_signals(shutdown.clone());
 
@@ -490,6 +488,7 @@ mod tests {
             storage_mode,
             false,
             dev_txs,
+            Default::default(),
         )
         .await
         .unwrap();
