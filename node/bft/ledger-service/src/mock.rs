@@ -147,7 +147,6 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Returns the committee for the given round.
-    /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, _round: u64) -> Result<Committee<N>> {
         Ok(self.committee.clone())
     }
