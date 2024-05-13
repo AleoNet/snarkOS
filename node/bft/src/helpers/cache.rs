@@ -39,6 +39,10 @@ pub struct Cache<N: Network> {
     /// The ordered timestamp map of peer IPs and their cache hits on transmission requests.
     seen_outbound_transmissions: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
     /// The map of IPs to the number of validators requests.
+    ///
+    /// Note: we don't clear this map based on time but only on peer disconnect.
+    /// This is sufficient to avoid infinite growth as the committee has a fixed number
+    /// of members.
     seen_outbound_validators_requests: RwLock<HashMap<SocketAddr, u32>>,
 }
 
@@ -118,6 +122,11 @@ impl<N: Network> Cache<N> {
     /// Decrement the IP's number of validators requests, returning the updated number of validators requests.
     pub fn decrement_outbound_validators_requests(&self, peer_ip: SocketAddr) -> u32 {
         Self::decrement_counter(&self.seen_outbound_validators_requests, peer_ip)
+    }
+
+    /// Clears the the IP's number of validator requests.
+    pub fn clear_outbound_validators_requests(&self, peer_ip: SocketAddr) {
+        self.seen_outbound_validators_requests.write().remove(&peer_ip);
     }
 }
 
@@ -292,5 +301,28 @@ mod tests {
        outbound_event,
        outbound_certificate,
        outbound_transmission
+    }
+
+    #[test]
+    fn test_seen_outbound_validators_requests() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let input = Input::input();
+
+        // Check the map is empty.
+        assert!(!cache.contains_outbound_validators_request(input));
+
+        // Insert some requests.
+        for _ in 0..3 {
+            cache.increment_outbound_validators_requests(input);
+            assert!(cache.contains_outbound_validators_request(input));
+        }
+
+        // Remove a request.
+        cache.decrement_outbound_validators_requests(input);
+        assert!(cache.contains_outbound_validators_request(input));
+
+        // Clear all requests.
+        cache.clear_outbound_validators_requests(input);
+        assert!(!cache.contains_outbound_validators_request(input));
     }
 }

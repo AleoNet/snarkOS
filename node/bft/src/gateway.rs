@@ -1085,6 +1085,7 @@ impl<N: Network> Disconnect for Gateway<N> {
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
         if let Some(peer_ip) = self.resolver.get_listener(peer_addr) {
             self.remove_connected_peer(peer_ip);
+            self.cache.clear_outbound_validators_requests(peer_ip);
         }
     }
 }
