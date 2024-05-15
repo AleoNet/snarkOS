@@ -2082,10 +2082,45 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should succeed.
         assert!(
             primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_batch_propose_from_peer_when_not_synced() {
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Create a valid proposal with an author that isn't the primary.
+        let round = 1;
+        let peer_account = &accounts[1];
+        let peer_ip = peer_account.0;
+        let timestamp = now() + MIN_BATCH_DELAY_IN_SECS as i64;
+        let proposal = create_test_proposal(
+            &peer_account.1,
+            primary.ledger.current_committee().unwrap(),
+            round,
+            Default::default(),
+            timestamp,
+            &mut rng,
+        );
+
+        // Make sure the primary is aware of the transmissions in the proposal.
+        for (transmission_id, transmission) in proposal.transmissions() {
+            primary.workers[0].process_transmission_from_peer(peer_ip, *transmission_id, transmission.clone())
+        }
+
+        // The author must be known to resolver to pass propose checks.
+        primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+
+        // Try to process the batch proposal from the peer, should fail.
+        assert!(
+            primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.is_err()
         );
     }
 
@@ -2118,6 +2153,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should succeed.
         primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.unwrap();
@@ -2149,6 +2186,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should error.
         assert!(
@@ -2191,6 +2230,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should error.
         assert!(
@@ -2233,6 +2274,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should error.
         assert!(
@@ -2269,6 +2312,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should error.
         assert!(
