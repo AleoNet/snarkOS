@@ -49,7 +49,6 @@ commands:
         default: snarkos-stable-cache
     steps:
       - run: set -e
-      - setup_remote_docker
       - run:
           name: Prepare environment and install dependencies
           command: |
