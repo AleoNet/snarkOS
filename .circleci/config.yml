@@ -161,7 +161,7 @@ jobs:
   integration:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: 2xlarge
+    resource_class: anf/2xlarge
     steps:
       - run_serial_long:
           workspace_member: .integration
@@ -170,7 +170,7 @@ jobs:
   snarkos:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: 2xlarge
+    resource_class: anf/2xlarge
     steps:
       - run_serial:
           workspace_member: .
@@ -206,7 +206,7 @@ jobs:
   node:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: 2xlarge
+    resource_class: anf/2xlarge
     steps:
       - run_serial:
           workspace_member: node
@@ -215,7 +215,7 @@ jobs:
   node-bft:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: 2xlarge
+    resource_class: anf/2xlarge
     steps:
       - run_serial:
           workspace_member: node/bft
@@ -224,7 +224,7 @@ jobs:
   node-bft-events:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: 2xlarge
+    resource_class: anf/2xlarge
     steps:
       - run_serial:
           workspace_member: node/bft/events
@@ -260,7 +260,7 @@ jobs:
   node-consensus:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: 2xlarge
+    resource_class: anf/2xlarge
     steps:
       - run_serial:
           workspace_member: node/consensus
@@ -348,7 +348,7 @@ jobs:
   check-clippy:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: 2xlarge
+    resource_class: anf/2xlarge
     steps:
       - checkout
       - setup_environment:
