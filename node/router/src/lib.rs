@@ -395,12 +395,12 @@ impl<N: Network> Router<N> {
         if cfg!(feature = "test") || self.is_dev {
             // Development testing contains no bootstrap peers.
             vec![]
-        } else if N::ID == 0 {
+        } else if N::ID == snarkvm::console::network::MainnetV0::ID {
             // Mainnet contains the following bootstrap peers.
             vec![
                 // TODO: Populate me with Mainnet Beta IP addresses.
             ]
-        } else if N::ID == 1 {
+        } else if N::ID == snarkvm::console::network::TestnetV0::ID {
             // Testnet contains the following bootstrap peers.
             vec![
                 SocketAddr::from_str("34.168.118.156:4130").unwrap(),
