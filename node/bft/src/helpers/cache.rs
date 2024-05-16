@@ -39,7 +39,6 @@ pub struct Cache<N: Network> {
     /// The ordered timestamp map of peer IPs and their cache hits on transmission requests.
     seen_outbound_transmissions: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
     /// The map of IPs to the number of validators requests.
-    ///
     seen_outbound_validators_requests: RwLock<HashMap<SocketAddr, u32>>,
 }
 
