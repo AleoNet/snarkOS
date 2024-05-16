@@ -115,8 +115,15 @@ impl Developer {
 
     /// Fetch the program from the given endpoint.
     fn fetch_program<N: Network>(program_id: &ProgramID<N>, endpoint: &str) -> Result<Program<N>> {
+        // Get the network being used.
+        let network = match N::ID {
+            snarkvm::console::network::MainnetV0::ID => "mainnet",
+            snarkvm::console::network::TestnetV0::ID => "testnet",
+            _ => "mainnet",
+        };
+
         // Send a request to the query node.
-        let response = ureq::get(&format!("{endpoint}/mainnet/program/{program_id}")).call();
+        let response = ureq::get(&format!("{endpoint}/{network}/program/{program_id}")).call();
 
         // Deserialize the program.
         match response {
@@ -136,9 +143,16 @@ impl Developer {
         let credits = ProgramID::<N>::from_str("credits.aleo")?;
         let account_mapping = Identifier::<N>::from_str("account")?;
 
+        // Get the network being used.
+        let network = match N::ID {
+            snarkvm::console::network::MainnetV0::ID => "mainnet",
+            snarkvm::console::network::TestnetV0::ID => "testnet",
+            _ => "mainnet",
+        };
+
         // Send a request to the query node.
         let response =
-            ureq::get(&format!("{endpoint}/mainnet/program/{credits}/mapping/{account_mapping}/{address}")).call();
+            ureq::get(&format!("{endpoint}/{network}/program/{credits}/mapping/{account_mapping}/{address}")).call();
 
         // Deserialize the balance.
         let balance: Result<Option<Value<N>>> = match response {
