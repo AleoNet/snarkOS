@@ -778,6 +778,7 @@ impl<N: Network> BFT<N> {
             mut rx_primary_certificate,
             mut rx_sync_bft_dag_at_bootup,
             mut rx_sync_bft,
+            mut rx_is_recently_committed,
         } = bft_receiver;
 
         // Process the current round from the primary.
@@ -817,6 +818,18 @@ impl<N: Network> BFT<N> {
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(result).ok();
+            }
+        });
+
+        // Process the request to check if the batch certificate was recently committed. 
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some((certificate, callback)) = rx_is_recently_committed.recv().await {
+                // Check if the certificate was recently committed. 
+                let is_committed = self_.dag.read().is_recently_committed(certificate.round(), certificate.id()); 
+                // Send the callback **after** updating the DAG.
+                // Note: We must await the DAG update before proceeding.
+                callback.send(is_committed).ok();
             }
         });
     }
