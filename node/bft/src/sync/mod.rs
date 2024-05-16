@@ -560,6 +560,7 @@ impl<N: Network> Sync<N> {
 
     /// Returns the block sync module.
     #[cfg(test)]
+    #[doc(hidden)]
     pub(super) fn block_sync(&self) -> &BlockSync<N> {
         &self.block_sync
     }
