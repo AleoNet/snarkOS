@@ -1085,6 +1085,10 @@ impl<N: Network> Disconnect for Gateway<N> {
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
         if let Some(peer_ip) = self.resolver.get_listener(peer_addr) {
             self.remove_connected_peer(peer_ip);
+
+            // We don't clear this map based on time but only on peer disconnect.
+            // This is sufficient to avoid infinite growth as the committee has a fixed number
+            // of members.
             self.cache.clear_outbound_validators_requests(peer_ip);
         }
     }

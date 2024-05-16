@@ -40,9 +40,6 @@ pub struct Cache<N: Network> {
     seen_outbound_transmissions: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
     /// The map of IPs to the number of validators requests.
     ///
-    /// Note: we don't clear this map based on time but only on peer disconnect.
-    /// This is sufficient to avoid infinite growth as the committee has a fixed number
-    /// of members.
     seen_outbound_validators_requests: RwLock<HashMap<SocketAddr, u32>>,
 }
 
