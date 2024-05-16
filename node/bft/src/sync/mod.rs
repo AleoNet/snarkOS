@@ -380,23 +380,12 @@ impl<N: Network> Sync<N> {
                 })
                 .collect::<HashMap<_, _>>();
 
-            // Iterate over the certificates.
+            // Sync the storage with the certificates.
             for certificates in subdag.values().cloned() {
                 cfg_into_iter!(certificates.clone()).for_each(|certificate| {
                     // Sync the batch certificate with the block.
                     self.storage.sync_certificate_with_block(&block, certificate.clone(), &unconfirmed_transactions);
                 });
-
-                // Sync the BFT DAG with the certificates.
-                for certificate in certificates {
-                    // If a BFT sender was provided, send the certificate to the BFT.
-                    if let Some(bft_sender) = self.bft_sender.get() {
-                        // Await the callback to continue.
-                        if let Err(e) = bft_sender.send_sync_bft(certificate).await {
-                            bail!("Sync - {e}");
-                        };
-                    }
-                }
             }
         }
 
@@ -474,15 +463,56 @@ impl<N: Network> Sync<N> {
                     }
                 }
 
-                // Add the blocks to the ledger.
-                for block in blocks_to_add {
+                // Sync the BFT DAG with the blocks.
+                for block in blocks_to_add.clone(){
                     // Check that the blocks are sequential and can be added to the ledger.
                     let block_height = block.height();
                     if block_height != self.ledger.latest_block_height().saturating_add(1) {
                         warn!("Skipping block {block_height} from the latest block responses - not sequential.");
                         continue;
                     }
+                    if let Authority::Quorum(subdag) = block.authority() {
+                        // Iterate over the certificates.
+                        for certificates in subdag.values().cloned() {
+                            // Sync the BFT DAG with the certificates.
+                            for certificate in certificates {
+                                // If a BFT sender was provided, send the certificate to the BFT.
+                                if let Some(bft_sender) = self.bft_sender.get() {
+                                    // Await the callback to continue.
+                                    if let Err(e) = bft_sender.send_sync_bft(certificate).await {
+                                        bail!("Sync - {e}");
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
 
+                // Check if the leader certificate of the block has recently been committed in the replicated DAG state above. 
+                // This ensures consistency between block sync and the BFT DAG state. 
+                for block in blocks_to_add {
+                    // Retrieve the block height.
+                    let block_height = block.height();
+                    if let Authority::Quorum(subdag) = block.authority() {
+                        // Retrieve the leader certificate of the subdag. 
+                        let leader_certificate = subdag.leader_certificate(); 
+                        if let Some(bft_sender) = self.bft_sender.get() {
+                            // Await the callback to continue.
+                            match bft_sender.send_sync_certificate_to_check_commit_bft(leader_certificate.clone()).await {
+                                Ok(is_recently_committed) => {
+                                    if !is_recently_committed{
+                                        bail!("Sync - Failed to advance blocks - leader certificate with author {} from round {} was not recently committed.", leader_certificate.author(), leader_certificate.round());
+                                    }
+                                    info!("Sync - leader certificate with author {} from round {} was recently committed.", leader_certificate.author(), leader_certificate.round());
+                                },
+                                Err(e) => {
+                                    bail!("Sync - Failed to check if leader certificate was recently committed - {e}");
+                                }
+                            }; 
+                        }
+                    }
+                    // Add the block to the ledger. 
+                    info!("Proceeding to advance to sync block at height {}. ", block_height); 
                     let self_ = self.clone();
                     tokio::task::spawn_blocking(move || {
                         // Check the next block.
@@ -501,6 +531,7 @@ impl<N: Network> Sync<N> {
                     // Remove the block height from the latest block responses.
                     latest_block_responses.remove(&block_height);
                 }
+
             } else {
                 debug!(
                     "Availability threshold was not reached for block {next_block_height} at round {commit_round}. Checking next block..."
