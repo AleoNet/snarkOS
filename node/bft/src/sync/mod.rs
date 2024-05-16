@@ -463,8 +463,10 @@ impl<N: Network> Sync<N> {
                     }
                 }
 
-                // Sync the BFT DAG with the blocks.
-                for block in blocks_to_add.clone(){
+                // Sync the BFT DAG with the blocks. Adding the certificates for the sync blocks must occur before checking if the leader certificates have been committed.
+                // Note subdags can be committed by the linking rule and so checking recent commits should only occur after the root subdag, that reached availability 
+                // threshold, was committed in the BFT. 
+                for block in blocks_to_add.clone() {
                     // Check that the blocks are sequential and can be added to the ledger.
                     let block_height = block.height();
                     if block_height != self.ledger.latest_block_height().saturating_add(1) {
