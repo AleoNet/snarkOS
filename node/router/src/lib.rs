@@ -390,16 +390,27 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of bootstrap peers.
+    #[allow(clippy::if_same_then_else)]
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
         if cfg!(feature = "test") || self.is_dev {
+            // Development testing contains no bootstrap peers.
             vec![]
-        } else {
+        } else if N::ID == 0 {
+            // Mainnet contains the following bootstrap peers.
+            vec![
+                // TODO: Populate me with Mainnet Beta IP addresses.
+            ]
+        } else if N::ID == 1 {
+            // Testnet contains the following bootstrap peers.
             vec![
                 SocketAddr::from_str("34.168.118.156:4130").unwrap(),
                 SocketAddr::from_str("35.231.152.213:4130").unwrap(),
                 SocketAddr::from_str("34.17.53.129:4130").unwrap(),
                 SocketAddr::from_str("35.200.149.162:4130").unwrap(),
             ]
+        } else {
+            // Unrecognized networks contain no bootstrap peers.
+            vec![]
         }
     }
 
