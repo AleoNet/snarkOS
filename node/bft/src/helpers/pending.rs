@@ -270,7 +270,7 @@ mod tests {
         let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
         let addr_2 = SocketAddr::from(([127, 0, 0, 1], 2345));
         let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
-        let addr_4 = SocketAddr::from(([127, 0, 0, 1], 3456));
+        let addr_4 = SocketAddr::from(([127, 0, 0, 1], 5678));
 
         // Initialize the callbacks.
         let (callback_sender_1, _) = oneshot::channel();
