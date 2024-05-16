@@ -119,7 +119,7 @@ impl Developer {
         let network = match N::ID {
             snarkvm::console::network::MainnetV0::ID => "mainnet",
             snarkvm::console::network::TestnetV0::ID => "testnet",
-            _ => "mainnet",
+            _ => bail!("Unsupported network ID"),
         };
 
         // Send a request to the query node.
@@ -147,7 +147,7 @@ impl Developer {
         let network = match N::ID {
             snarkvm::console::network::MainnetV0::ID => "mainnet",
             snarkvm::console::network::TestnetV0::ID => "testnet",
-            _ => "mainnet",
+            _ => bail!("Unsupported network ID"),
         };
 
         // Send a request to the query node.
