@@ -71,7 +71,7 @@ impl Scan {
         match self.network {
             MainnetV0::ID => self.scan_records::<MainnetV0>(),
             TestnetV0::ID => self.scan_records::<TestnetV0>(),
-            _ => bail!("Unsupported network ID"),
+            unknown_id => bail!("Unknown network ID ({unknown_id})"),
         }
     }
 
@@ -135,7 +135,7 @@ impl Scan {
         let network = match self.network {
             MainnetV0::ID => "mainnet",
             TestnetV0::ID => "testnet",
-            _ => bail!("Unsupported network ID"),
+            unknown_id => bail!("Unknown network ID ({unknown_id})"),
         };
 
         match (self.start, self.end, self.last) {
@@ -186,7 +186,7 @@ impl Scan {
         let network = match N::ID {
             MainnetV0::ID => "mainnet",
             TestnetV0::ID => "testnet",
-            _ => bail!("Unsupported network ID"),
+            unknown_id => bail!("Unknown network ID ({unknown_id})"),
         };
 
         // Derive the x-coordinate of the address corresponding to the given view key.
@@ -364,7 +364,7 @@ impl Scan {
             let network = match N::ID {
                 MainnetV0::ID => "mainnet",
                 TestnetV0::ID => "testnet",
-                _ => bail!("Unsupported network ID"),
+                unknown_id => bail!("Unknown network ID ({unknown_id})"),
             };
 
             // Establish the endpoint.
