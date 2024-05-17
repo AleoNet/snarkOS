@@ -99,11 +99,11 @@ impl<N: Network> BFTSender<N> {
         callback_receiver.await?
     }
 
-    /// Sends the batch certificate to the BFT to receive a callback on whether the certificate was recently committed. 
+    /// Sends the batch certificate to the BFT to receive a callback on whether the certificate was recently committed.
     pub async fn send_sync_certificate_to_check_commit_bft(&self, certificate: BatchCertificate<N>) -> Result<bool> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
-        // Send the certificate to the BFT. 
+        // Send the certificate to the BFT.
         self.tx_is_recently_committed.send((certificate, callback_sender)).await?;
         // Await the callback to continue.
         Ok(callback_receiver.await?)
@@ -125,10 +125,22 @@ pub fn init_bft_channels<N: Network>() -> (BFTSender<N>, BFTReceiver<N>) {
     let (tx_primary_certificate, rx_primary_certificate) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_sync_bft_dag_at_bootup, rx_sync_bft_dag_at_bootup) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_sync_bft, rx_sync_bft) = mpsc::channel(MAX_CHANNEL_SIZE);
-    let (tx_is_recently_committed, rx_is_recently_committed) = mpsc::channel(MAX_CHANNEL_SIZE); 
+    let (tx_is_recently_committed, rx_is_recently_committed) = mpsc::channel(MAX_CHANNEL_SIZE);
 
-    let sender = BFTSender { tx_primary_round, tx_primary_certificate, tx_sync_bft_dag_at_bootup, tx_sync_bft, tx_is_recently_committed };
-    let receiver = BFTReceiver { rx_primary_round, rx_primary_certificate, rx_sync_bft_dag_at_bootup, rx_sync_bft, rx_is_recently_committed };
+    let sender = BFTSender {
+        tx_primary_round,
+        tx_primary_certificate,
+        tx_sync_bft_dag_at_bootup,
+        tx_sync_bft,
+        tx_is_recently_committed,
+    };
+    let receiver = BFTReceiver {
+        rx_primary_round,
+        rx_primary_certificate,
+        rx_sync_bft_dag_at_bootup,
+        rx_sync_bft,
+        rx_is_recently_committed,
+    };
 
     (sender, receiver)
 }
