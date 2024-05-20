@@ -348,6 +348,12 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
+        // Determine if the current proposal is expired.
+        if round == *lock_guard {
+            warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
+            return Ok(());
+        }
+
         // If there is a batch being proposed already,
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
@@ -531,13 +537,6 @@ impl<N: Network> Primary<N> {
         ensure!(round > 0, "Round 0 cannot have transaction batches");
         // Determine the current timestamp.
         let current_timestamp = now();
-        // Determine if the current proposal is expired.
-        if *lock_guard == round {
-            warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
-            // Reinsert the transmissions back into the ready queue for the next proposal.
-            self.reinsert_transmissions_into_workers(transmissions)?;
-            return Ok(());
-        }
 
         *lock_guard = round;
 
