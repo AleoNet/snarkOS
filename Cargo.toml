@@ -4,7 +4,7 @@ version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -45,8 +45,8 @@ version = "=0.1.24"
 default-features = false
 
 [workspace.dependencies.snarkvm]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "3ebe60c"
+git = "https://github.com/AleoNet/snarkVM.git"
+rev = "140ff26"
 #version = "=0.16.18"
 features = [ "circuit", "console", "rocks" ]
 
