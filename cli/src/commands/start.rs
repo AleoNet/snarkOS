@@ -37,7 +37,7 @@ use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
 use indexmap::IndexMap;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -392,11 +392,11 @@ impl Start {
                             "Validator address {validator_address} is not included in the list of development addresses"
                         );
 
-                        // Add or update the validator entry in the list of members.
+                        // Add or update the validator entry in the list of members
                         members
                             .entry(*validator_address)
-                            .and_modify(|(stake, _)| *stake += amount)
-                            .or_insert((*amount, true));
+                            .and_modify(|(stake, _, _)| *stake += amount)
+                            .or_insert((*amount, true, rng.gen_range(0..100)));
                     }
                     // Construct the committee.
                     let committee = Committee::<N>::new(0u64, members)?;
@@ -411,14 +411,14 @@ impl Start {
                     // Construct the committee members and distribute stakes evenly among committee members.
                     let members = development_addresses
                         .iter()
-                        .map(|address| (*address, (stake_per_member, true)))
+                        .map(|address| (*address, (stake_per_member, true, rng.gen_range(0..100))))
                         .collect::<IndexMap<_, _>>();
 
                     // Construct the bonded balances.
                     // Note: The withdrawal address is set to the staker address.
                     let bonded_balances = members
                         .iter()
-                        .map(|(address, (stake, _))| (*address, (*address, *address, *stake)))
+                        .map(|(address, (stake, _, _))| (*address, (*address, *address, *stake)))
                         .collect::<IndexMap<_, _>>();
                     // Construct the committee.
                     let committee = Committee::<N>::new(0u64, members)?;
@@ -658,9 +658,9 @@ fn load_or_compute_genesis<N: Network>(
     ]?);
 
     // Input the parameters' metadata.
+    preimage.extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
     preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
     preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::UnbondDelegatorAsValidatorVerifier::METADATA.as_bytes());
     preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
     preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
     preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
