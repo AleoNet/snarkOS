@@ -320,6 +320,13 @@ impl<N: Network> Primary<N> {
 }
 
 impl<N: Network> Primary<N> {
+    /// Clears the worker solutions.
+    pub fn clear_worker_solutions(&self) {
+        self.workers.iter().for_each(Worker::clear_solutions);
+    }
+}
+
+impl<N: Network> Primary<N> {
     /// Proposes the batch for the current round.
     ///
     /// This method performs the following steps:
