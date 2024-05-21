@@ -342,6 +342,9 @@ impl<N: Network> Primary<N> {
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
 
+        // If the current round is 0, return early.
+        ensure!(round > 0, "Round 0 cannot have transaction batches");
+
         // If the current storage round is below the latest proposal round, then return early.
         if round < *lock_guard {
             warn!("Cannot propose a batch for round {round} - the latest proposal cache round is {}", *lock_guard);
@@ -533,8 +536,7 @@ impl<N: Network> Primary<N> {
                 }
             }
         }
-        // Ditto if the batch had already been proposed and not expired.
-        ensure!(round > 0, "Round 0 cannot have transaction batches");
+
         // Determine the current timestamp.
         let current_timestamp = now();
 
