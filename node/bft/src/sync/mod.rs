@@ -382,16 +382,28 @@ impl<N: Network> Sync<N> {
 
             // Sync the storage with the certificates.
             for certificates in subdag.values().cloned() {
-                cfg_into_iter!(certificates).for_each(|certificate| {
+                cfg_into_iter!(certificates.clone()).for_each(|certificate| {
                     // Sync the batch certificate with the block.
                     self.storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
                 });
+
+                // Sync the BFT DAG with the blocks.
+                // Note subdags can be committed by the linking rule and so checking recent commits should only occur after the root subdag, that reached availability
+                // threshold, was committed in the BFT.
+                for certificate in certificates{
+                    // If a BFT sender was provided, send the certificate to the BFT.
+                    if let Some(bft_sender) = self.bft_sender.get() {
+                        // Await the callback to continue.
+                        if let Err(e) = bft_sender.send_sync_bft(certificate).await {
+                            bail!("Sync - {e}");
+                        };
+                    }
+                }
             }
         }
 
         // Fetch the latest block height.
         let latest_block_height = self.ledger.latest_block_height();
-
         // Insert the latest block response.
         latest_block_responses.insert(block.height(), block);
         // Clear the latest block responses of older blocks.
@@ -460,33 +472,6 @@ impl<N: Network> Sync<N> {
                         blocks_to_add.insert(0, previous_block.clone());
                         // Update the current certificate to the previous leader certificate.
                         current_certificate = previous_certificate;
-                    }
-                }
-
-                // Sync the BFT DAG with the blocks. Adding the certificates for the sync blocks must occur before checking if the leader certificates have been committed.
-                // Note subdags can be committed by the linking rule and so checking recent commits should only occur after the root subdag, that reached availability
-                // threshold, was committed in the BFT.
-                for block in blocks_to_add.iter() {
-                    // Check that the blocks are sequential and can be added to the ledger.
-                    let block_height = block.height();
-                    if block_height != self.ledger.latest_block_height().saturating_add(1) {
-                        warn!("Skipping block {block_height} from the latest block responses - not sequential.");
-                        continue;
-                    }
-                    if let Authority::Quorum(subdag) = block.authority() {
-                        // Iterate over the certificates.
-                        for certificates in subdag.values().cloned() {
-                            // Sync the BFT DAG with the certificates.
-                            for certificate in certificates {
-                                // If a BFT sender was provided, send the certificate to the BFT.
-                                if let Some(bft_sender) = self.bft_sender.get() {
-                                    // Await the callback to continue.
-                                    if let Err(e) = bft_sender.send_sync_bft(certificate).await {
-                                        bail!("Sync - {e}");
-                                    };
-                                }
-                            }
-                        }
                     }
                 }
 
