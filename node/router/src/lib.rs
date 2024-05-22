@@ -401,12 +401,17 @@ impl<N: Network> Router<N> {
                 // TODO: Populate me with Mainnet Beta IP addresses.
             ]
         } else if N::ID == snarkvm::console::network::TestnetV0::ID {
-            // Testnet contains the following bootstrap peers.
+            // TestnetV0 contains the following bootstrap peers.
             vec![
                 SocketAddr::from_str("34.168.118.156:4130").unwrap(),
                 SocketAddr::from_str("35.231.152.213:4130").unwrap(),
                 SocketAddr::from_str("34.17.53.129:4130").unwrap(),
                 SocketAddr::from_str("35.200.149.162:4130").unwrap(),
+            ]
+        } else if N::ID == snarkvm::console::network::TestnetV1::ID {
+            // TestnetV1 contains the following bootstrap peers.
+            vec![
+                // TODO: Populate me with TestnetV1 IP addresses.
             ]
         } else {
             // Unrecognized networks contain no bootstrap peers.

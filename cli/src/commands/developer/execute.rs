@@ -14,7 +14,7 @@
 
 use super::Developer;
 use snarkvm::{
-    console::network::{MainnetV0, Network, TestnetV0},
+    console::network::{MainnetV0, Network, TestnetV0, TestnetV1},
     prelude::{
         query::Query,
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
@@ -94,6 +94,7 @@ impl Execute {
         match self.network {
             MainnetV0::ID => self.construct_execution::<MainnetV0>(),
             TestnetV0::ID => self.construct_execution::<TestnetV0>(),
+            TestnetV1::ID => self.construct_execution::<TestnetV1>(),
             unknown_id => bail!("Unknown network ID ({unknown_id})"),
         }
     }

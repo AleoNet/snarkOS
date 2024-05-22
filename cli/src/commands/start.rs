@@ -19,7 +19,7 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey},
         algorithms::Hash,
-        network::{MainnetV0, Network, TestnetV0},
+        network::{MainnetV0, Network, TestnetV0, TestnetV1},
     },
     ledger::{
         block::Block,
@@ -183,6 +183,15 @@ impl Start {
                 TestnetV0::ID => {
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    // If the display is enabled, render the display.
+                    if !cli.nodisplay {
+                        // Initialize the display.
+                        Display::start(node, log_receiver).expect("Failed to initialize the display");
+                    }
+                }
+                TestnetV1::ID => {
+                    // Parse the node from the configurations.
+                    let node = cli.parse_node::<TestnetV1>(shutdown.clone()).await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
                     if !cli.nodisplay {
                         // Initialize the display.

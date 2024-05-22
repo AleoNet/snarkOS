@@ -121,6 +121,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         let network = match N::ID {
             snarkvm::console::network::MainnetV0::ID => "mainnet",
             snarkvm::console::network::TestnetV0::ID => "testnet",
+            snarkvm::console::network::TestnetV1::ID => "testnet_v1",
             unknown_id => {
                 eprintln!("Unknown network ID ({unknown_id})");
                 return;
