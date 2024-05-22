@@ -351,12 +351,6 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // Determine if the current proposal is expired.
-        if round == *lock_guard {
-            warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
-            return Ok(());
-        }
-
         // If there is a batch being proposed already,
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
@@ -425,6 +419,12 @@ impl<N: Network> Primary<N> {
                 }
             }
             debug!("Primary is safely skipping {}", format!("(round {round} was already certified)").dimmed());
+            return Ok(());
+        }
+
+        // Determine if the current round has been proposed.
+        if round == *lock_guard {
+            warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
             return Ok(());
         }
 
