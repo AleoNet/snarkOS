@@ -102,6 +102,11 @@ impl<N: Network> Sync<N> {
         // Start the block sync loop.
         let self_ = self.clone();
         self.handles.lock().push(tokio::spawn(async move {
+            // Sleep briefly to allow an initial primary ping to come in prior to entering the loop.
+            // Ideally, a node does not consider itself synced when it has not received
+            // any block locators from peer. However, in the initial bootup of validators,
+            // this needs to happen, so we use this additional sleep as a grace period.
+            tokio::time::sleep(Duration::from_millis(PRIMARY_PING_IN_MS)).await;
             loop {
                 // Sleep briefly to avoid triggering spam detection.
                 tokio::time::sleep(Duration::from_millis(PRIMARY_PING_IN_MS)).await;
