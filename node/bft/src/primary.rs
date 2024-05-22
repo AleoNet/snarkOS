@@ -423,6 +423,10 @@ impl<N: Network> Primary<N> {
         }
 
         // Determine if the current round has been proposed.
+        // Note: Do NOT make this judgment in advance before rebroadcast and round update. Rebroadcasting is
+        // good for network reliability and should not be prevented for the already existing proposed_batch.
+        // If a certificate already exists for the current round, an attempt should be made to advance the
+        // round as early as possible.
         if round == *lock_guard {
             warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
             return Ok(());
