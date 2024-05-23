@@ -484,6 +484,14 @@ impl<N: Network> Consensus<N> {
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
 
+        // If the next block starts a new epoch, clear the existing solutions.
+        if next_block.height() % N::NUM_BLOCKS_PER_EPOCH == 0 {
+            // Clear the solutions queue.
+            self.solutions_queue.lock().clear();
+            // Clear the worker solutions.
+            self.bft.primary().clear_worker_solutions();
+        }
+
         #[cfg(feature = "metrics")]
         {
             let elapsed = std::time::Duration::from_secs((snarkos_node_bft::helpers::now() - start) as u64);

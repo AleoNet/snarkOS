@@ -15,7 +15,7 @@
 use snarkvm::{
     console::{
         account::{Address, PrivateKey, Signature},
-        network::{MainnetV0, Network, TestnetV0},
+        network::{CanaryV0, MainnetV0, Network, TestnetV0},
         prelude::{Environment, Uniform},
         program::{ToFields, Value},
         types::Field,
@@ -113,12 +113,14 @@ impl Account {
                     Some(vanity) => match network {
                         MainnetV0::ID => Self::new_vanity::<MainnetV0>(vanity.as_str(), discreet),
                         TestnetV0::ID => Self::new_vanity::<TestnetV0>(vanity.as_str(), discreet),
+                        CanaryV0::ID => Self::new_vanity::<CanaryV0>(vanity.as_str(), discreet),
                         unknown_id => bail!("Unknown network ID ({unknown_id})"),
                     },
                     // Generate a seeded account for the specified network.
                     None => match network {
                         MainnetV0::ID => Self::new_seeded::<MainnetV0>(seed, discreet),
                         TestnetV0::ID => Self::new_seeded::<TestnetV0>(seed, discreet),
+                        CanaryV0::ID => Self::new_seeded::<CanaryV0>(seed, discreet),
                         unknown_id => bail!("Unknown network ID ({unknown_id})"),
                     },
                 }
@@ -140,6 +142,7 @@ impl Account {
                 match network {
                     MainnetV0::ID => Self::sign::<MainnetV0>(key, message, seed, raw),
                     TestnetV0::ID => Self::sign::<TestnetV0>(key, message, seed, raw),
+                    CanaryV0::ID => Self::sign::<CanaryV0>(key, message, seed, raw),
                     unknown_id => bail!("Unknown network ID ({unknown_id})"),
                 }
             }
@@ -148,6 +151,7 @@ impl Account {
                 match network {
                     MainnetV0::ID => Self::verify::<MainnetV0>(address, signature, message, raw),
                     TestnetV0::ID => Self::verify::<TestnetV0>(address, signature, message, raw),
+                    CanaryV0::ID => Self::verify::<CanaryV0>(address, signature, message, raw),
                     unknown_id => bail!("Unknown network ID ({unknown_id})"),
                 }
             }
