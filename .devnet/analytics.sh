@@ -16,9 +16,9 @@ fi
 
 # Prompt the user to specify a network ID
 while true; do
-  echo "Please specify a network ID (0 for mainnet, 1 for testnet):"
+  echo "Please specify a network ID (0 for mainnet, 1 for testnet, 2 for canary):"
   read networkID
-  if [[ $networkID == 0 || $networkID == 1 ]]; then
+  if [[ $networkID == 0 || $networkID == 1 || $networkID == 2 ]]; then
     break
   else
     echo "Invalid network ID. Please enter 0 or 1."

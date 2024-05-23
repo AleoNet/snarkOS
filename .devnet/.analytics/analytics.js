@@ -148,6 +148,9 @@ async function fetchBlockMetrics(metricType, optionalBlockHeight, networkID) {
         case 1:
             networkName = "testnet";
             break;
+        case 2:
+            networkName = "canary";
+            break;
         default:
             throw new Error(`Unknown network ID (${networkID})`);
     }
@@ -214,7 +217,7 @@ async function main() {
                 describe: 'Network ID to fetch block metrics from',
                 demandOption: true,
                 type: 'number',
-                choices: [0, 1],
+                choices: [0, 1, 2],
             }
         })
         .check((argv) => {

@@ -13,7 +13,7 @@ NUM_INSTANCES="${NUM_INSTANCES:-$NODE_ID}"
 echo "Using $NUM_INSTANCES AWS EC2 instances for querying."
 
 # Read the network ID from user or use a default value of 1
-read -p "Enter the network ID (mainnet = 0, testnet = 1) (default: 1): " NETWORK_ID
+read -p "Enter the network ID (mainnet = 0, testnet = 1, canary = 2) (default: 1): " NETWORK_ID
 NETWORK_ID=${NETWORK_ID:-1}
 
 echo "Using network ID $NETWORK_ID."
