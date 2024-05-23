@@ -14,7 +14,7 @@
 
 use super::Developer;
 use snarkvm::{
-    console::network::{MainnetV0, Network, TestnetV0},
+    console::network::{CanaryV0, MainnetV0, Network, TestnetV0},
     prelude::{
         query::Query,
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
@@ -93,6 +93,7 @@ impl TransferPrivate {
         match self.network {
             MainnetV0::ID => self.construct_transfer_private::<MainnetV0>(),
             TestnetV0::ID => self.construct_transfer_private::<TestnetV0>(),
+            CanaryV0::ID => self.construct_transfer_private::<CanaryV0>(),
             unknown_id => bail!("Unknown network ID ({unknown_id})"),
         }
     }
