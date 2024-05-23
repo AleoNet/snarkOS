@@ -513,23 +513,21 @@ impl<N: Network> Sync<N> {
                     if let Authority::Quorum(subdag) = block.authority() {
                         // Retrieve the leader certificate of the subdag.
                         let leader_certificate = subdag.leader_certificate();
+                        let leader_round = leader_certificate.round();
+                        let leader_author = leader_certificate.author();
+                        let leader_id = leader_certificate.id();
                         if let Some(bft_sender) = self.bft_sender.get() {
                             // Check if the leader certificate of the block has recently been committed in the replicated DAG state above.
                             // This ensures consistency between block sync and the BFT DAG state.
-                            match bft_sender.send_sync_certificate_to_check_commit_bft(leader_certificate.clone()).await
-                            {
+                            match bft_sender.send_sync_is_recently_committed(leader_round, leader_id).await {
                                 Ok(is_recently_committed) => {
                                     if !is_recently_committed {
                                         bail!(
-                                            "Sync - Failed to advance blocks - leader certificate with author {} from round {} was not recently committed.",
-                                            leader_certificate.author(),
-                                            leader_certificate.round()
+                                            "Sync - Failed to advance blocks - leader certificate with author {leader_author} from round {leader_round} was not recently committed.",
                                         );
                                     }
-                                    info!(
-                                        "Sync - leader certificate with author {} from round {} was recently committed.",
-                                        leader_certificate.author(),
-                                        leader_certificate.round()
+                                    debug!(
+                                        "Sync - Leader certificate with author {leader_author} from round {leader_round} was recently committed.",
                                     );
                                 }
                                 Err(e) => {

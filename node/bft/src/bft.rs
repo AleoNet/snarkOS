@@ -824,9 +824,9 @@ impl<N: Network> BFT<N> {
         // Process the request to check if the batch certificate was recently committed.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((certificate, callback)) = rx_is_recently_committed.recv().await {
+            while let Some(((round, certificate_id), callback)) = rx_is_recently_committed.recv().await {
                 // Check if the certificate was recently committed.
-                let is_committed = self_.dag.read().is_recently_committed(certificate.round(), certificate.id());
+                let is_committed = self_.dag.read().is_recently_committed(round, certificate_id);
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(is_committed).ok();

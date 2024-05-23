@@ -28,7 +28,7 @@ use snarkvm::{
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
     },
-    prelude::Result,
+    prelude::{Field, Result},
 };
 
 use indexmap::IndexMap;
@@ -65,7 +65,7 @@ pub struct BFTSender<N: Network> {
     pub tx_primary_certificate: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
     pub tx_sync_bft_dag_at_bootup: mpsc::Sender<Vec<BatchCertificate<N>>>,
     pub tx_sync_bft: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
-    pub tx_is_recently_committed: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<bool>)>,
+    pub tx_is_recently_committed: mpsc::Sender<((u64, Field<N>), oneshot::Sender<bool>)>,
 }
 
 impl<N: Network> BFTSender<N> {
@@ -99,12 +99,12 @@ impl<N: Network> BFTSender<N> {
         callback_receiver.await?
     }
 
-    /// Sends the batch certificate to the BFT to receive a callback on whether the certificate was recently committed.
-    pub async fn send_sync_certificate_to_check_commit_bft(&self, certificate: BatchCertificate<N>) -> Result<bool> {
+    /// Sends the certificate round and ID to the BFT to receive a callback on whether the certificate was recently committed.
+    pub async fn send_sync_is_recently_committed(&self, round: u64, certificate_id: Field<N>) -> Result<bool> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
-        // Send the certificate to the BFT.
-        self.tx_is_recently_committed.send((certificate, callback_sender)).await?;
+        // Send the round and certificate ID to the BFT.
+        self.tx_is_recently_committed.send(((round, certificate_id), callback_sender)).await?;
         // Await the callback to continue.
         Ok(callback_receiver.await?)
     }
@@ -116,7 +116,7 @@ pub struct BFTReceiver<N: Network> {
     pub rx_primary_certificate: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
     pub rx_sync_bft_dag_at_bootup: mpsc::Receiver<Vec<BatchCertificate<N>>>,
     pub rx_sync_bft: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
-    pub rx_is_recently_committed: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<bool>)>,
+    pub rx_is_recently_committed: mpsc::Receiver<((u64, Field<N>), oneshot::Sender<bool>)>,
 }
 
 /// Initializes the BFT channels.
