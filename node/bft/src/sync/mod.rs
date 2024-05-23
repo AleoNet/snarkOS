@@ -32,7 +32,13 @@ use snarkvm::{
 use anyhow::{bail, Result};
 use parking_lot::Mutex;
 use rayon::prelude::*;
-use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    future::Future,
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{
     sync::{oneshot, Mutex as TMutex, OnceCell},
     task::JoinHandle,
@@ -382,7 +388,7 @@ impl<N: Network> Sync<N> {
 
             // Sync the storage with the certificates.
             for certificates in subdag.values().cloned() {
-                cfg_into_iter!(certificates.clone()).for_each(|certificate| {
+                cfg_into_iter!(certificates).for_each(|certificate| {
                     // Sync the batch certificate with the block.
                     self.storage.sync_certificate_with_block(&block, certificate, &unconfirmed_transactions);
                 });
@@ -425,22 +431,17 @@ impl<N: Network> Sync<N> {
             // Retrieve all of the certificates for the **certificate** round.
             let certificates = self.storage.get_certificates_for_round(certificate_round);
             // Construct a set over the certificates that included the leader's certificate in the certificate round.
-            let election_certificates: Vec<_> = certificates
+            let (election_authors, election_certificates): (HashSet<_>, HashSet<_>) = certificates
                 .iter()
                 .filter_map(|c| match c.previous_certificate_ids().contains(&leader_certificate.id()) {
-                    true => Some(c),
+                    true => Some((c.author(), c)),
                     false => None,
                 })
-                .collect();
-            // Construct a set over the authors who included the leader's certificate in the certificate round.
-            let election_certificate_authors = election_certificates
-                .iter()
-                .map(|c| c.author())
-                .collect();
+                .unzip();
 
             debug!("Validating sync block {next_block_height} at round {commit_round}...");
             // Check if the leader is ready to be committed.
-            if committee_lookback.is_availability_threshold_reached(&election_certificate_authors) {
+            if committee_lookback.is_availability_threshold_reached(&election_authors) {
                 // Initialize the current certificate.
                 let mut current_certificate = leader_certificate;
                 // Check if there are any linked blocks that need to be added.
@@ -468,9 +469,9 @@ impl<N: Network> Sync<N> {
                 }
 
                 // Sync the BFT DAG with the blocks.
-                // Note subdags can be committed by the linking rule and so checking recent commits should only occur after the root subdag, that reached availability
-                // threshold, was committed in the BFT.
-                for block in blocks_to_add.iter(){
+                // Note: Subdags are committed by the linking rule. So, it is essential to check recent commits
+                // only after the root subdag, which has reached the availability threshold, has been committed in the BFT.
+                for block in blocks_to_add.iter() {
                     // Check that the blocks are sequential and can be added to the ledger.
                     let block_height = block.height();
                     if block_height != self.ledger.latest_block_height().saturating_add(1) {
@@ -493,9 +494,9 @@ impl<N: Network> Sync<N> {
                         }
                     }
                 }
-                
-                // Sync the election certificates with the BFT DAG.
-                for election_certificate in election_certificates{
+
+                // Sync the election certificates with the BFT DAG. This ensures that the root subdag is committed.
+                for election_certificate in election_certificates {
                     // If a BFT sender was provided, send the certificate to the BFT.
                     if let Some(bft_sender) = self.bft_sender.get() {
                         // Await the callback to continue.
@@ -505,8 +506,7 @@ impl<N: Network> Sync<N> {
                     }
                 }
 
-                // Check if the leader certificate of the block has recently been committed in the replicated DAG state above.
-                // This ensures consistency between block sync and the BFT DAG state.
+                // Add the blocks to the ledger.
                 for block in blocks_to_add {
                     // Retrieve the block height.
                     let block_height = block.height();
@@ -514,7 +514,8 @@ impl<N: Network> Sync<N> {
                         // Retrieve the leader certificate of the subdag.
                         let leader_certificate = subdag.leader_certificate();
                         if let Some(bft_sender) = self.bft_sender.get() {
-                            // Await the callback to continue.
+                            // Check if the leader certificate of the block has recently been committed in the replicated DAG state above.
+                            // This ensures consistency between block sync and the BFT DAG state.
                             match bft_sender.send_sync_certificate_to_check_commit_bft(leader_certificate.clone()).await
                             {
                                 Ok(is_recently_committed) => {
