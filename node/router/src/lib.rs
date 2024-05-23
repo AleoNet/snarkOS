@@ -408,10 +408,10 @@ impl<N: Network> Router<N> {
                 SocketAddr::from_str("34.17.53.129:4130").unwrap(),
                 SocketAddr::from_str("35.200.149.162:4130").unwrap(),
             ]
-        } else if N::ID == snarkvm::console::network::TestnetV1::ID {
-            // TestnetV1 contains the following bootstrap peers.
+        } else if N::ID == snarkvm::console::network::CanaryV0::ID {
+            // CanaryV0 contains the following bootstrap peers.
             vec![
-                // TODO: Populate me with TestnetV1 IP addresses.
+                // TODO: Populate me with CanaryV0 IP addresses.
             ]
         } else {
             // Unrecognized networks contain no bootstrap peers.

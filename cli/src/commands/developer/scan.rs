@@ -15,7 +15,7 @@
 #![allow(clippy::type_complexity)]
 
 use snarkvm::{
-    console::network::{MainnetV0, Network, TestnetV0, TestnetV1},
+    console::network::{CanaryV0, MainnetV0, Network, TestnetV0},
     prelude::{block::Block, Ciphertext, Field, FromBytes, Plaintext, PrivateKey, Record, ViewKey},
 };
 
@@ -71,7 +71,7 @@ impl Scan {
         match self.network {
             MainnetV0::ID => self.scan_records::<MainnetV0>(),
             TestnetV0::ID => self.scan_records::<TestnetV0>(),
-            TestnetV1::ID => self.scan_records::<TestnetV1>(),
+            CanaryV0::ID => self.scan_records::<CanaryV0>(),
             unknown_id => bail!("Unknown network ID ({unknown_id})"),
         }
     }
@@ -136,7 +136,7 @@ impl Scan {
         let network = match self.network {
             MainnetV0::ID => "mainnet",
             TestnetV0::ID => "testnet",
-            TestnetV1::ID => "testnet_v1",
+            CanaryV0::ID => "canary",
             unknown_id => bail!("Unknown network ID ({unknown_id})"),
         };
 
@@ -188,7 +188,7 @@ impl Scan {
         let network = match N::ID {
             MainnetV0::ID => "mainnet",
             TestnetV0::ID => "testnet",
-            TestnetV1::ID => "testnet_v1",
+            CanaryV0::ID => "canary",
             unknown_id => bail!("Unknown network ID ({unknown_id})"),
         };
 
@@ -367,7 +367,7 @@ impl Scan {
             let network = match N::ID {
                 MainnetV0::ID => "mainnet",
                 TestnetV0::ID => "testnet",
-                TestnetV1::ID => "testnet_v1",
+                CanaryV0::ID => "canary",
                 unknown_id => bail!("Unknown network ID ({unknown_id})"),
             };
 
