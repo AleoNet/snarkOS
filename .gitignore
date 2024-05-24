@@ -4,7 +4,6 @@
 wasm/Cargo.lock
 **/build
 **.ledger-*
-**.current-proposal-cache-*
 **.logs-*
 validator-*
 **.bft-storage-*/

@@ -557,13 +557,6 @@ impl<N: Network> Sync<N> {
     pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
         self.block_sync.get_block_locators()
     }
-
-    /// Returns the block sync module.
-    #[cfg(test)]
-    #[doc(hidden)]
-    pub(super) fn block_sync(&self) -> &BlockSync<N> {
-        &self.block_sync
-    }
 }
 
 // Methods to assist with fetching batch certificates from peers.
