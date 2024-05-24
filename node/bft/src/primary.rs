@@ -342,9 +342,6 @@ impl<N: Network> Primary<N> {
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
 
-        // If the current round is 0, return early.
-        ensure!(round > 0, "Round 0 cannot have transaction batches");
-
         // If the current storage round is below the latest proposal round, then return early.
         if round < *lock_guard {
             warn!("Cannot propose a batch for round {round} - the latest proposal cache round is {}", *lock_guard);
@@ -419,16 +416,6 @@ impl<N: Network> Primary<N> {
                 }
             }
             debug!("Primary is safely skipping {}", format!("(round {round} was already certified)").dimmed());
-            return Ok(());
-        }
-
-        // Determine if the current round has been proposed.
-        // Note: Do NOT make this judgment in advance before rebroadcast and round update. Rebroadcasting is
-        // good for network reliability and should not be prevented for the already existing proposed_batch.
-        // If a certificate already exists for the current round, an attempt should be made to advance the
-        // round as early as possible.
-        if round == *lock_guard {
-            warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
             return Ok(());
         }
 
@@ -540,9 +527,17 @@ impl<N: Network> Primary<N> {
                 }
             }
         }
-
+        // Ditto if the batch had already been proposed and not expired.
+        ensure!(round > 0, "Round 0 cannot have transaction batches");
         // Determine the current timestamp.
         let current_timestamp = now();
+        // Determine if the current proposal is expired.
+        if *lock_guard == round {
+            warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
+            // Reinsert the transmissions back into the ready queue for the next proposal.
+            self.reinsert_transmissions_into_workers(transmissions)?;
+            return Ok(());
+        }
 
         *lock_guard = round;
 
