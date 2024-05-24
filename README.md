@@ -1,5 +1,5 @@
 <p align="center">
-    <img alt="snarkOS" width="1412" src="https://cdn.aleo.org/snarkos/banner.png">
+    <img alt="snarkOS" width="1412" src="https://repository-images.githubusercontent.com/240971104/5b15c264-7eb0-44ac-a13a-659590b5e053">
 </p>
 
 <p align="center">
