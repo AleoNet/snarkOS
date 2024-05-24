@@ -115,7 +115,7 @@ async function calculateRoundsInBlocks(baseUrl, latestHeight) {
     }
 }
 
-async function checkBlockHash(networkName, blockHeight) {
+async function checkBlockHash(blockHeight) {
     const numNodes = await getAWSNodeCount();
     console.log(`Detected ${numNodes} AWS nodes... \n`);
 
@@ -125,7 +125,7 @@ async function checkBlockHash(networkName, blockHeight) {
         // Get the IP address of the AWS node
         const ipAddress = await getIPAddress(awsNodeName);
         // Define the base URL for the node
-        const baseUrl = `http://${ipAddress}:3030/${networkName}/block`;
+        const baseUrl = `http://${ipAddress}:3030/mainnet/block`;
 
         // Fetch the block data
         const blockData = await fetchBlockData(baseUrl, blockHeight);
@@ -138,23 +138,7 @@ async function checkBlockHash(networkName, blockHeight) {
 }
 
 // Main function to fetch block metrics
-async function fetchBlockMetrics(metricType, optionalBlockHeight, networkID) {
-    // Derive the network name based on the network ID.
-    let networkName;
-    switch (networkID) {
-        case 0:
-            networkName = "mainnet";
-            break;
-        case 1:
-            networkName = "testnet";
-            break;
-        case 2:
-            networkName = "canary";
-            break;
-        default:
-            throw new Error(`Unknown network ID (${networkID})`);
-    }
-
+async function fetchBlockMetrics(metricType, optionalBlockHeight) {
     // Function to get the latest block height
     async function getLatestBlockHeight(baseUrl) {
         try {
@@ -173,7 +157,7 @@ async function fetchBlockMetrics(metricType, optionalBlockHeight, networkID) {
     // Get the IP address of the AWS node
     const ipAddress = await getIPAddress(awsNodeName);
     // Define the base URL for the node.
-    const baseUrl = `http://${ipAddress}:3030/${networkName}/block`;
+    const baseUrl = `http://${ipAddress}:3030/mainnet/block`;
 
     console.log(`${dimStart}IP Address: ${ipAddress}${dimEnd}`);
     console.log(`${dimStart}Base URL: ${baseUrl}${dimEnd}`);
@@ -191,7 +175,7 @@ async function fetchBlockMetrics(metricType, optionalBlockHeight, networkID) {
     } else if (metricType === 'roundsInBlocks') {
         calculateRoundsInBlocks(baseUrl, latestHeight);
     } else if (metricType === 'checkBlockHash' && optionalBlockHeight) {
-        checkBlockHash(networkName, optionalBlockHeight);
+        checkBlockHash(optionalBlockHeight);
     } else {
         console.error('Invalid metric type. Supported types: "averageBlockTime" or "roundsInBlocks".');
     }
@@ -212,13 +196,6 @@ async function main() {
                 describe: 'Block height to examine for checkBlockHash metric',
                 type: 'number',
             },
-            'network-id': {
-                alias: 'n',
-                describe: 'Network ID to fetch block metrics from',
-                demandOption: true,
-                type: 'number',
-                choices: [0, 1, 2],
-            }
         })
         .check((argv) => {
             // Check if metric-type is checkBlockHash and block-height is provided
@@ -230,7 +207,7 @@ async function main() {
         .argv;
 
     // Fetch and output the specified block metric
-    fetchBlockMetrics(argv['metric-type'], argv['block-height'], argv['network-id']);
+    fetchBlockMetrics(argv['metric-type'], argv['block-height']);
 }
 
 // Run the main function
