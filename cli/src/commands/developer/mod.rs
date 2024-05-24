@@ -119,7 +119,6 @@ impl Developer {
         let network = match N::ID {
             snarkvm::console::network::MainnetV0::ID => "mainnet",
             snarkvm::console::network::TestnetV0::ID => "testnet",
-            snarkvm::console::network::CanaryV0::ID => "canary",
             unknown_id => bail!("Unknown network ID ({unknown_id})"),
         };
 
@@ -148,7 +147,6 @@ impl Developer {
         let network = match N::ID {
             snarkvm::console::network::MainnetV0::ID => "mainnet",
             snarkvm::console::network::TestnetV0::ID => "testnet",
-            snarkvm::console::network::CanaryV0::ID => "canary",
             unknown_id => bail!("Unknown network ID ({unknown_id})"),
         };
 
