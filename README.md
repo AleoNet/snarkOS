@@ -38,37 +38,40 @@ which verifies transactions and stores the encrypted state applications in a pub
 
 ## 2. Build Guide
 
-### 2.1 Requirements
+### 2.1 Definitions
 
-The following are **minimum** requirements to run an Aleo node:
+The following snarkOS node types exist in the Aleo network:
+ - **Validator**: Validator nodes participate in consensus and must be started with an account that is bonded into the committee.
+ - **Client**: Clients do not participate in consensus but maintain a ledger. They are capable of providing information about the network as well as accepting solutions and transactions and communicating them to their peers. Two types of clients exist:
+    - Core client: Client node connected directly to a validator node.
+    - Outer Client: Client node connected only to other clients or prover nodes.
+ - **Prover**: Prover nodes are dedicated to solving the Aleo puzzle. They do not participate in consensus or maintain a copy of the ledger.
+
+### 2.2 Requirements
+
+The following are the requirements to run an Aleo node:
  - **OS**: 64-bit architectures only, latest up-to-date for security
     - Clients: Ubuntu 22.04 (LTS), macOS Ventura or later, Windows 11 or later
-    - Provers: Ubuntu 22.04 (LTS), macOS Ventura or later
     - Validators: Ubuntu 22.04 (LTS)
- - **CPU**: 64-bit architectures only
-    - Clients: 16-cores
-    - Provers: 32-cores (64-cores preferred)
-    - Validators: 32-cores (64-cores preferred)
+ - **CPU**: 64-bit architectures only, Latest Intel Xeon or Better
+    - Clients, core: 32-cores (24 minimum)
+    - Clients, outer: 32-cores (16 minimum)
+    - Validators: 64-cores (or better)
  - **RAM**: DDR4 or better
-    - Clients: 16GB of memory
-    - Provers: 32GB of memory (64GB or larger preferred)
-    - Validators: 64GB of memory (128GB or larger preferred)
+    - Clients, core: 192GB of memory (128 minimum)
+    - Clients, outer: 128GB of memory (64 minimum)
+    - Validators: 384GB of memory (256 minimum)
  - **Storage**: PCIe Gen 3 x4, PCIe Gen 4 x2 NVME SSD, or better
-    - Clients: 64GB of disk space
-    - Provers: 128GB of disk space
-    - Validators: 2TB of disk space (4TB or larger preferred)
+    - Clients, core: 4TB of disk space (2 minimum)
+    - Clients, outer: 2TB of disk space (1 minimum)
+    - Validators: 6TB of disk space (4 minimum)
  - **Network**: Symmetric, commercial, always-on
-    - Clients: 100Mbps of upload **and** download bandwidth
-    - Provers: 250Mbps of upload **and** download bandwidth
+    - Clients: 250Mbps of upload **and** download bandwidth
     - Validators: 500Mbps of upload **and** download bandwidth
-- **GPU**:
-    - Clients: Not required at this time
-    - Provers: CUDA-enabled GPU (optional)
-    - Validators: Not required at this time
 
-Please note that in order to run an Aleo Prover that is **competitive**, the machine will need more than these requirements.
+Please note that we do not provide official recommendations to run an Aleo Prover. In order to run an Aleo Prover that is **competitive**, the machine requirements will likely be high.
 
-### 2.2 Installation
+### 2.3 Installation
 
 Before beginning, please ensure your machine has `Rust v1.66+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
@@ -93,19 +96,74 @@ cargo install --locked --path .
 ```
 
 Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS firewall.
+### 2.4 Port Configuration
+
+#### 2.4.1 For Core Clients
+
+| Port     | Protocol | Allow/Deny | Source                       | Explanation                                                |
+|----------|----------|------------|------------------------------|------------------------------------------------------------|
+| 4130/tcp | TCP      | Allow      | All IPv4/IPv6 | TCP traffic to other clients and validators                |
+
+#### 2.4.2 For Outer Clients
+
+| Port     | Protocol | Allow/Deny | Source                       | Explanation                                                |
+|----------|----------|------------|------------------------------|------------------------------------------------------------|
+| 3030/tcp | TCP      | Allow      | All IPv4/IPv6                | REST server                                                |
+| 4130/tcp | TCP      | Allow      | All IPv4/IPv6 | TCP traffic to other clients and validators                |
+
+#### 2.4.3 For Validators
+
+| Port     | Protocol | Allow/Deny | Source                       | Explanation                                                |
+|----------|----------|------------|------------------------------|------------------------------------------------------------|
+| 4130/tcp | TCP      | Allow      | All IPv4/IPv6 | TCP traffic to other clients and validators                |
+| 5000/tcp | TCP      | Allow      | Trusted Validator IPs        | TCP traffic between validators for BFT communication       |
+| 3000/tcp | TCP      | Allow      | Internal VPC or VPN          | Metrics dashboard, should only be open within an internal VPC or VPN |
+| 3030/tcp | TCP      | Deny       | All IPv4/IPv6                | REST server. This should always be disabled for validators |
+| 9000/tcp | TCP      | Allow      | Internal VPC or VPN          | Metrics export, should only be open within an internal VPC or VPN |
+| 9090/tcp | TCP      | Allow      | Internal VPC or VPN          | Prometheus metrics, should only be open within an internal VPC or VPN |
 
 ## 3. Run an Aleo Node
 
 ## 3.1 Run an Aleo Client
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
+The next step depends on if you want to run a `core` client or an `outer` client. Validators and related entities may want to run a `core` client. In all other cases, running an `outer` client is the default.
 
-Next, to start a client node, from the `snarkOS` directory, run:
+### 3.1.1 Run an Aleo Core Client
+
+Generally, we recommend the following start command:
+`snarkos start --client --nodisplay --node 0.0.0.0:4130 --peers “validator_ip:4130,core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip3:4130,outer_client_ip_1:4130,...” --verbosity 1 --norest`
+
+To start a core client node, you can also run the following command from the `snarkOS` directory:
 ```
-./run-client.sh
+./run-core-client.sh
 ```
 
-## 3.2 Run an Aleo Prover
+### 3.1.2 Run an Aleo Outer Client
+
+Generally, we recommend the following start command:
+`snarkos start --client --nodisplay --node 0.0.0.0:4130 --peers “validator_ip:4130,core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip3:4130,outer_client_ip_1:4130,...” --verbosity 1 --rest 0.0.0.0:3030`
+
+To start an outer client node, you can also run the following command from the `snarkOS` directory:
+```
+./run-outer-client.sh
+```
+
+## 3.2 Run an Aleo Validator
+
+Start by following the instructions in the [Build Guide](#2-build-guide).
+
+Generally, we recommend the following start command:
+`snarkos start --validator --nodisplay --bft 0.0.0.0:5000 --node 0.0.0.0:4130 --peers “core_client_ip_1:4130,core_client_ip_2:4130,...” --validators “validator_ip_1:5000,validator_ip_2:5000,...” --verbosity 1 --norest --private-key-file ~/snarkOS/privatekey`
+
+Instead of specifying a private key file (`--private-key-file` flag), the private key can also be defined explicitly (`--private-key` flag).
+
+To start a validator, you can also run the following command from the `snarkOS` directory:
+```
+./run-validator.sh
+```
+
+## 3.3 Run an Aleo Prover
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
 

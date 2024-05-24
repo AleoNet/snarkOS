@@ -32,20 +32,15 @@ function exit_node()
 
 trap exit_node SIGINT
 
+echo "Checking for updates..."
+git stash
+STATUS=$(git pull)
+
+if [ "$STATUS" != "Already up to date." ]; then
+  echo "Updated code found, cleaning the project"
+  cargo clean
+fi
+
 echo "Running an Aleo Prover node..."
 $COMMAND &
-
-while :
-do
-  echo "Checking for updates..."
-  git stash
-  STATUS=$(git pull)
-
-  if [ "$STATUS" != "Already up to date." ]; then
-    echo "Updated code found, rebuilding and relaunching prover"
-    cargo clean
-    kill -INT $!; sleep 2; $COMMAND &
-  fi
-
-  sleep 1800;
-done
+wait
