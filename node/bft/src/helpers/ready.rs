@@ -126,14 +126,6 @@ impl<N: Network> Ready<N> {
         // Drain the transmission IDs.
         transmissions.drain(range).collect::<IndexMap<_, _>>()
     }
-
-    /// Clears all solutions from the ready queue.
-    pub(crate) fn clear_solutions(&self) {
-        // Acquire the write lock.
-        let mut transmissions = self.transmissions.write();
-        // Remove all solutions.
-        transmissions.retain(|id, _| !matches!(id, TransmissionID::Solution(..)));
-    }
 }
 
 #[cfg(test)]

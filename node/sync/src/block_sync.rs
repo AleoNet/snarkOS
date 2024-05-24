@@ -453,11 +453,8 @@ impl<N: Network> BlockSync<N> {
             // Return the list of block requests.
             (self.construct_requests(&sync_peers, min_common_ancestor), sync_peers)
         } else {
-            // Update `is_block_synced` if there are no pending requests or responses.
-            if self.requests.read().is_empty() && self.responses.read().is_empty() {
-                // Update the state of `is_block_synced` for the sync module.
-                self.update_is_block_synced(0, MAX_BLOCKS_BEHIND);
-            }
+            // Update the state of `is_block_synced` for the sync module.
+            self.update_is_block_synced(0, MAX_BLOCKS_BEHIND);
             // Return an empty list of block requests.
             (Default::default(), Default::default())
         }

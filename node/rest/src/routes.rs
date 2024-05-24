@@ -135,18 +135,16 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             )));
         }
 
-        // Prepare a closure for the blocking work.
-        let get_json_blocks = move || -> Result<ErasedJson, RestError> {
-            let blocks = cfg_into_iter!((start_height..end_height))
+        // Fetch the blocks from ledger.
+        match tokio::task::spawn_blocking(move || {
+            cfg_into_iter!((start_height..end_height))
                 .map(|height| rest.ledger.get_block(height))
-                .collect::<Result<Vec<_>, _>>()?;
-
-            Ok(ErasedJson::pretty(blocks))
-        };
-
-        // Fetch the blocks from ledger and serialize to json.
-        match tokio::task::spawn_blocking(get_json_blocks).await {
-            Ok(json) => json,
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .await
+        {
+            Ok(Ok(blocks)) => Ok(ErasedJson::pretty(blocks)),
+            Ok(Err(err)) => Err(RestError(format!("Failed to get blocks '{start_height}..{end_height}' - {err}"))),
             Err(err) => Err(RestError(format!("Failed to get blocks '{start_height}..{end_height}' - {err}"))),
         }
     }
