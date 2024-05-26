@@ -16,9 +16,9 @@ use crate::LedgerService;
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
     prelude::{bail, Address, Field, Network, Result},
 };
@@ -81,6 +81,11 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Block {height} does not exist in prover")
     }
 
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        bail!("Block {height} does not exist in prover")
+    }
+
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>> {
         bail!("Block {height} does not exist in prover")
@@ -93,7 +98,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         bail!("Solution '{solution_id}' does not exist in prover")
     }
 
@@ -113,13 +118,11 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Returns the committee for the given round.
-    /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
         bail!("Committee for round {round} does not exist in prover")
     }
 
     /// Returns the committee lookback for the given round.
-    /// If the committee lookback round is in the future, then the current committee is returned.
     fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>> {
         bail!("Previous committee for round {round} does not exist in prover")
     }
@@ -144,11 +147,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        _puzzle_commitment: PuzzleCommitment<N>,
-        _solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, _solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
         Ok(())
     }
 

@@ -15,6 +15,7 @@
 use crate::{
     events::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, max_redundant_requests, Pending, Ready, Storage, WorkerReceiver},
+    spawn_blocking,
     ProposedBatch,
     Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
@@ -25,13 +26,14 @@ use snarkvm::{
     console::prelude::*,
     ledger::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{BatchHeader, Data, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
 };
 
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
+use rand::seq::IteratorRandom;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
@@ -139,7 +141,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Returns the solutions in the ready queue.
-    pub fn solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+    pub fn solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
         self.ready.solutions()
     }
 
@@ -222,7 +224,8 @@ impl<N: Network> Worker<N> {
             .ready
             .transmission_ids()
             .into_iter()
-            .take(Self::MAX_TRANSMISSIONS_PER_WORKER_PING)
+            .choose_multiple(&mut rand::thread_rng(), Self::MAX_TRANSMISSIONS_PER_WORKER_PING)
+            .into_iter()
             .collect::<IndexSet<_>>();
 
         // Broadcast the ping event.
@@ -302,24 +305,22 @@ impl<N: Network> Worker<N> {
     /// Note: This method assumes the incoming solution is valid and does not exist in the ledger.
     pub(crate) async fn process_unconfirmed_solution(
         &self,
-        puzzle_commitment: PuzzleCommitment<N>,
-        prover_solution: Data<ProverSolution<N>>,
+        solution_id: SolutionID<N>,
+        solution: Data<Solution<N>>,
     ) -> Result<()> {
         // Construct the transmission.
-        let transmission = Transmission::Solution(prover_solution.clone());
-        // Remove the puzzle commitment from the pending queue.
-        self.pending.remove(puzzle_commitment, Some(transmission.clone()));
+        let transmission = Transmission::Solution(solution.clone());
+        // Remove the solution ID from the pending queue.
+        self.pending.remove(solution_id, Some(transmission.clone()));
         // Check if the solution exists.
-        if self.contains_transmission(puzzle_commitment) {
-            bail!("Solution '{}' already exists.", fmt_id(puzzle_commitment));
+        if self.contains_transmission(solution_id) {
+            bail!("Solution '{}' already exists.", fmt_id(solution_id));
         }
         // Check that the solution is well-formed and unique.
-        if let Err(e) = self.ledger.check_solution_basic(puzzle_commitment, prover_solution).await {
-            bail!("Invalid unconfirmed solution '{}': {e}", fmt_id(puzzle_commitment));
-        }
-        // Adds the prover solution to the ready queue.
-        if self.ready.insert(puzzle_commitment, transmission) {
-            trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
+        self.ledger.check_solution_basic(solution_id, solution).await?;
+        // Adds the solution to the ready queue.
+        if self.ready.insert(solution_id, transmission) {
+            trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(solution_id));
         }
         Ok(())
     }
@@ -339,9 +340,7 @@ impl<N: Network> Worker<N> {
             bail!("Transaction '{}' already exists.", fmt_id(transaction_id));
         }
         // Check that the transaction is well-formed and unique.
-        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
-            bail!("Invalid unconfirmed transaction '{}': {e}", fmt_id(transaction_id));
-        }
+        self.ledger.check_transaction_basic(transaction_id, transaction).await?;
         // Adds the transaction to the ready queue.
         if self.ready.insert(&transaction_id, transmission) {
             trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
@@ -354,6 +353,22 @@ impl<N: Network> Worker<N> {
     /// Starts the worker handlers.
     fn start_handlers(&self, receiver: WorkerReceiver<N>) {
         let WorkerReceiver { mut rx_worker_ping, mut rx_transmission_request, mut rx_transmission_response } = receiver;
+
+        // Start the pending queue expiration loop.
+        let self_ = self.clone();
+        self.spawn(async move {
+            loop {
+                // Sleep briefly.
+                tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
+
+                // Remove the expired pending certificate requests.
+                let self__ = self_.clone();
+                let _ = spawn_blocking!({
+                    self__.pending.clear_expired_callbacks();
+                    Ok(())
+                });
+            }
+        });
 
         // Process the ping events.
         let self_ = self.clone();
@@ -376,7 +391,11 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
                 // Process the transmission response.
-                self_.finish_transmission_request(peer_ip, transmission_response);
+                let self__ = self_.clone();
+                let _ = spawn_blocking!({
+                    self__.finish_transmission_request(peer_ip, transmission_response);
+                    Ok(())
+                });
             }
         });
     }
@@ -425,7 +444,7 @@ impl<N: Network> Worker<N> {
     fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) {
         let TransmissionResponse { transmission_id, mut transmission } = response;
         // Check if the peer IP exists in the pending queue for the given transmission ID.
-        let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
+        let exists = self.pending.get_peers(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
             // Ensure the transmission is not a fee and matches the transmission ID.
@@ -468,6 +487,7 @@ impl<N: Network> Worker<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::helpers::CALLBACK_EXPIRATION_IN_SECS;
     use snarkos_node_bft_ledger_service::LedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
@@ -511,9 +531,10 @@ mod tests {
             fn contains_block_height(&self, height: u32) -> bool;
             fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32>;
             fn get_block_hash(&self, height: u32) -> Result<N::BlockHash>;
+            fn get_block_round(&self, height: u32) -> Result<u64>;
             fn get_block(&self, height: u32) -> Result<Block<N>>;
             fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>>;
-            fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>>;
+            fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>>;
             fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
             fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;
             fn current_committee(&self) -> Result<Committee<N>>;
@@ -528,8 +549,8 @@ mod tests {
             ) -> Result<()>;
             async fn check_solution_basic(
                 &self,
-                puzzle_commitment: PuzzleCommitment<N>,
-                solution: Data<ProverSolution<N>>,
+                solution_id: SolutionID<N>,
+                solution: Data<Solution<N>>,
             ) -> Result<()>;
             async fn check_transaction_basic(
                 &self,
@@ -548,9 +569,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_max_redundant_requests() {
+        const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
+
         let rng = &mut TestRng::default();
         // Sample a committee.
-        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_size(0, 100, rng);
+        let committee =
+            snarkvm::ledger::committee::test_helpers::sample_committee_for_round_and_size(0, NUM_NODES, rng);
         let committee_clone = committee.clone();
         // Setup the mock ledger.
         let mut mock_ledger = MockLedger::default();
@@ -584,7 +608,7 @@ mod tests {
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
-        let transmission_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        let transmission_id = TransmissionID::Solution(rng.gen::<u64>().into());
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
         let transmission = Transmission::Solution(data(rng));
 
@@ -621,7 +645,7 @@ mod tests {
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
-        let transmission_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        let transmission_id = TransmissionID::Solution(rng.gen::<u64>().into());
         let worker_ = worker.clone();
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
         let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
@@ -659,21 +683,21 @@ mod tests {
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
-        let puzzle = PuzzleCommitment::from_g1_affine(rng.gen());
-        let transmission_id = TransmissionID::Solution(puzzle);
+        let solution_id = rng.gen::<u64>().into();
+        let transmission_id = TransmissionID::Solution(solution_id);
         let worker_ = worker.clone();
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
         let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
         assert!(worker.pending.contains(transmission_id));
         let result = worker
             .process_unconfirmed_solution(
-                puzzle,
+                solution_id,
                 Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>())),
             )
             .await;
         assert!(result.is_ok());
         assert!(!worker.pending.contains(transmission_id));
-        assert!(worker.ready.contains(puzzle));
+        assert!(worker.ready.contains(solution_id));
     }
 
     #[tokio::test]
@@ -699,21 +723,21 @@ mod tests {
 
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
-        let puzzle = PuzzleCommitment::from_g1_affine(rng.gen());
-        let transmission_id = TransmissionID::Solution(puzzle);
+        let solution_id = rng.gen::<u64>().into();
+        let transmission_id = TransmissionID::Solution(solution_id);
         let worker_ = worker.clone();
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
         let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
         assert!(worker.pending.contains(transmission_id));
         let result = worker
             .process_unconfirmed_solution(
-                puzzle,
+                solution_id,
                 Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>())),
             )
             .await;
         assert!(result.is_err());
-        assert!(!worker.pending.contains(puzzle));
-        assert!(!worker.ready.contains(puzzle));
+        assert!(!worker.pending.contains(solution_id));
+        assert!(!worker.ready.contains(solution_id));
     }
 
     #[tokio::test]
@@ -842,7 +866,7 @@ mod tests {
         assert_eq!(worker.pending.num_callbacks(transmission_id), num_flood_requests);
 
         // Let all the requests expire.
-        tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS + 1000)).await;
+        tokio::time::sleep(Duration::from_secs(CALLBACK_EXPIRATION_IN_SECS as u64 + 1)).await;
         assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
         assert_eq!(worker.pending.num_callbacks(transmission_id), 0);
 

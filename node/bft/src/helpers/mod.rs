@@ -30,11 +30,17 @@ pub use pending::*;
 pub mod proposal;
 pub use proposal::*;
 
+pub mod proposal_cache;
+pub use proposal_cache::*;
+
 pub mod ready;
 pub use ready::*;
 
 pub mod resolver;
 pub use resolver::*;
+
+pub mod signed_proposals;
+pub use signed_proposals::*;
 
 pub mod storage;
 pub use storage::*;

@@ -18,9 +18,9 @@ use indexmap::IndexMap;
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
         store::ConsensusStorage,
         Ledger,
     },
@@ -92,6 +92,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.get_block_hash(height)
     }
 
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        self.inner.get_block_round(height)
+    }
+
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>> {
         self.inner.get_block(height)
@@ -104,7 +109,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         self.inner.get_solution(solution_id)
     }
 
@@ -124,7 +129,6 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Returns the committee for the given round.
-    /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
         self.inner.get_committee_for_round(round)
     }
@@ -154,11 +158,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Always succeeds.
-    async fn check_solution_basic(
-        &self,
-        _puzzle_commitment: PuzzleCommitment<N>,
-        _solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, _solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
         Ok(())
     }
 

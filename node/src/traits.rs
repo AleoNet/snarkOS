@@ -90,6 +90,12 @@ pub trait NodeInterface<N: Network>: Routing<N> {
         tokio::task::spawn(async move {
             match signal_listener().await {
                 Ok(()) => {
+                    warn!("==========================================================================================");
+                    warn!("⚠️  Attention - Starting the graceful shutdown procedure (ETA: 30 seconds)...");
+                    warn!("⚠️  Attention - To avoid DATA CORRUPTION, do NOT interrupt snarkOS (or press Ctrl+C again)");
+                    warn!("⚠️  Attention - Please wait until the shutdown gracefully completes (ETA: 30 seconds)");
+                    warn!("==========================================================================================");
+
                     match node_clone.get() {
                         // If the node is already initialized, then shut it down.
                         Some(node) => node.shut_down().await,

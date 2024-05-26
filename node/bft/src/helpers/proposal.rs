@@ -22,12 +22,13 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, Itertools, Result},
+    prelude::{bail, ensure, error, FromBytes, IoResult, Itertools, Read, Result, ToBytes, Write},
 };
 
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashSet;
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Proposal<N: Network> {
     /// The proposed batch header.
     batch_header: BatchHeader<N>,
@@ -48,8 +49,6 @@ impl<N: Network> Proposal<N> {
         ensure!(batch_header.round() >= committee.starting_round(), "Batch round must be >= the committee round");
         // Ensure the batch author is a member of the committee.
         ensure!(committee.is_committee_member(batch_header.author()), "The batch author is not a committee member");
-        // Ensure the transmissions are not empty.
-        ensure!(!transmissions.is_empty(), "The transmissions are empty");
         // Ensure the transmission IDs match in the batch header and transmissions.
         ensure!(
             batch_header.transmission_ids().len() == transmissions.len(),
@@ -166,6 +165,94 @@ impl<N: Network> Proposal<N> {
         let certificate = BatchCertificate::from(self.batch_header.clone(), self.signatures.clone())?;
         // Return the certificate and transmissions.
         Ok((certificate, self.transmissions.clone()))
+    }
+}
+
+impl<N: Network> ToBytes for Proposal<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Write the batch header.
+        self.batch_header.write_le(&mut writer)?;
+        // Write the number of transmissions.
+        u32::try_from(self.transmissions.len()).map_err(error)?.write_le(&mut writer)?;
+        // Write the transmissions.
+        for (transmission_id, transmission) in &self.transmissions {
+            transmission_id.write_le(&mut writer)?;
+            transmission.write_le(&mut writer)?;
+        }
+        // Write the number of signatures.
+        u32::try_from(self.signatures.len()).map_err(error)?.write_le(&mut writer)?;
+        // Write the signatures.
+        for signature in &self.signatures {
+            signature.write_le(&mut writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for Proposal<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Read the batch header.
+        let batch_header = FromBytes::read_le(&mut reader)?;
+        // Read the number of transmissions.
+        let num_transmissions = u32::read_le(&mut reader)?;
+        // Ensure the number of transmissions is within bounds (this is an early safety check).
+        if num_transmissions as usize > BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
+            return Err(error("Invalid number of transmissions in the proposal"));
+        }
+        // Read the transmissions.
+        let mut transmissions = IndexMap::default();
+        for _ in 0..num_transmissions {
+            let transmission_id = FromBytes::read_le(&mut reader)?;
+            let transmission = FromBytes::read_le(&mut reader)?;
+            transmissions.insert(transmission_id, transmission);
+        }
+        // Read the number of signatures.
+        let num_signatures = u32::read_le(&mut reader)?;
+        // Ensure the number of signatures is within bounds (this is an early safety check).
+        if num_signatures as usize > Committee::<N>::MAX_COMMITTEE_SIZE as usize {
+            return Err(error("Invalid number of signatures in the proposal"));
+        }
+        // Read the signatures.
+        let mut signatures = IndexSet::default();
+        for _ in 0..num_signatures {
+            signatures.insert(FromBytes::read_le(&mut reader)?);
+        }
+
+        Ok(Self { batch_header, transmissions, signatures })
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::helpers::storage::tests::sample_transmissions;
+    use snarkvm::{console::network::MainnetV0, utilities::TestRng};
+
+    type CurrentNetwork = MainnetV0;
+
+    const ITERATIONS: usize = 100;
+
+    pub(crate) fn sample_proposal(rng: &mut TestRng) -> Proposal<CurrentNetwork> {
+        let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
+        let (_, transmissions) = sample_transmissions(&certificate, rng);
+
+        let transmissions = transmissions.into_iter().map(|(id, (t, _))| (id, t)).collect::<IndexMap<_, _>>();
+        let batch_header = certificate.batch_header().clone();
+        let signatures = certificate.signatures().copied().collect();
+
+        Proposal { batch_header, transmissions, signatures }
+    }
+
+    #[test]
+    fn test_bytes() {
+        let rng = &mut TestRng::default();
+
+        for _ in 0..ITERATIONS {
+            let expected = sample_proposal(rng);
+            // Check the byte representation.
+            let expected_bytes = expected.to_bytes_le().unwrap();
+            assert_eq!(expected, Proposal::read_le(&expected_bytes[..]).unwrap());
+        }
     }
 }
 

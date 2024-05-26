@@ -28,11 +28,6 @@ pub fn check_timestamp_for_liveness(timestamp: i64) -> Result<()> {
     if timestamp > (now() + MAX_TIMESTAMP_DELTA_IN_SECS) {
         bail!("Timestamp {timestamp} is too far in the future")
     }
-    // TODO (howardwu): Ensure the timestamp is after the previous timestamp. (Needs Bullshark committee)
-    // // Ensure the timestamp is after the previous timestamp.
-    // if timestamp <= committee.previous_timestamp() {
-    //     bail!("Timestamp {timestamp} for the proposed batch must be after the previous round timestamp")
-    // }
     Ok(())
 }
 

@@ -30,7 +30,7 @@ use crate::{
 use snarkos_node_tcp::protocols::Reading;
 use snarkvm::prelude::{
     block::{Block, Header, Transaction},
-    coinbase::{EpochChallenge, ProverSolution},
+    puzzle::Solution,
     Network,
 };
 
@@ -42,10 +42,16 @@ use tokio::task::spawn_blocking;
 /// The max number of peers to send in a `PeerResponse` message.
 const MAX_PEERS_TO_SEND: usize = u8::MAX as usize;
 
+/// The maximum number of blocks the client can be behind it's latest peer before it skips
+/// processing incoming transactions and solutions.
+pub const SYNC_LENIENCY: u32 = 10;
+
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// The maximum number of puzzle requests per interval.
     const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
+    /// The maximum number of block requests per interval.
+    const MAXIMUM_BLOCK_REQUESTS_PER_INTERVAL: usize = 256;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
     const PING_SLEEP_IN_SECS: u64 = 20; // 20 seconds
     /// The time frame to enforce the `MESSAGE_LIMIT`.
@@ -75,7 +81,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         match message {
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
-
+                // Insert the block request for the peer, and fetch the recent frequency.
+                let frequency = self.router().cache.insert_inbound_block_request(peer_ip);
+                // Check if the number of block requests is within the limit.
+                if frequency > Self::MAXIMUM_BLOCK_REQUESTS_PER_INTERVAL {
+                    bail!("Peer '{peer_ip}' is not following the protocol (excessive block requests)")
+                }
                 // Ensure the block request is well-formed.
                 if start_height >= end_height {
                     bail!("Block request from '{peer_ip}' has an invalid range ({start_height}..{end_height})")
@@ -124,6 +135,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             Message::PeerResponse(message) => {
                 if !self.router().cache.contains_outbound_peer_request(peer_ip) {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected peer response)")
+                }
+                self.router().cache.decrement_outbound_peer_requests(peer_ip);
+                if !self.router().allow_external_peers() {
+                    bail!("Not accepting peer response from '{peer_ip}' (validator gossip is disabled)");
                 }
 
                 match self.peer_response(peer_ip, &message.peers) {
@@ -198,14 +213,17 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     Err(error) => bail!("[PuzzleResponse] {error}"),
                 };
                 // Process the puzzle response.
-                match self.puzzle_response(peer_ip, message.epoch_challenge, header) {
+                match self.puzzle_response(peer_ip, message.epoch_hash, header) {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid puzzle response"),
                 }
             }
             Message::UnconfirmedSolution(message) => {
-                // Clone the serialized message.
-                let serialized = message.clone();
+                // Do not process unconfirmed solutions if the node is too far behind.
+                if self.num_blocks_behind() > SYNC_LENIENCY {
+                    trace!("Skipped processing unconfirmed solution '{}' (node is syncing)", message.solution_id);
+                    return Ok(());
+                }
                 // Update the timestamp for the unconfirmed solution.
                 let seen_before = self.router().cache.insert_inbound_solution(peer_ip, message.solution_id).is_some();
                 // Determine whether to propagate the solution.
@@ -213,13 +231,15 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
                     return Ok(());
                 }
+                // Clone the serialized message.
+                let serialized = message.clone();
                 // Perform the deferred non-blocking deserialization of the solution.
                 let solution = match message.solution.deserialize().await {
                     Ok(solution) => solution,
                     Err(error) => bail!("[UnconfirmedSolution] {error}"),
                 };
                 // Check that the solution parameters match.
-                if message.solution_id != solution.commitment() {
+                if message.solution_id != solution.id() {
                     bail!("Peer '{peer_ip}' is not following the 'UnconfirmedSolution' protocol")
                 }
                 // Handle the unconfirmed solution.
@@ -229,8 +249,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
             Message::UnconfirmedTransaction(message) => {
-                // Clone the serialized message.
-                let serialized = message.clone();
+                // Do not process unconfirmed transactions if the node is too far behind.
+                if self.num_blocks_behind() > SYNC_LENIENCY {
+                    trace!("Skipped processing unconfirmed transaction '{}' (node is syncing)", message.transaction_id);
+                    return Ok(());
+                }
                 // Update the timestamp for the unconfirmed transaction.
                 let seen_before =
                     self.router().cache.insert_inbound_transaction(peer_ip, message.transaction_id).is_some();
@@ -239,6 +262,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     trace!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'");
                     return Ok(());
                 }
+                // Clone the serialized message.
+                let serialized = message.clone();
                 // Perform the deferred non-blocking deserialization of the transaction.
                 let transaction = match message.transaction.deserialize().await {
                     Ok(transaction) => transaction,
@@ -313,14 +338,14 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool;
 
     /// Handles a `PuzzleResponse` message.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _challenge: EpochChallenge<N>, _header: Header<N>) -> bool;
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_hash: N::BlockHash, _header: Header<N>) -> bool;
 
     /// Handles an `UnconfirmedSolution` message.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
-        solution: ProverSolution<N>,
+        solution: Solution<N>,
     ) -> bool;
 
     /// Handles an `UnconfirmedTransaction` message.

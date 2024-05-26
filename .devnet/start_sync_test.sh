@@ -37,7 +37,7 @@ start_snarkos_in_tmux() {
     tmux new-session -d -s snarkos-session
 
     # Send the snarkOS start command to the tmux session with the NODE_ID
-    tmux send-keys -t "snarkos-session" "snarkos start --nodisplay --bft 0.0.0.0:5000 --rest 0.0.0.0:3030 --allow-external-peers --peers $NODE_IP:4130 --validators $NODE_IP:5000 --rest-rps 1000 --verbosity $VERBOSITY --dev $NODE_ID --dev-num-validators $NUM_INSTANCES --validator --metrics" C-m
+    tmux send-keys -t "snarkos-session" "snarkos start --client --nocdn --nodisplay --rest 0.0.0.0:3030 --node 0.0.0.0:4130 --verbosity 4 --metrics --logfile "/tmp/snarkos-syncing-range-3.log" --peers 167.71.249.65:4130,157.245.218.195:4130,167.71.249.55:4130" C-m
 
     exit  # Exit root user
 EOF

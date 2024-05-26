@@ -19,7 +19,7 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey},
         algorithms::Hash,
-        network::{MainnetV0, Network},
+        network::{MainnetV0, Network, TestnetV0},
     },
     ledger::{
         block::Block,
@@ -40,7 +40,11 @@ use indexmap::IndexMap;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, path::PathBuf};
+use std::{
+    net::SocketAddr,
+    path::PathBuf,
+    sync::{atomic::AtomicBool, Arc},
+};
 use tokio::runtime::{self, Runtime};
 
 /// The recommended minimum number of 'open files' limit for a validator.
@@ -53,8 +57,9 @@ const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 /// The development mode number of genesis committee members.
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
+/// A mapping of `staker_address` to `(validator_address, withdrawal_address, amount)`.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-struct BondedBalances(IndexMap<String, (String, u64)>);
+pub struct BondedBalances(IndexMap<String, (String, String, u64)>);
 
 impl FromStr for BondedBalances {
     type Err = serde_json::Error;
@@ -89,8 +94,8 @@ pub struct Start {
     pub private_key_file: Option<PathBuf>,
 
     /// Specify the IP address and port for the node server
-    #[clap(default_value = "0.0.0.0:4130", long = "node")]
-    pub node: SocketAddr,
+    #[clap(long = "node")]
+    pub node: Option<SocketAddr>,
     /// Specify the IP address and port for the BFT
     #[clap(long = "bft")]
     pub bft: Option<SocketAddr>,
@@ -100,6 +105,9 @@ pub struct Start {
     /// Specify the IP address and port of the validator(s) to connect to
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
+    /// If the flag is set, a node will allow untrusted peers to connect
+    #[clap(long = "allow-external-peers")]
+    pub allow_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3030", long = "rest")]
@@ -124,6 +132,9 @@ pub struct Start {
     #[clap(default_value = "false", long = "metrics")]
     pub metrics: bool,
 
+    /// Specify the path to a directory containing the storage database for the ledger
+    #[clap(long = "storage")]
+    pub storage: Option<PathBuf>,
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3", long = "cdn")]
     pub cdn: String,
@@ -137,29 +148,41 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
-    /// Specify the path to a directory containing the ledger
-    #[clap(long = "storage_path")]
-    pub storage_path: Option<PathBuf>,
-
+    /// If developtment mode is enabled, specify whether node 0 should generate traffic to drive the network
+    #[clap(default_value = "false", long = "no-dev-txs")]
+    pub no_dev_txs: bool,
+    /// If development mode is enabled, specify the custom bonded balances as a JSON object (default: None)
     #[clap(long)]
-    /// If development mode is enabled, specify the custom bonded balances as a json object. (default: None)
-    dev_bonded_balances: Option<BondedBalances>,
+    pub dev_bonded_balances: Option<BondedBalances>,
 }
 
 impl Start {
     /// Starts the snarkOS node.
     pub fn parse(self) -> Result<String> {
+        // Prepare the shutdown flag.
+        let shutdown: Arc<AtomicBool> = Default::default();
+
         // Initialize the logger.
-        let log_receiver = crate::helpers::initialize_logger(self.verbosity, self.nodisplay, self.logfile.clone());
+        let log_receiver =
+            crate::helpers::initialize_logger(self.verbosity, self.nodisplay, self.logfile.clone(), shutdown.clone());
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
             let mut cli = self.clone();
             // Parse the network.
             match cli.network {
-                0 => {
+                MainnetV0::ID => {
                     // Parse the node from the configurations.
-                    let node = cli.parse_node::<MainnetV0>().await.expect("Failed to parse the node");
+                    let node = cli.parse_node::<MainnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    // If the display is enabled, render the display.
+                    if !cli.nodisplay {
+                        // Initialize the display.
+                        Display::start(node, log_receiver).expect("Failed to initialize the display");
+                    }
+                }
+                TestnetV0::ID => {
+                    // Parse the node from the configurations.
+                    let node = cli.parse_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
                     if !cli.nodisplay {
                         // Initialize the display.
@@ -300,11 +323,15 @@ impl Start {
                 }
             }
             // Set the node IP to `4130 + dev`.
-            self.node = SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?;
+            //
+            // Note: the `node` flag is an option to detect remote devnet testing.
+            if self.node.is_none() {
+                self.node = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?);
+            }
             // If the `norest` flag is not set, and the `bft` flag was not overridden,
             // then set the REST IP to `3030 + dev`.
             //
-            // Note: the reason the `bft` flag is an option is to detect for remote devnet testing.
+            // Note: the `bft` flag is an option to detect remote devnet testing.
             if !self.norest && self.bft.is_none() {
                 self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
             }
@@ -342,16 +369,17 @@ impl Start {
                     let bonded_balances = bonded_balances
                         .0
                         .iter()
-                        .map(|(staker_address, (validator_address, amount))| {
+                        .map(|(staker_address, (validator_address, withdrawal_address, amount))| {
                             let staker_addr = Address::<N>::from_str(staker_address)?;
                             let validator_addr = Address::<N>::from_str(validator_address)?;
-                            Ok((staker_addr, (validator_addr, *amount)))
+                            let withdrawal_addr = Address::<N>::from_str(withdrawal_address)?;
+                            Ok((staker_addr, (validator_addr, withdrawal_addr, *amount)))
                         })
                         .collect::<Result<IndexMap<_, _>>>()?;
 
                     // Construct the committee members.
                     let mut members = IndexMap::new();
-                    for (staker_address, (validator_address, amount)) in bonded_balances.iter() {
+                    for (staker_address, (validator_address, _, amount)) in bonded_balances.iter() {
                         // Ensure that the staking amount is sufficient.
                         match staker_address == validator_address {
                             true => ensure!(amount >= &MIN_VALIDATOR_STAKE, "Validator stake is too low"),
@@ -387,9 +415,10 @@ impl Start {
                         .collect::<IndexMap<_, _>>();
 
                     // Construct the bonded balances.
+                    // Note: The withdrawal address is set to the staker address.
                     let bonded_balances = members
                         .iter()
-                        .map(|(address, (stake, _))| (*address, (*address, *stake)))
+                        .map(|(address, (stake, _))| (*address, (*address, *address, *stake)))
                         .collect::<IndexMap<_, _>>();
                     // Construct the committee.
                     let committee = Committee::<N>::new(0u64, members)?;
@@ -454,7 +483,7 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn parse_node<N: Network>(&mut self) -> Result<Node<N>> {
+    async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Node<N>> {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
 
@@ -475,6 +504,16 @@ impl Start {
         // Parse the node type.
         let node_type = self.parse_node_type();
 
+        // Parse the node IP.
+        let node_ip = match self.node {
+            Some(node_ip) => node_ip,
+            None => SocketAddr::from_str("0.0.0.0:4130").unwrap(),
+        };
+        // Parse the BFT IP.
+        let bft_ip = match self.dev.is_some() {
+            true => self.bft,
+            false => None
+        };
         // Parse the REST IP.
         let rest_ip = match self.norest {
             true => None,
@@ -490,7 +529,7 @@ impl Start {
                 "🧭 Starting {} on {} at {}.\n",
                 node_type.description().bold(),
                 N::NAME.bold(),
-                self.node.to_string().bold()
+                node_ip.to_string().bold()
             );
 
             // If the node is running a REST server, print the REST IP and JWT.
@@ -519,17 +558,28 @@ impl Start {
         }
 
         // Initialize the storage mode.
-        let storage_mode = match &self.storage_path {
+        let storage_mode = match &self.storage {
             Some(path) => StorageMode::Custom(path.clone()),
             None => StorageMode::from(self.dev),
         };
 
+        // Determine whether to generate background transactions in dev mode.
+        let dev_txs = match self.dev {
+            Some(_) => !self.no_dev_txs,
+            None => {
+                // If the `no_dev_txs` flag is set, inform the user that it is ignored.
+                if self.no_dev_txs {
+                    eprintln!("The '--no-dev-txs' flag is ignored because '--dev' is not set");
+                }
+                false
+            }
+        };
+
         // Initialize the node.
-        let bft_ip = if self.dev.is_some() { self.bft } else { None };
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode).await,
-            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
-            NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
+            NodeType::Validator => Node::new_validator(node_ip, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs, shutdown.clone()).await,
+            NodeType::Prover => Node::new_prover(node_ip, account, &trusted_peers, genesis, storage_mode, shutdown.clone()).await,
+            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, shutdown).await,
         }
     }
 
@@ -587,17 +637,25 @@ fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
-    bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, u64)>,
+    bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, Address<N>, u64)>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
     let mut preimage = Vec::new();
 
+    // Input the network ID.
+    preimage.extend(&N::ID.to_le_bytes());
+
     // Input the genesis private key, committee, and public balances.
     preimage.extend(genesis_private_key.to_bytes_le()?);
     preimage.extend(committee.to_bytes_le()?);
     preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
-    preimage.extend(&to_bytes_le![bonded_balances.iter().collect::<Vec<(_, _)>>()]?);
+    preimage.extend(&to_bytes_le![
+        bonded_balances
+            .iter()
+            .flat_map(|(staker, (validator, withdrawal, amount))| to_bytes_le![staker, validator, withdrawal, amount])
+            .collect::<Vec<_>>()
+    ]?);
 
     // Input the parameters' metadata.
     preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
@@ -807,7 +865,7 @@ mod tests {
         let mut config = Start::try_parse_from(["snarkos", "--dev", "0"].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let expected_genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
+        assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4130").unwrap()));
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
         assert_eq!(trusted_validators.len(), 1);
@@ -822,7 +880,7 @@ mod tests {
             Start::try_parse_from(["snarkos", "--dev", "1", "--validator", "--private-key", ""].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4131").unwrap());
+        assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4131").unwrap()));
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
         assert_eq!(trusted_peers.len(), 1);
         assert_eq!(trusted_validators.len(), 1);
@@ -837,7 +895,7 @@ mod tests {
             Start::try_parse_from(["snarkos", "--dev", "2", "--prover", "--private-key", ""].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4132").unwrap());
+        assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4132").unwrap()));
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
         assert_eq!(trusted_peers.len(), 2);
         assert_eq!(trusted_validators.len(), 2);
@@ -852,7 +910,7 @@ mod tests {
             Start::try_parse_from(["snarkos", "--dev", "3", "--client", "--private-key", ""].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
-        assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4133").unwrap());
+        assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4133").unwrap()));
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
         assert_eq!(trusted_peers.len(), 3);
         assert_eq!(trusted_validators.len(), 2);

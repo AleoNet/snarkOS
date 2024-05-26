@@ -4,7 +4,7 @@ version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -15,7 +15,7 @@ keywords = [
 categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
-rust-version = "1.74.1"
+rust-version = "1.76.0" # Attention - Change the MSRV in rust-toolchain and in .circleci/config.yml as well
 
 [workspace]
 members = [
@@ -45,8 +45,8 @@ version = "=0.1.24"
 default-features = false
 
 [workspace.dependencies.snarkvm]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "eba8b44"
+git = "https://github.com/AleoNet/snarkVM.git"
+rev = "393b8fb"
 #version = "=0.16.18"
 features = [ "circuit", "console", "rocks" ]
 

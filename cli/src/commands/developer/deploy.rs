@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{CurrentAleo, CurrentNetwork, Developer};
+use super::Developer;
 use snarkvm::{
-    console::program::ProgramOwner,
+    circuit::{Aleo, AleoTestnetV0, AleoV0},
+    console::{
+        network::{MainnetV0, Network, TestnetV0},
+        program::ProgramOwner,
+    },
     prelude::{
         block::Transaction,
         deployment_cost,
@@ -37,7 +41,10 @@ use zeroize::Zeroize;
 #[derive(Debug, Parser)]
 pub struct Deploy {
     /// The name of the program to deploy.
-    program_id: ProgramID<CurrentNetwork>,
+    program_id: String,
+    /// Specify the network to create a deployment for.
+    #[clap(default_value = "0", long = "network")]
+    pub network: u16,
     /// A path to a directory containing a manifest file. Defaults to the current working directory.
     #[clap(long)]
     path: Option<String>,
@@ -82,19 +89,32 @@ impl Deploy {
             bail!("❌ Please specify one of the following actions: --broadcast, --dry-run, --store");
         }
 
+        // Construct the deployment for the specified network.
+        match self.network {
+            MainnetV0::ID => self.construct_deployment::<MainnetV0, AleoV0>(),
+            TestnetV0::ID => self.construct_deployment::<TestnetV0, AleoTestnetV0>(),
+            unknown_id => bail!("Unknown network ID ({unknown_id})"),
+        }
+    }
+
+    /// Construct and process the deployment transaction.
+    fn construct_deployment<N: Network, A: Aleo<Network = N, BaseField = N::Field>>(&self) -> Result<String> {
         // Specify the query
         let query = Query::from(&self.query);
 
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
-        // Fetch the package from the directory.
-        let package = Developer::parse_package(self.program_id, &self.path)?;
+        // Retrieve the program ID.
+        let program_id = ProgramID::from_str(&self.program_id)?;
 
-        println!("📦 Creating deployment transaction for '{}'...\n", &self.program_id.to_string().bold());
+        // Fetch the package from the directory.
+        let package = Developer::parse_package(program_id, &self.path)?;
+
+        println!("📦 Creating deployment transaction for '{}'...\n", &program_id.to_string().bold());
 
         // Generate the deployment
-        let deployment = package.deploy::<CurrentAleo>(None)?;
+        let deployment = package.deploy::<A>(None)?;
         let deployment_id = deployment.to_deployment_id()?;
 
         // Generate the deployment transaction.
@@ -107,7 +127,7 @@ impl Deploy {
                 Some(path) => StorageMode::Custom(path.clone()),
                 None => StorageMode::Production,
             };
-            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(storage_mode)?;
+            let store = ConsensusStore::<N, ConsensusMemory<N>>::open(storage_mode)?;
 
             // Initialize the VM.
             let vm = VM::from(store)?;
@@ -146,16 +166,10 @@ impl Deploy {
             // Create a new transaction.
             Transaction::from_deployment(owner, deployment, fee)?
         };
-        println!("✅ Created deployment transaction for '{}'", self.program_id.to_string().bold());
+        println!("✅ Created deployment transaction for '{}'", program_id.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to the user.
-        Developer::handle_transaction(
-            &self.broadcast,
-            self.dry_run,
-            &self.store,
-            transaction,
-            self.program_id.to_string(),
-        )
+        Developer::handle_transaction(&self.broadcast, self.dry_run, &self.store, transaction, program_id.to_string())
     }
 }
 
@@ -183,7 +197,8 @@ mod tests {
         let cli = CLI::parse_from(arg_vec);
 
         if let Command::Developer(Developer::Deploy(deploy)) = cli.command {
-            assert_eq!(deploy.program_id, "hello.aleo".try_into().unwrap());
+            assert_eq!(deploy.network, 0);
+            assert_eq!(deploy.program_id, "hello.aleo");
             assert_eq!(deploy.private_key, "PRIVATE_KEY");
             assert_eq!(deploy.query, "QUERY");
             assert_eq!(deploy.priority_fee, 77);

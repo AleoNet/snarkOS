@@ -14,7 +14,7 @@
 
 use crate::{
     events::{EventCodec, PrimaryPing},
-    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
+    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, Storage, SyncSender, WorkerSender},
     spawn_blocking,
     Worker,
     CONTEXT,
@@ -39,7 +39,7 @@ use snarkos_node_bft_events::{
     ValidatorsResponse,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_sync::communication_service::CommunicationService;
+use snarkos_node_sync::{communication_service::CommunicationService, MAX_BLOCKS_BEHIND};
 use snarkos_node_tcp::{
     is_bogon_ip,
     is_unspecified_or_broadcast_ip,
@@ -100,6 +100,8 @@ pub trait Transport<N: Network>: Send + Sync {
 pub struct Gateway<N: Network> {
     /// The account of the node.
     account: Account<N>,
+    /// The storage.
+    storage: Storage<N>,
     /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
     /// The TCP stack.
@@ -133,6 +135,7 @@ impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
     pub fn new(
         account: Account<N>,
+        storage: Storage<N>,
         ledger: Arc<dyn LedgerService<N>>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
@@ -149,6 +152,7 @@ impl<N: Network> Gateway<N> {
         // Return the gateway.
         Ok(Self {
             account,
+            storage,
             ledger,
             tcp,
             cache: Default::default(),
@@ -257,6 +261,11 @@ impl<N: Network> Gateway<N> {
         &self.account
     }
 
+    /// Returns the dev identifier of the node.
+    pub const fn dev(&self) -> Option<u16> {
+        self.dev
+    }
+
     /// Returns the IP address of this node.
     pub fn local_ip(&self) -> SocketAddr {
         self.tcp.listening_addr().expect("The TCP listener is not enabled")
@@ -330,18 +339,38 @@ impl<N: Network> Gateway<N> {
 
     /// Returns `true` if the given address is an authorized validator.
     pub fn is_authorized_validator_address(&self, validator_address: Address<N>) -> bool {
-        // Determine if the validator address is a member of the committee lookback or the current committee.
+        // Determine if the validator address is a member of the committee lookback,
+        // the current committee, or the previous committee lookbacks.
         // We allow leniency in this validation check in order to accommodate these two scenarios:
         //  1. New validators should be able to connect immediately once bonded as a committee member.
         //  2. Existing validators must remain connected until they are no longer bonded as a committee member.
         //     (i.e. meaning they must stay online until the next block has been produced)
-        self.ledger
-            .get_committee_lookback_for_round(self.ledger.latest_round())
+
+        // Determine if the validator is in the current committee with lookback.
+        if self
+            .ledger
+            .get_committee_lookback_for_round(self.storage.current_round())
             .map_or(false, |committee| committee.is_committee_member(validator_address))
-            || self
-                .ledger
-                .current_committee()
-                .map_or(false, |committee| committee.is_committee_member(validator_address))
+        {
+            return true;
+        }
+
+        // Determine if the validator is in the latest committee on the ledger.
+        if self.ledger.current_committee().map_or(false, |committee| committee.is_committee_member(validator_address)) {
+            return true;
+        }
+
+        // Retrieve the previous block height to consider from the sync tolerance.
+        let previous_block_height = self.ledger.latest_block_height().saturating_sub(MAX_BLOCKS_BEHIND);
+        // Determine if the validator is in any of the previous committee lookbacks.
+        match self.ledger.get_block_round(previous_block_height) {
+            Ok(block_round) => (block_round..self.storage.current_round()).step_by(2).any(|round| {
+                self.ledger
+                    .get_committee_lookback_for_round(round)
+                    .map_or(false, |committee| committee.is_committee_member(validator_address))
+            }),
+            Err(_) => false,
+        }
     }
 
     /// Returns the maximum number of connected peers.
@@ -1341,16 +1370,22 @@ mod prop_tests {
     };
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;
+    use snarkos_node_bft_storage_service::BFTMemoryService;
     use snarkos_node_tcp::P2P;
     use snarkvm::{
-        ledger::committee::{
-            prop_tests::{CommitteeContext, ValidatorSet},
-            Committee,
+        ledger::{
+            committee::{
+                prop_tests::{CommitteeContext, ValidatorSet},
+                test_helpers::sample_committee_for_round_and_members,
+                Committee,
+            },
+            narwhal::{batch_certificate::test_helpers::sample_batch_certificate_for_round, BatchHeader},
         },
         prelude::{MainnetV0, PrivateKey},
+        utilities::TestRng,
     };
 
-    use indexmap::IndexMap;
+    use indexmap::{IndexMap, IndexSet};
     use proptest::{
         prelude::{any, any_with, Arbitrary, BoxedStrategy, Just, Strategy},
         sample::Selector,
@@ -1402,6 +1437,7 @@ mod prop_tests {
                 .prop_map(|(storage, _, private_key, address)| {
                     Gateway::new(
                         Account::try_from(private_key).unwrap(),
+                        storage.clone(),
                         storage.ledger().clone(),
                         address.ip(),
                         &[],
@@ -1450,7 +1486,9 @@ mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+        let gateway =
+            Gateway::new(account.clone(), storage.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port())
+                .unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.port().unwrap()));
@@ -1465,7 +1503,9 @@ mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+        let gateway =
+            Gateway::new(account.clone(), storage.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port())
+                .unwrap();
         let tcp_config = gateway.tcp().config();
         if let Some(socket_addr) = dev.ip() {
             assert_eq!(tcp_config.listener_ip, Some(socket_addr.ip()));
@@ -1490,7 +1530,8 @@ mod prop_tests {
         let worker_storage = storage.clone();
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account, storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
+        let gateway =
+            Gateway::new(account, storage.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
 
         let (primary_sender, _) = init_primary_channels();
 
@@ -1524,5 +1565,50 @@ mod prop_tests {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + dev.port().unwrap())
         );
         assert_eq!(gateway.num_workers(), workers.len() as u8);
+    }
+
+    #[proptest]
+    fn test_is_authorized_validator(#[strategy(any_valid_dev_gateway())] input: GatewayInput) {
+        let rng = &mut TestRng::default();
+
+        // Initialize the round parameters.
+        let current_round = 2;
+        let committee_size = 4;
+        let max_gc_rounds = BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
+        let (_, _, private_key, dev) = input;
+        let account = Account::try_from(private_key).unwrap();
+
+        // Sample the certificates.
+        let mut certificates = IndexSet::new();
+        for _ in 0..committee_size {
+            certificates.insert(sample_batch_certificate_for_round(current_round, rng));
+        }
+        let addresses: Vec<_> = certificates.iter().map(|certificate| certificate.author()).collect();
+        // Initialize the committee.
+        let committee = sample_committee_for_round_and_members(current_round, addresses, rng);
+        // Sample extra certificates from non-committee members.
+        for _ in 0..committee_size {
+            certificates.insert(sample_batch_certificate_for_round(current_round, rng));
+        }
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        // Initialize the gateway.
+        let gateway =
+            Gateway::new(account.clone(), storage.clone(), ledger.clone(), dev.ip(), &[], dev.port()).unwrap();
+        // Insert certificate to the storage.
+        for certificate in certificates.iter() {
+            storage.testing_only_insert_certificate_testing_only(certificate.clone());
+        }
+        // Check that the current committee members are authorized validators.
+        for i in 0..certificates.clone().len() {
+            let is_authorized = gateway.is_authorized_validator_address(certificates[i].author());
+            if i < committee_size {
+                assert!(is_authorized);
+            } else {
+                assert!(!is_authorized);
+            }
+        }
     }
 }

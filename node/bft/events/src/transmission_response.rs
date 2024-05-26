@@ -62,7 +62,7 @@ impl<N: Network> FromBytes for TransmissionResponse<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        prop_tests::{any_puzzle_commitment, any_transaction_id},
+        prop_tests::{any_solution_id, any_transaction_id},
         TransmissionResponse,
     };
     use snarkvm::{
@@ -82,7 +82,7 @@ pub mod prop_tests {
 
     pub fn any_transmission() -> BoxedStrategy<(TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>)> {
         prop_oneof![
-            (any_puzzle_commitment(), collection::vec(any::<u8>(), 256..=256)).prop_map(|(pc, bytes)| (
+            (any_solution_id(), collection::vec(any::<u8>(), 256..=256)).prop_map(|(pc, bytes)| (
                 TransmissionID::Solution(pc),
                 Transmission::Solution(Data::Buffer(Bytes::from(bytes)))
             )),

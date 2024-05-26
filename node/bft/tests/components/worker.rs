@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    common::CurrentNetwork,
-    components::{sample_ledger, sample_worker},
+use crate::common::{
+    primary::new_test_committee,
+    utils::{sample_ledger, sample_worker},
+    CurrentNetwork,
 };
 use snarkos_node_bft::helpers::max_redundant_requests;
 use snarkvm::{
-    ledger::narwhal::TransmissionID,
+    ledger::{committee::Committee, narwhal::TransmissionID},
     prelude::{Network, TestRng},
 };
 
@@ -27,14 +28,20 @@ use std::net::SocketAddr;
 #[tokio::test]
 #[rustfmt::skip]
 async fn test_resend_transmission_request() {
-    const NUM_NODES: u16 = 100;
+    const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
 
     // Initialize the RNG.
-    let rng = &mut TestRng::default();
+    let mut rng = TestRng::default();
+    // Initialize the accounts and the committee.
+    let (accounts, committee) = new_test_committee(NUM_NODES, &mut rng);
     // Sample a ledger.
-    let ledger = sample_ledger(NUM_NODES, rng);
+    let ledger = sample_ledger(&accounts, &committee, &mut rng);
     // Sample a worker.
-    let worker = sample_worker(0, ledger.clone());
+    let worker = sample_worker(0, accounts[0].clone(), ledger.clone());
+
+    // Determine the maximum number of redundant requests.
+    let max_redundancy = max_redundant_requests(ledger.clone(), 0);
+    assert_eq!(max_redundancy, 34, "Update me if the formula changes");
 
     // Prepare a dummy transmission ID.
     let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -54,7 +61,7 @@ async fn test_resend_transmission_request() {
     assert!(pending.contains(transmission_id), "Missing a transmission in the pending queue");
     // Ensure the peer IP is in the pending queue for the transmission ID.
     assert!(pending.contains_peer(transmission_id, peer_ip), "Missing a peer IP for transmission in the pending queue");
-    assert_eq!(pending.get(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
+    assert_eq!(pending.get_peers(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
     // Ensure the number of callbacks is correct.
     assert_eq!(pending.num_callbacks(transmission_id), 1, "Incorrect number of callbacks for transmission");
     // Ensure the number of sent requests is correct.
@@ -71,25 +78,27 @@ async fn test_resend_transmission_request() {
         assert!(pending.contains(transmission_id), "Missing a transmission in the pending queue");
         // Ensure the peer IP is in the pending queue for the transmission ID.
         assert!(pending.contains_peer(transmission_id, peer_ip), "Missing a peer IP for transmission in the pending queue");
-        assert_eq!(pending.get(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
+        assert_eq!(pending.get_peers(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
         // Ensure the number of callbacks is correct.
         assert_eq!(pending.num_callbacks(transmission_id), 1 + i, "Incorrect number of callbacks for transmission");
         // Ensure the number of sent requests is correct.
-        assert_eq!(pending.num_sent_requests(transmission_id), 1 + i, "Incorrect number of sent requests for transmission");
+        assert_eq!(pending.num_sent_requests(transmission_id), (1 + i).min(max_redundancy), "Incorrect number of sent requests for transmission");
     }
 }
 
 #[tokio::test]
 #[rustfmt::skip]
 async fn test_flood_transmission_requests() {
-    const NUM_NODES: u16 = 100;
+    const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
 
     // Initialize the RNG.
-    let rng = &mut TestRng::default();
+    let mut rng = TestRng::default();
+    // Initialize the accounts and the committee.
+    let (accounts, committee) = new_test_committee(NUM_NODES, &mut rng);
     // Sample a ledger.
-    let ledger = sample_ledger(NUM_NODES, rng);
+    let ledger = sample_ledger(&accounts, &committee, &mut rng);
     // Sample a worker.
-    let worker = sample_worker(0, ledger.clone());
+    let worker = sample_worker(0, accounts[0].clone(), ledger.clone());
 
     // Determine the maximum number of redundant requests.
     let max_redundancy = max_redundant_requests(ledger.clone(), 0);
@@ -115,7 +124,7 @@ async fn test_flood_transmission_requests() {
     assert!(pending.contains(transmission_id), "Missing a transmission in the pending queue");
     // Ensure the peer IP is in the pending queue for the transmission ID.
     assert!(pending.contains_peer(transmission_id, peer_ip), "Missing a peer IP for transmission in the pending queue");
-    assert_eq!(pending.get(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
+    assert_eq!(pending.get_peers(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
     // Ensure the number of callbacks is correct.
     assert_eq!(pending.num_callbacks(transmission_id), max_redundancy, "Incorrect number of callbacks for transmission");
     // Ensure the number of sent requests is correct.
@@ -132,7 +141,7 @@ async fn test_flood_transmission_requests() {
         assert!(pending.contains(transmission_id), "Missing a transmission in the pending queue");
         // Ensure the peer IP is in the pending queue for the transmission ID.
         assert!(pending.contains_peer(transmission_id, peer_ip), "Missing a peer IP for transmission in the pending queue");
-        assert_eq!(pending.get(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
+        assert_eq!(pending.get_peers(transmission_id), Some([peer_ip].into_iter().collect()), "Missing a peer IP for transmission in the pending queue");
         // Ensure the number of callbacks is correct.
         assert_eq!(pending.num_callbacks(transmission_id), max_redundancy + i, "Incorrect number of callbacks for transmission");
         // Ensure the number of sent requests is correct.

@@ -48,7 +48,7 @@ const MAXIMUM_PENDING_BLOCKS: u32 = BLOCKS_PER_FILE * CONCURRENT_REQUESTS * 2;
 /// Maximum number of attempts for a request to the CDN.
 const MAXIMUM_REQUEST_ATTEMPTS: u8 = 10;
 /// The supported network.
-const NETWORK_ID: u16 = 3;
+const NETWORK_ID: u16 = 0;
 
 /// Loads blocks from a CDN into the ledger.
 ///

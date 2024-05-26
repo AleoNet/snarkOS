@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use snarkos_node::bft::helpers::proposal_cache_path;
+
 use aleo_std::StorageMode;
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -35,6 +37,13 @@ pub struct Clean {
 impl Clean {
     /// Cleans the snarkOS node storage.
     pub fn parse(self) -> Result<String> {
+        // Remove the current proposal cache file, if it exists.
+        let proposal_cache_path = proposal_cache_path(self.network, self.dev);
+        if proposal_cache_path.exists() {
+            if let Err(err) = std::fs::remove_file(&proposal_cache_path) {
+                bail!("Failed to remove the current proposal cache file at {}: {err}", proposal_cache_path.display());
+            }
+        }
         // Remove the specified ledger from storage.
         Self::remove_ledger(self.network, match self.path {
             Some(path) => StorageMode::Custom(path),
