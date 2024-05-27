@@ -393,10 +393,11 @@ impl Start {
                         );
 
                         // Add or update the validator entry in the list of members
-                        members
-                            .entry(*validator_address)
-                            .and_modify(|(stake, _, _)| *stake += amount)
-                            .or_insert((*amount, true, rng.gen_range(0..100)));
+                        members.entry(*validator_address).and_modify(|(stake, _, _)| *stake += amount).or_insert((
+                            *amount,
+                            true,
+                            rng.gen_range(0..100),
+                        ));
                     }
                     // Construct the committee.
                     let committee = Committee::<N>::new(0u64, members)?;
@@ -657,19 +658,55 @@ fn load_or_compute_genesis<N: Network>(
             .collect::<Vec<_>>()
     ]?);
 
-    // Input the parameters' metadata.
-    preimage.extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
+    // Input the parameters' metadata based on network
+    match N::ID {
+        snarkvm::console::network::MainnetV0::ID => {
+            preimage.extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
+        }
+        snarkvm::console::network::TestnetV0::ID => {
+            preimage.extend(snarkvm::parameters::testnet::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::BondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::SetValidatorStateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::FeePrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::FeePublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::InclusionVerifier::METADATA.as_bytes());
+        }
+        snarkvm::console::network::CanaryV0::ID => {
+            preimage.extend(snarkvm::parameters::canary::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::BondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::SetValidatorStateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::FeePrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::FeePublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::InclusionVerifier::METADATA.as_bytes());
+        }
+        _ => {
+            // Unrecognized Network ID
+            bail!("Unrecognized Network ID: {}", N::ID);
+        }
+    }
 
     // Initialize the hasher.
     let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
