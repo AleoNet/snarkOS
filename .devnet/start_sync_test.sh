@@ -12,6 +12,12 @@ NUM_INSTANCES="${NUM_INSTANCES:-$NODE_ID}"
 
 echo "Using $NUM_INSTANCES AWS EC2 instances for querying."
 
+# Read the network ID from user or use a default value of 1
+read -p "Enter the network ID (mainnet = 0, testnet = 1, canary = 2) (default: 1): " NETWORK_ID
+NETWORK_ID=${NETWORK_ID:-1}
+
+echo "Using network ID $NETWORK_ID."
+
 # Read the verbosity level from the user (default: 1)
 read -p "Enter the verbosity level (default: 1): " VERBOSITY
 VERBOSITY="${VERBOSITY:-1}"
@@ -37,7 +43,7 @@ start_snarkos_in_tmux() {
     tmux new-session -d -s snarkos-session
 
     # Send the snarkOS start command to the tmux session with the NODE_ID
-    tmux send-keys -t "snarkos-session" "snarkos start --client --nocdn --nodisplay --rest 0.0.0.0:3030 --node 0.0.0.0:4130 --verbosity 4 --metrics --logfile "/tmp/snarkos-syncing-range-3.log" --peers 167.71.249.65:4130,157.245.218.195:4130,167.71.249.55:4130" C-m
+    tmux send-keys -t "snarkos-session" "snarkos start --client --nocdn --nodisplay --rest 0.0.0.0:3030 --node 0.0.0.0:4130 --verbosity 4 --network $NETWORK_ID --metrics --logfile "/tmp/snarkos-syncing-range-3.log" --peers 167.71.249.65:4130,157.245.218.195:4130,167.71.249.55:4130" C-m
 
     exit  # Exit root user
 EOF
