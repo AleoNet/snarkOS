@@ -411,7 +411,10 @@ impl<N: Network> Router<N> {
         } else if N::ID == snarkvm::console::network::CanaryV0::ID {
             // CanaryV0 contains the following bootstrap peers.
             vec![
-                // TODO: Populate me with CanaryV0 IP addresses.
+                SocketAddr::from_str("34.74.24.41:4130").unwrap(),
+                SocketAddr::from_str("35.228.3.69:4130").unwrap(),
+                SocketAddr::from_str("34.124.178.133:4130").unwrap(),
+                SocketAddr::from_str("34.125.137.231:4130").unwrap(),
             ]
         } else {
             // Unrecognized networks contain no bootstrap peers.
