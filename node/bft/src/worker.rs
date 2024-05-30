@@ -949,7 +949,7 @@ mod prop_tests {
             let rng = &mut TestRng::fixed(i as u64);
             let address = Address::new(rng.gen());
             info!("Validator {i}: {address}");
-            members.insert(address, (MIN_VALIDATOR_STAKE, false));
+            members.insert(address, (MIN_VALIDATOR_STAKE, false, rng.gen_range(0..100)));
         }
         // Initialize the committee.
         Committee::<CurrentNetwork>::new(1u64, members).unwrap()

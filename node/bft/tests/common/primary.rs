@@ -137,7 +137,7 @@ impl TestNetwork {
         let bonded_balances: IndexMap<_, _> = committee
             .members()
             .iter()
-            .map(|(address, (amount, _))| (*address, (*address, *address, *amount)))
+            .map(|(address, (amount, _, _))| (*address, (*address, *address, *amount)))
             .collect();
         let gen_key = *accounts[0].private_key();
         let public_balance_per_validator = (CurrentNetwork::STARTING_SUPPLY
@@ -338,7 +338,7 @@ pub fn new_test_committee(n: u16, rng: &mut TestRng) -> (Vec<Account<CurrentNetw
         let account = Account::new(rng).unwrap();
         info!("Validator {}: {}", i, account.address());
 
-        members.insert(account.address(), (MIN_VALIDATOR_STAKE, false));
+        members.insert(account.address(), (MIN_VALIDATOR_STAKE, false, rng.gen_range(0..100)));
         accounts.push(account);
     }
     // Initialize the committee.

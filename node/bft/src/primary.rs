@@ -1703,7 +1703,7 @@ mod tests {
             for i in 0..COMMITTEE_SIZE {
                 let socket_addr = format!("127.0.0.1:{}", 5000 + i).parse().unwrap();
                 let account = Account::new(rng).unwrap();
-                members.insert(account.address(), (MIN_VALIDATOR_STAKE, true));
+                members.insert(account.address(), (MIN_VALIDATOR_STAKE, true, rng.gen_range(0..100)));
                 accounts.push((socket_addr, account));
             }
 
