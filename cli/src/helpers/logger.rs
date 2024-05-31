@@ -114,16 +114,7 @@ pub fn initialize_logger<P: AsRef<Path>>(
     };
 
     // Initialize tracing.
-    let _ = tracing_subscriber::registry()
-        .with(
-            // Add layer using LogWriter for stdout / terminal
-            tracing_subscriber::fmt::Layer::default()
-                .with_ansi(log_sender.is_none() && io::stdout().is_tty())
-                .with_writer(move || LogWriter::new(&log_sender))
-                .with_target(verbosity > 2)
-                .event_format(DynamicFormatter::new(shutdown))
-                .with_filter(filter),
-        )
+    let tracing = tracing_subscriber::registry()
         .with(
             // Add layer redirecting logs to the file
             tracing_subscriber::fmt::Layer::default()
@@ -131,8 +122,20 @@ pub fn initialize_logger<P: AsRef<Path>>(
                 .with_writer(logfile)
                 .with_target(verbosity > 2)
                 .with_filter(filter2),
-        )
-        .try_init();
+        );
+    let _ = if log_sender.is_some() {
+        tracing.with(
+            // Add layer using LogWriter for terminal
+            tracing_subscriber::fmt::Layer::default()
+                .with_ansi(false)
+                .with_writer(move || LogWriter::new(&log_sender))
+                .with_target(verbosity > 2)
+                .event_format(DynamicFormatter::new(shutdown))
+                .with_filter(filter),
+        ).try_init()
+    } else {
+        tracing.try_init()
+    };
 
     log_receiver
 }
