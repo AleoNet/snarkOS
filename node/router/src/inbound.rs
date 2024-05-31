@@ -110,7 +110,15 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
                 }
                 // Perform the deferred non-blocking deserialization of the blocks.
-                let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+                // The deserialization can take a long time (minutes). We should not be running
+                // this on a blocking task, but on a rayon thread pool.
+                let (send, recv) = tokio::sync::oneshot::channel();
+                rayon::spawn_fifo(move || {
+                    let blocks = blocks.deserialize_blocking().map_err(|error| anyhow!("[BlockResponse] {error}"));
+                    let _ = send.send(blocks);
+                });
+                let blocks = recv.await??;
+
                 // Ensure the block response is well-formed.
                 blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
 
