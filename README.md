@@ -115,7 +115,7 @@ Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS fir
 
 | Port     | Protocol | Allow/Deny | Source                       | Explanation                                                |
 |----------|----------|------------|------------------------------|------------------------------------------------------------|
-| 4130/tcp | TCP      | Allow      | All IPv4/IPv6 | TCP traffic to other clients and validators                |
+| 4130/tcp | TCP      | Allow      | All IPv4/IPv6 | TCP traffic to peers                |
 | 5000/tcp | TCP      | Allow      | Trusted Validator IPs        | TCP traffic between validators for BFT communication       |
 | 3000/tcp | TCP      | Allow      | Internal VPC or VPN          | Metrics dashboard, should only be open within an internal VPC or VPN |
 | 3030/tcp | TCP      | Deny       | All IPv4/IPv6                | REST server. This should always be disabled for validators |
