@@ -141,7 +141,7 @@ To start a core client node, you can also run the following command from the `sn
 
 ### 3.1.2 Run an Aleo Outer Client
 
-Generally, we recommend the following start command:
+The following command is recommended when starting a client node that is NOT connected to a validator:
 `snarkos start --client --nodisplay --node 0.0.0.0:4130 --peers “validator_ip:4130,core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip3:4130,outer_client_ip_1:4130,...” --verbosity 1 --rest 0.0.0.0:3030`
 
 To start an outer client node, you can also run the following command from the `snarkOS` directory:
