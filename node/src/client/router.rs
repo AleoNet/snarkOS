@@ -115,6 +115,26 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Client<N, C> {
 
     /// Processes a message received from the network.
     async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
+        let clone = self.clone();
+        if matches!(message, Message::BlockRequest(_) | Message::BlockResponse(_)) {
+            // Handle BlockRequest and BlockResponse messages in a separate task to not block the
+            // inbound queue.
+            tokio::spawn(async move {
+                clone.process_message_inner(peer_addr, message).await;
+            });
+        } else {
+            self.process_message_inner(peer_addr, message).await;
+        }
+        Ok(())
+    }
+}
+
+impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
+    async fn process_message_inner(
+        &self,
+        peer_addr: SocketAddr,
+        message: <Client<N, C> as snarkos_node_tcp::protocols::Reading>::Message,
+    ) {
         // Process the message. Disconnect if the peer violated the protocol.
         if let Err(error) = self.inbound(peer_addr, message).await {
             if let Some(peer_ip) = self.router().resolve_to_listener(&peer_addr) {
@@ -124,7 +144,6 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Client<N, C> {
                 self.router().disconnect(peer_ip);
             }
         }
-        Ok(())
     }
 }
 
