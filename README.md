@@ -109,7 +109,7 @@ Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS fir
 | Port     | Protocol | Allow/Deny | Source                       | Explanation                                                |
 |----------|----------|------------|------------------------------|------------------------------------------------------------|
 | 3030/tcp | TCP      | Allow      | All IPv4/IPv6                | REST server                                                |
-| 4130/tcp | TCP      | Allow      | All IPv4/IPv6 | TCP traffic to other clients and validators                |
+| 4130/tcp | TCP      | Allow      | All IPv4/IPv6 | TCP traffic to peers                |
 
 #### 2.4.3 For Validators
 
