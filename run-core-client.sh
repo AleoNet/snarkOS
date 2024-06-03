@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # USAGE examples: 
-  # CLI with env vars: PEERS=core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip_3:4130,outer_client_ip_1:4130,... ./run-core-client.sh
+  # CLI with env vars: PEERS=“validator_ip:4130,core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip_3:4130,outer_client_ip_1:4130,... ./run-core-client.sh
   # CLI with prompts for vars:  ./run-core-client.sh
 
 # If the env var PEERS is not set, prompt for it
 if [ -z "${PEERS}" ]
 then
-  read -r -p "Enter the peers (comma-separated) (e.g., core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip_3:4130,outer_client_ip_1:4130,...): "
+  read -r -p "Enter the peers (comma-separated) (e.g., “validator_ip:4130,core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip_3:4130,outer_client_ip_1:4130,...): "
   PEERS=$REPLY
 fi
 

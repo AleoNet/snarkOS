@@ -127,7 +127,7 @@ Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS fir
 ## 3.1 Run an Aleo Client
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
-The guide below provides information on running `core` and `outer` clients (as defined in Section 2.2.) Aleo community members running Validators are recommended to run 1-3 `core` clients as their exclusive peers. This will ensure network traffic from the public internet is verified prior to reaching the validator.
+The guide below provides information on running `core` and `outer` clients (as defined in Section 2.2.) Aleo community members running validators are recommended to run 1-3 `core` clients as their exclusive peers. This will ensure network traffic from the public internet is verified prior to reaching the validator.
 
 Any client **not** connected directly to a validator can be considered an `outer` client.
 
