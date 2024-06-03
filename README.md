@@ -42,7 +42,7 @@ which verifies transactions and stores the encrypted state applications in a pub
 
 The following snarkOS node types exist in the Aleo network:
  - **Validator**: Validator nodes participate in consensus and must be started with an account that is bonded into the committee.
- - **Client**: Clients do not participate in consensus but maintain a ledger. They are capable of providing information about the network as well as accepting solutions and transactions and communicating them to their peers. Two types of clients exist:
+ - **Client**: Clients do not participate in consensus but maintain a ledger. They are capable of providing information about the network as well as accepting solutions and transactions and communicating them to their peers. All clients run the same software, however, for the purposes of configuration management, this document defines two types of clients:
     - Core client: Client node connected directly to a validator node.
     - Outer Client: Client node connected only to other clients or prover nodes.
  - **Prover**: Prover nodes are dedicated to solving the Aleo puzzle. They do not participate in consensus or maintain a copy of the ledger.
