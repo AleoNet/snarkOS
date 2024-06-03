@@ -69,7 +69,7 @@ The following are the requirements to run an Aleo node:
     - Clients: 250Mbps of upload **and** download bandwidth
     - Validators: 500Mbps of upload **and** download bandwidth
 
-Please note that we do not provide official recommendations to run an Aleo Prover. In order to run an Aleo Prover that is **competitive**, the machine requirements will likely be high.
+No explicit recommendations are made for proving nodes as proving hardware may be highly variable. If interested in running Aleo Provers nodes, please refer to resources published by the Aleo community.
 
 ### 2.3 Installation
 
@@ -127,7 +127,9 @@ Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS fir
 ## 3.1 Run an Aleo Client
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
-The next step depends on if you want to run a `core` client or an `outer` client. Validators and related entities may want to run a `core` client. In all other cases, running an `outer` client is the default.
+The guide below provides information on running `core` and `outer` clients (as defined in Section 2.2.) Aleo community members running Validators are recommended to run 1-3 `core` clients as their exclusive peers. This will ensure network traffic from the public internet is verified prior to reaching the validator.
+
+Any client **not** connected directly to a validator can be considered an `outer` client.
 
 ### 3.1.1 Run an Aleo Core Client
 
@@ -142,7 +144,7 @@ To start a core client node, you can also run the following command from the `sn
 ### 3.1.2 Run an Aleo Outer Client
 
 The following command is recommended when starting a client node that is NOT connected to a validator:
-`snarkos start --client --nodisplay --node 0.0.0.0:4130 --peers “validator_ip:4130,core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip3:4130,outer_client_ip_1:4130,...” --verbosity 1 --rest 0.0.0.0:3030`
+`snarkos start --client --nodisplay --node 0.0.0.0:4130 --peers “core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip3:4130,outer_client_ip_1:4130,...” --verbosity 1 --rest 0.0.0.0:3030`
 
 To start an outer client node, you can also run the following command from the `snarkOS` directory:
 ```
@@ -153,7 +155,7 @@ To start an outer client node, you can also run the following command from the `
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
 
-Generally, we recommend the following start command:
+The following command is recommended when starting a validator node:
 `snarkos start --validator --nodisplay --bft 0.0.0.0:5000 --node 0.0.0.0:4130 --peers “core_client_ip_1:4130,core_client_ip_2:4130,...” --validators “validator_ip_1:5000,validator_ip_2:5000,...” --verbosity 1 --norest --private-key-file ~/snarkOS/privatekey`
 
 Instead of specifying a private key file (`--private-key-file` flag), the private key can also be defined explicitly (`--private-key` flag).
