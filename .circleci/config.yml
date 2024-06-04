@@ -162,7 +162,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $twoxlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial_long:
           workspace_member: .integration
@@ -172,7 +172,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $twoxlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: .
@@ -182,7 +182,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: account
@@ -192,7 +192,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: cli
@@ -202,7 +202,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: display
@@ -212,7 +212,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $twoxlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node
@@ -223,7 +223,7 @@ jobs:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $twoxlarge
     steps:
-    context: snarkOS
+    context: runners
       - run_serial:
           workspace_member: node/bft
           cache_key: snarkos-node-bft-cache
@@ -232,7 +232,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $twoxlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/bft/events
@@ -242,7 +242,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/bft/ledger-service
@@ -252,7 +252,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/bft/storage-service
@@ -262,7 +262,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/cdn
@@ -272,7 +272,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $twoxlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/consensus
@@ -282,7 +282,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/rest
@@ -292,7 +292,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/router
@@ -302,7 +302,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/router/messages
@@ -312,7 +312,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/sync
@@ -322,7 +322,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS    
+    context: runners    
     steps:
       - run_serial:
           workspace_member: node/sync/communication-service
@@ -332,7 +332,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/sync/locators
@@ -342,7 +342,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - run_serial:
           workspace_member: node/tcp
@@ -352,7 +352,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $xlarge
-    context: snarkOS
+    context: runners
     steps:
       - checkout
       - install_rust_nightly
@@ -369,7 +369,7 @@ jobs:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: $twoxlarge
-    context: snarkOS
+    context: runners
     steps:
       - checkout
       - setup_environment:
