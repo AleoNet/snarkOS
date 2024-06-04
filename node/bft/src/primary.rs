@@ -822,10 +822,6 @@ impl<N: Network> Primary<N> {
                     }
                     // Retrieve the committee lookback for the round.
                     let committee_lookback = self_.ledger.get_committee_lookback_for_round(proposal.round())?;
-                    // Retrieve the address of the validator.
-                    let Some(signer) = self_.gateway.resolver().get_address(peer_ip) else {
-                        bail!("Signature is from a disconnected validator");
-                    };
                     // Add the signature to the batch.
                     proposal.add_signature(signer, signature, &committee_lookback)?;
                     info!("Received a batch signature for round {} from '{peer_ip}'", proposal.round());
