@@ -120,7 +120,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     let blocks = blocks.deserialize_blocking().map_err(|error| anyhow!("[BlockResponse] {error}"));
                     let _ = send.send(blocks);
                 });
-                let blocks = recv.await??;
+                let blocks = match recv.await {
+                    Ok(Ok(blocks)) => blocks,
+                    Ok(Err(error)) => bail!("Peer '{peer_ip}' sent an invalid block response - {error}"),
+                    Err(error) => bail!("Peer '{peer_ip}' sent an invalid block response - {error}"),
+                };
 
                 // Ensure the block response is well-formed.
                 blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
