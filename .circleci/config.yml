@@ -1,13 +1,5 @@
 version: 2.1
 
-parameters:
-  xlarge:
-    type: string
-    default: xlarge
-  twoxlarge:
-    type: string
-    default: 2xlarge
-
 orbs:
   windows: circleci/windows@5.0
 
@@ -168,7 +160,8 @@ jobs:
   integration:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: $twoxlarge
+    context: snarkOS
     steps:
       - run_serial_long:
           workspace_member: .integration
@@ -177,7 +170,8 @@ jobs:
   snarkos:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: $twoxlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: .
@@ -186,7 +180,8 @@ jobs:
   account:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: account
@@ -195,7 +190,8 @@ jobs:
   cli:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: cli
@@ -204,7 +200,8 @@ jobs:
   display:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: display
@@ -213,7 +210,8 @@ jobs:
   node:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: $twoxlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node
@@ -222,8 +220,9 @@ jobs:
   node-bft:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: $twoxlarge
     steps:
+    context: snarkOS
       - run_serial:
           workspace_member: node/bft
           cache_key: snarkos-node-bft-cache
@@ -231,7 +230,8 @@ jobs:
   node-bft-events:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: $twoxlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/bft/events
@@ -240,7 +240,8 @@ jobs:
   node-bft-ledger-service:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/bft/ledger-service
@@ -249,7 +250,8 @@ jobs:
   node-bft-storage-service:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/bft/storage-service
@@ -258,7 +260,8 @@ jobs:
   node-cdn:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/cdn
@@ -267,7 +270,8 @@ jobs:
   node-consensus:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: $twoxlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/consensus
@@ -276,7 +280,8 @@ jobs:
   node-rest:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/rest
@@ -285,7 +290,8 @@ jobs:
   node-router:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/router
@@ -294,7 +300,8 @@ jobs:
   node-router-messages:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/router/messages
@@ -303,7 +310,8 @@ jobs:
   node-sync:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/sync
@@ -312,7 +320,8 @@ jobs:
   node-sync-communication-service:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS    
     steps:
       - run_serial:
           workspace_member: node/sync/communication-service
@@ -321,7 +330,8 @@ jobs:
   node-sync-locators:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/sync/locators
@@ -330,7 +340,8 @@ jobs:
   node-tcp:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - run_serial:
           workspace_member: node/tcp
@@ -339,7 +350,8 @@ jobs:
   check-fmt:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: $xlarge
+    context: snarkOS
     steps:
       - checkout
       - install_rust_nightly
@@ -355,7 +367,8 @@ jobs:
   check-clippy:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: $twoxlarge
+    context: snarkOS
     steps:
       - checkout
       - setup_environment:
