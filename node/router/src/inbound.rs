@@ -36,7 +36,7 @@ use snarkvm::prelude::{
 
 use anyhow::{anyhow, bail, Result};
 use snarkos_node_tcp::is_bogon_ip;
-use std::{net::SocketAddr, time::Instant};
+use std::net::SocketAddr;
 use tokio::task::spawn_blocking;
 
 /// The max number of peers to send in a `PeerResponse` message.
@@ -75,6 +75,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         }
 
         trace!("Received '{}' from '{peer_ip}'", message.name());
+
+        // Update the last seen timestamp of the peer.
+        self.router().update_last_seen_for_connected_peer(peer_ip);
 
         // This match statement handles the inbound message by deserializing the message,
         // checking that the message is valid, and then calling the appropriate (trait) handler.
@@ -177,8 +180,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                         peer.set_version(message.version);
                         // Update the node type of the peer.
                         peer.set_node_type(message.node_type);
-                        // Update the last seen timestamp of the peer.
-                        peer.set_last_seen(Instant::now());
                     })
                 {
                     bail!("[Ping] {error}");

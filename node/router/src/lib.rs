@@ -500,6 +500,12 @@ impl<N: Network> Router<N> {
         Ok(())
     }
 
+    pub fn update_last_seen_for_connected_peer(&self, peer_ip: SocketAddr) {
+        if let Some(peer) = self.connected_peers.write().get_mut(&peer_ip) {
+            peer.set_last_seen(Instant::now());
+        }
+    }
+
     /// Removes the connected peer and adds them to the candidate peers.
     pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
