@@ -571,10 +571,13 @@ impl<N: Network> Sync<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Determine how many sent requests are pending.
         let num_sent_requests = self.pending.num_sent_requests(certificate_id);
+        // Determine if we've already sent a request to the peer.
+        let contains_peer_with_sent_request = self.pending.contains_peer_with_sent_request(certificate_id, peer_ip);
         // Determine the maximum number of redundant requests.
         let num_redundant_requests = max_redundant_requests(self.ledger.clone(), self.storage.current_round());
         // Determine if we should send a certificate request to the peer.
-        let should_send_request = num_sent_requests < num_redundant_requests;
+        // We send at most `num_redundant_requests` requests and each peer can only receive one request at a time.
+        let should_send_request = num_sent_requests < num_redundant_requests && !contains_peer_with_sent_request;
 
         // Insert the certificate ID into the pending queue.
         self.pending.insert(certificate_id, peer_ip, Some((callback_sender, should_send_request)));
