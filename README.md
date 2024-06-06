@@ -58,9 +58,9 @@ The following are the requirements to run an Aleo node:
     - Clients, outer: 32-cores (16 minimum)
     - Validators: 64-cores (or better)
  - **RAM**: DDR4 or better
-    - Clients, core: 192GB of memory (128 minimum)
-    - Clients, outer: 128GB of memory (64 minimum)
-    - Validators: 384GB of memory (256 minimum)
+    - Clients, core: 192GiB of memory (128 minimum)
+    - Clients, outer: 128GiB of memory (64 minimum)
+    - Validators: 384GiB of memory (256 minimum)
  - **Storage**: PCIe Gen 3 x4, PCIe Gen 4 x2 NVME SSD, or better
     - Clients, core: 4TB of disk space (2 minimum)
     - Clients, outer: 2TB of disk space (1 minimum)
