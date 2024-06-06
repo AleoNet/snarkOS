@@ -98,7 +98,7 @@ pub(crate) fn check_validator_machine(node_type: NodeType) {
         }
         // Enforce the minimum amount of RAM.
         if let Ok(ram) = crate::helpers::detect_ram_memory() {
-            let min_ram = 238;
+            let min_ram = 256;
             if ram < min_ram {
                 let message = format!("⚠️  The amount of RAM ({ram} GiB) on this machine is insufficient for a validator (minimum {min_ram} GiB)\n");
                 println!("{}", message.yellow().bold());
