@@ -152,6 +152,13 @@ impl<N: Network> Worker<N> {
 }
 
 impl<N: Network> Worker<N> {
+    /// Clears the solutions from the ready queue.
+    pub(super) fn clear_solutions(&self) {
+        self.ready.clear_solutions()
+    }
+}
+
+impl<N: Network> Worker<N> {
     /// Returns `true` if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
     pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         let transmission_id = transmission_id.into();
