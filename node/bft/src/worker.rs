@@ -848,14 +848,18 @@ mod tests {
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
         let transmission_id = TransmissionID::Transaction(transaction_id);
-        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
 
         // Determine the number of redundant requests are sent.
         let num_redundant_requests = max_redundant_requests(worker.ledger.clone(), worker.storage.current_round());
         let num_flood_requests = num_redundant_requests * 10;
+        let mut peer_ips =
+            (0..num_flood_requests).map(|i| SocketAddr::from(([127, 0, 0, 1], 1234 + i as u16))).collect_vec();
+        let first_peer_ip = peer_ips[0];
+
         // Flood the pending queue with transmission requests.
         for i in 1..=num_flood_requests {
             let worker_ = worker.clone();
+            let peer_ip = peer_ips.pop().unwrap();
             tokio::spawn(async move {
                 let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
             });
@@ -873,18 +877,18 @@ mod tests {
         assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
         assert_eq!(worker.pending.num_callbacks(transmission_id), 0);
 
-        // Flood the pending queue with transmission requests again.
+        // Flood the pending queue with transmission requests again, this time to a single peer
         for i in 1..=num_flood_requests {
             let worker_ = worker.clone();
             tokio::spawn(async move {
-                let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+                let _ = worker_.send_transmission_request(first_peer_ip, transmission_id).await;
             });
             tokio::time::sleep(Duration::from_millis(10)).await;
             assert!(worker.pending.num_sent_requests(transmission_id) <= num_redundant_requests);
             assert_eq!(worker.pending.num_callbacks(transmission_id), i);
         }
         // Check that the number of sent requests does not exceed the maximum number of redundant requests.
-        assert_eq!(worker.pending.num_sent_requests(transmission_id), num_redundant_requests);
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), 1);
         assert_eq!(worker.pending.num_callbacks(transmission_id), num_flood_requests);
 
         // Check that fulfilling a transmission request clears the pending queue.
