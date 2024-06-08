@@ -67,6 +67,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.latest_block()
     }
 
+    /// Returns the latest restrictions ID in the ledger.
+    fn latest_restrictions_id(&self) -> Field<N> {
+        self.inner.latest_restrictions_id()
+    }
+
     /// Returns the latest cached leader and its associated round.
     fn latest_leader(&self) -> Option<(u64, Address<N>)> {
         self.inner.latest_leader()

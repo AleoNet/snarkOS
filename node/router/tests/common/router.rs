@@ -40,7 +40,9 @@ use snarkos_node_tcp::{
 use snarkvm::prelude::{
     block::{Block, Header, Transaction},
     puzzle::Solution,
+    Field,
     Network,
+    Zero,
 };
 
 use async_trait::async_trait;
@@ -80,7 +82,8 @@ impl<N: Network> Handshake for TestRouter<N> {
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = *sample_genesis_block().header();
-        self.router().handshake(peer_addr, stream, conn_side, genesis_header).await?;
+        let restrictions_id = Field::<N>::zero();
+        self.router().handshake(peer_addr, stream, conn_side, genesis_header, restrictions_id).await?;
 
         Ok(connection)
     }

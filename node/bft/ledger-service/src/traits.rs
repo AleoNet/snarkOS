@@ -36,6 +36,9 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// Returns the latest block in the ledger.
     fn latest_block(&self) -> Block<N>;
 
+    /// Returns the latest restrictions ID in the ledger.
+    fn latest_restrictions_id(&self) -> Field<N>;
+
     /// Returns the latest cached leader and its associated round.
     fn latest_leader(&self) -> Option<(u64, Address<N>)>;
 

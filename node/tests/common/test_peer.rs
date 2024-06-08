@@ -19,7 +19,7 @@ use snarkos_node_router::{
 };
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Block, error, Address, FromBytes, MainnetV0 as CurrentNetwork, Network, TestRng},
+    prelude::{block::Block, error, Address, Field, FromBytes, MainnetV0 as CurrentNetwork, Network, TestRng, Zero},
 };
 
 use std::{
@@ -126,6 +126,8 @@ impl Handshake for TestPeer {
 
         // Retrieve the genesis block header.
         let genesis_header = *sample_genesis_block().header();
+        // Retrieve the restrictions ID.
+        let restrictions_id = Field::<CurrentNetwork>::zero();
 
         // TODO(nkls): add assertions on the contents of messages.
         match node_side {
@@ -144,8 +146,12 @@ impl Handshake for TestPeer {
                 let signature = self.account().sign_bytes(&data, rng).unwrap();
 
                 // Send the challenge response.
-                let our_response =
-                    ChallengeResponse { genesis_header, signature: Data::Object(signature), nonce: response_nonce };
+                let our_response = ChallengeResponse {
+                    genesis_header,
+                    restrictions_id,
+                    signature: Data::Object(signature),
+                    nonce: response_nonce,
+                };
                 framed.send(Message::ChallengeResponse(our_response)).await?;
             }
             ConnectionSide::Responder => {
@@ -158,8 +164,12 @@ impl Handshake for TestPeer {
                 let signature = self.account().sign_bytes(&data, rng).unwrap();
 
                 // Send our challenge bundle.
-                let our_response =
-                    ChallengeResponse { genesis_header, signature: Data::Object(signature), nonce: response_nonce };
+                let our_response = ChallengeResponse {
+                    genesis_header,
+                    restrictions_id,
+                    signature: Data::Object(signature),
+                    nonce: response_nonce,
+                };
                 framed.send(Message::ChallengeResponse(our_response)).await?;
                 let our_request = ChallengeRequest::new(local_ip.port(), self.node_type(), self.address(), rng.gen());
                 framed.send(Message::ChallengeRequest(our_request)).await?;

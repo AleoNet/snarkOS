@@ -16,6 +16,7 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChallengeResponse<N: Network> {
+    pub restrictions_id: Field<N>,
     pub signature: Data<Signature<N>>,
     pub nonce: u64,
 }
@@ -30,6 +31,7 @@ impl<N: Network> EventTrait for ChallengeResponse<N> {
 
 impl<N: Network> ToBytes for ChallengeResponse<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.restrictions_id.write_le(&mut writer)?;
         self.signature.write_le(&mut writer)?;
         self.nonce.write_le(&mut writer)?;
         Ok(())
@@ -38,10 +40,11 @@ impl<N: Network> ToBytes for ChallengeResponse<N> {
 
 impl<N: Network> FromBytes for ChallengeResponse<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let restrictions_id = Field::read_le(&mut reader)?;
         let signature = Data::read_le(&mut reader)?;
         let nonce = u64::read_le(&mut reader)?;
 
-        Ok(Self { signature, nonce })
+        Ok(Self { restrictions_id, signature, nonce })
     }
 }
 
@@ -51,7 +54,7 @@ pub mod prop_tests {
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
         ledger::narwhal::Data,
-        prelude::{PrivateKey, Signature},
+        prelude::{Field, PrivateKey, Signature},
         utilities::rand::{TestRng, Uniform},
     };
 
@@ -60,6 +63,10 @@ pub mod prop_tests {
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
+
+    pub fn any_restrictions_id() -> Field<CurrentNetwork> {
+        Uniform::rand(&mut TestRng::default())
+    }
 
     pub fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
         (0..64)
@@ -74,7 +81,11 @@ pub mod prop_tests {
 
     pub fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
         (any_signature(), any::<u64>())
-            .prop_map(|(sig, nonce)| ChallengeResponse { signature: Data::Object(sig), nonce })
+            .prop_map(|(sig, nonce)| ChallengeResponse {
+                restrictions_id: any_restrictions_id(),
+                signature: Data::Object(sig),
+                nonce,
+            })
             .boxed()
     }
 
