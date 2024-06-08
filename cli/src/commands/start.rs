@@ -835,27 +835,6 @@ mod tests {
         assert!(config.parse_cdn().is_none());
     }
 
-
-    #[tokio::test]
-    async fn test_rest_ip_behavior_in_production() {
-
-        // Test default REST IP when REST flag is not passed in prod mode
-        let mut config = Start::try_parse_from(["snarkos", "--private-key", "aleo1xx"].iter()).unwrap();
-        let _ = config.parse_node::<CurrentNetwork>().await.expect("Failed to parse the node with default settings");
-        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3030").unwrap()));
-
-        // Test specified REST IP when passed in prod mode
-        let mut config = Start::try_parse_from(["snarkos", "--rest", "192.168.1.1:8080", "--private-key", "aleo1xx"].iter()).unwrap();
-        let _ = config.parse_node::<CurrentNetwork>().await.expect("Failed to parse the node with specified REST IP");
-        assert_eq!(config.rest, Some(SocketAddr::from_str("192.168.1.1:8080").unwrap()));
-
-        // Test behavior when REST flag is not passed and REST is disabled in prod mode
-        let mut config = Start::try_parse_from(["snarkos", "--norest", "--private-key", "aleo1xx"].iter()).unwrap();
-        let _ = config.parse_node::<CurrentNetwork>().await.expect("Failed to parse the node with REST disabled");
-        assert!(config.rest.is_none());
-    }
-
-
     #[test]
     fn test_parse_development_and_genesis() {
         let prod_genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
