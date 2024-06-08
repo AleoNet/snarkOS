@@ -352,7 +352,7 @@ impl<N: Network> Router<N> {
             return Some(DisconnectReason::InvalidChallengeResponse);
         }
         // Verify the restrictions ID.
-        if !peer_node_type.is_prover() && restrictions_id != expected_restrictions_id {
+        if !peer_node_type.is_prover() && !self.node_type.is_prover() && restrictions_id != expected_restrictions_id {
             warn!("Handshake with '{peer_addr}' failed (incorrect restrictions ID)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         }
