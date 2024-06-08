@@ -45,9 +45,10 @@ version = "=0.1.24"
 default-features = false
 
 [workspace.dependencies.snarkvm]
-git = "https://github.com/AleoNet/snarkVM.git"
-rev = "74a437897"
+#git = "https://github.com/AleoNet/snarkVM.git"
+#rev = "74a437897"
 #version = "=0.16.18"
+path = "../snarkVM"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
@@ -56,6 +57,7 @@ path = "snarkos/main.rs"
 
 [features]
 metrics = [ "snarkos-node-metrics", "snarkos-node/metrics" ]
+history = [ "snarkos-node/history" ]
 
 [dependencies.anyhow]
 version = "1.0.79"

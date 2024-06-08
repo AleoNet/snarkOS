@@ -23,6 +23,7 @@ use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use snarkvm::prelude::{History, HistoryVariant};
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -443,5 +444,18 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         rest.routing.propagate(message, &[]);
 
         Ok(ErasedJson::pretty(solution_id))
+    }
+
+    // GET /{network}/block/{blockHeight}/history/{mapping}
+    // TODO: Clean up
+    #[cfg(feature = "history")]
+    pub(crate) async fn get_history(
+        State(rest): State<Self>,
+        Path((height, variant)): Path<(u32, HistoryVariant)>,
+    ) -> Result<ErasedJson, RestError> {
+        // Retrieve the history for the given block height and variant.
+        let history = History::new(N::ID, rest.ledger.vm().finalize_store().storage_mode().clone());
+        let result = history.load_entry(height, variant)?;
+        Ok(ErasedJson::pretty(result))
     }
 }

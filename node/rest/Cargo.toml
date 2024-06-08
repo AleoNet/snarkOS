@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ "parallel" ]
 parallel = [ "rayon" ]
+history = [ ]
 
 [dependencies.anyhow]
 version = "1.0.79"
