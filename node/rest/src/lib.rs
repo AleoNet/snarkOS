@@ -198,10 +198,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route(&format!("/{network}/committee/:height"), get(Self::get_committee))
             .route(&format!("/{network}/delegators/:validator"), get(Self::get_delegators_for_validator));
 
-            // TODO: Cleanup
+            // If the `history` feature is enabled, enable the additional endpoint.
             #[cfg(feature = "history")]
             {
-                routes = routes.route(&format!("/{network}/block/:blockHeight/history/:mapping"), get(Self::get_history))
+                routes =
+                    routes.route(&format!("/{network}/block/:blockHeight/history/:mapping"), get(Self::get_history));
             }
 
             routes

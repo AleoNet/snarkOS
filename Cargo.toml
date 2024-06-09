@@ -57,7 +57,7 @@ path = "snarkos/main.rs"
 
 [features]
 metrics = [ "snarkos-node-metrics", "snarkos-node/metrics" ]
-history = [ "snarkos-node/history" ]
+history = [ "snarkos-node/history", "snarkvm-synthesizer/history" ]
 
 [dependencies.anyhow]
 version = "1.0.79"
@@ -120,6 +120,11 @@ version = "=2.2.7"
 [dependencies.snarkos-node-tcp]
 path = "./node/tcp"
 version = "=2.2.7"
+
+[dependencies.snarkvm-synthesizer]
+path = "../snarkVM/synthesizer"
+default-features = false
+optional = true
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"
