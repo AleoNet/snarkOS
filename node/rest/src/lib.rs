@@ -129,7 +129,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         };
 
         let router = {
-            let mut routes = axum::Router::new()
+            let routes = axum::Router::new()
 
             // All the endpoints before the call to `route_layer` are protected with JWT auth.
             .route(&format!("/{network}/node/address"), get(Self::get_node_address))
@@ -200,10 +200,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
             // If the `history` feature is enabled, enable the additional endpoint.
             #[cfg(feature = "history")]
-            {
-                routes =
-                    routes.route(&format!("/{network}/block/:blockHeight/history/:mapping"), get(Self::get_history));
-            }
+            let routes =
+                routes.route(&format!("/{network}/block/:blockHeight/history/:mapping"), get(Self::get_history));
 
             routes
             // Pass in `Rest` to make things convenient.
