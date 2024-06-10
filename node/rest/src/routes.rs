@@ -455,7 +455,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         let history = snarkvm::prelude::History::new(N::ID, rest.ledger.vm().finalize_store().storage_mode().clone());
         let result = history
             .load_mapping(height, mapping)
-            .map_err(|err| RestError(format!("Could not load mapping '{mapping}' from block '{height}'")))?;
+            .map_err(|_| RestError(format!("Could not load mapping '{mapping}' from block '{height}'")))?;
 
         Ok((StatusCode::OK, [(CONTENT_TYPE, "application/json")], result))
     }
