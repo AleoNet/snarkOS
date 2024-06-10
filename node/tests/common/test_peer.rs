@@ -19,7 +19,7 @@ use snarkos_node_router::{
 };
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Block, error, Address, Field, FromBytes, MainnetV0 as CurrentNetwork, Network, TestRng, Zero},
+    prelude::{block::Block, error, Address, Field, FromBytes, MainnetV0 as CurrentNetwork, Network, TestRng},
 };
 
 use std::{
@@ -127,7 +127,10 @@ impl Handshake for TestPeer {
         // Retrieve the genesis block header.
         let genesis_header = *sample_genesis_block().header();
         // Retrieve the restrictions ID.
-        let restrictions_id = Field::<CurrentNetwork>::zero();
+        let restrictions_id = Field::<CurrentNetwork>::from_str(
+            "7562506206353711030068167991213732850758501012603348777370400520506564970105field",
+        )
+        .unwrap();
 
         // TODO(nkls): add assertions on the contents of messages.
         match node_side {

@@ -42,11 +42,10 @@ use snarkvm::prelude::{
     puzzle::Solution,
     Field,
     Network,
-    Zero,
 };
 
 use async_trait::async_trait;
-use std::{io, net::SocketAddr};
+use std::{io, net::SocketAddr, str::FromStr};
 use tracing::*;
 
 #[derive(Clone)]
@@ -82,7 +81,9 @@ impl<N: Network> Handshake for TestRouter<N> {
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = *sample_genesis_block().header();
-        let restrictions_id = Field::<N>::zero();
+        let restrictions_id =
+            Field::<N>::from_str("7562506206353711030068167991213732850758501012603348777370400520506564970105field")
+                .unwrap();
         self.router().handshake(peer_addr, stream, conn_side, genesis_header, restrictions_id).await?;
 
         Ok(connection)
