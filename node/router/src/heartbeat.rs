@@ -142,13 +142,20 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     fn handle_connected_peers(&self) {
         // Obtain the number of connected peers.
         let num_connected = self.router().number_of_connected_peers();
-        // Compute the total number of surplus peers.
-        let num_surplus_peers = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
-
         // Obtain the number of connected provers.
         let num_connected_provers = self.router().number_of_connected_provers();
+
+        // Determine the maximum number of peers and provers to keep.
+        let (max_peers, max_provers) = if self.router().rotate_external_peers() {
+            (Self::MEDIAN_NUMBER_OF_PEERS, 0)
+        } else {
+            (Self::MAXIMUM_NUMBER_OF_PEERS, Self::MAXIMUM_NUMBER_OF_PROVERS)
+        };
+
+        // Compute the number of surplus peers.
+        let num_surplus_peers = num_connected.saturating_sub(max_peers);
         // Compute the number of surplus provers.
-        let num_surplus_provers = num_connected_provers.saturating_sub(Self::MAXIMUM_NUMBER_OF_PROVERS);
+        let num_surplus_provers = num_connected_provers.saturating_sub(max_provers);
         // Compute the number of provers remaining connected.
         let num_remaining_provers = num_connected_provers.saturating_sub(num_surplus_provers);
         // Compute the number of surplus clients and validators.
