@@ -119,6 +119,11 @@ impl<N: Network> Cache<N> {
     pub fn decrement_outbound_validators_requests(&self, peer_ip: SocketAddr) -> u32 {
         Self::decrement_counter(&self.seen_outbound_validators_requests, peer_ip)
     }
+
+    /// Clears the the IP's number of validator requests.
+    pub fn clear_outbound_validators_requests(&self, peer_ip: SocketAddr) {
+        self.seen_outbound_validators_requests.write().remove(&peer_ip);
+    }
 }
 
 impl<N: Network> Cache<N> {
@@ -292,5 +297,28 @@ mod tests {
        outbound_event,
        outbound_certificate,
        outbound_transmission
+    }
+
+    #[test]
+    fn test_seen_outbound_validators_requests() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let input = Input::input();
+
+        // Check the map is empty.
+        assert!(!cache.contains_outbound_validators_request(input));
+
+        // Insert some requests.
+        for _ in 0..3 {
+            cache.increment_outbound_validators_requests(input);
+            assert!(cache.contains_outbound_validators_request(input));
+        }
+
+        // Remove a request.
+        cache.decrement_outbound_validators_requests(input);
+        assert!(cache.contains_outbound_validators_request(input));
+
+        // Clear all requests.
+        cache.clear_outbound_validators_requests(input);
+        assert!(!cache.contains_outbound_validators_request(input));
     }
 }
