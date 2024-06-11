@@ -536,6 +536,7 @@ mod tests {
             fn latest_round(&self) -> u64;
             fn latest_block_height(&self) -> u32;
             fn latest_block(&self) -> Block<N>;
+            fn latest_restrictions_id(&self) -> Field<N>;
             fn latest_leader(&self) -> Option<(u64, Address<N>)>;
             fn update_latest_leader(&self, round: u64, leader: Address<N>);
             fn contains_block_height(&self, height: u32) -> bool;

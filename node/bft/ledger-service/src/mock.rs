@@ -20,7 +20,7 @@ use snarkvm::{
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
     },
-    prelude::{bail, ensure, Address, Field, Network, Result},
+    prelude::{bail, ensure, Address, Field, Network, Result, Zero},
 };
 
 use indexmap::IndexMap;
@@ -66,6 +66,11 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// Returns the latest block in the ledger.
     fn latest_block(&self) -> Block<N> {
         unreachable!("MockLedgerService does not support latest_block")
+    }
+
+    /// Returns the latest restrictions ID in the ledger.
+    fn latest_restrictions_id(&self) -> Field<N> {
+        Field::zero()
     }
 
     /// Returns the latest cached leader and its associated round.
