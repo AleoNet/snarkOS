@@ -649,6 +649,7 @@ impl<N: Network> BlockSync<N> {
 
             let retain = !peer_ips.is_empty() || responses.get(height).is_some();
             if !retain {
+                trace!("Removed block request timestamp for {peer_ip} at height {height}");
                 self.request_timestamps.write().remove(height);
             }
             retain
@@ -668,11 +669,15 @@ impl<N: Network> BlockSync<N> {
         // Retrieve the current time.
         let now = Instant::now();
 
+        // Retrieve the current block height
+        let current_height = self.canon.latest_block_height();
+
         // Track the number of timed out block requests.
         let mut num_timed_out_block_requests = 0;
 
         // Remove timed out block requests.
         request_timestamps.retain(|height, timestamp| {
+            let is_obsolete = *height < current_height;
             // Determine if the duration since the request timestamp has exceeded the request timeout.
             let is_time_passed = now.duration_since(*timestamp).as_secs() > BLOCK_REQUEST_TIMEOUT_IN_SECS;
             // Determine if the request is incomplete.
@@ -681,8 +686,9 @@ impl<N: Network> BlockSync<N> {
             // Determine if the request has timed out.
             let is_timeout = is_time_passed && is_request_incomplete;
 
-            // If the request has timed out, then remove it.
-            if is_timeout {
+            // If the request has timed out, or is obsolete, then remove it.
+            if is_timeout || is_obsolete {
+                trace!("Block request {height} has timed out: is_time_passed = {is_time_passed}, is_request_incomplete = {is_request_incomplete}, is_obsolete = {is_obsolete}");
                 // Remove the request entry for the given height.
                 requests.remove(height);
                 // Remove the response entry for the given height.
@@ -690,8 +696,8 @@ impl<N: Network> BlockSync<N> {
                 // Increment the number of timed out block requests.
                 num_timed_out_block_requests += 1;
             }
-            // Retain if this is not a timeout.
-            !is_timeout
+            // Retain if this is not a timeout and is not obsolete.
+            !is_timeout && !is_obsolete
         });
 
         num_timed_out_block_requests
