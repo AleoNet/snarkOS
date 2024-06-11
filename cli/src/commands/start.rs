@@ -110,8 +110,8 @@ pub struct Start {
     pub allow_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
-    #[clap(default_value = "0.0.0.0:3030", long = "rest")]
-    pub rest: SocketAddr,
+    #[clap(long = "rest")]
+    pub rest: Option<SocketAddr>,
     /// Specify the requests per second (RPS) rate limit per IP for the REST server
     #[clap(default_value = "10", long = "rest-rps")]
     pub rest_rps: u32,
@@ -337,12 +337,10 @@ impl Start {
             if self.node.is_none() {
                 self.node = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?);
             }
-            // If the `norest` flag is not set, and the `bft` flag was not overridden,
-            // then set the REST IP to `3030 + dev`.
-            //
-            // Note: the `bft` flag is an option to detect remote devnet testing.
-            if !self.norest && self.bft.is_none() {
-                self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
+
+            // If the `norest` flag is not set and the REST IP is not already specified set the REST IP to `3030 + dev`.
+            if !self.norest && self.rest.is_none() {
+                self.rest = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev)).unwrap());
             }
         }
         Ok(())
@@ -519,15 +517,11 @@ impl Start {
             Some(node_ip) => node_ip,
             None => SocketAddr::from_str("0.0.0.0:4130").unwrap(),
         };
-        // Parse the BFT IP.
-        let bft_ip = match self.dev.is_some() {
-            true => self.bft,
-            false => None
-        };
+
         // Parse the REST IP.
         let rest_ip = match self.norest {
             true => None,
-            false => Some(self.rest),
+            false => self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap())),
         };
 
         // If the display is not enabled, render the welcome message.
@@ -587,7 +581,7 @@ impl Start {
 
         // Initialize the node.
         match node_type {
-            NodeType::Validator => Node::new_validator(node_ip, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs, shutdown.clone()).await,
+            NodeType::Validator => Node::new_validator(node_ip, self.bft, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs, shutdown.clone()).await,
             NodeType::Prover => Node::new_prover(node_ip, account, &trusted_peers, genesis, storage_mode, shutdown.clone()).await,
             NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, shutdown).await,
         }
@@ -891,6 +885,35 @@ mod tests {
         assert!(config.parse_cdn().is_none());
     }
 
+    #[tokio::test]
+    async fn test_rest_ip_behavior_in_production() {
+        // Test default REST IP when REST flag is not passed in prod mode
+        let mut config = Start::try_parse_from(["snarkos", "--private-key", "aleo1xx"].iter()).unwrap();
+        let _ = config
+            .parse_node::<CurrentNetwork>(Default::default())
+            .await
+            .expect("Failed to parse the node with default settings");
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3030").unwrap()));
+
+        // Test specified REST IP when passed in prod mode
+        let mut config =
+            Start::try_parse_from(["snarkos", "--rest", "192.168.1.1:8080", "--private-key", "aleo1xx"].iter())
+                .unwrap();
+        let _ = config
+            .parse_node::<CurrentNetwork>(Default::default())
+            .await
+            .expect("Failed to parse the node with specified REST IP");
+        assert_eq!(config.rest, Some(SocketAddr::from_str("192.168.1.1:8080").unwrap()));
+
+        // Test behavior when REST flag is not passed and REST is disabled in prod mode
+        let mut config = Start::try_parse_from(["snarkos", "--norest", "--private-key", "aleo1xx"].iter()).unwrap();
+        let _ = config
+            .parse_node::<CurrentNetwork>(Default::default())
+            .await
+            .expect("Failed to parse the node with REST disabled");
+        assert!(config.rest.is_none());
+    }
+
     #[test]
     fn test_parse_development_and_genesis() {
         let prod_genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
@@ -908,11 +931,29 @@ mod tests {
 
         let mut trusted_peers = vec![];
         let mut trusted_validators = vec![];
+        let mut config = Start::try_parse_from(["snarkos", "--dev", "1"].iter()).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3031").unwrap()));
+
+        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
+        let mut config = Start::try_parse_from(["snarkos", "--dev", "1", "--rest", "127.0.0.1:8080"].iter()).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("127.0.0.1:8080").unwrap()));
+
+        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
+        let mut config = Start::try_parse_from(["snarkos", "--dev", "1", "--norest"].iter()).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        assert!(config.rest.is_none());
+
+        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config = Start::try_parse_from(["snarkos", "--dev", "0"].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let expected_genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4130").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3030").unwrap()));
         assert_eq!(trusted_peers.len(), 0);
         assert_eq!(trusted_validators.len(), 1);
         assert!(!config.validator);
@@ -927,7 +968,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4131").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3031").unwrap()));
         assert_eq!(trusted_peers.len(), 1);
         assert_eq!(trusted_validators.len(), 1);
         assert!(config.validator);
@@ -942,7 +983,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4132").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3032").unwrap()));
         assert_eq!(trusted_peers.len(), 2);
         assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
@@ -957,7 +998,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4133").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3033").unwrap()));
         assert_eq!(trusted_peers.len(), 3);
         assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
@@ -994,7 +1035,7 @@ mod tests {
             assert!(start.validator);
             assert_eq!(start.private_key.as_deref(), Some("PRIVATE_KEY"));
             assert_eq!(start.cdn, "CDN");
-            assert_eq!(start.rest, "127.0.0.1:3030".parse().unwrap());
+            assert_eq!(start.rest, Some("127.0.0.1:3030".parse().unwrap()));
             assert_eq!(start.network, 0);
             assert_eq!(start.peers, "IP1,IP2,IP3");
             assert_eq!(start.validators, "IP1,IP2,IP3");
