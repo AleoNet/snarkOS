@@ -3205,6 +3205,7 @@ dependencies = [
  "parking_lot",
  "peak_alloc",
  "rand",
+ "rayon",
  "reqwest",
  "serde",
  "snarkos-account",

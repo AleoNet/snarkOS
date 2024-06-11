@@ -36,7 +36,7 @@ use snarkvm::prelude::{
 
 use anyhow::{anyhow, bail, Result};
 use snarkos_node_tcp::is_bogon_ip;
-use std::{net::SocketAddr, time::Instant};
+use std::net::SocketAddr;
 use tokio::task::spawn_blocking;
 
 /// The max number of peers to send in a `PeerResponse` message.
@@ -76,6 +76,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
         trace!("Received '{}' from '{peer_ip}'", message.name());
 
+        // Update the last seen timestamp of the peer.
+        self.router().update_last_seen_for_connected_peer(peer_ip);
+
         // This match statement handles the inbound message by deserializing the message,
         // checking that the message is valid, and then calling the appropriate (trait) handler.
         match message {
@@ -110,7 +113,19 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
                 }
                 // Perform the deferred non-blocking deserialization of the blocks.
-                let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+                // The deserialization can take a long time (minutes). We should not be running
+                // this on a blocking task, but on a rayon thread pool.
+                let (send, recv) = tokio::sync::oneshot::channel();
+                rayon::spawn_fifo(move || {
+                    let blocks = blocks.deserialize_blocking().map_err(|error| anyhow!("[BlockResponse] {error}"));
+                    let _ = send.send(blocks);
+                });
+                let blocks = match recv.await {
+                    Ok(Ok(blocks)) => blocks,
+                    Ok(Err(error)) => bail!("Peer '{peer_ip}' sent an invalid block response - {error}"),
+                    Err(error) => bail!("Peer '{peer_ip}' sent an invalid block response - {error}"),
+                };
+
                 // Ensure the block response is well-formed.
                 blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
 
@@ -169,8 +184,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                         peer.set_version(message.version);
                         // Update the node type of the peer.
                         peer.set_node_type(message.node_type);
-                        // Update the last seen timestamp of the peer.
-                        peer.set_last_seen(Instant::now());
                     })
                 {
                     bail!("[Ping] {error}");
