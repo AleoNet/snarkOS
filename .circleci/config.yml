@@ -6,7 +6,7 @@ parameters:
     default: anf/xlarge
   twoxlarge:
     type: string
-    default: anf/2xlarge
+    default: anf/xlarge
 
 orbs:
   windows: circleci/windows@5.0
