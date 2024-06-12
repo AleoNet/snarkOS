@@ -205,6 +205,11 @@ impl<N: Network> Router<N> {
         genesis_header: Header<N>,
         restrictions_id: Field<N>,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
+        // Knowing the peer's listening address, ensure it is allowed to connect.
+        if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_addr) {
+            return Err(error(format!("{forbidden_message}")));
+        }
+
         // Construct the stream.
         let mut framed = Framed::new(stream, MessageCodec::<N>::handshake());
 
@@ -217,10 +222,6 @@ impl<N: Network> Router<N> {
         *peer_ip = Some(SocketAddr::new(peer_addr.ip(), peer_request.listener_port));
         let peer_ip = peer_ip.unwrap();
 
-        // Knowing the peer's listening address, ensure it is allowed to connect.
-        if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_ip) {
-            return Err(error(format!("{forbidden_message}")));
-        }
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
             send(&mut framed, peer_addr, reason.into()).await?;
