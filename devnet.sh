@@ -22,7 +22,7 @@ clear_ledger=${clear_ledger:-n}
 
 if [[ $build_binary == "y" ]]; then
   # Build the binary using 'cargo install --path .'
-  cargo install --features history --locked --path . || exit 1
+  cargo install --locked --path . || exit 1
 fi
 
 # Clear the ledger logs for each validator if the user chooses to clear ledger
