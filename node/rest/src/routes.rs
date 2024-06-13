@@ -454,8 +454,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Path((height, mapping)): Path<(u32, snarkvm::synthesizer::MappingName)>,
     ) -> Result<impl axum::response::IntoResponse, RestError> {
         // Retrieve the history for the given block height and variant.
-        let history =
-            snarkvm::synthesizer::History::new(N::ID, rest.ledger.vm().finalize_store().storage_mode().clone());
+        let history = snarkvm::synthesizer::History::new(N::ID, rest.ledger.vm().finalize_store().storage_mode());
         let result = history
             .load_mapping(height, mapping)
             .map_err(|_| RestError(format!("Could not load mapping '{mapping}' from block '{height}'")))?;
