@@ -20,6 +20,7 @@ use snarkos_node_router::{
         DataBlocks,
         DisconnectReason,
         MessageCodec,
+        PeerRequest,
         Ping,
         Pong,
         PuzzleResponse,
@@ -66,6 +67,10 @@ where
     async fn on_connect(&self, peer_addr: SocketAddr) {
         // Resolve the peer address to the listener address.
         let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) else { return };
+        // If it's a bootstrap peer, first request its peers.
+        if self.router.bootstrap_peers().contains(&peer_ip) {
+            Outbound::send(self, peer_ip, Message::PeerRequest(PeerRequest));
+        }
         // Retrieve the block locators.
         let block_locators = match self.sync.get_block_locators() {
             Ok(block_locators) => Some(block_locators),
