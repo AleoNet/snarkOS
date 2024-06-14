@@ -631,8 +631,21 @@ impl<N: Network> Gateway<N> {
                 if let Some(sync_sender) = self.sync_sender.get() {
                     // Retrieve the block response.
                     let BlockResponse { request, blocks } = block_response;
+
                     // Perform the deferred non-blocking deserialization of the blocks.
-                    let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
+                    // The deserialization can take a long time (minutes). We should not be running
+                    // this on a blocking task, but on a rayon thread pool.
+                    let (send, recv) = tokio::sync::oneshot::channel();
+                    rayon::spawn_fifo(move || {
+                        let blocks = blocks.deserialize_blocking().map_err(|error| anyhow!("[BlockResponse] {error}"));
+                        let _ = send.send(blocks);
+                    });
+                    let blocks = match recv.await {
+                        Ok(Ok(blocks)) => blocks,
+                        Ok(Err(error)) => bail!("Peer '{peer_ip}' sent an invalid block response - {error}"),
+                        Err(error) => bail!("Peer '{peer_ip}' sent an invalid block response - {error}"),
+                    };
+
                     // Ensure the block response is well-formed.
                     blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
                     // Send the blocks to the sync module.
