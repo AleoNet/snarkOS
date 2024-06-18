@@ -968,6 +968,23 @@ impl<N: Network> Gateway<N> {
             }
         }
     }
+
+    /// Processes a message received from the network.
+    async fn process_message_inner(&self, peer_addr: SocketAddr, message: Event<N>) -> io::Result<()> {
+        // Process the message. Disconnect if the peer violated the protocol.
+        if let Err(error) = self.inbound(peer_addr, message).await {
+            if let Some(peer_ip) = self.resolver.get_listener(peer_addr) {
+                warn!("{CONTEXT} Disconnecting from '{peer_ip}' - {error}");
+                let self_ = self.clone();
+                tokio::spawn(async move {
+                    Transport::send(&self_, peer_ip, DisconnectReason::ProtocolViolation.into()).await;
+                    // Disconnect from this peer.
+                    self_.disconnect(peer_ip);
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -1058,17 +1075,15 @@ impl<N: Network> Reading for Gateway<N> {
 
     /// Processes a message received from the network.
     async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
-        // Process the message. Disconnect if the peer violated the protocol.
-        if let Err(error) = self.inbound(peer_addr, message).await {
-            if let Some(peer_ip) = self.resolver.get_listener(peer_addr) {
-                warn!("{CONTEXT} Disconnecting from '{peer_ip}' - {error}");
-                let self_ = self.clone();
-                tokio::spawn(async move {
-                    Transport::send(&self_, peer_ip, DisconnectReason::ProtocolViolation.into()).await;
-                    // Disconnect from this peer.
-                    self_.disconnect(peer_ip);
-                });
-            }
+        if matches!(message, Event::BlockRequest(_) | Event::BlockResponse(_)) {
+            let self_ = self.clone();
+            // Handle BlockRequest and BlockResponse messages in a separate task to not block the
+            // inbound queue.
+            tokio::spawn(async move {
+                self_.process_message_inner(peer_addr, message).await;
+            });
+        } else {
+            self.process_message_inner(peer_addr, message).await;
         }
         Ok(())
     }
