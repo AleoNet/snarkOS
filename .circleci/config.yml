@@ -3,13 +3,13 @@ version: 2.1
 parameters:
   large:
     type: string
-    default: aleonet/large
+    default: large
   xlarge:
     type: string
-    default: aleonet/xlarge
+    default: xlarge
   twoxlarge:
     type: string
-    default: aleonet/2xlarge
+    default: xlarge
 
 orbs:
   windows: circleci/windows@5.0
@@ -225,7 +225,7 @@ jobs:
   node-bft:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: << pipeline.parameters.xlarge >>
     steps:
       - run_serial:
           workspace_member: node/bft
@@ -306,7 +306,7 @@ jobs:
   node-sync:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: << pipeline.parameters.xlarge >>
     steps:
       - run_serial:
           workspace_member: node/sync
