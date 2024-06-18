@@ -20,7 +20,7 @@ use crate::{
 use snarkvm::prelude::Network;
 
 use colored::Colorize;
-use rand::{prelude::IteratorRandom, rngs::OsRng};
+use rand::{prelude::IteratorRandom, rngs::OsRng, Rng};
 
 /// A helper function to compute the maximum of two numbers.
 /// See Rust issue 92391: https://github.com/rust-lang/rust/issues/92391.
@@ -140,13 +140,18 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     /// TODO (howardwu): If the node is a validator, keep the validator.
     /// This function keeps the number of connected peers within the allowed range.
     fn handle_connected_peers(&self) {
+        // Initialize an RNG.
+        let rng = &mut OsRng;
+
         // Obtain the number of connected peers.
         let num_connected = self.router().number_of_connected_peers();
         // Obtain the number of connected provers.
         let num_connected_provers = self.router().number_of_connected_provers();
 
+        // Consider rotating more external peers every ~10 heartbeats.
+        let reduce_peers = rng.gen_range(0..10) == 0 && self.router().rotate_external_peers();
         // Determine the maximum number of peers and provers to keep.
-        let (max_peers, max_provers) = if self.router().rotate_external_peers() {
+        let (max_peers, max_provers) = if reduce_peers {
             (Self::MEDIAN_NUMBER_OF_PEERS, 0)
         } else {
             (Self::MAXIMUM_NUMBER_OF_PEERS, Self::MAXIMUM_NUMBER_OF_PROVERS)
@@ -170,9 +175,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             let trusted = self.router().trusted_peers();
             // Retrieve the bootstrap peers.
             let bootstrap = self.router().bootstrap_peers();
-
-            // Initialize an RNG.
-            let rng = &mut OsRng;
 
             // Determine the provers to disconnect from.
             let prover_ips_to_disconnect = self
