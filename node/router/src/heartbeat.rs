@@ -149,7 +149,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         let num_connected_provers = self.router().number_of_connected_provers();
 
         // Consider rotating more external peers every ~10 heartbeats.
-        let reduce_peers = rng.gen_range(0..10) == 0 && self.router().rotate_external_peers();
+        let reduce_peers = self.router().rotate_external_peers() && rng.gen_range(0..10) == 0;
         // Determine the maximum number of peers and provers to keep.
         let (max_peers, max_provers) = if reduce_peers {
             (Self::MEDIAN_NUMBER_OF_PEERS, 0)
