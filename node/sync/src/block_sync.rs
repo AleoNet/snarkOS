@@ -233,6 +233,16 @@ impl<N: Network> BlockSync<N> {
         if block_requests.is_empty() && !self.responses.read().is_empty() && self.mode.is_router() {
             // Retrieve the latest block height.
             let current_height = self.canon.latest_block_height();
+
+            // Acquire the lock to ensure try_advancing_with_block_responses is called only once at a time.
+            // If the lock is already acquired, return early.
+            let Some(_lock) = self.advance_with_sync_blocks_lock.try_lock() else {
+                trace!(
+                    "Skipping a call to try_block_sync() as a block advance is already in progress (at block {current_height})"
+                );
+                return;
+            };
+
             // Try to advance the ledger with the sync pool.
             trace!("No block requests to send - try advancing with block responses (at block {current_height})");
             self.try_advancing_with_block_responses(current_height);
@@ -602,7 +612,7 @@ impl<N: Network> BlockSync<N> {
         let mut requests = self.requests.write();
 
         // Determine if the request is complete.
-        let is_request_complete = requests.get(&height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false);
+        let is_request_complete = requests.get(&height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(true);
 
         // If the request is not complete, return early.
         if !is_request_complete {
@@ -682,7 +692,7 @@ impl<N: Network> BlockSync<N> {
             let is_time_passed = now.duration_since(*timestamp).as_secs() > BLOCK_REQUEST_TIMEOUT_IN_SECS;
             // Determine if the request is incomplete.
             let is_request_incomplete =
-                !requests.get(height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false);
+                !requests.get(height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(true);
             // Determine if the request has timed out.
             let is_timeout = is_time_passed && is_request_incomplete;
 
