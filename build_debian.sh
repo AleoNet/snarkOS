@@ -17,7 +17,6 @@ sudo apt-get install -y \
         sudo \
 	tmux \
 	xz-utils \
-	ufw
 
 # Install Rust
 
@@ -29,13 +28,13 @@ source $HOME/.cargo/env
 cargo install --locked --path .
 
 echo "=================================================="
-echo " Attention - Please ensure ports 4133 and 3033"
+echo " Attention - Please ensure ports 4130 and 3030"
 echo "             are enabled on your local network."
 echo ""
-echo " Cloud Providers - Enable ports 4133 and 3033"
+echo " Cloud Providers - Enable ports 4130 and 3030"
 echo "                   in your network firewall"
 echo ""
 echo " Home Users - Enable port forwarding or NAT rules"
-echo "              for 4133 and 3033 on your router."
+echo "              for 4130 and 3030 on your router."
 echo "=================================================="
 
