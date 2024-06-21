@@ -3,13 +3,13 @@ version: 2.1
 parameters:
   large:
     type: string
-    default: large
+    default: medium
   xlarge:
     type: string
-    default: xlarge
+    default: medium
   twoxlarge:
     type: string
-    default: xlarge
+    default: medium
 
 orbs:
   windows: circleci/windows@5.0
