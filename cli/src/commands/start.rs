@@ -19,7 +19,7 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey},
         algorithms::Hash,
-        network::{MainnetV0, Network, TestnetV0},
+        network::{CanaryV0, MainnetV0, Network, TestnetV0},
     },
     ledger::{
         block::Block,
@@ -37,7 +37,7 @@ use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
 use indexmap::IndexMap;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -110,8 +110,8 @@ pub struct Start {
     pub allow_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
-    #[clap(default_value = "0.0.0.0:3030", long = "rest")]
-    pub rest: SocketAddr,
+    #[clap(long = "rest")]
+    pub rest: Option<SocketAddr>,
     /// Specify the requests per second (RPS) rate limit per IP for the REST server
     #[clap(default_value = "10", long = "rest-rps")]
     pub rest_rps: u32,
@@ -183,6 +183,15 @@ impl Start {
                 TestnetV0::ID => {
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    // If the display is enabled, render the display.
+                    if !cli.nodisplay {
+                        // Initialize the display.
+                        Display::start(node, log_receiver).expect("Failed to initialize the display");
+                    }
+                }
+                CanaryV0::ID => {
+                    // Parse the node from the configurations.
+                    let node = cli.parse_node::<CanaryV0>(shutdown.clone()).await.expect("Failed to parse the node");
                     // If the display is enabled, render the display.
                     if !cli.nodisplay {
                         // Initialize the display.
@@ -328,12 +337,10 @@ impl Start {
             if self.node.is_none() {
                 self.node = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?);
             }
-            // If the `norest` flag is not set, and the `bft` flag was not overridden,
-            // then set the REST IP to `3030 + dev`.
-            //
-            // Note: the `bft` flag is an option to detect remote devnet testing.
-            if !self.norest && self.bft.is_none() {
-                self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
+
+            // If the `norest` flag is not set and the REST IP is not already specified set the REST IP to `3030 + dev`.
+            if !self.norest && self.rest.is_none() {
+                self.rest = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev)).unwrap());
             }
         }
         Ok(())
@@ -392,11 +399,12 @@ impl Start {
                             "Validator address {validator_address} is not included in the list of development addresses"
                         );
 
-                        // Add or update the validator entry in the list of members.
-                        members
-                            .entry(*validator_address)
-                            .and_modify(|(stake, _)| *stake += amount)
-                            .or_insert((*amount, true));
+                        // Add or update the validator entry in the list of members
+                        members.entry(*validator_address).and_modify(|(stake, _, _)| *stake += amount).or_insert((
+                            *amount,
+                            true,
+                            rng.gen_range(0..100),
+                        ));
                     }
                     // Construct the committee.
                     let committee = Committee::<N>::new(0u64, members)?;
@@ -411,14 +419,14 @@ impl Start {
                     // Construct the committee members and distribute stakes evenly among committee members.
                     let members = development_addresses
                         .iter()
-                        .map(|address| (*address, (stake_per_member, true)))
+                        .map(|address| (*address, (stake_per_member, true, rng.gen_range(0..100))))
                         .collect::<IndexMap<_, _>>();
 
                     // Construct the bonded balances.
                     // Note: The withdrawal address is set to the staker address.
                     let bonded_balances = members
                         .iter()
-                        .map(|(address, (stake, _))| (*address, (*address, *address, *stake)))
+                        .map(|(address, (stake, _, _))| (*address, (*address, *address, *stake)))
                         .collect::<IndexMap<_, _>>();
                     // Construct the committee.
                     let committee = Committee::<N>::new(0u64, members)?;
@@ -509,15 +517,11 @@ impl Start {
             Some(node_ip) => node_ip,
             None => SocketAddr::from_str("0.0.0.0:4130").unwrap(),
         };
-        // Parse the BFT IP.
-        let bft_ip = match self.dev.is_some() {
-            true => self.bft,
-            false => None
-        };
+
         // Parse the REST IP.
         let rest_ip = match self.norest {
             true => None,
-            false => Some(self.rest),
+            false => self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap())),
         };
 
         // If the display is not enabled, render the welcome message.
@@ -577,7 +581,7 @@ impl Start {
 
         // Initialize the node.
         match node_type {
-            NodeType::Validator => Node::new_validator(node_ip, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs, shutdown.clone()).await,
+            NodeType::Validator => Node::new_validator(node_ip, self.bft, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs, shutdown.clone()).await,
             NodeType::Prover => Node::new_prover(node_ip, account, &trusted_peers, genesis, storage_mode, shutdown.clone()).await,
             NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, shutdown).await,
         }
@@ -657,19 +661,55 @@ fn load_or_compute_genesis<N: Network>(
             .collect::<Vec<_>>()
     ]?);
 
-    // Input the parameters' metadata.
-    preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::UnbondDelegatorAsValidatorVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
-    preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
+    // Input the parameters' metadata based on network
+    match N::ID {
+        snarkvm::console::network::MainnetV0::ID => {
+            preimage.extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
+        }
+        snarkvm::console::network::TestnetV0::ID => {
+            preimage.extend(snarkvm::parameters::testnet::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::BondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::SetValidatorStateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::FeePrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::FeePublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::InclusionVerifier::METADATA.as_bytes());
+        }
+        snarkvm::console::network::CanaryV0::ID => {
+            preimage.extend(snarkvm::parameters::canary::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::BondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::SetValidatorStateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPublicToPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::FeePrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::FeePublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::InclusionVerifier::METADATA.as_bytes());
+        }
+        _ => {
+            // Unrecognized Network ID
+            bail!("Unrecognized Network ID: {}", N::ID);
+        }
+    }
 
     // Initialize the hasher.
     let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
@@ -862,11 +902,29 @@ mod tests {
 
         let mut trusted_peers = vec![];
         let mut trusted_validators = vec![];
+        let mut config = Start::try_parse_from(["snarkos", "--dev", "1"].iter()).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3031").unwrap()));
+
+        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
+        let mut config = Start::try_parse_from(["snarkos", "--dev", "1", "--rest", "127.0.0.1:8080"].iter()).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        assert_eq!(config.rest, Some(SocketAddr::from_str("127.0.0.1:8080").unwrap()));
+
+        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
+        let mut config = Start::try_parse_from(["snarkos", "--dev", "1", "--norest"].iter()).unwrap();
+        config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
+        assert!(config.rest.is_none());
+
+        let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config = Start::try_parse_from(["snarkos", "--dev", "0"].iter()).unwrap();
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let expected_genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4130").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3030").unwrap()));
         assert_eq!(trusted_peers.len(), 0);
         assert_eq!(trusted_validators.len(), 1);
         assert!(!config.validator);
@@ -881,7 +939,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4131").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3031").unwrap()));
         assert_eq!(trusted_peers.len(), 1);
         assert_eq!(trusted_validators.len(), 1);
         assert!(config.validator);
@@ -896,7 +954,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4132").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3032").unwrap()));
         assert_eq!(trusted_peers.len(), 2);
         assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
@@ -911,7 +969,7 @@ mod tests {
         config.parse_development(&mut trusted_peers, &mut trusted_validators).unwrap();
         let genesis = config.parse_genesis::<CurrentNetwork>().unwrap();
         assert_eq!(config.node, Some(SocketAddr::from_str("0.0.0.0:4133").unwrap()));
-        assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
+        assert_eq!(config.rest, Some(SocketAddr::from_str("0.0.0.0:3033").unwrap()));
         assert_eq!(trusted_peers.len(), 3);
         assert_eq!(trusted_validators.len(), 2);
         assert!(!config.validator);
@@ -948,7 +1006,7 @@ mod tests {
             assert!(start.validator);
             assert_eq!(start.private_key.as_deref(), Some("PRIVATE_KEY"));
             assert_eq!(start.cdn, "CDN");
-            assert_eq!(start.rest, "127.0.0.1:3030".parse().unwrap());
+            assert_eq!(start.rest, Some("127.0.0.1:3030".parse().unwrap()));
             assert_eq!(start.network, 0);
             assert_eq!(start.peers, "IP1,IP2,IP3");
             assert_eq!(start.validators, "IP1,IP2,IP3");

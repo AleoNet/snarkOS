@@ -14,9 +14,9 @@
 
 use super::Developer;
 use snarkvm::{
-    circuit::{Aleo, AleoTestnetV0, AleoV0},
+    circuit::{Aleo, AleoCanaryV0, AleoTestnetV0, AleoV0},
     console::{
-        network::{MainnetV0, Network, TestnetV0},
+        network::{CanaryV0, MainnetV0, Network, TestnetV0},
         program::ProgramOwner,
     },
     prelude::{
@@ -93,6 +93,7 @@ impl Deploy {
         match self.network {
             MainnetV0::ID => self.construct_deployment::<MainnetV0, AleoV0>(),
             TestnetV0::ID => self.construct_deployment::<TestnetV0, AleoTestnetV0>(),
+            CanaryV0::ID => self.construct_deployment::<CanaryV0, AleoCanaryV0>(),
             unknown_id => bail!("Unknown network ID ({unknown_id})"),
         }
     }

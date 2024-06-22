@@ -16,7 +16,7 @@ use super::*;
 
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{FromBytes, ToBytes},
+    prelude::{Field, FromBytes, ToBytes},
 };
 
 use std::borrow::Cow;
@@ -24,6 +24,7 @@ use std::borrow::Cow;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChallengeResponse<N: Network> {
     pub genesis_header: Header<N>,
+    pub restrictions_id: Field<N>,
     pub signature: Data<Signature<N>>,
     pub nonce: u64,
 }
@@ -39,6 +40,7 @@ impl<N: Network> MessageTrait for ChallengeResponse<N> {
 impl<N: Network> ToBytes for ChallengeResponse<N> {
     fn write_le<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
         self.genesis_header.write_le(&mut writer)?;
+        self.restrictions_id.write_le(&mut writer)?;
         self.signature.write_le(&mut writer)?;
         self.nonce.write_le(&mut writer)
     }
@@ -48,6 +50,7 @@ impl<N: Network> FromBytes for ChallengeResponse<N> {
     fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
         Ok(Self {
             genesis_header: Header::read_le(&mut reader)?,
+            restrictions_id: Field::read_le(&mut reader)?,
             signature: Data::read_le(&mut reader)?,
             nonce: u64::read_le(reader)?,
         })
@@ -60,7 +63,7 @@ pub mod prop_tests {
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
         ledger::{ledger_test_helpers::sample_genesis_block, narwhal::Data},
-        prelude::{block::Header, PrivateKey, Signature},
+        prelude::{block::Header, Field, PrivateKey, Signature},
         utilities::rand::{TestRng, Uniform},
     };
 
@@ -69,6 +72,10 @@ pub mod prop_tests {
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
+
+    pub fn any_restrictions_id() -> Field<CurrentNetwork> {
+        Uniform::rand(&mut TestRng::default())
+    }
 
     pub fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
         (0..64)
@@ -86,10 +93,11 @@ pub mod prop_tests {
     }
 
     pub fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
-        (any_signature(), any_genesis_header(), any::<u64>())
-            .prop_map(|(sig, genesis_header, nonce)| ChallengeResponse {
-                signature: Data::Object(sig),
+        (any_genesis_header(), any_signature(), any::<u64>())
+            .prop_map(|(genesis_header, sig, nonce)| ChallengeResponse {
                 genesis_header,
+                restrictions_id: any_restrictions_id(),
+                signature: Data::Object(sig),
                 nonce,
             })
             .boxed()

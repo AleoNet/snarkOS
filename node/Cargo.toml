@@ -27,6 +27,7 @@ metrics = [
   "snarkos-node-router/metrics",
   "snarkos-node-tcp/metrics"
 ]
+history = [ "snarkos-node-rest/history" ]
 
 [dependencies.aleo-std]
 workspace = true

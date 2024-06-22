@@ -223,7 +223,7 @@ fn genesis_block(
     let vm = VM::from(store).unwrap();
     // Initialize the genesis block.
     let bonded_balances: IndexMap<_, _> =
-        committee.members().iter().map(|(address, (amount, _))| (*address, (*address, *address, *amount))).collect();
+        committee.members().iter().map(|(address, (amount, _, _))| (*address, (*address, *address, *amount))).collect();
     vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng).unwrap()
 }
 
@@ -276,7 +276,7 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<Curr
         // Sample the account.
         let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
         // Add the validator.
-        members.insert(account.address(), (MIN_VALIDATOR_STAKE, false));
+        members.insert(account.address(), (MIN_VALIDATOR_STAKE, false, i as u8));
         println!("  Validator {}: {}", i, account.address());
     }
     println!();
