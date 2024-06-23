@@ -12,7 +12,7 @@ parameters:
     default: xlarge
   twoxlarge:
     type: string
-    default: large
+    default: aleonet/2xlarge
 
 orbs:
   windows: circleci/windows@5.0
