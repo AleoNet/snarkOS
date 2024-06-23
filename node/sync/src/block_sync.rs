@@ -44,7 +44,7 @@ pub const REDUNDANCY_FACTOR: usize = 3;
 const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 3;
 const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
-const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 600; // 600 seconds
+const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 10; // 10 seconds
 const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
 
 /// The maximum number of blocks tolerated before the primary is considered behind its peers.
