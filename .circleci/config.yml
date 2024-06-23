@@ -1,12 +1,15 @@
 version: 2.1
 
 parameters:
+  medium:
+    type: string
+    default: medium
   large:
     type: string
-    default: aleonet/large
+    default: large
   xlarge:
     type: string
-    default: aleonet/xlarge
+    default: xlarge
   twoxlarge:
     type: string
     default: aleonet/2xlarge
@@ -171,7 +174,7 @@ jobs:
   integration:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial_long:
           workspace_member: .integration
@@ -180,7 +183,7 @@ jobs:
   snarkos:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: << pipeline.parameters.large >>
     steps:
       - run_serial:
           workspace_member: .
@@ -189,7 +192,7 @@ jobs:
   account:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: account
@@ -207,7 +210,7 @@ jobs:
   display:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: display
@@ -234,7 +237,7 @@ jobs:
   node-bft-events:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/bft/events
@@ -243,7 +246,7 @@ jobs:
   node-bft-ledger-service:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/bft/ledger-service
@@ -252,7 +255,7 @@ jobs:
   node-bft-storage-service:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/bft/storage-service
@@ -261,7 +264,7 @@ jobs:
   node-cdn:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/cdn
@@ -270,7 +273,7 @@ jobs:
   node-consensus:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/consensus
@@ -279,7 +282,7 @@ jobs:
   node-rest:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/rest
@@ -288,7 +291,7 @@ jobs:
   node-router:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/router
@@ -297,7 +300,7 @@ jobs:
   node-router-messages:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/router/messages
@@ -315,7 +318,7 @@ jobs:
   node-sync-communication-service:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/sync/communication-service
@@ -324,7 +327,7 @@ jobs:
   node-sync-locators:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/sync/locators
@@ -333,7 +336,7 @@ jobs:
   node-tcp:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/tcp
@@ -342,7 +345,7 @@ jobs:
   check-fmt:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.xlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - checkout
       - install_rust_nightly
@@ -358,7 +361,7 @@ jobs:
   check-clippy:
     docker:
       - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.twoxlarge >>
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - checkout
       - setup_environment:
@@ -433,3 +436,4 @@ workflows:
                 - mainnet
     jobs:
       - integration
+      
