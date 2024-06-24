@@ -175,7 +175,7 @@ impl<N: Network> Gateway<N> {
         worker_senders: IndexMap<u8, WorkerSender<N>>,
         sync_sender: Option<SyncSender<N>>,
     ) {
-        debug!("Starting the gateway for the memory pool...");
+        trace!("Starting the gateway for the memory pool...");
 
         // Set the primary sender.
         self.primary_sender.set(primary_sender).expect("Primary sender already set in gateway");
@@ -403,7 +403,7 @@ impl<N: Network> Gateway<N> {
 
         let self_ = self.clone();
         Some(tokio::spawn(async move {
-            debug!("Connecting to validator {peer_ip}...");
+            trace!("Connecting to validator {peer_ip}...");
             // Attempt to connect to the peer.
             if let Err(error) = self_.tcp.connect(peer_ip).await {
                 self_.connecting_peers.lock().shift_remove(&peer_ip);
@@ -524,7 +524,7 @@ impl<N: Network> Gateway<N> {
         // If the event was unable to be sent, disconnect.
         if let Err(e) = &result {
             warn!("{CONTEXT} Failed to send '{name}' to '{peer_ip}': {e}");
-            debug!("{CONTEXT} Disconnecting from '{peer_ip}' (unable to send)");
+            trace!("{CONTEXT} Disconnecting from '{peer_ip}' (unable to send)");
             self.disconnect(peer_ip);
         }
         result.ok()
@@ -894,7 +894,7 @@ impl<N: Network> Gateway<N> {
         info!("{connections_msg}");
         for peer_ip in validators {
             let address = self.resolver.get_address(peer_ip).map_or("Unknown".to_string(), |a| a.to_string());
-            debug!("{}", format!("  {peer_ip} - {address}").dimmed());
+            info!("{}", format!("  {peer_ip} - {address}").dimmed());
         }
     }
 
@@ -1113,10 +1113,10 @@ impl<N: Network> Handshake for Gateway<N> {
         // If this is an inbound connection, we log it, but don't know the listening address yet.
         // Otherwise, we can immediately register the listening address.
         let mut peer_ip = if peer_side == ConnectionSide::Initiator {
-            debug!("{CONTEXT} Gateway received a connection request from '{peer_addr}'");
+            trace!("{CONTEXT} Gateway received a connection request from '{peer_addr}'");
             None
         } else {
-            debug!("{CONTEXT} Gateway is connecting to {peer_addr}...");
+            trace!("{CONTEXT} Gateway is connecting to {peer_addr}...");
             Some(peer_addr)
         };
 
