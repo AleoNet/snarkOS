@@ -93,10 +93,10 @@ impl<N: Network> Router<N> {
         // If this is an inbound connection, we log it, but don't know the listening address yet.
         // Otherwise, we can immediately register the listening address.
         let mut peer_ip = if peer_side == ConnectionSide::Initiator {
-            debug!("Received a connection request from '{peer_addr}'");
+            trace!("Received a connection request from '{peer_addr}'");
             None
         } else {
-            debug!("Connecting to {peer_addr}...");
+            trace!("Connecting to {peer_addr}...");
             Some(peer_addr)
         };
 

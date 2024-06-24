@@ -79,9 +79,9 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         let connected_peers = self.router().connected_peers();
         let connected_peers_fmt = format!("{connected_peers:?}").dimmed();
         match connected_peers.len() {
-            0 => debug!("No connected peers"),
-            1 => debug!("Connected to 1 peer: {connected_peers_fmt}"),
-            num_connected => debug!("Connected to {num_connected} peers {connected_peers_fmt}"),
+            0 => info!("No connected peers"),
+            1 => info!("Connected to 1 peer: {connected_peers_fmt}"),
+            num_connected => info!("Connected to {num_connected} peers {connected_peers_fmt}"),
         }
     }
 
@@ -155,7 +155,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         let num_surplus_clients_validators = num_surplus_peers.saturating_sub(num_remaining_provers);
 
         if num_surplus_provers > 0 || num_surplus_clients_validators > 0 {
-            debug!(
+            info!(
                 "Exceeded maximum number of connected peers, disconnecting from ({num_surplus_provers} + {num_surplus_clients_validators}) peers"
             );
 

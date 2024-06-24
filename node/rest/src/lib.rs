@@ -234,7 +234,7 @@ async fn log_middleware(
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    info!("Received '{} {}' from '{addr}'", request.method(), request.uri());
+    debug!("Received '{} {}' from '{addr}'", request.method(), request.uri());
 
     Ok(next.run(request).await)
 }
