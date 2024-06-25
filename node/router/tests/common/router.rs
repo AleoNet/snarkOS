@@ -92,8 +92,15 @@ impl<N: Network> Handshake for TestRouter<N> {
 
 #[async_trait]
 impl<N: Network> OnConnect for TestRouter<N> {
-    async fn on_connect(&self, _peer_addr: SocketAddr) {
-        // This behavior is currently not tested.
+    async fn on_connect(&self, peer_addr: SocketAddr) {
+        let peer_ip = if let Some(ip) = self.router().resolve_to_listener(&peer_addr) {
+            ip
+        } else {
+            panic!("The peer IP should be known by the time OnConnect is triggered!");
+        };
+
+        // Promote the peer's status from "connecting" to "connected".
+        self.router().insert_connected_peer(peer_ip);
     }
 }
 

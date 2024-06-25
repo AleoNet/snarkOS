@@ -63,6 +63,8 @@ where
     async fn on_connect(&self, peer_addr: SocketAddr) {
         // Resolve the peer address to the listener address.
         let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) else { return };
+        // Promote the peer's status from "connecting" to "connected".
+        self.router().insert_connected_peer(peer_ip);
         // Retrieve the block locators.
         let block_locators = match self.sync.get_block_locators() {
             Ok(block_locators) => Some(block_locators),
