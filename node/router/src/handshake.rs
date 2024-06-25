@@ -114,11 +114,6 @@ impl<N: Network> Router<N> {
             }
         }
 
-        // If the handshake succeeded, announce it.
-        if let Ok((ref peer_ip, _)) = handshake_result {
-            info!("Connected to '{peer_ip}'");
-        }
-
         handshake_result
     }
 
