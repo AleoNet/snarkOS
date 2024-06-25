@@ -196,6 +196,11 @@ impl<N: Network> Cache<N> {
     pub fn decrement_outbound_peer_requests(&self, peer_ip: SocketAddr) -> u32 {
         Self::decrement_counter(&self.seen_outbound_peer_requests, peer_ip)
     }
+
+    /// Removes all cache entries applicable to the given key.
+    pub fn clear_peer_entries(&self, peer_ip: SocketAddr) {
+        self.seen_outbound_block_requests.write().remove(&peer_ip);
+    }
 }
 
 impl<N: Network> Cache<N> {

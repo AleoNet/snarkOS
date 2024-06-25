@@ -514,6 +514,8 @@ impl<N: Network> Router<N> {
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.
         self.candidate_peers.write().insert(peer_ip);
+        // Clear cached entries applicable to the peer.
+        self.cache.clear_peer_entries(peer_ip);
         #[cfg(feature = "metrics")]
         self.update_metrics();
     }
