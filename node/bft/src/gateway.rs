@@ -970,7 +970,7 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Processes a message received from the network.
-    async fn process_message_inner(&self, peer_addr: SocketAddr, message: Event<N>) -> io::Result<()> {
+    async fn process_message_inner(&self, peer_addr: SocketAddr, message: Event<N>) {
         // Process the message. Disconnect if the peer violated the protocol.
         if let Err(error) = self.inbound(peer_addr, message).await {
             if let Some(peer_ip) = self.resolver.get_listener(peer_addr) {
@@ -983,7 +983,6 @@ impl<N: Network> Gateway<N> {
                 });
             }
         }
-        Ok(())
     }
 }
 
