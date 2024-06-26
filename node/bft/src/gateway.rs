@@ -1079,7 +1079,7 @@ impl<N: Network> Reading for Gateway<N> {
             // Handle BlockRequest and BlockResponse messages in a separate task to not block the
             // inbound queue.
             tokio::spawn(async move {
-                let _ = self_.process_message_inner(peer_addr, message).await;
+                self_.process_message_inner(peer_addr, message).await;
             });
         } else {
             self.process_message_inner(peer_addr, message).await;
