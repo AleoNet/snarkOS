@@ -21,11 +21,7 @@ use snarkos_node_consensus::Consensus;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
     messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
-    Heartbeat,
-    Inbound,
-    Outbound,
-    Router,
-    Routing,
+    Heartbeat, Inbound, Outbound, Router, Routing,
 };
 use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
@@ -36,8 +32,7 @@ use snarkvm::prelude::{
     block::{Block, Header},
     puzzle::Solution,
     store::ConsensusStorage,
-    Ledger,
-    Network,
+    Ledger, Network,
 };
 
 use aleo_std::StorageMode;
@@ -421,7 +416,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
 
         // Shut down the node.
         trace!("Shutting down the node...");
-        self.shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.shutdown.store(true, std::sync::atomic::Ordering::Release);
 
         // Abort the tasks.
         trace!("Shutting down the validator...");
@@ -443,8 +438,7 @@ mod tests {
     use super::*;
     use snarkvm::prelude::{
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        MainnetV0,
-        VM,
+        MainnetV0, VM,
     };
 
     use anyhow::bail;

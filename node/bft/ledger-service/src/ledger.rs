@@ -334,7 +334,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     #[cfg(feature = "ledger-write")]
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
         // If the Ctrl-C handler registered the signal, then skip advancing to the next block.
-        if self.shutdown.load(Ordering::Relaxed) {
+        if self.shutdown.load(Ordering::Acquire) {
             bail!("Skipping advancing to block {} - The node is shutting down", block.height());
         }
         // Advance to the next block.
