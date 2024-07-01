@@ -54,17 +54,14 @@ The following are the requirements to run an Aleo node:
     - Clients: Ubuntu 22.04 (LTS), macOS Ventura or later, Windows 11 or later
     - Validators: Ubuntu 22.04 (LTS)
  - **CPU**: 64-bit architectures only, Latest Intel Xeon or Better
-    - Clients, core: 32-cores (24 minimum)
-    - Clients, outer: 32-cores (16 minimum)
-    - Validators: 64-cores (or better)
+    - Clients: 24-cores (32-cores preferred)
+    - Validators: 64-cores (128-cores preferred)
  - **RAM**: DDR4 or better
-    - Clients, core: 192GiB of memory (128 minimum)
-    - Clients, outer: 128GiB of memory (64 minimum)
-    - Validators: 384GiB of memory (256 minimum)
+    - Clients: 128GiB of memory (192GiB preferred)
+    - Validators: 256GiB of memory (384GiB preferred)
  - **Storage**: PCIe Gen 3 x4, PCIe Gen 4 x2 NVME SSD, or better
-    - Clients, core: 4TB of disk space (2 minimum)
-    - Clients, outer: 2TB of disk space (1 minimum)
-    - Validators: 6TB of disk space (4 minimum)
+    - Clients: 2TB of disk space (4TB preferred)
+    - Validators: 4TB of disk space (6TB preferred)
  - **Network**: Symmetric, commercial, always-on
     - Clients: 250Mbps of upload **and** download bandwidth
     - Validators: 500Mbps of upload **and** download bandwidth
