@@ -20,7 +20,11 @@ use snarkos_node_bft::ledger_service::CoreLedgerService;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
     messages::{Message, NodeType, UnconfirmedSolution},
-    Heartbeat, Inbound, Outbound, Router, Routing,
+    Heartbeat,
+    Inbound,
+    Outbound,
+    Router,
+    Routing,
 };
 use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{

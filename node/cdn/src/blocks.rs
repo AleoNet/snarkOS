@@ -19,7 +19,11 @@
 use snarkvm::prelude::{
     block::Block,
     store::{cow_to_copied, ConsensusStorage},
-    Deserialize, DeserializeOwned, Ledger, Network, Serialize,
+    Deserialize,
+    DeserializeOwned,
+    Ledger,
+    Network,
+    Serialize,
 };
 
 use anyhow::{anyhow, bail, Result};

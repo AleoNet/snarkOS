@@ -21,7 +21,11 @@ use snarkos_node_consensus::Consensus;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
     messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
-    Heartbeat, Inbound, Outbound, Router, Routing,
+    Heartbeat,
+    Inbound,
+    Outbound,
+    Router,
+    Routing,
 };
 use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
@@ -32,7 +36,8 @@ use snarkvm::prelude::{
     block::{Block, Header},
     puzzle::Solution,
     store::ConsensusStorage,
-    Ledger, Network,
+    Ledger,
+    Network,
 };
 
 use aleo_std::StorageMode;
@@ -438,7 +443,8 @@ mod tests {
     use super::*;
     use snarkvm::prelude::{
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        MainnetV0, VM,
+        MainnetV0,
+        VM,
     };
 
     use anyhow::bail;
