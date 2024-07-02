@@ -140,8 +140,6 @@ mod tests {
         }
     }
 
-    // TODO (raychu86): Fix this test. https://github.com/AleoHQ/snarkVM/issues/1472
-    #[ignore]
     #[test]
     fn test_failed_decryption() {
         let mut rng = TestRng::default();
