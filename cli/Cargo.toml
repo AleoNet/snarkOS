@@ -68,7 +68,8 @@ default-features = false
 version = "1"
 
 [dependencies.self_update]
-version = "0.39"
+version = "0.41"
+features = [ "archive-zip", "compression-zip-deflate" ]
 
 [dependencies.serde]
 version = "1"
