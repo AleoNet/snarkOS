@@ -40,42 +40,6 @@ pub(crate) struct Metadata {
 }
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
-    // ----------------- DEPRECATED FUNCTIONS -----------------
-    // The functions below are associated with deprecated routes.
-    // Please use the recommended alternatives when implementing new features or refactoring.
-
-    // Deprecated: Use `get_block_height_latest` instead.
-    // GET /<network>/latest/height
-    pub(crate) async fn latest_height(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.ledger.latest_height())
-    }
-
-    // Deprecated: Use `get_block_hash_latest` instead.
-    // GET /<network>/latest/hash
-    pub(crate) async fn latest_hash(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.ledger.latest_hash())
-    }
-
-    // Deprecated: Use `get_block_latest` instead.
-    // GET /<network>/latest/block
-    pub(crate) async fn latest_block(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.ledger.latest_block())
-    }
-
-    // Deprecated: Use `get_state_root_latest` instead.
-    // GET /<network>/latest/stateRoot
-    pub(crate) async fn latest_state_root(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.ledger.latest_state_root())
-    }
-
-    // Deprecated: Use `get_committee_latest` instead.
-    // GET /<network>/latest/committee
-    pub(crate) async fn latest_committee(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
-    }
-
-    // ---------------------------------------------------------
-
     // GET /<network>/block/height/latest
     pub(crate) async fn get_block_height_latest(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_height())

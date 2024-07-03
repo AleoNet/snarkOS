@@ -135,22 +135,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route(&format!("/{network}/node/address"), get(Self::get_node_address))
             .route_layer(middleware::from_fn(auth_middleware))
 
-            // ----------------- DEPRECATED ROUTES -----------------
-            // The following `GET ../latest/..` routes will be removed before mainnet.
-            // Please refer to the recommended routes for each endpoint:
-
-            // Deprecated: use `/<network>/block/height/latest` instead.
-            .route(&format!("/{network}/latest/height"), get(Self::latest_height))
-            // Deprecated: use `/<network>/block/hash/latest` instead.
-            .route(&format!("/{network}/latest/hash"), get(Self::latest_hash))
-            // Deprecated: use `/<network>/latest/block/height` instead.
-            .route(&format!("/{network}/latest/block"), get(Self::latest_block))
-            // Deprecated: use `/<network>/stateRoot/latest` instead.
-            .route(&format!("/{network}/latest/stateRoot"), get(Self::latest_state_root))
-            // Deprecated: use `/<network>/committee/latest` instead.
-            .route(&format!("/{network}/latest/committee"), get(Self::latest_committee))
-            // ------------------------------------------------------
-
             // GET ../block/..
             .route(&format!("/{network}/block/height/latest"), get(Self::get_block_height_latest))
             .route(&format!("/{network}/block/hash/latest"), get(Self::get_block_hash_latest))
