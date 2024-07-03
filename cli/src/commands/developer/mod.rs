@@ -131,7 +131,9 @@ impl Developer {
             Ok(response) => response.into_json().map_err(|err| err.into()),
             Err(err) => match err {
                 ureq::Error::Status(_status, response) => {
-                    bail!(response.into_string().unwrap_or("Response too large!".to_owned()))
+                    // Response::into_string() returns the response BODY, but there is none
+                    // better to format using debug this at least gives some useful info
+                    bail!("Failed to fetch program {program_id}: {response:?}")
                 }
                 err => bail!(err),
             },
