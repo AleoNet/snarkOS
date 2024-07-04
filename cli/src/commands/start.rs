@@ -266,8 +266,11 @@ impl Start {
         else {
             // Determine the CDN URL.
             match &self.cdn {
-                // Use the provided CDN URL.
-                Some(cdn) => Some(cdn.clone()),
+                // Use the provided CDN URL if it is not empty.
+                Some(cdn) => match cdn.is_empty() {
+                    true => None,
+                    false => Some(cdn.clone()),
+                },
                 // If no CDN URL is provided, determine the CDN URL based on the network ID.
                 None => match N::ID {
                     MainnetV0::ID => Some(format!("{CDN_BASE_URL}/mainnet.blocks/v0")),
