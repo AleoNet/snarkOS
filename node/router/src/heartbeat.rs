@@ -193,7 +193,12 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 .into_iter()
                 .filter_map(|peer| {
                     let peer_ip = peer.ip();
-                    if !peer.is_prover() && !trusted.contains(&peer_ip) && !bootstrap.contains(&peer_ip) {
+                    if !peer.is_prover() && // Skip if the peer is a prover.
+                       !trusted.contains(&peer_ip) && // Skip if the peer is trusted.
+                       !bootstrap.contains(&peer_ip) && // Skip if the peer is a bootstrap peer.
+                       // Skip if you are syncing from this peer.
+                       !self.is_block_synced() && self.router().cache.num_outbound_block_requests(&peer.ip()) == 0
+                    {
                         Some(peer_ip)
                     } else {
                         None
