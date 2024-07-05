@@ -133,6 +133,9 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
             // All the endpoints before the call to `route_layer` are protected with JWT auth.
             .route(&format!("/{network}/node/address"), get(Self::get_node_address))
+            // Auth required as the call can be costly and the response quite large.
+            .route(&format!("/{network}/blocks"), get(Self::get_blocks))
+            .route(&format!("/{network}/delegators/:validator"), get(Self::get_delegators_for_validator))
             .route_layer(middleware::from_fn(auth_middleware))
 
             // ----------------- DEPRECATED ROUTES -----------------
@@ -186,7 +189,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route(&format!("/{network}/program/:id/mapping/:name/:key"), get(Self::get_mapping_value))
 
             // GET misc endpoints.
-            .route(&format!("/{network}/blocks"), get(Self::get_blocks))
             .route(&format!("/{network}/height/:hash"), get(Self::get_height))
             .route(&format!("/{network}/memoryPool/transmissions"), get(Self::get_memory_pool_transmissions))
             .route(&format!("/{network}/memoryPool/solutions"), get(Self::get_memory_pool_solutions))
@@ -195,8 +197,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route(&format!("/{network}/stateRoot/latest"), get(Self::get_state_root_latest))
             .route(&format!("/{network}/stateRoot/:height"), get(Self::get_state_root))
             .route(&format!("/{network}/committee/latest"), get(Self::get_committee_latest))
-            .route(&format!("/{network}/committee/:height"), get(Self::get_committee))
-            .route(&format!("/{network}/delegators/:validator"), get(Self::get_delegators_for_validator));
+            .route(&format!("/{network}/committee/:height"), get(Self::get_committee));
 
             // If the `history` feature is enabled, enable the additional endpoint.
             #[cfg(feature = "history")]
