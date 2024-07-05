@@ -19,7 +19,7 @@ fi
 # If the env var PEERS is not set, prompt for it
 if [ -z "${PEERS}" ]
 then
-  read -r -p "Enter the peers (comma-separated) (e.g., core_client_ip_1:4130,core_client_ip_2:4130,...): "
+  read -r -p "Enter the peers (comma-separated) (e.g., validator_ip_1:4130,validator_ip_2:4130,...,core_client_ip_1:4130,core_client_ip_2:4130,...): "
   PEERS=$REPLY
 fi
 
