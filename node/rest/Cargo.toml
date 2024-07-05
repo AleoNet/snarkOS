@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ "parallel" ]
 parallel = [ "rayon" ]
+history = [ "snarkvm-synthesizer/history" ]
 
 [dependencies.anyhow]
 version = "1.0.79"
@@ -62,6 +63,12 @@ version = "=2.2.7"
 [dependencies.snarkos-node-router]
 path = "../router"
 version = "=2.2.7"
+
+[dependencies.snarkvm-synthesizer]
+git = "https://github.com/AleoNet/snarkVM.git"
+rev = "d170a9f"
+default-features = false
+optional = true
 
 [dependencies.rand]
 version = "0.8"

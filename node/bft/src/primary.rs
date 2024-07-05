@@ -161,7 +161,8 @@ impl<N: Network> Primary<N> {
                         // We use a dummy IP because the node should not need to request from any peers.
                         // The storage should have stored all the transmissions. If not, we simply
                         // skip the certificate.
-                        if let Err(err) = self.sync_with_certificate_from_peer(DUMMY_SELF_IP, certificate).await {
+                        if let Err(err) = self.sync_with_certificate_from_peer::<true>(DUMMY_SELF_IP, certificate).await
+                        {
                             warn!("Failed to load stored certificate {} from proposal cache - {err}", fmt_id(batch_id));
                         }
                     }
@@ -320,6 +321,13 @@ impl<N: Network> Primary<N> {
 }
 
 impl<N: Network> Primary<N> {
+    /// Clears the worker solutions.
+    pub fn clear_worker_solutions(&self) {
+        self.workers.iter().for_each(Worker::clear_solutions);
+    }
+}
+
+impl<N: Network> Primary<N> {
     /// Proposes the batch for the current round.
     ///
     /// This method performs the following steps:
@@ -341,6 +349,9 @@ impl<N: Network> Primary<N> {
         let round = self.current_round();
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
+
+        // If the current round is 0, return early.
+        ensure!(round > 0, "Round 0 cannot have transaction batches");
 
         // If the current storage round is below the latest proposal round, then return early.
         if round < *lock_guard {
@@ -416,6 +427,16 @@ impl<N: Network> Primary<N> {
                 }
             }
             debug!("Primary is safely skipping {}", format!("(round {round} was already certified)").dimmed());
+            return Ok(());
+        }
+
+        // Determine if the current round has been proposed.
+        // Note: Do NOT make this judgment in advance before rebroadcast and round update. Rebroadcasting is
+        // good for network reliability and should not be prevented for the already existing proposed_batch.
+        // If a certificate already exists for the current round, an attempt should be made to advance the
+        // round as early as possible.
+        if round == *lock_guard {
+            warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
             return Ok(());
         }
 
@@ -527,17 +548,9 @@ impl<N: Network> Primary<N> {
                 }
             }
         }
-        // Ditto if the batch had already been proposed and not expired.
-        ensure!(round > 0, "Round 0 cannot have transaction batches");
+
         // Determine the current timestamp.
         let current_timestamp = now();
-        // Determine if the current proposal is expired.
-        if *lock_guard == round {
-            warn!("Primary is safely skipping a batch proposal - round {round} already proposed");
-            // Reinsert the transmissions back into the ready queue for the next proposal.
-            self.reinsert_transmissions_into_workers(transmissions)?;
-            return Ok(());
-        }
 
         *lock_guard = round;
 
@@ -690,7 +703,7 @@ impl<N: Network> Primary<N> {
         }
 
         // If the peer is ahead, use the batch header to sync up to the peer.
-        let mut transmissions = self.sync_with_batch_header_from_peer(peer_ip, &batch_header).await?;
+        let mut transmissions = self.sync_with_batch_header_from_peer::<false>(peer_ip, &batch_header).await?;
 
         // Check that the transmission ids match and are not fee transactions.
         if let Err(err) = cfg_iter_mut!(transmissions).try_for_each(|(transmission_id, transmission)| {
@@ -902,7 +915,7 @@ impl<N: Network> Primary<N> {
         }
 
         // Store the certificate, after ensuring it is valid.
-        self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
+        self.sync_with_certificate_from_peer::<false>(peer_ip, certificate).await?;
 
         // If there are enough certificates to reach quorum threshold for the certificate round,
         // then proceed to advance to the next round.
@@ -1421,7 +1434,7 @@ impl<N: Network> Primary<N> {
     ///   - Ensure the previous certificates have reached the quorum threshold.
     ///   - Ensure we have not already signed the batch ID.
     #[async_recursion::async_recursion]
-    async fn sync_with_certificate_from_peer(
+    async fn sync_with_certificate_from_peer<const IS_SYNCING: bool>(
         &self,
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
@@ -1440,8 +1453,16 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
+        // If node is not in sync mode and the node is not synced. Then return an error.
+        if !IS_SYNCING && !self.is_synced() {
+            bail!(
+                "Failed to process certificate `{}` at round {batch_round} from '{peer_ip}' (node is syncing)",
+                fmt_id(certificate.id())
+            );
+        }
+
         // If the peer is ahead, use the batch header to sync up to the peer.
-        let missing_transmissions = self.sync_with_batch_header_from_peer(peer_ip, batch_header).await?;
+        let missing_transmissions = self.sync_with_batch_header_from_peer::<IS_SYNCING>(peer_ip, batch_header).await?;
 
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.id()) {
@@ -1462,7 +1483,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Recursively syncs using the given batch header.
-    async fn sync_with_batch_header_from_peer(
+    async fn sync_with_batch_header_from_peer<const IS_SYNCING: bool>(
         &self,
         peer_ip: SocketAddr,
         batch_header: &BatchHeader<N>,
@@ -1473,6 +1494,14 @@ impl<N: Network> Primary<N> {
         // If the certificate round is outdated, do not store it.
         if batch_round <= self.storage.gc_round() {
             bail!("Round {batch_round} is too far in the past")
+        }
+
+        // If node is not in sync mode and the node is not synced. Then return an error.
+        if !IS_SYNCING && !self.is_synced() {
+            bail!(
+                "Failed to process batch header `{}` at round {batch_round} from '{peer_ip}' (node is syncing)",
+                fmt_id(batch_header.batch_id())
+            );
         }
 
         // Determine if quorum threshold is reached on the batch round.
@@ -1510,7 +1539,7 @@ impl<N: Network> Primary<N> {
         // Iterate through the missing previous certificates.
         for batch_certificate in missing_previous_certificates {
             // Store the batch certificate (recursively fetching any missing previous certificates).
-            self.sync_with_certificate_from_peer(peer_ip, batch_certificate).await?;
+            self.sync_with_certificate_from_peer::<IS_SYNCING>(peer_ip, batch_certificate).await?;
         }
         Ok(missing_transmissions)
     }
@@ -1698,7 +1727,7 @@ mod tests {
             for i in 0..COMMITTEE_SIZE {
                 let socket_addr = format!("127.0.0.1:{}", 5000 + i).parse().unwrap();
                 let account = Account::new(rng).unwrap();
-                members.insert(account.address(), (MIN_VALIDATOR_STAKE, true));
+                members.insert(account.address(), (MIN_VALIDATOR_STAKE, true, rng.gen_range(0..100)));
                 accounts.push((socket_addr, account));
             }
 
@@ -2065,10 +2094,45 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should succeed.
         assert!(
             primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_batch_propose_from_peer_when_not_synced() {
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Create a valid proposal with an author that isn't the primary.
+        let round = 1;
+        let peer_account = &accounts[1];
+        let peer_ip = peer_account.0;
+        let timestamp = now() + MIN_BATCH_DELAY_IN_SECS as i64;
+        let proposal = create_test_proposal(
+            &peer_account.1,
+            primary.ledger.current_committee().unwrap(),
+            round,
+            Default::default(),
+            timestamp,
+            &mut rng,
+        );
+
+        // Make sure the primary is aware of the transmissions in the proposal.
+        for (transmission_id, transmission) in proposal.transmissions() {
+            primary.workers[0].process_transmission_from_peer(peer_ip, *transmission_id, transmission.clone())
+        }
+
+        // The author must be known to resolver to pass propose checks.
+        primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+
+        // Try to process the batch proposal from the peer, should fail.
+        assert!(
+            primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.is_err()
         );
     }
 
@@ -2101,6 +2165,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should succeed.
         primary.process_batch_propose_from_peer(peer_ip, (*proposal.batch_header()).clone().into()).await.unwrap();
@@ -2132,6 +2198,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should error.
         assert!(
@@ -2174,6 +2242,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should error.
         assert!(
@@ -2216,6 +2286,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should error.
         assert!(
@@ -2252,6 +2324,8 @@ mod tests {
 
         // The author must be known to resolver to pass propose checks.
         primary.gateway.resolver().insert_peer(peer_ip, peer_ip, peer_account.1.address());
+        // The primary must be considered synced.
+        primary.sync.block_sync().try_block_sync(&primary.gateway.clone()).await;
 
         // Try to process the batch proposal from the peer, should error.
         assert!(

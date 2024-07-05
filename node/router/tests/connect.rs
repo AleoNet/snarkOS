@@ -18,6 +18,7 @@ use common::*;
 use snarkos_node_tcp::{protocols::Handshake, P2P};
 
 use core::time::Duration;
+use deadline::deadline;
 
 #[tokio::test]
 async fn test_connect_without_handshake() {
@@ -94,8 +95,10 @@ async fn test_connect_with_handshake() {
     {
         // Connect node0 to node1.
         node0.connect(node1.local_ip());
-        // Sleep briefly.
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        // Await for node1 to be connected.
+        let node0_ip = node0.local_ip();
+        let node1_ = node1.clone();
+        deadline!(Duration::from_secs(5), move || { node1_.is_connected(&node0_ip) });
 
         print_tcp!(node0);
         print_tcp!(node1);
@@ -113,8 +116,10 @@ async fn test_connect_with_handshake() {
     {
         // Connect node0 to node1 again.
         node0.connect(node1.local_ip());
-        // Sleep briefly.
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Await for node1 to be connected.
+        let node0_ip = node0.local_ip();
+        let node1_ = node1.clone();
+        deadline!(Duration::from_secs(5), move || { node1_.is_connected(&node0_ip) });
 
         print_tcp!(node0);
         print_tcp!(node1);
@@ -132,8 +137,10 @@ async fn test_connect_with_handshake() {
     {
         // Connect node1 to node0.
         node1.connect(node0.local_ip());
-        // Sleep briefly.
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Await for node0 to be connected.
+        let node1_ip = node1.local_ip();
+        let node0_ = node0.clone();
+        deadline!(Duration::from_secs(5), move || { node0_.is_connected(&node1_ip) });
 
         print_tcp!(node0);
         print_tcp!(node1);
@@ -170,8 +177,10 @@ async fn test_validator_connection() {
     {
         // Connect node0 to node1.
         node0.connect(node1.local_ip());
-        // Sleep briefly.
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        // Await for node1 to be connected.
+        let node0_ip = node0.local_ip();
+        let node1_ = node1.clone();
+        deadline!(Duration::from_secs(5), move || { node1_.is_connected(&node0_ip) });
 
         print_tcp!(node0);
         print_tcp!(node1);
@@ -188,10 +197,18 @@ async fn test_validator_connection() {
         node0.disconnect(node1.local_ip());
         node1.disconnect(node0.local_ip());
 
+        // Await for node1 and node0 to be disconnected.
+        let node1_ = node1.clone();
+        let node0_ = node0.clone();
+        deadline!(Duration::from_secs(5), move || {
+            !node1_.is_connected(&node0_.local_ip()) && !node0_.is_connected(&node1_.local_ip())
+        });
+
         // Connect node1 to node0.
-        node1.connect(node0.local_ip());
-        // Sleep briefly.
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        let Ok(res) = node1.connect(node0.local_ip()).unwrap().await else {
+            panic!("Connection failed for the wrong reasons.");
+        };
+        assert!(!res, "Connection was accepted when it should not have been.");
 
         // Check the TCP level - connection was not accepted.
         assert_eq!(node0.tcp().num_connected(), 0);

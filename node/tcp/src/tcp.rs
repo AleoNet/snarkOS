@@ -225,21 +225,31 @@ impl Tcp {
             return Err(io::ErrorKind::AlreadyExists.into());
         }
 
-        let stream =
-            match timeout(Duration::from_millis(self.config().connection_timeout_ms.into()), TcpStream::connect(addr))
-                .await
-            {
-                Ok(Ok(stream)) => Ok(stream),
-                Ok(err) => {
-                    self.connecting.lock().remove(&addr);
-                    err
-                }
-                Err(err) => {
-                    self.connecting.lock().remove(&addr);
-                    error!("connection timeout error: {}", err);
-                    Err(io::ErrorKind::TimedOut.into())
-                }
-            }?;
+        let timeout_duration = Duration::from_millis(self.config().connection_timeout_ms.into());
+
+        // Bind the tcp socket to the configured listener ip if it's set.
+        // Otherwise default to the system's default interface.
+        let res = if let Some(listen_ip) = self.config().listener_ip {
+            let sock =
+                if listen_ip.is_ipv4() { tokio::net::TcpSocket::new_v4()? } else { tokio::net::TcpSocket::new_v6()? };
+            sock.bind(SocketAddr::new(listen_ip, 0))?;
+            timeout(timeout_duration, sock.connect(addr)).await
+        } else {
+            timeout(timeout_duration, TcpStream::connect(addr)).await
+        };
+
+        let stream = match res {
+            Ok(Ok(stream)) => Ok(stream),
+            Ok(err) => {
+                self.connecting.lock().remove(&addr);
+                err
+            }
+            Err(err) => {
+                self.connecting.lock().remove(&addr);
+                error!("connection timeout error: {}", err);
+                Err(io::ErrorKind::TimedOut.into())
+            }
+        }?;
 
         let ret = self.adapt_stream(stream, addr, ConnectionSide::Initiator).await;
 

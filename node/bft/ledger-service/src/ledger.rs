@@ -82,6 +82,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         self.ledger.latest_block()
     }
 
+    /// Returns the latest restrictions ID in the ledger.
+    fn latest_restrictions_id(&self) -> Field<N> {
+        self.ledger.vm().restrictions().restrictions_id()
+    }
+
     /// Returns the latest cached leader and its associated round.
     fn latest_leader(&self) -> Option<(u64, Address<N>)> {
         *self.latest_leader.read()

@@ -85,6 +85,16 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
         self.pending.read().get(&item.into()).map_or(false, |peer_ips| peer_ips.contains_key(&peer_ip))
     }
 
+    /// Returns `true` if the pending queue contains the specified `item` for the specified `peer IP` with a sent request.
+    pub fn contains_peer_with_sent_request(&self, item: impl Into<T>, peer_ip: SocketAddr) -> bool {
+        self.pending.read().get(&item.into()).map_or(false, |peer_ips| {
+            peer_ips
+                .get(&peer_ip)
+                .map(|callbacks| callbacks.iter().any(|(_, _, request_sent)| *request_sent))
+                .unwrap_or(false)
+        })
+    }
+
     /// Returns the peer IPs for the specified `item`.
     pub fn get_peers(&self, item: impl Into<T>) -> Option<HashSet<SocketAddr>> {
         self.pending.read().get(&item.into()).map(|map| map.keys().cloned().collect())
@@ -254,24 +264,29 @@ mod tests {
         let solution_id_1 = TransmissionID::Solution(rng.gen::<u64>().into());
         let solution_id_2 = TransmissionID::Solution(rng.gen::<u64>().into());
         let solution_id_3 = TransmissionID::Solution(rng.gen::<u64>().into());
+        let solution_id_4 = TransmissionID::Solution(rng.gen::<u64>().into());
 
         // Initialize the SocketAddrs.
         let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
         let addr_2 = SocketAddr::from(([127, 0, 0, 1], 2345));
         let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
+        let addr_4 = SocketAddr::from(([127, 0, 0, 1], 4567));
 
         // Initialize the callbacks.
         let (callback_sender_1, _) = oneshot::channel();
         let (callback_sender_2, _) = oneshot::channel();
         let (callback_sender_3, _) = oneshot::channel();
+        let (callback_sender_4, _) = oneshot::channel();
 
         // Insert the solution IDs.
         assert!(pending.insert(solution_id_1, addr_1, Some((callback_sender_1, true))));
         assert!(pending.insert(solution_id_2, addr_2, Some((callback_sender_2, true))));
         assert!(pending.insert(solution_id_3, addr_3, Some((callback_sender_3, true))));
+        // Add a callback without a sent request.
+        assert!(pending.insert(solution_id_4, addr_4, Some((callback_sender_4, false))));
 
         // Check the number of SocketAddrs.
-        assert_eq!(pending.len(), 3);
+        assert_eq!(pending.len(), 4);
         assert!(!pending.is_empty());
 
         // Check the items.
@@ -282,7 +297,12 @@ mod tests {
             let id = ids[i];
             assert!(pending.contains(id));
             assert!(pending.contains_peer(id, peers[i]));
+            assert!(pending.contains_peer_with_sent_request(id, peers[i]));
         }
+        // Ensure the last item does not have a sent request.
+        assert!(pending.contains_peer(solution_id_4, addr_4));
+        assert!(!pending.contains_peer_with_sent_request(solution_id_4, addr_4));
+
         let unknown_id = TransmissionID::Solution(rng.gen::<u64>().into());
         assert!(!pending.contains(unknown_id));
 
@@ -290,12 +310,14 @@ mod tests {
         assert_eq!(pending.get_peers(solution_id_1), Some(HashSet::from([addr_1])));
         assert_eq!(pending.get_peers(solution_id_2), Some(HashSet::from([addr_2])));
         assert_eq!(pending.get_peers(solution_id_3), Some(HashSet::from([addr_3])));
+        assert_eq!(pending.get_peers(solution_id_4), Some(HashSet::from([addr_4])));
         assert_eq!(pending.get_peers(unknown_id), None);
 
         // Check remove.
         assert!(pending.remove(solution_id_1, None).is_some());
         assert!(pending.remove(solution_id_2, None).is_some());
         assert!(pending.remove(solution_id_3, None).is_some());
+        assert!(pending.remove(solution_id_4, None).is_some());
         assert!(pending.remove(unknown_id, None).is_none());
 
         // Check empty again.

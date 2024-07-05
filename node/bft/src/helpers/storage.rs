@@ -788,6 +788,7 @@ impl<N: Network> Storage<N> {
     /// Inserts the given `certificate` into storage.
     ///
     /// Note: Do NOT use this in production. This is for **testing only**.
+    #[cfg(test)]
     #[doc(hidden)]
     pub(crate) fn testing_only_insert_certificate_testing_only(&self, certificate: BatchCertificate<N>) {
         // Retrieve the round.

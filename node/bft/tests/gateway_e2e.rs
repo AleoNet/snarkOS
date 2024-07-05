@@ -219,7 +219,7 @@ async fn handshake_responder_side_invalid_challenge_response() {
     let _ = test_peer.unicast(gateway.local_ip(), Event::ChallengeRequest(challenge_request));
 
     // Receive the gateway's challenge response.
-    let (peer_addr, Event::ChallengeResponse(ChallengeResponse { signature, nonce })) =
+    let (peer_addr, Event::ChallengeResponse(ChallengeResponse { restrictions_id, signature, nonce })) =
         test_peer.recv_timeout(Duration::from_secs(1)).await
     else {
         panic!("Expected challenge response")
@@ -251,6 +251,7 @@ async fn handshake_responder_side_invalid_challenge_response() {
     let _ = test_peer.unicast(
         gateway.local_ip(),
         Event::ChallengeResponse(ChallengeResponse {
+            restrictions_id,
             signature: Data::Object(
                 accounts.get(2).unwrap().sign_bytes(&challenge_request.nonce.to_le_bytes(), &mut rng).unwrap(),
             ),

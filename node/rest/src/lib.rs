@@ -121,6 +121,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         let network = match N::ID {
             snarkvm::console::network::MainnetV0::ID => "mainnet",
             snarkvm::console::network::TestnetV0::ID => "testnet",
+            snarkvm::console::network::CanaryV0::ID => "canary",
             unknown_id => {
                 eprintln!("Unknown network ID ({unknown_id})");
                 return;
@@ -128,7 +129,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         };
 
         let router = {
-            axum::Router::new()
+            let routes = axum::Router::new()
 
             // All the endpoints before the call to `route_layer` are protected with JWT auth.
             .route(&format!("/{network}/node/address"), get(Self::get_node_address))
@@ -195,8 +196,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route(&format!("/{network}/stateRoot/:height"), get(Self::get_state_root))
             .route(&format!("/{network}/committee/latest"), get(Self::get_committee_latest))
             .route(&format!("/{network}/committee/:height"), get(Self::get_committee))
-            .route(&format!("/{network}/delegators/:validator"), get(Self::get_delegators_for_validator))
+            .route(&format!("/{network}/delegators/:validator"), get(Self::get_delegators_for_validator));
 
+            // If the `history` feature is enabled, enable the additional endpoint.
+            #[cfg(feature = "history")]
+            let routes =
+                routes.route(&format!("/{network}/block/:blockHeight/history/:mapping"), get(Self::get_history));
+
+            routes
             // Pass in `Rest` to make things convenient.
             .with_state(self.clone())
             // Enable tower-http tracing.
