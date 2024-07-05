@@ -131,7 +131,7 @@ Any client **not** connected directly to a validator can be considered an `outer
 ### 3.1.1 Run an Aleo Core Client
 
 The following command is recommended when starting a client node that is connected to a validator:
-`snarkos start --client --nodisplay --node 0.0.0.0:4130 --peers “validator_ip:4130,core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip3:4130,outer_client_ip_1:4130,...” --verbosity 1 --norest`
+`snarkos start --client --nodisplay --node 0.0.0.0:4130 --peers "validator_ip:4130,core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip3:4130,outer_client_ip_1:4130,..." --verbosity 1 --norest`
 
 To start a core client node, you can also run the following command from the `snarkOS` directory:
 ```
@@ -141,7 +141,7 @@ To start a core client node, you can also run the following command from the `sn
 ### 3.1.2 Run an Aleo Outer Client
 
 The following command is recommended when starting a client node that is NOT connected to a validator:
-`snarkos start --client --nodisplay --node 0.0.0.0:4130 --peers “core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip3:4130,outer_client_ip_1:4130,...” --verbosity 1 --rest 0.0.0.0:3030`
+`snarkos start --client --nodisplay --node 0.0.0.0:4130 --peers "core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip3:4130,outer_client_ip_1:4130,..." --verbosity 1 --rest 0.0.0.0:3030`
 
 To start an outer client node, you can also run the following command from the `snarkOS` directory:
 ```
@@ -153,7 +153,7 @@ To start an outer client node, you can also run the following command from the `
 Start by following the instructions in the [Build Guide](#2-build-guide).
 
 The following command is recommended when starting a validator node:
-`snarkos start --validator --nodisplay --bft 0.0.0.0:5000 --node 0.0.0.0:4130 --peers “validator_ip_1:4130,validator_ip_2:4130,...,core_client_ip_1:4130,core_client_ip_2:4130,...” --validators “validator_ip_1:5000,validator_ip_2:5000,...” --verbosity 1 --norest --private-key-file ~/snarkOS/privatekey`
+`snarkos start --validator --nodisplay --bft 0.0.0.0:5000 --node 0.0.0.0:4130 --peers "validator_ip_1:4130,validator_ip_2:4130,...,core_client_ip_1:4130,core_client_ip_2:4130,..." --validators "validator_ip_1:5000,validator_ip_2:5000,..." --verbosity 1 --norest --private-key-file ~/snarkOS/privatekey`
 
 Instead of specifying a private key file (`--private-key-file` flag), the private key can also be defined explicitly (`--private-key` flag).
 
