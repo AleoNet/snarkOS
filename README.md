@@ -94,6 +94,13 @@ cargo install --locked --path .
 ```
 
 Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS firewall.
+```
+sudo ufw allow 4130/tcp
+sudo ufw allow 3030/tcp
+sudo ufw allow ssh
+sudo ufw enable -y
+sudo ufw status
+```
 
 ## 3. Run an Aleo Node
 
