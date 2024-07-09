@@ -295,34 +295,13 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         serialized: UnconfirmedSolution<N>,
         solution: Solution<N>,
     ) -> bool {
-        // Retrieve the latest epoch hash.
-        if let Ok(epoch_hash) = self.ledger.latest_epoch_hash() {
-            // Retrieve the latest proof target.
-            let proof_target = self.ledger.latest_block().header().proof_target();
-            // Ensure that the solution is valid for the given epoch.
-            let puzzle = self.puzzle.clone();
-            let is_valid =
-                tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target)).await;
-
-            match is_valid {
-                // If the solution is valid, propagate the `UnconfirmedSolution`.
-                Ok(Ok(())) => {
-                    let message = Message::UnconfirmedSolution(serialized);
-                    // Propagate the "UnconfirmedSolution".
-                    self.propagate(message, &[peer_ip]);
-                }
-                Ok(Err(_)) => {
-                    trace!("Invalid solution '{}' for the proof target.", solution.id())
-                }
-                // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
-                Err(error) => {
-                    if self.ledger.latest_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
-                        warn!("Failed to verify the solution - {error}")
-                    }
-                }
-            }
+        // Try to add the solution to the verification queue, without changing LRU status of known solutions.
+        let mut solution_queue = self.solution_queue.lock();
+        if !solution_queue.contains(&solution.id()) {
+            solution_queue.put(solution.id(), (peer_ip, serialized, solution));
         }
-        true
+
+        true // Maintain the connection
     }
 
     /// Handles an `UnconfirmedTransaction` message.
@@ -336,11 +315,13 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         if transaction.is_fee() {
             return true; // Maintain the connection.
         }
-        // Check that the transaction is well-formed and unique.
-        if self.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok() {
-            // Propagate the `UnconfirmedTransaction`.
-            self.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+
+        // Try to add the transaction to the verification queue, without changing LRU status of known txs.
+        let mut tx_queue = self.transaction_queue.lock();
+        if !tx_queue.contains(&transaction.id()) {
+            tx_queue.put(transaction.id(), (peer_ip, serialized, transaction));
         }
-        true
+
+        true // Maintain the connection
     }
 }
