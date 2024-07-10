@@ -111,7 +111,7 @@ impl<N: Network> From<DisconnectReason> for Message<N> {
 
 impl<N: Network> Message<N> {
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 13;
+    pub const VERSION: u32 = 15;
 
     /// Returns the message name.
     #[inline]

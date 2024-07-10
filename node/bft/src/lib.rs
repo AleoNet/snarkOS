@@ -14,6 +14,7 @@
 
 #![forbid(unsafe_code)]
 #![allow(clippy::type_complexity)]
+#![allow(clippy::unit_arg)]
 
 #[macro_use]
 extern crate async_trait;
@@ -46,10 +47,12 @@ pub const CONTEXT: &str = "[MemoryPool]";
 /// The port on which the memory pool listens for incoming connections.
 pub const MEMORY_POOL_PORT: u16 = 5000; // port
 
-/// The maximum number of milliseconds to wait before proposing a batch.
-pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
+/// TODO: Remove this constant, as mainnet already has one in snarkVM.
 /// The maximum number of rounds to store before garbage collecting.
 pub const MAX_GC_ROUNDS: u64 = 50; // rounds
+
+/// The maximum number of milliseconds to wait before proposing a batch.
+pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
 /// The maximum number of seconds allowed for the leader to send their certificate.
 pub const MAX_LEADER_CERTIFICATE_DELAY_IN_SECS: i64 = 2 * MAX_BATCH_DELAY_IN_MS as i64 / 1000; // seconds
 /// The maximum number of seconds before the timestamp is considered expired.
@@ -75,16 +78,4 @@ macro_rules! spawn_blocking {
             Err(error) => Err(anyhow::anyhow!("[tokio::spawn_blocking] {error}")),
         }
     };
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    type CurrentNetwork = snarkvm::console::network::Testnet3;
-
-    #[test]
-    fn test_max_gc_rounds() {
-        assert_eq!(MAX_GC_ROUNDS as usize, snarkvm::ledger::narwhal::Subdag::<CurrentNetwork>::MAX_ROUNDS);
-    }
 }

@@ -108,9 +108,9 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Committee for round {round} does not exist in prover")
     }
 
-    /// Returns the previous committee for the given round.
-    /// If the previous round is in the future, then the current committee is returned.
-    fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
+    /// Returns the committee lookback for the given round.
+    /// If the committee lookback round is in the future, then the current committee is returned.
+    fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>> {
         bail!("Previous committee for round {round} does not exist in prover")
     }
 
@@ -124,8 +124,8 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
         bail!("Transmission '{transmission_id}' does not exist in prover")
     }
 
-    /// Ensures the given transmission ID matches the given transmission.
-    fn ensure_transmission_id_matches(
+    /// Ensures that the given transmission is not a fee and matches the given transmission ID.
+    fn ensure_transmission_is_well_formed(
         &self,
         _transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,

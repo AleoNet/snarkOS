@@ -112,7 +112,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             GovernorConfigBuilder::default()
                 .per_second(1)
                 .burst_size(rest_rps)
-                .error_handler(|error| Response::new(error.to_string()))
+                .error_handler(|error| Response::new(error.to_string().into()))
                 .finish()
                 .expect("Couldn't set up rate limiting for the REST server!"),
         );
@@ -155,7 +155,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/transaction/broadcast", post(Self::transaction_broadcast))
 
             // POST ../solution/broadcast
-            .route("/testnet3/solution/broadcast", post(Self::solution_broadcast))
+            // .route("/testnet3/solution/broadcast", post(Self::solution_broadcast))
 
             // GET ../find/..
             .route("/testnet3/find/blockHash/:tx_id", get(Self::find_block_hash))
@@ -177,7 +177,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/blocks", get(Self::get_blocks))
             .route("/testnet3/height/:hash", get(Self::get_height))
             .route("/testnet3/memoryPool/transmissions", get(Self::get_memory_pool_transmissions))
-            .route("/testnet3/memoryPool/solutions", get(Self::get_memory_pool_solutions))
+            // .route("/testnet3/memoryPool/solutions", get(Self::get_memory_pool_solutions))
             .route("/testnet3/memoryPool/transactions", get(Self::get_memory_pool_transactions))
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
             .route("/testnet3/stateRoot/latest", get(Self::get_state_root_latest))

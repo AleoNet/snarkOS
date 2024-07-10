@@ -55,6 +55,7 @@ use tokio::{
     task::JoinHandle,
 };
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Consensus<N: Network> {
     /// The ledger.
@@ -189,52 +190,52 @@ impl<N: Network> Consensus<N> {
 
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
-    pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
-        // Process the unconfirmed solution.
-        {
-            let solution_id = solution.commitment();
-
-            // Check if the transaction was recently seen.
-            if self.seen_solutions.lock().put(solution_id, ()).is_some() {
-                // If the transaction was recently seen, return early.
-                return Ok(());
-            }
-            // Check if the solution already exists in the ledger.
-            if self.ledger.contains_transmission(&TransmissionID::from(solution_id))? {
-                bail!("Solution '{}' exists in the ledger {}", fmt_id(solution_id), "(skipping)".dimmed());
-            }
-            // Add the solution to the memory pool.
-            trace!("Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
-            if self.solutions_queue.lock().put(solution_id, solution).is_some() {
-                bail!("Solution '{}' exists in the memory pool", fmt_id(solution_id));
-            }
-        }
-
-        // If the memory pool of this node is full, return early.
-        let num_unconfirmed = self.num_unconfirmed_transmissions();
-        if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
-            return Ok(());
-        }
-        // Retrieve the solutions.
-        let solutions = {
-            // Determine the available capacity.
-            let capacity = N::MAX_SOLUTIONS.saturating_sub(num_unconfirmed);
-            // Acquire the lock on the queue.
-            let mut queue = self.solutions_queue.lock();
-            // Determine the number of solutions to send.
-            let num_solutions = queue.len().min(capacity);
-            // Drain the solutions from the queue.
-            (0..num_solutions).filter_map(|_| queue.pop_lru().map(|(_, solution)| solution)).collect::<Vec<_>>()
-        };
-        // Iterate over the solutions.
-        for solution in solutions.into_iter() {
-            let solution_id = solution.commitment();
-            trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
-            // Send the unconfirmed solution to the primary.
-            if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
-                warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
-            }
-        }
+    pub async fn add_unconfirmed_solution(&self, _solution: ProverSolution<N>) -> Result<()> {
+        // // Process the unconfirmed solution.
+        // {
+        //     let solution_id = solution.commitment();
+        //
+        //     // Check if the transaction was recently seen.
+        //     if self.seen_solutions.lock().put(solution_id, ()).is_some() {
+        //         // If the transaction was recently seen, return early.
+        //         return Ok(());
+        //     }
+        //     // Check if the solution already exists in the ledger.
+        //     if self.ledger.contains_transmission(&TransmissionID::from(solution_id))? {
+        //         bail!("Solution '{}' exists in the ledger {}", fmt_id(solution_id), "(skipping)".dimmed());
+        //     }
+        //     // Add the solution to the memory pool.
+        //     trace!("Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
+        //     if self.solutions_queue.lock().put(solution_id, solution).is_some() {
+        //         bail!("Solution '{}' exists in the memory pool", fmt_id(solution_id));
+        //     }
+        // }
+        //
+        // // If the memory pool of this node is full, return early.
+        // let num_unconfirmed = self.num_unconfirmed_transmissions();
+        // if num_unconfirmed > N::MAX_SOLUTIONS || num_unconfirmed > MAX_TRANSMISSIONS_PER_BATCH {
+        //     return Ok(());
+        // }
+        // // Retrieve the solutions.
+        // let solutions = {
+        //     // Determine the available capacity.
+        //     let capacity = N::MAX_SOLUTIONS.saturating_sub(num_unconfirmed);
+        //     // Acquire the lock on the queue.
+        //     let mut queue = self.solutions_queue.lock();
+        //     // Determine the number of solutions to send.
+        //     let num_solutions = queue.len().min(capacity);
+        //     // Drain the solutions from the queue.
+        //     (0..num_solutions).filter_map(|_| queue.pop_lru().map(|(_, solution)| solution)).collect::<Vec<_>>()
+        // };
+        // // Iterate over the solutions.
+        // for solution in solutions.into_iter() {
+        //     let solution_id = solution.commitment();
+        //     trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
+        //     // Send the unconfirmed solution to the primary.
+        //     if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
+        //         warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id));
+        //     }
+        // }
         Ok(())
     }
 

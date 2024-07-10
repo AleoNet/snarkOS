@@ -68,9 +68,9 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
 
-    /// Returns the previous committee for the given round.
-    /// If the previous round is in the future, then the current committee is returned.
-    fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
+    /// Returns the committee lookback for the given round.
+    /// If the committee lookback round is in the future, then the current committee is returned.
+    fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>>;
 
     /// Returns `true` if the ledger contains the given certificate ID.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
@@ -78,8 +78,8 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     /// Returns `true` if the ledger contains the given transmission ID.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
 
-    /// Ensures the given transmission ID matches the given transmission.
-    fn ensure_transmission_id_matches(
+    /// Ensures that the given transmission is not a fee and matches the given transmission ID.
+    fn ensure_transmission_is_well_formed(
         &self,
         transmission_id: TransmissionID<N>,
         transmission: &mut Transmission<N>,

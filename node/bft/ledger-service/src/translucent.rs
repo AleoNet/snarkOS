@@ -119,8 +119,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.get_committee_for_round(round)
     }
 
-    fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
-        self.inner.get_previous_committee_for_round(round)
+    /// Returns the committee lookback for the given round.
+    fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>> {
+        self.inner.get_committee_lookback_for_round(round)
     }
 
     /// Returns `true` if the ledger contains the given certificate ID in block history.
@@ -134,7 +135,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Always succeeds.
-    fn ensure_transmission_id_matches(
+    fn ensure_transmission_is_well_formed(
         &self,
         _transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,

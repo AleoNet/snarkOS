@@ -348,12 +348,12 @@ impl<N: Network> Storage<N> {
             bail!("Batch for round {round} already exists in storage {gc_log}")
         }
 
-        // Retrieve the previous committee for the batch round.
-        let Ok(previous_committee) = self.ledger.get_previous_committee_for_round(round) else {
-            bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
+        // Retrieve the committee lookback for the batch round.
+        let Ok(committee_lookback) = self.ledger.get_committee_lookback_for_round(round) else {
+            bail!("Storage failed to retrieve the committee lookback for round {round} {gc_log}")
         };
         // Ensure the author is in the committee.
-        if !previous_committee.is_committee_member(batch_header.author()) {
+        if !committee_lookback.is_committee_member(batch_header.author()) {
             bail!("Author {} is not in the committee for round {round} {gc_log}", batch_header.author())
         }
 
@@ -370,8 +370,8 @@ impl<N: Network> Storage<N> {
         let previous_round = round.saturating_sub(1);
         // Check if the previous round is within range of the GC round.
         if previous_round > gc_round {
-            // Retrieve the committee for the previous round.
-            let Ok(previous_committee) = self.ledger.get_previous_committee_for_round(previous_round) else {
+            // Retrieve the committee lookback for the previous round.
+            let Ok(previous_committee_lookback) = self.ledger.get_committee_lookback_for_round(previous_round) else {
                 bail!("Missing committee for the previous round {previous_round} in storage {gc_log}")
             };
             // Ensure the previous round certificates exists in storage.
@@ -379,7 +379,7 @@ impl<N: Network> Storage<N> {
                 bail!("Missing certificates for the previous round {previous_round} in storage {gc_log}")
             }
             // Ensure the number of previous certificate IDs is at or below the number of committee members.
-            if batch_header.previous_certificate_ids().len() > previous_committee.num_members() {
+            if batch_header.previous_certificate_ids().len() > previous_committee_lookback.num_members() {
                 bail!("Too many previous certificates for round {round} {gc_log}")
             }
             // Initialize a set of the previous authors.
@@ -405,7 +405,7 @@ impl<N: Network> Storage<N> {
                 previous_authors.insert(previous_certificate.author());
             }
             // Ensure the previous certificates have reached the quorum threshold.
-            if !previous_committee.is_quorum_threshold_reached(&previous_authors) {
+            if !previous_committee_lookback.is_quorum_threshold_reached(&previous_authors) {
                 bail!("Previous certificates for a batch in round {round} did not reach quorum threshold {gc_log}")
             }
         }
@@ -455,8 +455,8 @@ impl<N: Network> Storage<N> {
         // Check the timestamp for liveness.
         check_timestamp_for_liveness(certificate.timestamp())?;
 
-        // Retrieve the previous committee for the batch round.
-        let Ok(previous_committee) = self.ledger.get_previous_committee_for_round(round) else {
+        // Retrieve the committee lookback for the batch round.
+        let Ok(committee_lookback) = self.ledger.get_committee_lookback_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
 
@@ -470,7 +470,7 @@ impl<N: Network> Storage<N> {
             // Retrieve the signer.
             let signer = signature.to_address();
             // Ensure the signer is in the committee.
-            if !previous_committee.is_committee_member(signer) {
+            if !committee_lookback.is_committee_member(signer) {
                 bail!("Signer {signer} is not in the committee for round {round} {gc_log}")
             }
             // Append the signer.
@@ -478,7 +478,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Ensure the signatures have reached the quorum threshold.
-        if !previous_committee.is_quorum_threshold_reached(&signers) {
+        if !committee_lookback.is_quorum_threshold_reached(&signers) {
             bail!("Signatures for a batch in round {round} did not reach quorum threshold {gc_log}")
         }
         Ok(missing_transmissions)

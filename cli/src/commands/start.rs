@@ -248,7 +248,7 @@ impl Start {
                         let _ = PrivateKey::<N>::new(&mut rng)?;
                     }
                     let private_key = PrivateKey::<N>::new(&mut rng)?;
-                    println!("🔑 Your development private key for node {dev} is {}\n", private_key.to_string().bold());
+                    println!("🔑 Your development private key for node {dev} is {}.\n", private_key.to_string().bold());
                     private_key
                 })
             }
@@ -411,7 +411,7 @@ impl Start {
         // If the display is not enabled, render the welcome message.
         if self.nodisplay {
             // Print the Aleo address.
-            println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
+            println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
             // Print the node type and network.
             println!(
                 "🧭 Starting {} on {} {} at {}.\n",
@@ -465,23 +465,12 @@ impl Start {
     fn runtime() -> Runtime {
         // Retrieve the number of cores.
         let num_cores = num_cpus::get();
-        // Determine the number of main cores.
-        let main_cores = match num_cores {
-            // Insufficient
-            0..=3 => {
-                eprintln!("The number of cores is insufficient, at least 4 are needed.");
-                std::process::exit(1);
-            }
-            // Efficiency mode
-            4..=8 => 2,
-            // Standard mode
-            9..=16 => 8,
-            // Performance mode
-            _ => 16,
-        };
 
+        // Initialize the number of tokio worker threads, max tokio blocking threads, and rayon cores.
+        // Note: We intentionally set the number of tokio worker threads and number of rayon cores to be
+        // more than the number of physical cores, because the node is expected to be I/O-bound.
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
-            { (num_cores.min(main_cores), 512, num_cores.saturating_sub(main_cores).max(1)) };
+            (2 * num_cores, 512, num_cores);
 
         // Initialize the parallelization parameters.
         rayon::ThreadPoolBuilder::new()

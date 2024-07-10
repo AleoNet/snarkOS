@@ -126,8 +126,8 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         Ok(self.committee.clone())
     }
 
-    /// Returns the previous committee for the given round.
-    fn get_previous_committee_for_round(&self, _round: u64) -> Result<Committee<N>> {
+    /// Returns the committee lookback for the given round.
+    fn get_committee_lookback_for_round(&self, _round: u64) -> Result<Committee<N>> {
         Ok(self.committee.clone())
     }
 
@@ -143,8 +143,8 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         Ok(false)
     }
 
-    /// Ensures the given transmission ID matches the given transmission.
-    fn ensure_transmission_id_matches(
+    /// Ensures that the given transmission is not a fee and matches the given transmission ID.
+    fn ensure_transmission_is_well_formed(
         &self,
         transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,
