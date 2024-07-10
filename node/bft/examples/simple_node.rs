@@ -602,7 +602,7 @@ async fn main() -> Result<()> {
     #[cfg(feature = "metrics")]
     if args.metrics {
         info!("Initializing metrics...");
-        metrics::initialize_metrics();
+        metrics::initialize_metrics(SocketAddr::from_str(&format!("0.0.0.0:{}", 9000 + args.id)).ok());
     }
 
     // Start the monitoring server.
