@@ -271,27 +271,20 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                     let previous_counter = node.num_verifying_solutions.fetch_add(1, Relaxed);
                     let _node = node.clone();
                     // For each solution, spawn a task to verify it.
-                    tokio::spawn(async move {
+                    tokio::task::spawn_blocking(move || {
                         // Retrieve the latest epoch hash.
                         if let Ok(epoch_hash) = _node.ledger.latest_epoch_hash() {
                             // Retrieve the latest proof target.
                             let proof_target = _node.ledger.latest_block().header().proof_target();
                             // Ensure that the solution is valid for the given epoch.
-                            let puzzle = _node.puzzle.clone();
-                            let is_valid = tokio::task::spawn_blocking(move || {
-                                puzzle.check_solution(&solution, epoch_hash, proof_target)
-                            })
-                            .await;
+                            let is_valid = _node.puzzle.check_solution(&solution, epoch_hash, proof_target);
 
                             match is_valid {
                                 // If the solution is valid, propagate the `UnconfirmedSolution`.
-                                Ok(Ok(())) => {
+                                Ok(()) => {
                                     let message = Message::UnconfirmedSolution(serialized);
                                     // Propagate the "UnconfirmedSolution".
                                     _node.propagate(message, &[peer_ip]);
-                                }
-                                Ok(Err(_)) => {
-                                    trace!("Invalid solution '{}' for the proof target.", solution.id())
                                 }
                                 // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
                                 Err(error) => {
@@ -344,7 +337,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                     let previous_counter = node.num_verifying_deploys.fetch_add(1, Relaxed);
                     let _node = node.clone();
                     // For each deployment, spawn a task to verify it.
-                    tokio::spawn(async move {
+                    tokio::task::spawn_blocking(move || {
                         // Check the deployment.
                         if _node.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok() {
                             // Propagate the `UnconfirmedTransaction`.
@@ -391,7 +384,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                     let previous_counter = node.num_verifying_executions.fetch_add(1, Relaxed);
                     let _node = node.clone();
                     // For each execution, spawn a task to verify it.
-                    tokio::spawn(async move {
+                    tokio::task::spawn_blocking(move || {
                         // Check the execution.
                         if _node.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok() {
                             // Propagate the `UnconfirmedTransaction`.
