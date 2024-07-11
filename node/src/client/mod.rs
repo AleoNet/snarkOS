@@ -62,15 +62,21 @@ use std::{
 };
 use tokio::{task::JoinHandle, time::sleep};
 
-/// The number of transactions we can verify in parallel.
-/// Note: worst case memory to verify a deployment (MAX_DEPLOYMENT_CONSTRAINTS = 1 << 20) is 2 GiB.
-const TRANSACTION_MAX_CONCURRENCY: usize = 10;
-/// The number of solutions we can verify in parallel.
+/// The maximum number of deployments to verify in parallel.
+/// Note: worst case memory to verify a deployment (MAX_DEPLOYMENT_CONSTRAINTS = 1 << 20) is ~2 GiB.
+const MAX_PARALLEL_DEPLOY_VERIFICATIONS: usize = 5;
+/// The maximum number of executions to verify in parallel.
+/// Note: worst case memory to verify an execution is 0.01 GiB.
+const MAX_PARALLEL_EXECUTE_VERIFICATIONS: usize = 1000;
+/// The maximum number of solutions to verify in parallel.
 /// Note: worst case memory to verify a solution is 0.5 GiB.
-const SOLUTION_MAX_CONCURRENCY: usize = 40;
-/// The capacity for storing unconfirmed transactions.
+const MAX_PARALLEL_SOLUTION_VERIFICATIONS: usize = 20;
+/// The capacity for storing unconfirmed deployments.
 /// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
-const CAPACITY_FOR_TRANSACTIONS: usize = 1 << 11;
+const CAPACITY_FOR_DEPLOYMENTS: usize = 1 << 10;
+/// The capacity for storing unconfirmed executions.
+/// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
+const CAPACITY_FOR_EXECUTIONS: usize = 1 << 10;
 /// The capacity for storing unconfirmed solutions.
 /// Note: This is an inbound queue capacity, not a Narwhal-enforced capacity.
 const CAPACITY_FOR_SOLUTIONS: usize = 1 << 10;
@@ -99,12 +105,16 @@ pub struct Client<N: Network, C: ConsensusStorage<N>> {
     puzzle: Puzzle<N>,
     /// The unconfirmed solutions queue.
     solution_queue: Arc<Mutex<LruCache<SolutionID<N>, SolutionContents<N>>>>,
-    /// The unconfirmed transactions queue.
-    transaction_queue: Arc<Mutex<LruCache<N::TransactionID, TransactionContents<N>>>>,
+    /// The unconfirmed deployments queue.
+    deploy_queue: Arc<Mutex<LruCache<N::TransactionID, TransactionContents<N>>>>,
+    /// The unconfirmed executions queue.
+    execute_queue: Arc<Mutex<LruCache<N::TransactionID, TransactionContents<N>>>>,
     /// The amount of solutions currently being verified.
-    solution_verification_counter: Arc<AtomicUsize>,
-    /// The amount of transactions currently being verified.
-    tx_verification_counter: Arc<AtomicUsize>,
+    num_verifying_solutions: Arc<AtomicUsize>,
+    /// The amount of deployments currently being verified.
+    num_verifying_deploys: Arc<AtomicUsize>,
+    /// The amount of executions currently being verified.
+    num_verifying_executions: Arc<AtomicUsize>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -168,11 +178,11 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             genesis,
             puzzle: ledger.puzzle().clone(),
             solution_queue: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(CAPACITY_FOR_SOLUTIONS).unwrap()))),
-            transaction_queue: Arc::new(Mutex::new(LruCache::new(
-                NonZeroUsize::new(CAPACITY_FOR_TRANSACTIONS).unwrap(),
-            ))),
-            solution_verification_counter: Default::default(),
-            tx_verification_counter: Default::default(),
+            deploy_queue: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(CAPACITY_FOR_DEPLOYMENTS).unwrap()))),
+            execute_queue: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(CAPACITY_FOR_EXECUTIONS).unwrap()))),
+            num_verifying_solutions: Default::default(),
+            num_verifying_deploys: Default::default(),
+            num_verifying_executions: Default::default(),
             handles: Default::default(),
             shutdown,
         };
@@ -187,8 +197,10 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         node.initialize_sync();
         // Initialize solution verification.
         node.initialize_solution_verification();
-        // Initialize transaction verification.
-        node.initialize_transaction_verification();
+        // Initialize deployment verification.
+        node.initialize_deploy_verification();
+        // Initialize execution verification.
+        node.initialize_execute_verification();
         // Initialize the notification message loop.
         node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
@@ -244,7 +256,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                 // Determine if the queue contains txs to verify.
                 let queue_is_empty = node.solution_queue.lock().is_empty();
                 // Determine if our verification counter has space to verify new solutions.
-                let counter_is_full = node.solution_verification_counter.load(Acquire) >= SOLUTION_MAX_CONCURRENCY;
+                let counter_is_full = node.num_verifying_solutions.load(Acquire) >= MAX_PARALLEL_SOLUTION_VERIFICATIONS;
 
                 // Sleep to allow the queue to be filled or solutions to be validated.
                 if queue_is_empty || counter_is_full {
@@ -256,7 +268,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                 let mut solution_queue = node.solution_queue.lock();
                 while let Some((_, (peer_ip, serialized, solution))) = solution_queue.pop_lru() {
                     // Increment the verification counter.
-                    let previous_counter = node.solution_verification_counter.fetch_add(1, Relaxed);
+                    let previous_counter = node.num_verifying_solutions.fetch_add(1, Relaxed);
                     let _node = node.clone();
                     // For each solution, spawn a task to verify it.
                     tokio::spawn(async move {
@@ -292,10 +304,10 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                             warn!("Failed to retrieve the latest epoch hash.");
                         }
                         // Decrement the verification counter.
-                        _node.solution_verification_counter.fetch_sub(1, Relaxed);
+                        _node.num_verifying_solutions.fetch_sub(1, Relaxed);
                     });
                     // If we are already at capacity, don't verify more solutions.
-                    if previous_counter + 1 >= SOLUTION_MAX_CONCURRENCY {
+                    if previous_counter + 1 >= MAX_PARALLEL_SOLUTION_VERIFICATIONS {
                         break;
                     }
                 }
@@ -303,22 +315,22 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         }));
     }
 
-    /// Initializes transaction verification.
-    fn initialize_transaction_verification(&self) {
-        // Start the transaction verification loop.
+    /// Initializes deploy verification.
+    fn initialize_deploy_verification(&self) {
+        // Start the deploy verification loop.
         let node = self.clone();
         self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
                 if node.shutdown.load(Acquire) {
-                    info!("Shutting down transaction verification");
+                    info!("Shutting down deployment verification");
                     break;
                 }
 
                 // Determine if the queue contains txs to verify.
-                let queue_is_empty = node.transaction_queue.lock().is_empty();
+                let queue_is_empty = node.deploy_queue.lock().is_empty();
                 // Determine if our verification counter has space to verify new txs.
-                let counter_is_full = node.tx_verification_counter.load(Acquire) >= TRANSACTION_MAX_CONCURRENCY;
+                let counter_is_full = node.num_verifying_deploys.load(Acquire) >= MAX_PARALLEL_DEPLOY_VERIFICATIONS;
 
                 // Sleep to allow the queue to be filled or transactions to be validated.
                 if queue_is_empty || counter_is_full {
@@ -326,24 +338,70 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                     continue;
                 }
 
-                // Try to verify transactions.
-                let mut tx_queue = node.transaction_queue.lock();
-                while let Some((_, (peer_ip, serialized, transaction))) = tx_queue.pop_lru() {
+                // Try to verify deployments.
+                while let Some((_, (peer_ip, serialized, transaction))) = node.deploy_queue.lock().pop_lru() {
                     // Increment the verification counter.
-                    let previous_counter = node.tx_verification_counter.fetch_add(1, Relaxed);
+                    let previous_counter = node.num_verifying_deploys.fetch_add(1, Relaxed);
                     let _node = node.clone();
-                    // For each transaction, spawn a task to verify it.
+                    // For each deployment, spawn a task to verify it.
                     tokio::spawn(async move {
-                        // Check the transaction.
+                        // Check the deployment.
                         if _node.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok() {
                             // Propagate the `UnconfirmedTransaction`.
                             _node.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
                         }
                         // Decrement the verification counter.
-                        _node.tx_verification_counter.fetch_sub(1, Relaxed);
+                        _node.num_verifying_deploys.fetch_sub(1, Relaxed);
                     });
-                    // If we are already at capacity, don't verify more transactions.
-                    if previous_counter + 1 >= TRANSACTION_MAX_CONCURRENCY {
+                    // If we are already at capacity, don't verify more deployments.
+                    if previous_counter + 1 >= MAX_PARALLEL_DEPLOY_VERIFICATIONS {
+                        break;
+                    }
+                }
+            }
+        }));
+    }
+
+    /// Initializes execute verification.
+    fn initialize_execute_verification(&self) {
+        // Start the execute verification loop.
+        let node = self.clone();
+        self.handles.lock().push(tokio::spawn(async move {
+            loop {
+                // If the Ctrl-C handler registered the signal, stop the node.
+                if node.shutdown.load(Acquire) {
+                    info!("Shutting down execution verification");
+                    break;
+                }
+
+                // Determine if the queue contains txs to verify.
+                let queue_is_empty = node.execute_queue.lock().is_empty();
+                // Determine if our verification counter has space to verify new txs.
+                let counter_is_full = node.num_verifying_executions.load(Acquire) >= MAX_PARALLEL_EXECUTE_VERIFICATIONS;
+
+                // Sleep to allow the queue to be filled or transactions to be validated.
+                if queue_is_empty || counter_is_full {
+                    sleep(Duration::from_millis(50)).await;
+                    continue;
+                }
+
+                // Try to verify executions.
+                while let Some((_, (peer_ip, serialized, transaction))) = node.execute_queue.lock().pop_lru() {
+                    // Increment the verification counter.
+                    let previous_counter = node.num_verifying_executions.fetch_add(1, Relaxed);
+                    let _node = node.clone();
+                    // For each execution, spawn a task to verify it.
+                    tokio::spawn(async move {
+                        // Check the execution.
+                        if _node.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok() {
+                            // Propagate the `UnconfirmedTransaction`.
+                            _node.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+                        }
+                        // Decrement the verification counter.
+                        _node.num_verifying_executions.fetch_sub(1, Relaxed);
+                    });
+                    // If we are already at capacity, don't verify more executions.
+                    if previous_counter + 1 >= MAX_PARALLEL_EXECUTE_VERIFICATIONS {
                         break;
                     }
                 }

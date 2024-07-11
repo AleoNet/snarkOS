@@ -311,15 +311,21 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         serialized: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
     ) -> bool {
-        // Check that the transaction is not a fee transaction.
-        if transaction.is_fee() {
-            return true; // Maintain the connection.
-        }
-
-        // Try to add the transaction to the verification queue, without changing LRU status of known txs.
-        let mut tx_queue = self.transaction_queue.lock();
-        if !tx_queue.contains(&transaction.id()) {
-            tx_queue.put(transaction.id(), (peer_ip, serialized, transaction));
+        // Try to add the transaction to a verification queue, without changing LRU status of known solutions.
+        match &transaction {
+            Transaction::<N>::Fee(..) => (), // Fee Transactions are not valid.
+            Transaction::<N>::Deploy(..) => {
+                let mut deploy_queue = self.deploy_queue.lock();
+                if !deploy_queue.contains(&transaction.id()) {
+                    deploy_queue.put(transaction.id(), (peer_ip, serialized, transaction));
+                }
+            }
+            Transaction::<N>::Execute(..) => {
+                let mut execute_queue = self.execute_queue.lock();
+                if !execute_queue.contains(&transaction.id()) {
+                    execute_queue.put(transaction.id(), (peer_ip, serialized, transaction));
+                }
+            }
         }
 
         true // Maintain the connection
