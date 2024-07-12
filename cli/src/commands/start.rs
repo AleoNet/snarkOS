@@ -109,7 +109,7 @@ pub struct Start {
     #[clap(long = "allow-external-peers")]
     pub allow_external_peers: bool,
     /// If the flag is set, a client will periodically evict more external peers
-    #[clap(long = "rotate_external_peers")]
+    #[clap(long = "rotate-external-peers")]
     pub rotate_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
