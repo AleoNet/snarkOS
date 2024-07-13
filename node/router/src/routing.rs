@@ -41,9 +41,7 @@ pub trait Routing<N: Network>:
 
     // Start listening for inbound connections.
     async fn enable_listener(&self) {
-        if let Err(e) = self.tcp().enable_listener().await {
-            eprintln!("Failed to enable the TCP listener: {:?}", e);
-        }
+        self.tcp().enable_listener().await.expect("Failed to enable the TCP listener");
     }
 
     /// Initialize a new instance of the heartbeat.
