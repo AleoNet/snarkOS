@@ -153,6 +153,7 @@ impl Account {
         }
     }
 
+    // Abstract the logic for processing messages
     fn process_message<F, N: Network>(
         network: u16,
         key: String,
@@ -167,6 +168,7 @@ impl Account {
         Self::execute_for_network(network, |net| func::<net>(key, message, seed, raw))
     }
 
+    // Abstract Network Execution Logic
     fn execute_for_network<F, R>(network: u16, func: F) -> Result<R>
     where
         F: FnOnce(&dyn Network) -> Result<R>,
