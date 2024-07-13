@@ -131,10 +131,12 @@ impl Account {
         }
     }
 
+    // Generate a vanity account for the specified network.
     fn new_vanity_account(network: u16, vanity: &str, discreet: bool) -> Result<String> {
         Self::execute_for_network(network, |net| Self::new_vanity::<net>(vanity, discreet))
     }
 
+    // Generate a seeded account for the specified network.
     fn new_seeded_account(network: u16, seed: Option<String>, discreet: bool) -> Result<String> {
         Self::execute_for_network(network, |net| Self::new_seeded::<net>(seed, discreet))
     }
