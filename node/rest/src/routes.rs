@@ -256,14 +256,25 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     ) -> Result<ErasedJson, RestError> {
         // If the `all` query parameter is set, return the full mapping.
         if metadata.all.unwrap_or(false) {
+            // Retrieve the latest height.
+            let height = rest.ledger.latest_height();
+
             // Retrieve all the mapping values from the mapping.
-            let mapping_values = rest.ledger.vm().finalize_store().get_mapping_confirmed(id, name)?;
+            let mapping_values = match tokio::task::spawn_blocking(move || {
+                rest.ledger.vm().finalize_store().get_mapping_confirmed(id, name)
+            })
+            .await
+            {
+                Ok(Ok(mapping_values)) => mapping_values,
+                Ok(Err(err)) => return Err(RestError(format!("Unable to read mapping - {err}"))),
+                Err(err) => return Err(RestError(format!("Unable to read mapping - {err}"))),
+            };
 
             // Check if metadata is requested and return the mapping with metadata if so.
             if metadata.metadata.unwrap_or(false) {
                 return Ok(ErasedJson::pretty(json!({
                     "data": mapping_values,
-                    "height": rest.ledger.latest_height(),
+                    "height": height,
                 })));
             }
 
