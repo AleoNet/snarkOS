@@ -133,6 +133,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
             // All the endpoints before the call to `route_layer` are protected with JWT auth.
             .route(&format!("/{network}/node/address"), get(Self::get_node_address))
+            .route(&format!("/{network}/program/:id/mapping/:name"), get(Self::get_mapping_values))
             .route_layer(middleware::from_fn(auth_middleware))
 
             // ----------------- DEPRECATED ROUTES -----------------

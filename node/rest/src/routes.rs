@@ -33,10 +33,11 @@ pub(crate) struct BlockRange {
     end: u32,
 }
 
-/// The `get_mapping_value` query object.
-#[derive(Deserialize, Serialize)]
+/// The query object for `get_mapping_value` and `get_mapping_values`.
+#[derive(Copy, Clone, Deserialize, Serialize)]
 pub(crate) struct Metadata {
-    metadata: bool,
+    metadata: Option<bool>,
+    all: Option<bool>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
@@ -230,13 +231,13 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     pub(crate) async fn get_mapping_value(
         State(rest): State<Self>,
         Path((id, name, key)): Path<(ProgramID<N>, Identifier<N>, Plaintext<N>)>,
-        metadata: Option<Query<Metadata>>,
+        metadata: Query<Metadata>,
     ) -> Result<ErasedJson, RestError> {
         // Retrieve the mapping value.
         let mapping_value = rest.ledger.vm().finalize_store().get_value_confirmed(id, name, &key)?;
 
         // Check if metadata is requested and return the value with metadata if so.
-        if metadata.map(|q| q.metadata).unwrap_or(false) {
+        if metadata.metadata.unwrap_or(false) {
             return Ok(ErasedJson::pretty(json!({
                 "data": mapping_value,
                 "height": rest.ledger.latest_height(),
@@ -245,6 +246,33 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
         // Return the value without metadata.
         Ok(ErasedJson::pretty(mapping_value))
+    }
+
+    // GET /<network>/program/{programID}/mapping/{mappingName}?all={true}&metadata={true}
+    pub(crate) async fn get_mapping_values(
+        State(rest): State<Self>,
+        Path((id, name)): Path<(ProgramID<N>, Identifier<N>)>,
+        metadata: Query<Metadata>,
+    ) -> Result<ErasedJson, RestError> {
+        // If the `all` query parameter is set, return the full mapping.
+        if metadata.all.unwrap_or(false) {
+            // Retrieve all the mapping values from the mapping.
+            let mapping_values = rest.ledger.vm().finalize_store().get_mapping_confirmed(id, name)?;
+
+            // Check if metadata is requested and return the mapping with metadata if so.
+            if metadata.metadata.unwrap_or(false) {
+                return Ok(ErasedJson::pretty(json!({
+                    "data": mapping_values,
+                    "height": rest.ledger.latest_height(),
+                })));
+            }
+
+            // Return the full mapping without metadata.
+            return Ok(ErasedJson::pretty(mapping_values));
+        }
+
+        // Return an error if the `all` query parameter is not set to `true`.
+        Err(RestError("Invalid query parameter. At this time, 'all=true' must be included".to_string()))
     }
 
     // GET /<network>/statePath/{commitment}
