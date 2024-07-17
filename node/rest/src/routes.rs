@@ -254,36 +254,35 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Path((id, name)): Path<(ProgramID<N>, Identifier<N>)>,
         metadata: Query<Metadata>,
     ) -> Result<ErasedJson, RestError> {
-        // If the `all` query parameter is set, return the full mapping.
-        if metadata.all.unwrap_or(false) {
-            // Retrieve the latest height.
-            let height = rest.ledger.latest_height();
-
-            // Retrieve all the mapping values from the mapping.
-            let mapping_values = match tokio::task::spawn_blocking(move || {
-                rest.ledger.vm().finalize_store().get_mapping_confirmed(id, name)
-            })
-            .await
-            {
-                Ok(Ok(mapping_values)) => mapping_values,
-                Ok(Err(err)) => return Err(RestError(format!("Unable to read mapping - {err}"))),
-                Err(err) => return Err(RestError(format!("Unable to read mapping - {err}"))),
-            };
-
-            // Check if metadata is requested and return the mapping with metadata if so.
-            if metadata.metadata.unwrap_or(false) {
-                return Ok(ErasedJson::pretty(json!({
-                    "data": mapping_values,
-                    "height": height,
-                })));
-            }
-
-            // Return the full mapping without metadata.
-            return Ok(ErasedJson::pretty(mapping_values));
+        // Return an error if the `all` query parameter is not set to `true`.
+        if metadata.all != Some(true) {
+            return Err(RestError("Invalid query parameter. At this time, 'all=true' must be included".to_string()));
         }
 
-        // Return an error if the `all` query parameter is not set to `true`.
-        Err(RestError("Invalid query parameter. At this time, 'all=true' must be included".to_string()))
+        // Retrieve the latest height.
+        let height = rest.ledger.latest_height();
+
+        // Retrieve all the mapping values from the mapping.
+        let mapping_values = match tokio::task::spawn_blocking(move || {
+            rest.ledger.vm().finalize_store().get_mapping_confirmed(id, name)
+        })
+        .await
+        {
+            Ok(Ok(mapping_values)) => mapping_values,
+            Ok(Err(err)) => return Err(RestError(format!("Unable to read mapping - {err}"))),
+            Err(err) => return Err(RestError(format!("Unable to read mapping - {err}"))),
+        };
+
+        // Check if metadata is requested and return the mapping with metadata if so.
+        if metadata.metadata.unwrap_or(false) {
+            return Ok(ErasedJson::pretty(json!({
+                "data": mapping_values,
+                "height": height,
+            })));
+        }
+
+        // Return the full mapping without metadata.
+        Ok(ErasedJson::pretty(mapping_values))
     }
 
     // GET /<network>/statePath/{commitment}
