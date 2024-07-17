@@ -263,26 +263,24 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         let height = rest.ledger.latest_height();
 
         // Retrieve all the mapping values from the mapping.
-        let mapping_values = match tokio::task::spawn_blocking(move || {
-            rest.ledger.vm().finalize_store().get_mapping_confirmed(id, name)
-        })
-        .await
+        match tokio::task::spawn_blocking(move || rest.ledger.vm().finalize_store().get_mapping_confirmed(id, name))
+            .await
         {
-            Ok(Ok(mapping_values)) => mapping_values,
-            Ok(Err(err)) => return Err(RestError(format!("Unable to read mapping - {err}"))),
-            Err(err) => return Err(RestError(format!("Unable to read mapping - {err}"))),
-        };
+            Ok(Ok(mapping_values)) => {
+                // Check if metadata is requested and return the mapping with metadata if so.
+                if metadata.metadata.unwrap_or(false) {
+                    return Ok(ErasedJson::pretty(json!({
+                        "data": mapping_values,
+                        "height": height,
+                    })));
+                }
 
-        // Check if metadata is requested and return the mapping with metadata if so.
-        if metadata.metadata.unwrap_or(false) {
-            return Ok(ErasedJson::pretty(json!({
-                "data": mapping_values,
-                "height": height,
-            })));
+                // Return the full mapping without metadata.
+                Ok(ErasedJson::pretty(mapping_values))
+            }
+            Ok(Err(err)) => Err(RestError(format!("Unable to read mapping - {err}"))),
+            Err(err) => Err(RestError(format!("Unable to read mapping - {err}"))),
         }
-
-        // Return the full mapping without metadata.
-        Ok(ErasedJson::pretty(mapping_values))
     }
 
     // GET /<network>/statePath/{commitment}
