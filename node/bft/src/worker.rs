@@ -152,6 +152,13 @@ impl<N: Network> Worker<N> {
 }
 
 impl<N: Network> Worker<N> {
+    /// Clears the solutions from the ready queue.
+    pub(super) fn clear_solutions(&self) {
+        self.ready.clear_solutions()
+    }
+}
+
+impl<N: Network> Worker<N> {
     /// Returns `true` if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
     pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         let transmission_id = transmission_id.into();
@@ -410,10 +417,13 @@ impl<N: Network> Worker<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Determine how many sent requests are pending.
         let num_sent_requests = self.pending.num_sent_requests(transmission_id);
+        // Determine if we've already sent a request to the peer.
+        let contains_peer_with_sent_request = self.pending.contains_peer_with_sent_request(transmission_id, peer_ip);
         // Determine the maximum number of redundant requests.
         let num_redundant_requests = max_redundant_requests(self.ledger.clone(), self.storage.current_round());
         // Determine if we should send a transmission request to the peer.
-        let should_send_request = num_sent_requests < num_redundant_requests;
+        // We send at most `num_redundant_requests` requests and each peer can only receive one request at a time.
+        let should_send_request = num_sent_requests < num_redundant_requests && !contains_peer_with_sent_request;
 
         // Insert the transmission ID into the pending queue.
         self.pending.insert(transmission_id, peer_ip, Some((callback_sender, should_send_request)));
@@ -526,6 +536,7 @@ mod tests {
             fn latest_round(&self) -> u64;
             fn latest_block_height(&self) -> u32;
             fn latest_block(&self) -> Block<N>;
+            fn latest_restrictions_id(&self) -> Field<N>;
             fn latest_leader(&self) -> Option<(u64, Address<N>)>;
             fn update_latest_leader(&self, round: u64, leader: Address<N>);
             fn contains_block_height(&self, height: u32) -> bool;
@@ -845,14 +856,18 @@ mod tests {
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
         let transmission_id = TransmissionID::Transaction(transaction_id);
-        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
 
         // Determine the number of redundant requests are sent.
         let num_redundant_requests = max_redundant_requests(worker.ledger.clone(), worker.storage.current_round());
         let num_flood_requests = num_redundant_requests * 10;
+        let mut peer_ips =
+            (0..num_flood_requests).map(|i| SocketAddr::from(([127, 0, 0, 1], 1234 + i as u16))).collect_vec();
+        let first_peer_ip = peer_ips[0];
+
         // Flood the pending queue with transmission requests.
         for i in 1..=num_flood_requests {
             let worker_ = worker.clone();
+            let peer_ip = peer_ips.pop().unwrap();
             tokio::spawn(async move {
                 let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
             });
@@ -870,18 +885,18 @@ mod tests {
         assert_eq!(worker.pending.num_sent_requests(transmission_id), 0);
         assert_eq!(worker.pending.num_callbacks(transmission_id), 0);
 
-        // Flood the pending queue with transmission requests again.
+        // Flood the pending queue with transmission requests again, this time to a single peer
         for i in 1..=num_flood_requests {
             let worker_ = worker.clone();
             tokio::spawn(async move {
-                let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+                let _ = worker_.send_transmission_request(first_peer_ip, transmission_id).await;
             });
             tokio::time::sleep(Duration::from_millis(10)).await;
             assert!(worker.pending.num_sent_requests(transmission_id) <= num_redundant_requests);
             assert_eq!(worker.pending.num_callbacks(transmission_id), i);
         }
         // Check that the number of sent requests does not exceed the maximum number of redundant requests.
-        assert_eq!(worker.pending.num_sent_requests(transmission_id), num_redundant_requests);
+        assert_eq!(worker.pending.num_sent_requests(transmission_id), 1);
         assert_eq!(worker.pending.num_callbacks(transmission_id), num_flood_requests);
 
         // Check that fulfilling a transmission request clears the pending queue.

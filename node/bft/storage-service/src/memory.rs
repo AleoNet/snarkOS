@@ -120,7 +120,9 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
                 Entry::Vacant(vacant_entry) => {
                     // Retrieve the missing transmission.
                     let Some(transmission) = missing_transmissions.remove(&transmission_id) else {
-                        if !aborted_transmission_ids.contains(&transmission_id) {
+                        if !aborted_transmission_ids.contains(&transmission_id)
+                            && !self.contains_transmission(transmission_id)
+                        {
                             error!("Failed to provide a missing transmission {transmission_id}");
                         }
                         continue 'outer;

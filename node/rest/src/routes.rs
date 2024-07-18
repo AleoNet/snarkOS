@@ -135,16 +135,18 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             )));
         }
 
-        // Fetch the blocks from ledger.
-        match tokio::task::spawn_blocking(move || {
-            cfg_into_iter!((start_height..end_height))
+        // Prepare a closure for the blocking work.
+        let get_json_blocks = move || -> Result<ErasedJson, RestError> {
+            let blocks = cfg_into_iter!((start_height..end_height))
                 .map(|height| rest.ledger.get_block(height))
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .await
-        {
-            Ok(Ok(blocks)) => Ok(ErasedJson::pretty(blocks)),
-            Ok(Err(err)) => Err(RestError(format!("Failed to get blocks '{start_height}..{end_height}' - {err}"))),
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(ErasedJson::pretty(blocks))
+        };
+
+        // Fetch the blocks from ledger and serialize to json.
+        match tokio::task::spawn_blocking(get_json_blocks).await {
+            Ok(json) => json,
             Err(err) => Err(RestError(format!("Failed to get blocks '{start_height}..{end_height}' - {err}"))),
         }
     }
@@ -443,5 +445,20 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         rest.routing.propagate(message, &[]);
 
         Ok(ErasedJson::pretty(solution_id))
+    }
+
+    // GET /{network}/block/{blockHeight}/history/{mapping}
+    #[cfg(feature = "history")]
+    pub(crate) async fn get_history(
+        State(rest): State<Self>,
+        Path((height, mapping)): Path<(u32, snarkvm::synthesizer::MappingName)>,
+    ) -> Result<impl axum::response::IntoResponse, RestError> {
+        // Retrieve the history for the given block height and variant.
+        let history = snarkvm::synthesizer::History::new(N::ID, rest.ledger.vm().finalize_store().storage_mode());
+        let result = history
+            .load_mapping(height, mapping)
+            .map_err(|_| RestError(format!("Could not load mapping '{mapping}' from block '{height}'")))?;
+
+        Ok((StatusCode::OK, [(CONTENT_TYPE, "application/json")], result))
     }
 }
