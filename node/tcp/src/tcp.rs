@@ -22,7 +22,7 @@ use std::{
         atomic::{AtomicUsize, Ordering::*},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use once_cell::sync::OnceCell;
@@ -101,7 +101,7 @@ impl Tcp {
             connecting: Default::default(),
             connections: Default::default(),
             known_peers: Default::default(),
-            stats: Default::default(),
+            stats: Stats::new(Instant::now()),
             tasks: Default::default(),
         }));
 
@@ -255,7 +255,7 @@ impl Tcp {
 
         if let Err(ref e) = ret {
             self.connecting.lock().remove(&addr);
-            self.known_peers().register_failure(addr);
+            self.known_peers().register_failure(addr.ip());
             error!(parent: self.span(), "Unable to initiate a connection with {addr}: {e}");
         }
 
@@ -280,13 +280,6 @@ impl Tcp {
             // Shut down the associated tasks of the peer.
             for task in conn.tasks.iter().rev() {
                 task.abort();
-            }
-
-            // If the (owning) Tcp was not the initiator of the connection, it doesn't know the listening address
-            // of the associated peer, so the related stats are unreliable; the next connection initiated by the
-            // peer could be bound to an entirely different port number
-            if conn.side() == ConnectionSide::Initiator {
-                self.known_peers().remove(conn.addr());
             }
 
             debug!(parent: self.span(), "Disconnected from {}", conn.addr());
@@ -386,7 +379,7 @@ impl Tcp {
         tokio::spawn(async move {
             if let Err(e) = tcp.adapt_stream(stream, addr, ConnectionSide::Responder).await {
                 tcp.connecting.lock().remove(&addr);
-                tcp.known_peers().register_failure(addr);
+                tcp.known_peers().register_failure(addr.ip());
                 error!(parent: tcp.span(), "Failed to connect with {addr}: {e}");
             }
         });
@@ -426,7 +419,7 @@ impl Tcp {
 
     /// Prepares the freshly acquired connection to handle the protocols the Tcp implements.
     async fn adapt_stream(&self, stream: TcpStream, peer_addr: SocketAddr, own_side: ConnectionSide) -> io::Result<()> {
-        self.known_peers.add(peer_addr);
+        self.known_peers.add(peer_addr.ip());
 
         // Register the port seen by the peer.
         if own_side == ConnectionSide::Initiator {
