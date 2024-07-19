@@ -292,10 +292,17 @@ pub mod prop_tests {
             .boxed()
     }
 
+    pub fn any_transmission_checksum() -> BoxedStrategy<<CurrentNetwork as Network>::TransmissionChecksum> {
+        Just(0)
+            .prop_perturb(|_, mut rng| <CurrentNetwork as Network>::TransmissionChecksum::from(Field::rand(&mut rng)))
+            .boxed()
+    }
+
     pub fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
-            any_transaction_id().prop_map(TransmissionID::Transaction),
-            any_solution_id().prop_map(TransmissionID::Solution),
+            ((any_transaction_id(), any_transmission_checksum()))
+                .prop_map(|(id, cs)| TransmissionID::Transaction(id, cs)),
+            ((any_solution_id(), any_transmission_checksum())).prop_map(|(id, cs)| TransmissionID::Solution(id, cs)),
         ]
         .boxed()
     }

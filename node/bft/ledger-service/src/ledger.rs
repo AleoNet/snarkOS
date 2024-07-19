@@ -205,8 +205,8 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         match transmission_id {
             TransmissionID::Ratification => Ok(false),
-            TransmissionID::Solution(solution_id) => self.ledger.contains_solution_id(solution_id),
-            TransmissionID::Transaction(transaction_id) => self.ledger.contains_transaction_id(transaction_id),
+            TransmissionID::Solution(solution_id, _) => self.ledger.contains_solution_id(solution_id),
+            TransmissionID::Transaction(transaction_id, _) => self.ledger.contains_transaction_id(transaction_id),
         }
     }
 
@@ -218,7 +218,10 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     ) -> Result<()> {
         match (transmission_id, transmission) {
             (TransmissionID::Ratification, Transmission::Ratification) => {}
-            (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction_data)) => {
+            (
+                TransmissionID::Transaction(expected_transaction_id, expected_checksum),
+                Transmission::Transaction(transaction_data),
+            ) => {
                 // Deserialize the transaction. If the transaction exceeds the maximum size, then return an error.
                 let transaction = match transaction_data.clone() {
                     Data::Object(transaction) => transaction,
@@ -232,6 +235,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                         fmt_id(transaction.id()),
                     );
                 }
+
+                // TODO: consider checking the checksum.
+
                 // Ensure the transaction is not a fee transaction.
                 if transaction.is_fee() {
                     bail!("Received a fee transaction in a transmission");
@@ -240,7 +246,10 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                 // Update the transmission with the deserialized transaction.
                 *transaction_data = Data::Object(transaction);
             }
-            (TransmissionID::Solution(expected_solution_id), Transmission::Solution(solution_data)) => {
+            (
+                TransmissionID::Solution(expected_solution_id, expected_checksum),
+                Transmission::Solution(solution_data),
+            ) => {
                 match solution_data.clone().deserialize_blocking() {
                     Ok(solution) => {
                         if solution.id() != expected_solution_id {
@@ -250,6 +259,8 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                                 fmt_id(solution.id()),
                             );
                         }
+
+                        // TODO: consider checking the checksum.
 
                         // Update the transmission with the deserialized solution.
                         *solution_data = Data::Object(solution);

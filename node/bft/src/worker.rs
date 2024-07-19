@@ -294,8 +294,8 @@ impl<N: Network> Worker<N> {
         }
         // Ensure the transmission ID and transmission type matches.
         let is_well_formed = match (&transmission_id, &transmission) {
-            (TransmissionID::Solution(_), Transmission::Solution(_)) => true,
-            (TransmissionID::Transaction(_), Transmission::Transaction(_)) => true,
+            (TransmissionID::Solution(_, _), Transmission::Solution(_)) => true,
+            (TransmissionID::Transaction(_, _), Transmission::Transaction(_)) => true,
             // Note: We explicitly forbid inserting ratifications into the ready queue,
             // as the protocol currently does not support ratifications.
             (TransmissionID::Ratification, Transmission::Ratification) => false,
@@ -317,17 +317,19 @@ impl<N: Network> Worker<N> {
     ) -> Result<()> {
         // Construct the transmission.
         let transmission = Transmission::Solution(solution.clone());
+        // Compute the checksum.
+        let checksum = solution.to_checksum();
         // Remove the solution ID from the pending queue.
-        self.pending.remove(solution_id, Some(transmission.clone()));
+        self.pending.remove((solution_id, checksum), Some(transmission.clone()));
         // Check if the solution exists.
-        if self.contains_transmission(solution_id) {
-            bail!("Solution '{}' already exists.", fmt_id(solution_id));
+        if self.contains_transmission((solution_id, checksum)) {
+            bail!("Solution '{}' already exists.", fmt_id(solution_id, checksum));
         }
         // Check that the solution is well-formed and unique.
         self.ledger.check_solution_basic(solution_id, solution).await?;
         // Adds the solution to the ready queue.
-        if self.ready.insert(solution_id, transmission) {
-            trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(solution_id));
+        if self.ready.insert((solution_id, checksum), transmission) {
+            trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(solution_id, checksum));
         }
         Ok(())
     }
@@ -775,7 +777,9 @@ mod tests {
         // Create the Worker.
         let worker = Worker::new(0, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
-        let transmission_id = TransmissionID::Transaction(transaction_id);
+        let checksum: <CurrentNetwork as Network>::TransmissionChecksum =
+            Field::<CurrentNetwork>::rand(&mut rng).into();
+        let transmission_id = TransmissionID::Transaction(transaction_id, checksum);
         let worker_ = worker.clone();
         let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
         let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
