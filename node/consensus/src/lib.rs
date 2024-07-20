@@ -534,7 +534,11 @@ impl<N: Network> Consensus<N> {
         for (transmission_id, transmission) in transmissions.into_iter() {
             // Reinsert the transmission into the memory pool.
             if let Err(e) = self.reinsert_transmission(transmission_id, transmission).await {
-                warn!("Unable to reinsert transmission {} into the memory pool - {e}", fmt_id(transmission_id));
+                warn!(
+                    "Unable to reinsert transmission {}.{} into the memory pool - {e}",
+                    fmt_id(transmission_id),
+                    fmt_id(transmission_id.checksum().unwrap_or_default()).dimmed()
+                );
             }
         }
     }

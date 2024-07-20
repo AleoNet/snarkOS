@@ -31,6 +31,7 @@ use snarkvm::{
     },
 };
 
+use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use rand::seq::IteratorRandom;
@@ -272,9 +273,10 @@ impl<N: Network> Worker<N> {
                 // If the transmission was not fetched, then attempt to fetch it again.
                 Err(e) => {
                     warn!(
-                        "Worker {} - Failed to fetch transmission '{}' from '{peer_ip}' (ping) - {e}",
+                        "Worker {} - Failed to fetch transmission '{}.{}' from '{peer_ip}' (ping) - {e}",
                         self_.id,
-                        fmt_id(transmission_id)
+                        fmt_id(transmission_id),
+                        fmt_id(transmission_id.checksum().unwrap_or_default()).dimmed()
                     );
                 }
             }
@@ -304,7 +306,12 @@ impl<N: Network> Worker<N> {
         };
         // If the transmission ID and transmission type matches, then insert the transmission into the ready queue.
         if is_well_formed && self.ready.insert(transmission_id, transmission) {
-            trace!("Worker {} - Added transmission '{}' from '{peer_ip}'", self.id, fmt_id(transmission_id));
+            trace!(
+                "Worker {} - Added transmission '{}.{}' from '{peer_ip}'",
+                self.id,
+                fmt_id(transmission_id),
+                fmt_id(transmission_id.checksum().unwrap_or_default()).dimmed()
+            );
         }
     }
 
@@ -331,7 +338,12 @@ impl<N: Network> Worker<N> {
         self.ledger.check_solution_basic(solution_id, solution).await?;
         // Adds the solution to the ready queue.
         if self.ready.insert(transmission_id, transmission) {
-            trace!("Worker {} - Added unconfirmed solution '{}.{}'", self.id, fmt_id(solution_id), fmt_id(checksum));
+            trace!(
+                "Worker {} - Added unconfirmed solution '{}.{}'",
+                self.id,
+                fmt_id(solution_id),
+                fmt_id(checksum).dimmed()
+            );
         }
         Ok(())
     }
@@ -352,7 +364,7 @@ impl<N: Network> Worker<N> {
         self.pending.remove(transmission_id, Some(transmission.clone()));
         // Check if the transaction ID exists.
         if self.contains_transmission(transmission_id) {
-            bail!("Transaction '{}.{}' already exists.", fmt_id(transaction_id), fmt_id(checksum));
+            bail!("Transaction '{}.{}' already exists.", fmt_id(transaction_id), fmt_id(checksum).dimmed());
         }
         // Check that the transaction is well-formed and unique.
         self.ledger.check_transaction_basic(transaction_id, transaction).await?;
@@ -449,8 +461,9 @@ impl<N: Network> Worker<N> {
             }
         } else {
             debug!(
-                "Skipped sending request for transmission {} to '{peer_ip}' ({num_sent_requests} redundant requests)",
-                fmt_id(transmission_id)
+                "Skipped sending request for transmission {}.{} to '{peer_ip}' ({num_sent_requests} redundant requests)",
+                fmt_id(transmission_id),
+                fmt_id(transmission_id.checksum().unwrap_or_default()).dimmed()
             );
         }
         // Wait for the transmission to be fetched.
