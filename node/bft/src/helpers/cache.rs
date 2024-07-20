@@ -226,7 +226,7 @@ mod tests {
 
     impl Input for TransmissionID<CurrentNetwork> {
         fn input() -> Self {
-            TransmissionID::Transaction(Default::default())
+            TransmissionID::Transaction(Default::default(), Default::default())
         }
     }
 

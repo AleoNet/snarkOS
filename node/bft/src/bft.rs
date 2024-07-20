@@ -602,7 +602,7 @@ impl<N: Network> BFT<N> {
                     // Retrieve the transmissions.
                     for transmission_id in certificate.transmission_ids() {
                         // If the transmission already exists in the map, skip it.
-                        if transmissions.contains_key(transmission_id.0) {
+                        if transmissions.contains_key(transmission_id) {
                             continue;
                         }
                         // If the transmission already exists in the ledger, skip it.
@@ -619,7 +619,7 @@ impl<N: Network> BFT<N> {
                             );
                         };
                         // Add the transmission to the set.
-                        transmissions.insert(*transmission_id.0, transmission);
+                        transmissions.insert(*transmission_id, transmission);
                     }
                 }
                 // Trigger consensus, as this will build a new block for the ledger.
