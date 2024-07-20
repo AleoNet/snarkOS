@@ -248,11 +248,18 @@ impl<N: Network> Consensus<N> {
     /// Returns the transmissions in the inbound queue.
     pub fn inbound_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
         self.inbound_transactions()
-            .map(|(id, tx)| (TransmissionID::Transaction(id), Transmission::Transaction(tx)))
-            .chain(
-                self.inbound_solutions()
-                    .map(|(id, solution)| (TransmissionID::Solution(id), Transmission::Solution(solution))),
-            )
+            .map(|(id, tx)| {
+                (
+                    TransmissionID::Transaction(id, tx.to_checksum::<N>().unwrap_or_default()),
+                    Transmission::Transaction(tx),
+                )
+            })
+            .chain(self.inbound_solutions().map(|(id, solution)| {
+                (
+                    TransmissionID::Solution(id, solution.to_checksum::<N>().unwrap_or_default()),
+                    Transmission::Solution(solution),
+                )
+            }))
     }
 
     /// Returns the solutions in the inbound queue.
@@ -278,11 +285,15 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: Solution<N>) -> Result<()> {
+        // Calculate the transmission checksum.
+        let checksum = Data::<Solution<N>>::Buffer(solution.to_bytes_le()?.into()).to_checksum::<N>()?;
         #[cfg(feature = "metrics")]
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
             let timestamp = snarkos_node_bft::helpers::now();
-            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Solution(solution.id()), timestamp);
+            self.transmissions_queue_timestamps
+                .lock()
+                .insert(TransmissionID::Solution(solution.id(), checksum), timestamp);
         }
         // Process the unconfirmed solution.
         {
@@ -294,7 +305,7 @@ impl<N: Network> Consensus<N> {
                 return Ok(());
             }
             // Check if the solution already exists in the ledger.
-            if self.ledger.contains_transmission(&TransmissionID::from(solution_id))? {
+            if self.ledger.contains_transmission(&TransmissionID::Solution(solution_id, checksum))? {
                 bail!("Solution '{}' exists in the ledger {}", fmt_id(solution_id), "(skipping)".dimmed());
             }
             // Add the solution to the memory pool.
@@ -343,11 +354,15 @@ impl<N: Network> Consensus<N> {
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        // Calculate the transmission checksum.
+        let checksum = Data::<Transaction<N>>::Buffer(transaction.to_bytes_le()?.into()).to_checksum::<N>()?;
         #[cfg(feature = "metrics")]
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
             let timestamp = snarkos_node_bft::helpers::now();
-            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Transaction(transaction.id()), timestamp);
+            self.transmissions_queue_timestamps
+                .lock()
+                .insert(TransmissionID::Transaction(transaction.id(), checksum), timestamp);
         }
         // Process the unconfirmed transaction.
         {
@@ -363,7 +378,7 @@ impl<N: Network> Consensus<N> {
                 return Ok(());
             }
             // Check if the transaction already exists in the ledger.
-            if self.ledger.contains_transmission(&TransmissionID::from(&transaction_id))? {
+            if self.ledger.contains_transmission(&TransmissionID::Transaction(transaction_id, checksum))? {
                 bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
             // Add the transaction to the memory pool.
@@ -535,11 +550,11 @@ impl<N: Network> Consensus<N> {
         // Send the transmission to the primary.
         match (transmission_id, transmission) {
             (TransmissionID::Ratification, Transmission::Ratification) => return Ok(()),
-            (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
+            (TransmissionID::Solution(solution_id, _), Transmission::Solution(solution)) => {
                 // Send the solution to the primary.
                 self.primary_sender().tx_unconfirmed_solution.send((solution_id, solution, callback)).await?;
             }
-            (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+            (TransmissionID::Transaction(transaction_id, _), Transmission::Transaction(transaction)) => {
                 // Send the transaction to the primary.
                 self.primary_sender().tx_unconfirmed_transaction.send((transaction_id, transaction, callback)).await?;
             }

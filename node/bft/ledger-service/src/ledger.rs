@@ -230,13 +230,20 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                 // Ensure the transaction ID matches the expected transaction ID.
                 if transaction.id() != expected_transaction_id {
                     bail!(
-                        "Received mismatching transaction ID  - expected {}, found {}",
+                        "Received mismatching transaction ID - expected {}, found {}",
                         fmt_id(expected_transaction_id),
                         fmt_id(transaction.id()),
                     );
                 }
 
-                // TODO: consider checking the checksum.
+                // Ensure the transmission checksum matches the expected checksum.
+                let checksum = transaction_data.to_checksum::<N>()?;
+                if checksum != expected_checksum {
+                    bail!(
+                        "Received mismatching checksum for transaction {} - expected {expected_checksum} but found {checksum}",
+                        fmt_id(expected_transaction_id)
+                    );
+                }
 
                 // Ensure the transaction is not a fee transaction.
                 if transaction.is_fee() {
@@ -260,7 +267,14 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                             );
                         }
 
-                        // TODO: consider checking the checksum.
+                        // Ensure the transmission checksum matches the expected checksum.
+                        let checksum = solution_data.to_checksum::<N>()?;
+                        if checksum != expected_checksum {
+                            bail!(
+                                "Received mismatching checksum for solution {} - expected {expected_checksum} but found {checksum}",
+                                fmt_id(expected_solution_id)
+                            );
+                        }
 
                         // Update the transmission with the deserialized solution.
                         *solution_data = Data::Object(solution);
