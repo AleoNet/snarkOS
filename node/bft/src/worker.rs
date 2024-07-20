@@ -331,7 +331,7 @@ impl<N: Network> Worker<N> {
         // Remove the solution ID from the pending queue.
         self.pending.remove(transmission_id, Some(transmission.clone()));
         // Check if the solution exists.
-        if self.contains_transmission((solution_id, checksum)) {
+        if self.contains_transmission(transmission_id) {
             bail!("Solution '{}.{}' already exists.", fmt_id(solution_id), fmt_id(checksum));
         }
         // Check that the solution is well-formed and unique.
