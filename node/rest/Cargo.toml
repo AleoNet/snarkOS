@@ -65,9 +65,9 @@ path = "../router"
 version = "=2.2.7"
 
 [dependencies.snarkvm-synthesizer]
-path = "../../../snarkVM/synthesizer"
-#git = "https://github.com/AleoNet/snarkVM.git"
-#rev = "d170a9f"
+#path = "../../../snarkVM/synthesizer"
+git = "https://github.com/AleoNet/snarkVM.git"
+rev = "f48330b"
 default-features = false
 optional = true
 
