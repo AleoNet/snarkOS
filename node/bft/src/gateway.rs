@@ -64,14 +64,9 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rand::seq::{IteratorRandom, SliceRandom};
-use std::{
-    collections::{HashMap, HashSet},
-    future::Future,
-    io,
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-    time::{Duration, Instant},
-};
+#[cfg(not(any(test, feature = "test")))]
+use std::net::IpAddr;
+use std::{collections::HashSet, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
@@ -132,8 +127,6 @@ pub struct Gateway<N: Network> {
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
     connecting_peers: Arc<Mutex<IndexSet<SocketAddr>>>,
-    /// The set of banned IP addresses.
-    banned_ips: Arc<RwLock<HashMap<IpAddr, Instant>>>,
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The worker senders.
@@ -175,7 +168,6 @@ impl<N: Network> Gateway<N> {
             trusted_validators: trusted_validators.iter().copied().collect(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
-            banned_ips: Default::default(),
             primary_sender: Default::default(),
             worker_senders: Default::default(),
             sync_sender: Default::default(),
@@ -478,14 +470,13 @@ impl<N: Network> Gateway<N> {
     /// Check whether the given IP address is currently banned.
     #[cfg(not(any(test, feature = "test")))]
     fn is_ip_banned(&self, ip: IpAddr) -> bool {
-        self.banned_ips.read().contains_key(&ip)
+        self.tcp.banned_peers().is_ip_banned(ip)
     }
 
     /// Insert or update a banned IP.
     #[cfg(not(any(test, feature = "test")))]
     fn update_ip_ban(&self, ip: IpAddr) {
-        let timestamp = Instant::now();
-        self.banned_ips.write().insert(ip, timestamp);
+        self.tcp.banned_peers().update_ip_ban(ip);
     }
 
     #[cfg(feature = "metrics")]
@@ -989,7 +980,7 @@ impl<N: Network> Gateway<N> {
 
     // Remove addresses whose ban time has expired.
     fn handle_banned_ips(&self) {
-        self.banned_ips.write().retain(|_, timestamp| timestamp.elapsed().as_secs() < IP_BAN_TIME_IN_SECS);
+        self.tcp.banned_peers().remove_old_bans(IP_BAN_TIME_IN_SECS);
     }
 }
 

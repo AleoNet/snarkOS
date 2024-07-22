@@ -15,6 +15,9 @@
 mod config;
 pub use config::Config;
 
+mod banned_peers;
+pub use banned_peers::BannedPeers;
+
 pub mod connections;
 pub use connections::{Connection, ConnectionSide};
 

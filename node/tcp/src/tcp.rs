@@ -39,6 +39,7 @@ use tracing::*;
 use crate::{
     connections::{Connection, ConnectionSide, Connections},
     protocols::{Protocol, Protocols},
+    BannedPeers,
     Config,
     KnownPeers,
     Stats,
@@ -75,6 +76,8 @@ pub struct InnerTcp {
     connections: Connections,
     /// Collects statistics related to the node's peers.
     known_peers: KnownPeers,
+    /// Contains the set of currently banned peers.
+    banned_peers: BannedPeers,
     /// Collects statistics related to the node itself.
     stats: Stats,
     /// The node's tasks.
@@ -101,6 +104,7 @@ impl Tcp {
             connecting: Default::default(),
             connections: Default::default(),
             known_peers: Default::default(),
+            banned_peers: Default::default(),
             stats: Stats::new(Instant::now()),
             tasks: Default::default(),
         }));
@@ -163,6 +167,12 @@ impl Tcp {
     #[inline]
     pub fn known_peers(&self) -> &KnownPeers {
         &self.known_peers
+    }
+
+    /// Returns a reference to the set of currently banned peers.
+    #[inline]
+    pub fn banned_peers(&self) -> &BannedPeers {
+        &self.banned_peers
     }
 
     /// Returns a reference to the statistics.
