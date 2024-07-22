@@ -11,13 +11,11 @@ then
   PEERS=$REPLY
 fi
 
-if [ "${PEERS}" == "" ]
-then
-  echo "Missing peers."
-  exit 1
+if [ -z "${PEERS}" ]; then
+  COMMAND="cargo run --release -- start --nodisplay --client --node 0.0.0.0:4130 --verbosity 1 --rest 0.0.0.0:3030"
+else
+  COMMAND="cargo run --release -- start --nodisplay --client --node 0.0.0.0:4130 --peers ${PEERS} --verbosity 1 --rest 0.0.0.0:3030"
 fi
-
-COMMAND='cargo run --release -- start --nodisplay --client --node 0.0.0.0:4130 --peers ${PEERS} --verbosity 1 --rest 0.0.0.0:3030'
 
 for word in $*;
 do
