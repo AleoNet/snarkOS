@@ -332,7 +332,7 @@ impl<N: Network> Worker<N> {
         self.pending.remove(transmission_id, Some(transmission.clone()));
         // Check if the solution exists.
         if self.contains_transmission(transmission_id) {
-            bail!("Solution '{}.{}' already exists.", fmt_id(solution_id), fmt_id(checksum));
+            bail!("Solution '{}.{}' already exists.", fmt_id(solution_id), fmt_id(checksum).dimmed());
         }
         // Check that the solution is well-formed and unique.
         self.ledger.check_solution_basic(solution_id, solution).await?;
@@ -374,7 +374,7 @@ impl<N: Network> Worker<N> {
                 "Worker {}.{} - Added unconfirmed transaction '{}'",
                 self.id,
                 fmt_id(transaction_id),
-                fmt_id(checksum)
+                fmt_id(checksum).dimmed()
             );
         }
         Ok(())
