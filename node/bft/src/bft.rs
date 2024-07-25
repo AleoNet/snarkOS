@@ -597,10 +597,34 @@ impl<N: Network> BFT<N> {
             if !IS_SYNCING {
                 // Initialize a map for the deduped transmissions.
                 let mut transmissions = IndexMap::new();
+                // Initialize a map for the deduped transaction ids.
+                let mut seen_transaction_ids = IndexSet::new();
+                // Initialize a map for the deduped solution ids.
+                let mut seen_solution_ids = IndexSet::new();
                 // Start from the oldest leader certificate.
                 for certificate in commit_subdag.values().flatten() {
                     // Retrieve the transmissions.
                     for transmission_id in certificate.transmission_ids() {
+                        // If the transaction ID or solution ID already exists in the map, skip it.
+                        // Note: This additional check is done to ensure that we do not include duplicate
+                        // transaction IDs or solution IDs that may have a different transmission ID.
+                        match transmission_id {
+                            TransmissionID::Solution(solution_id, _) => {
+                                // If the solution already exists, skip it.
+                                if seen_solution_ids.contains(&solution_id) {
+                                    continue;
+                                }
+                            }
+                            TransmissionID::Transaction(transaction_id, _) => {
+                                // If the transaction already exists, skip it.
+                                if seen_transaction_ids.contains(transaction_id) {
+                                    continue;
+                                }
+                            }
+                            TransmissionID::Ratification => {
+                                bail!("Ratifications are currently not supported in the BFT.")
+                            }
+                        }
                         // If the transmission already exists in the map, skip it.
                         if transmissions.contains_key(transmission_id) {
                             continue;
@@ -619,6 +643,16 @@ impl<N: Network> BFT<N> {
                                 certificate.round()
                             );
                         };
+                        // Insert the transaction ID or solution ID into the map.
+                        match transmission_id {
+                            TransmissionID::Solution(id, _) => {
+                                seen_solution_ids.insert(id);
+                            }
+                            TransmissionID::Transaction(id, _) => {
+                                seen_transaction_ids.insert(id);
+                            }
+                            TransmissionID::Ratification => {}
+                        }
                         // Add the transmission to the set.
                         transmissions.insert(*transmission_id, transmission);
                     }
