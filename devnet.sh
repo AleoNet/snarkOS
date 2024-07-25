@@ -91,7 +91,7 @@ if [ "$total_clients" -ne 0 ]; then
     # Create a new window with a unique name
     tmux new-window -t "devnet:$window_index" -n "window-$window_index"
 
-    # Send the command to start the validator to the new window and capture output to the log file
+    # Send the command to start the client to the new window and capture output to the log file
     tmux send-keys -t "devnet:window-$window_index" "snarkos start --nodisplay --network $network_id --dev $window_index --dev-num-validators $total_validators --client --logfile $log_file" C-m
   done
 fi
