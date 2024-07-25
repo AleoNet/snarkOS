@@ -570,6 +570,11 @@ impl<N: Network> Gateway<N> {
             if num_events >= self.max_cache_duplicates() {
                 return Ok(());
             }
+        } else if matches!(&event, &Event::BlockRequest(_)) {
+            let num_events = self.cache.insert_inbound_block_request(peer_ip, CACHE_REQUESTS_INTERVAL);
+            if num_events >= self.max_cache_duplicates() {
+                return Ok(());
+            }
         }
         trace!("{CONTEXT} Received '{}' from '{peer_ip}'", event.name());
 
@@ -631,6 +636,10 @@ impl<N: Network> Gateway<N> {
                 if let Some(sync_sender) = self.sync_sender.get() {
                     // Retrieve the block response.
                     let BlockResponse { request, blocks } = block_response;
+                    // Check the response corresponds to a request.
+                    if !self.cache.remove_outbound_block_request(peer_ip, &request) {
+                        bail!("Unsolicited block response from '{peer_ip}'")
+                    }
                     // Perform the deferred non-blocking deserialization of the blocks.
                     let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
                     // Ensure the block response is well-formed.
@@ -992,6 +1001,11 @@ impl<N: Network> Transport<N> for Gateway<N> {
             self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
             // Send the event to the peer.
             send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, max_cache_transmissions)
+        } else if let Event::BlockRequest(request) = event {
+            // Insert the outbound request so we can match it to responses.
+            self.cache.insert_outbound_block_request(peer_ip, request);
+            // Send the event to the peer and updatet the outbound event cache, use the general rate limit.
+            send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, max_cache_events)
         }
         // Otherwise, employ a general rate limit.
         else {
@@ -1090,6 +1104,7 @@ impl<N: Network> Disconnect for Gateway<N> {
             // This is sufficient to avoid infinite growth as the committee has a fixed number
             // of members.
             self.cache.clear_outbound_validators_requests(peer_ip);
+            self.cache.clear_outbound_block_requests(peer_ip);
         }
     }
 }
