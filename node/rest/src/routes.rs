@@ -23,6 +23,7 @@ use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use snarkvm_ledger_puzzle_epoch::EpochProgram;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -207,6 +208,20 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_transactions().collect::<IndexMap<_, _>>())),
             None => Err(RestError("Route isn't available for this node type".to_string())),
         }
+    }
+
+    // GET /<network>/epoch_program/{epochNumber}
+    pub(crate) async fn get_epoch_program(
+        State(rest): State<Self>,
+        Path(epoch_number): Path<u32>,
+    ) -> Result<ErasedJson, RestError> {
+        let epoch_block_height = <N as Network>::NUM_BLOCKS_PER_EPOCH * epoch_number;
+        let epoch_block = rest.ledger.get_block(epoch_block_height)?;
+        let epoch_program = EpochProgram::<N>::new(epoch_block.previous_hash())?;
+        Ok(ErasedJson::pretty(json!({
+            "epoch_hash": epoch_block.previous_hash(),
+            "epoch_program": epoch_program.to_string(),
+        })))
     }
 
     // GET /<network>/program/{programID}

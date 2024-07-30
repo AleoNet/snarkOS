@@ -180,6 +180,9 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route(&format!("/{network}/peers/all"), get(Self::get_peers_all))
             .route(&format!("/{network}/peers/all/metrics"), get(Self::get_peers_all_metrics))
 
+            // GET ../epochProgram/..
+            .route(&format!("/{network}/epochProgram/:epoch_number"), get(Self::get_epoch_program))
+
             // GET ../program/..
             .route(&format!("/{network}/program/:id"), get(Self::get_program))
             .route(&format!("/{network}/program/:id/mappings"), get(Self::get_mapping_names))
