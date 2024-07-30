@@ -691,7 +691,7 @@ impl<N: Network> Storage<N> {
             // Retrieve the transmission.
             match transmission_id {
                 TransmissionID::Ratification => (),
-                TransmissionID::Solution(solution_id) => {
+                TransmissionID::Solution(solution_id, _) => {
                     // Retrieve the solution.
                     match block.get_solution(solution_id) {
                         // Insert the solution.
@@ -716,7 +716,7 @@ impl<N: Network> Storage<N> {
                         },
                     };
                 }
-                TransmissionID::Transaction(transaction_id) => {
+                TransmissionID::Transaction(transaction_id, _) => {
                     // Retrieve the transaction.
                     match unconfirmed_transactions.get(transaction_id) {
                         // Insert the transaction.
@@ -1156,8 +1156,14 @@ pub mod prop_tests {
 
     pub fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
-            any_transaction_id().prop_map(TransmissionID::Transaction),
-            any_solution_id().prop_map(TransmissionID::Solution),
+            any_transaction_id().prop_perturb(|id, mut rng| TransmissionID::Transaction(
+                id,
+                rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>()
+            )),
+            any_solution_id().prop_perturb(|id, mut rng| TransmissionID::Solution(
+                id,
+                rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>()
+            )),
         ]
         .boxed()
     }
