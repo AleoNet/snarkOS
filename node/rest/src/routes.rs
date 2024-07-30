@@ -218,7 +218,10 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         let epoch_block_height = <N as Network>::NUM_BLOCKS_PER_EPOCH * epoch_number;
         let epoch_block = rest.ledger.get_block(epoch_block_height)?;
         let epoch_program = EpochProgram::<N>::new(epoch_block.previous_hash())?;
-        Ok(ErasedJson::pretty(epoch_program.to_string()))
+        Ok(ErasedJson::pretty(json!({
+            "epoch_hash": epoch_block.previous_hash(),
+            "epoch_program": epoch_program.to_string(),
+        })))
     }
 
     // GET /<network>/program/{programID}
