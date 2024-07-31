@@ -14,6 +14,7 @@
 
 use super::*;
 use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
+use snarkvm_ledger_puzzle_epoch::EpochProgram;
 use snarkvm::{
     ledger::puzzle::Solution,
     prelude::{block::Transaction, Address, Identifier, LimitedWriter, Plaintext, ToBytes},
@@ -23,7 +24,6 @@ use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use snarkvm_ledger_puzzle_epoch::EpochProgram;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
