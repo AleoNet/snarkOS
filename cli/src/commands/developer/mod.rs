@@ -131,8 +131,7 @@ impl Developer {
             Ok(response) => response.into_json().map_err(|err| err.into()),
             Err(err) => match err {
                 ureq::Error::Status(_status, response) => {
-                    // Response::into_string() returns the response BODY, but there is none
-                    // better to format using debug this at least gives some useful info
+                    // Debug formatting displays more useful info, especially if the response body is empty.
                     bail!("Failed to fetch program {program_id}: {response:?}")
                 }
                 err => bail!(err),
