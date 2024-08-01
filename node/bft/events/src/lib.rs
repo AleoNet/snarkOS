@@ -117,7 +117,7 @@ impl<N: Network> From<DisconnectReason> for Event<N> {
 
 impl<N: Network> Event<N> {
     /// The version of the event protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 6;
+    pub const VERSION: u32 = 7;
 
     /// Returns the event name.
     #[inline]
@@ -292,10 +292,15 @@ pub mod prop_tests {
             .boxed()
     }
 
+    pub fn any_transmission_checksum() -> BoxedStrategy<<CurrentNetwork as Network>::TransmissionChecksum> {
+        Just(0).prop_perturb(|_, mut rng| rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>()).boxed()
+    }
+
     pub fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
-            any_transaction_id().prop_map(TransmissionID::Transaction),
-            any_solution_id().prop_map(TransmissionID::Solution),
+            (any_transaction_id(), any_transmission_checksum())
+                .prop_map(|(id, cs)| TransmissionID::Transaction(id, cs)),
+            (any_solution_id(), any_transmission_checksum()).prop_map(|(id, cs)| TransmissionID::Solution(id, cs)),
         ]
         .boxed()
     }

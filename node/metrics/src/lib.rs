@@ -119,8 +119,8 @@ pub fn add_transmission_latency_metric<N: Network>(
                 Some(*key)
             } else {
                 let transmission_type = match key {
-                    TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
-                    TransmissionID::Transaction(transaction_id) if transaction_ids.contains(transaction_id) => {
+                    TransmissionID::Solution(solution_id, _) if solution_ids.contains(solution_id) => Some("solution"),
+                    TransmissionID::Transaction(transaction_id, _) if transaction_ids.contains(transaction_id) => {
                         Some("transaction")
                     }
                     _ => None,
