@@ -213,7 +213,8 @@ async fn handshake_responder_side_invalid_challenge_response() {
     let listener_port = test_peer.listening_addr().port();
     let address = accounts.get(1).unwrap().address();
     let our_nonce = rng.gen();
-    let challenge_request = ChallengeRequest { version: 6, listener_port, address, nonce: our_nonce };
+    let version = Event::<CurrentNetwork>::VERSION;
+    let challenge_request = ChallengeRequest { version, listener_port, address, nonce: our_nonce };
 
     // Send the challenge request.
     let _ = test_peer.unicast(gateway.local_ip(), Event::ChallengeRequest(challenge_request));
@@ -242,7 +243,7 @@ async fn handshake_responder_side_invalid_challenge_response() {
     };
     // Check the version, listener port and address are correct.
     assert_eq!(peer_addr, gateway.local_ip());
-    assert_eq!(challenge_request.version, 6);
+    assert_eq!(challenge_request.version, version);
     assert_eq!(challenge_request.listener_port, gateway.local_ip().port());
     assert_eq!(challenge_request.address, accounts.first().unwrap().address());
 
