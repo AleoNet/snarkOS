@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ ]
 metrics = [ "dep:metrics" ]
+test_targets = [ "snarkvm/test_targets" ]
 
 [dependencies.aleo-std]
 workspace = true

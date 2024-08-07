@@ -16,6 +16,9 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+test_targets = [ "snarkvm/test_targets" ]
+
 [dependencies.anyhow]
 version = "1.0.79"
 

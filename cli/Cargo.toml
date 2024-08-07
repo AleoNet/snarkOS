@@ -18,6 +18,7 @@ edition = "2021"
 
 [features]
 default = [ "snarkos-node/metrics" ]
+test_targets = [ "snarkvm/test_targets" ]
 
 [dependencies.aleo-std]
 workspace = true

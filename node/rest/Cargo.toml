@@ -20,6 +20,7 @@ edition = "2021"
 default = [ "parallel" ]
 parallel = [ "rayon" ]
 history = [ "snarkvm-synthesizer/history" ]
+test_targets = [ "snarkvm/test_targets" ]
 
 [dependencies.anyhow]
 version = "1.0.79"
@@ -65,9 +66,10 @@ path = "../router"
 version = "=2.2.7"
 
 [dependencies.snarkvm-synthesizer]
-#path = "../../../snarkVM/synthesizer"
-git = "https://github.com/AleoNet/snarkVM.git"
-rev = "be171ce"
+git = "https://github.com/joske/snarkVM.git"
+branch = "feat/test-targets"
+# git = "https://github.com/AleoNet/snarkVM.git"
+# rev = "be171ce"
 default-features = false
 optional = true
 
