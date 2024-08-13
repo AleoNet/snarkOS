@@ -28,6 +28,7 @@ metrics = [
   "snarkos-node-tcp/metrics"
 ]
 history = [ "snarkos-node-rest/history" ]
+test_targets = [ "snarkvm/test_targets" ]
 
 [dependencies.aleo-std]
 workspace = true

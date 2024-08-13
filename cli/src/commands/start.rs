@@ -495,6 +495,12 @@ impl Start {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
 
+        // Check if we are running with the lower coinbase and proof targets. This should only be
+        // allowed in --dev mode.
+        if cfg!(feature = "test_targets") && self.dev.is_none() {
+            bail!("The 'test_targets' feature is enabled, but the '--dev' flag is not set");
+        }
+
         // Parse the trusted peers to connect to.
         let mut trusted_peers = self.parse_trusted_peers()?;
         // Parse the trusted validators to connect to.

@@ -20,6 +20,7 @@ edition = "2021"
 default = [ "rayon", "snarkvm/metrics"]
 metrics = [ "snarkvm/metrics" ]
 serial = ["snarkvm/metrics"]
+test_targets = [ "snarkvm/test_targets" ]
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.13"
