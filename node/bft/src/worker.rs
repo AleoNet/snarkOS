@@ -453,7 +453,7 @@ impl<N: Network> Worker<N> {
         // Insert the transmission ID into the pending queue.
         self.pending.insert(transmission_id, peer_ip, Some((callback_sender, should_send_request)));
 
-        // If the number of requests is less than or equal to the the redundancy factor, send the transmission request to the peer.
+        // If the number of requests is less than or equal to the redundancy factor, send the transmission request to the peer.
         if should_send_request {
             // Send the transmission request to the peer.
             if self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into())).await.is_none() {

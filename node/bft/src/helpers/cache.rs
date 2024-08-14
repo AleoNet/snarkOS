@@ -120,7 +120,7 @@ impl<N: Network> Cache<N> {
         Self::decrement_counter(&self.seen_outbound_validators_requests, peer_ip)
     }
 
-    /// Clears the the IP's number of validator requests.
+    /// Clears the IP's number of validator requests.
     pub fn clear_outbound_validators_requests(&self, peer_ip: SocketAddr) {
         self.seen_outbound_validators_requests.write().remove(&peer_ip);
     }

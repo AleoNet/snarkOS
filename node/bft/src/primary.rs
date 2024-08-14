@@ -845,7 +845,7 @@ impl<N: Network> Primary<N> {
                             // If this batch was already certified, return early.
                             true => {
                                 debug!(
-                                    "Primary is safely skipping a a batch signature from {peer_ip} for round {} - batch is already certified",
+                                    "Primary is safely skipping a batch signature from {peer_ip} for round {} - batch is already certified",
                                     proposal.round()
                                 );
                                 return Ok(None);
