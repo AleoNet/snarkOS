@@ -278,9 +278,11 @@ impl TestNetwork {
         sleep(Duration::from_millis(100)).await;
     }
 
-    // Checks if at least 2f + 1 nodes have reached the given round.
+    /// Checks if a Byzantine fault-tolerant quorum of validators has reached the given round.
+    /// Assuming `N = 3f + 1 + k`, where `0 <= k < 3`,
+    /// then `N - f = 2f + 1 + k = N - (N-1)/3`.
     pub fn is_round_reached(&self, round: u64) -> bool {
-        let quorum_threshold = self.validators.len() / 2 + 1;
+        let quorum_threshold = self.validators.len() - (self.validators.len() - 1) / 3;
         self.validators.values().filter(|v| v.primary.current_round() >= round).count() >= quorum_threshold
     }
 
