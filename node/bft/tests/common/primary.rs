@@ -278,9 +278,9 @@ impl TestNetwork {
         sleep(Duration::from_millis(100)).await;
     }
 
-    /// Checks if a Byzantine fault-tolerant quorum of validators has reached the given round.
-    /// Assuming `N = 3f + 1 + k`, where `0 <= k < 3`, and '/' denotes integer division,
-    /// then `N - (N-1)/3 = 2N/3 + 1 = 2f + 1 + (2k+2)/3 = 2f + 1 + k = N - f`.
+    // Checks if a Byzantine fault-tolerant quorum of validators has reached the given round.
+    // Assuming `N = 3f + 1 + k`, where `0 <= k < 3`, and '/' denotes integer division,
+    // then `N - (N-1)/3 = 2N/3 + 1 = 2f + 1 + (2k+2)/3 = 2f + 1 + k = N - f`.
     pub fn is_round_reached(&self, round: u64) -> bool {
         let quorum_threshold = self.validators.len() - (self.validators.len() - 1) / 3;
         self.validators.values().filter(|v| v.primary.current_round() >= round).count() >= quorum_threshold
