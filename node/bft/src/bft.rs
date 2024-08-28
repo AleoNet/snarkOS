@@ -813,6 +813,7 @@ impl<N: Network> BFT<N> {
             mut rx_primary_certificate,
             mut rx_sync_bft_dag_at_bootup,
             mut rx_sync_bft,
+            mut rx_commit_bft,
         } = bft_receiver;
 
         // Process the current round from the primary.
