@@ -483,13 +483,46 @@ impl<N: Network> Sync<N> {
                         continue;
                     }
 
+                    if let Authority::Quorum(subdag) = block.authority() {
+                        // Retrieve the leader certificate of the subdag.
+                        let leader_certificate = subdag.leader_certificate();
+                        let leader_round = leader_certificate.round();
+                        let leader_author = leader_certificate.author();
+                        let leader_id = leader_certificate.id();
+
+                        // If a BFT sender was provided, commit the leader certificate. 
+                        if let Some(bft_sender) = self.bft_sender.get() {
+                            // Send the leader certificate to the BFT. 
+                            if let Err(e) = bft_sender.send_commit_bft(leader_certificate.clone()).await {
+                                bail!("Sync - {e}");
+                            };
+
+                            // Ensure that leader certificate was recently committed in the DAG. 
+                            match bft_sender.send_sync_is_recently_committed(leader_round, leader_id).await {
+                                Ok(is_recently_committed) => {
+                                    if !is_recently_committed {
+                                        bail!(
+                                            "Sync - Failed to advance blocks - leader certificate with author {leader_author} from round {leader_round} was not recently committed.",
+                                        );
+                                    }
+                                    debug!(
+                                        "Sync - Leader certificate with author {leader_author} from round {leader_round} was recently committed.",
+                                    );
+                                }
+                                Err(e) => {
+                                    bail!("Sync - Failed to check if leader certificate was recently committed - {e}");
+                                }
+                            };
+                        }
+                    }
+
+                    // Advance the ledger state. 
                     let self_ = self.clone();
                     tokio::task::spawn_blocking(move || {
                         // Check the next block.
                         self_.ledger.check_next_block(&block)?;
                         // Attempt to advance to the next block.
                         self_.ledger.advance_to_next_block(&block)?;
-
                         // Sync the height with the block.
                         self_.storage.sync_height_with_block(block.height());
                         // Sync the round with the block.
