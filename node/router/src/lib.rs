@@ -45,6 +45,8 @@ use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
 use parking_lot::{Mutex, RwLock};
+#[cfg(not(any(test, feature = "test")))]
+use std::net::IpAddr;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
@@ -107,6 +109,9 @@ impl<N: Network> Router<N> {
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
+    /// The minimum permitted interval between connection attempts for an IP; anything shorter is considered malicious.
+    #[cfg(not(any(test, feature = "test")))]
+    const MIN_CONNECTION_INTERVAL_IN_SECS: u64 = 10;
 }
 
 impl<N: Network> Router<N> {
@@ -425,6 +430,18 @@ impl<N: Network> Router<N> {
     /// Returns the list of metrics for the connected peers.
     pub fn connected_metrics(&self) -> Vec<(SocketAddr, NodeType)> {
         self.connected_peers.read().iter().map(|(ip, peer)| (*ip, peer.node_type())).collect()
+    }
+
+    /// Check whether the given IP address is currently banned.
+    #[cfg(not(any(test, feature = "test")))]
+    fn is_ip_banned(&self, ip: IpAddr) -> bool {
+        self.tcp.banned_peers().is_ip_banned(ip)
+    }
+
+    /// Insert or update a banned IP.
+    #[cfg(not(any(test, feature = "test")))]
+    fn update_ip_ban(&self, ip: IpAddr) {
+        self.tcp.banned_peers().update_ip_ban(ip);
     }
 
     #[cfg(feature = "metrics")]
