@@ -6,7 +6,7 @@
     <a href="https://circleci.com/gh/AleoNet/snarkOS"><img src="https://circleci.com/gh/AleoNet/snarkOS.svg?style=svg"></a>
     <a href="https://codecov.io/gh/AleoNet/snarkOS"><img src="https://codecov.io/gh/AleoNet/snarkOS/branch/master/graph/badge.svg?token=cck8tS9HpO"/></a>
     <a href="https://discord.gg/aleo"><img src="https://img.shields.io/discord/700454073459015690?logo=discord"/></a>
-    <a href="https://twitter.com/AleoHQ"><img src="https://img.shields.io/twitter/follow/AleoHQ?style=social"/></a>
+    <a href="https://x.com/AleoHQ"><img src="https://img.shields.io/twitter/follow/AleoHQ?style=social"/></a>
     <a href="https://GitHub.com/AleoNet/snarkOS"><img src="https://img.shields.io/badge/contributors-59-ee8449"/></a>
 </p>
 
