@@ -214,7 +214,7 @@ impl<N: Network> FromBytes for Event<N> {
             13 => Self::ValidatorsRequest(ValidatorsRequest::read_le(&mut reader)?),
             14 => Self::ValidatorsResponse(ValidatorsResponse::read_le(&mut reader)?),
             15 => Self::WorkerPing(WorkerPing::read_le(&mut reader)?),
-            16.. => return Err(error("Unknown event ID {id}")),
+            16.. => return Err(error(format!("Unknown event ID {id}"))),
         };
 
         // Ensure that there are no "dangling" bytes.
