@@ -397,10 +397,12 @@ impl<N: Network> Router<N> {
             vec![]
         } else if N::ID == snarkvm::console::network::MainnetV0::ID {
             // Mainnet contains the following bootstrap peers.
+            vec![
                 SocketAddr::from_str("34.105.20.52:4130").unwrap(),
                 SocketAddr::from_str("35.231.118.193:4130").unwrap(),
                 SocketAddr::from_str("35.204.253.77:4130").unwrap(),
                 SocketAddr::from_str("34.87.188.140:4130").unwrap(),
+            ]
         } else if N::ID == snarkvm::console::network::TestnetV0::ID {
             // TestnetV0 contains the following bootstrap peers.
             vec![
