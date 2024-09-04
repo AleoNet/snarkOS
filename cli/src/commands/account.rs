@@ -108,53 +108,76 @@ impl Account {
                     bail!("Cannot specify both the '--seed' and '--vanity' flags");
                 }
 
-                match vanity {
-                    // Generate a vanity account for the specified network.
-                    Some(vanity) => match network {
-                        MainnetV0::ID => Self::new_vanity::<MainnetV0>(vanity.as_str(), discreet),
-                        TestnetV0::ID => Self::new_vanity::<TestnetV0>(vanity.as_str(), discreet),
-                        CanaryV0::ID => Self::new_vanity::<CanaryV0>(vanity.as_str(), discreet),
-                        unknown_id => bail!("Unknown network ID ({unknown_id})"),
-                    },
-                    // Generate a seeded account for the specified network.
-                    None => match network {
-                        MainnetV0::ID => Self::new_seeded::<MainnetV0>(seed, discreet),
-                        TestnetV0::ID => Self::new_seeded::<TestnetV0>(seed, discreet),
-                        CanaryV0::ID => Self::new_seeded::<CanaryV0>(seed, discreet),
-                        unknown_id => bail!("Unknown network ID ({unknown_id})"),
-                    },
-                }
+                Self::generate_account(network, seed, vanity, discreet)
             }
             Self::Sign { network, message, seed, raw, private_key, private_key_file } => {
-                let key = match (private_key, private_key_file) {
-                    (Some(private_key), None) => private_key,
-                    (None, Some(private_key_file)) => {
-                        let path = private_key_file.parse::<PathBuf>().map_err(|e| anyhow!("Invalid path - {e}"))?;
-                        std::fs::read_to_string(path)?.trim().to_string()
-                    }
-                    (None, None) => bail!("Missing the '--private-key' or '--private-key-file' argument"),
-                    (Some(_), Some(_)) => {
-                        bail!("Cannot specify both the '--private-key' and '--private-key-file' flags")
-                    }
-                };
-
+                let key = Self::get_private_key(private_key, private_key_file)?;
                 // Sign the message for the specified network.
-                match network {
-                    MainnetV0::ID => Self::sign::<MainnetV0>(key, message, seed, raw),
-                    TestnetV0::ID => Self::sign::<TestnetV0>(key, message, seed, raw),
-                    CanaryV0::ID => Self::sign::<CanaryV0>(key, message, seed, raw),
-                    unknown_id => bail!("Unknown network ID ({unknown_id})"),
-                }
+                Self::process_message(network, key, message, seed, raw, Self::sign)
             }
             Self::Verify { network, address, signature, message, raw } => {
                 // Verify the signature for the specified network.
-                match network {
-                    MainnetV0::ID => Self::verify::<MainnetV0>(address, signature, message, raw),
-                    TestnetV0::ID => Self::verify::<TestnetV0>(address, signature, message, raw),
-                    CanaryV0::ID => Self::verify::<CanaryV0>(address, signature, message, raw),
-                    unknown_id => bail!("Unknown network ID ({unknown_id})"),
-                }
+                Self::process_message(network, address, signature, message, raw, Self::verify)
             }
+        }
+    }
+
+    fn generate_account(network: u16, seed: Option<String>, vanity: Option<String>, discreet: bool) -> Result<String> {
+        match vanity {
+            // Generate a vanity account for the specified network.
+            Some(vanity) => Self::new_vanity_account(network, &vanity, discreet),
+            // Generate a seeded account for the specified network.
+            None => Self::new_seeded_account(network, seed, discreet),
+        }
+    }
+
+    // Generate a vanity account for the specified network.
+    fn new_vanity_account(network: u16, vanity: &str, discreet: bool) -> Result<String> {
+        Self::execute_for_network(network, |net| Self::new_vanity::<net>(vanity, discreet))
+    }
+
+    // Generate a seeded account for the specified network.
+    fn new_seeded_account(network: u16, seed: Option<String>, discreet: bool) -> Result<String> {
+        Self::execute_for_network(network, |net| Self::new_seeded::<net>(seed, discreet))
+    }
+
+    fn get_private_key(private_key: Option<String>, private_key_file: Option<String>) -> Result<String> {
+        match (private_key, private_key_file) {
+            (Some(private_key), None) => Ok(private_key),
+            (None, Some(private_key_file)) => {
+                let path = private_key_file.parse::<PathBuf>().map_err(|e| anyhow!("Invalid path - {e}"))?;
+                Ok(std::fs::read_to_string(path)?.trim().to_string())
+            }
+            (None, None) => bail!("Missing the '--private-key' or '--private-key-file' argument"),
+            (Some(_), Some(_)) => bail!("Cannot specify both the '--private-key' and '--private-key-file' flags"),
+        }
+    }
+
+    // Abstract the logic for processing messages
+    fn process_message<F, N: Network>(
+        network: u16,
+        key: String,
+        message: String,
+        seed: Option<String>,
+        raw: bool,
+        func: F,
+    ) -> Result<String>
+    where
+        F: Fn(String, String, Option<String>, bool) -> Result<String>,
+    {
+        Self::execute_for_network(network, |net| func::<net>(key, message, seed, raw))
+    }
+
+    // Abstract Network Execution Logic
+    fn execute_for_network<F, R>(network: u16, func: F) -> Result<R>
+    where
+        F: FnOnce(&dyn Network) -> Result<R>,
+    {
+        match network {
+            MainnetV0::ID => func(&MainnetV0),
+            TestnetV0::ID => func(&TestnetV0),
+            CanaryV0::ID => func(&CanaryV0),
+            unknown_id => bail!("Unknown network ID ({unknown_id})"),
         }
     }
 
