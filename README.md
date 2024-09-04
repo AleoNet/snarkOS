@@ -127,13 +127,19 @@ This will output a new Aleo account in the terminal.
 
 Next, to start a proving node, from the `snarkOS` directory, run:
 ```
-./run-prover.sh
+./run-prover.sh --network <0 - Mainnet, 1 - Testnet>
 ```
 When prompted, enter your Aleo private key:
 ```
 Enter the Aleo Prover account private key:
 APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+You can also start a prover with `snarkos start` without rebuilding:
+```
+snarkos start --prover --private-key APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx --nodisplay --network <0 - Mainnet, 1 - Testnet>
+```
+**`This method is NOT advised unless you update snarkOS yourself & rebuild it manually.`**
 
 ## 4. FAQs
 
