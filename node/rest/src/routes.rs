@@ -137,7 +137,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
         // Prepare a closure for the blocking work.
         let get_json_blocks = move || -> Result<ErasedJson, RestError> {
-            let blocks = cfg_into_iter!((start_height..end_height))
+            let blocks = cfg_into_iter!((start_height..=end_height))
                 .map(|height| rest.ledger.get_block(height))
                 .collect::<Result<Vec<_>, _>>()?;
 
