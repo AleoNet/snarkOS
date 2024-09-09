@@ -49,7 +49,7 @@ async fn test_resend_transmission_request() {
     let initial_peer_ip = peer_ips.pop().unwrap();
 
     // Prepare a dummy transmission ID.
-    let transmission_id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::default());
+    let transmission_id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::default(), <CurrentNetwork as Network>::TransmissionChecksum::default());
 
     // Ensure the worker does not have the dummy transmission ID.
     assert!(!worker.contains_transmission(transmission_id), "Transmission should not exist");
@@ -132,7 +132,7 @@ async fn test_flood_transmission_requests() {
     let mut remaining_peer_ips = peer_ips;
 
     // Prepare a dummy transmission ID.
-    let transmission_id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::default());
+    let transmission_id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::default(), <CurrentNetwork as Network>::TransmissionChecksum::default());
 
     // Ensure the worker does not have the dummy transmission ID.
     assert!(!worker.contains_transmission(transmission_id), "Transmission should not exist");

@@ -169,7 +169,11 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
 
     /// Returns `false` for all queries.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
-        trace!("[MockLedgerService] Contains transmission ID {} - false", fmt_id(transmission_id));
+        trace!(
+            "[MockLedgerService] Contains transmission ID {}.{} - false",
+            fmt_id(transmission_id),
+            fmt_id(transmission_id.checksum().unwrap_or_default())
+        );
         Ok(false)
     }
 
@@ -179,7 +183,11 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,
     ) -> Result<()> {
-        trace!("[MockLedgerService] Ensure transmission ID matches {:?} - Ok", fmt_id(transmission_id));
+        trace!(
+            "[MockLedgerService] Ensure transmission ID matches {}.{} - Ok",
+            fmt_id(transmission_id),
+            fmt_id(transmission_id.checksum().unwrap_or_default())
+        );
         Ok(())
     }
 
