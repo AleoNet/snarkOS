@@ -22,7 +22,7 @@ pub struct Updater;
 impl Updater {
     const SNARKOS_BIN_NAME: &'static str = "snarkos";
     const SNARKOS_REPO_NAME: &'static str = "snarkOS";
-    const SNARKOS_REPO_OWNER: &'static str = "AleoHQ";
+    const SNARKOS_REPO_OWNER: &'static str = "AleoNet";
 
     /// Show all available releases for `snarkos`.
     pub fn show_available_releases() -> Result<String, UpdaterError> {
