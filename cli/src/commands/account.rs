@@ -20,7 +20,6 @@ use snarkvm::{
         program::{ToFields, Value},
         types::Field,
     },
-    utilities::ToBytes,
 };
 
 use anyhow::{anyhow, bail, Result};
