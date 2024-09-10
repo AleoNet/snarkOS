@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::{
-    console::{
-        account::{Address, PrivateKey, Signature},
-        network::{CanaryV0, MainnetV0, Network, TestnetV0},
-        prelude::{Environment, Uniform},
-        program::{ToFields, Value},
-        types::Field,
-    },
+use snarkvm::console::{
+    account::{Address, PrivateKey, Signature},
+    network::{CanaryV0, MainnetV0, Network, TestnetV0},
+    prelude::{Environment, Uniform},
+    program::{ToFields, Value},
+    types::Field,
 };
 
 use anyhow::{anyhow, bail, Result};
