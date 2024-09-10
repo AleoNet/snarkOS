@@ -13,15 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::{
-    console::{
-        account::{Address, PrivateKey, Signature},
-        network::{CanaryV0, MainnetV0, Network, TestnetV0},
-        prelude::{Environment, Uniform},
-        program::{ToFields, Value},
-        types::Field,
-    },
-    utilities::ToBytes,
+use snarkvm::console::{
+    account::{Address, PrivateKey, Signature},
+    network::{CanaryV0, MainnetV0, Network, TestnetV0},
+    prelude::{Environment, Uniform},
+    program::{ToFields, Value},
+    types::Field,
 };
 
 use anyhow::{anyhow, bail, Result};
@@ -69,9 +66,6 @@ pub enum Account {
         /// Message (Aleo value) to sign
         #[clap(short = 'm', long)]
         message: String,
-        /// Seed the RNG with a numeric value
-        #[clap(short = 's', long)]
-        seed: Option<String>,
         /// When enabled, parses the message as bytes instead of Aleo literals
         #[clap(short = 'r', long)]
         raw: bool,
@@ -126,7 +120,7 @@ impl Account {
                     },
                 }
             }
-            Self::Sign { network, message, seed, raw, private_key, private_key_file } => {
+            Self::Sign { network, message, raw, private_key, private_key_file } => {
                 let key = match (private_key, private_key_file) {
                     (Some(private_key), None) => private_key,
                     (None, Some(private_key_file)) => {
@@ -141,9 +135,9 @@ impl Account {
 
                 // Sign the message for the specified network.
                 match network {
-                    MainnetV0::ID => Self::sign::<MainnetV0>(key, message, seed, raw),
-                    TestnetV0::ID => Self::sign::<TestnetV0>(key, message, seed, raw),
-                    CanaryV0::ID => Self::sign::<CanaryV0>(key, message, seed, raw),
+                    MainnetV0::ID => Self::sign::<MainnetV0>(key, message, raw),
+                    TestnetV0::ID => Self::sign::<TestnetV0>(key, message, raw),
+                    CanaryV0::ID => Self::sign::<CanaryV0>(key, message, raw),
                     unknown_id => bail!("Unknown network ID ({unknown_id})"),
                 }
             }
@@ -268,21 +262,9 @@ impl Account {
     }
 
     // Sign a message with an Aleo private key
-    fn sign<N: Network>(key: String, message: String, seed: Option<String>, raw: bool) -> Result<String> {
-        // Recover the seed.
-        let mut rng = match seed {
-            // Recover the field element deterministically.
-            Some(seed) => {
-                let field: Field<_> = Field::<N>::new(
-                    <N as Environment>::Field::from_str(&seed).map_err(|e| anyhow!("Invalid seed - {e}"))?,
-                );
-
-                // field is always 32 bytes
-                ChaChaRng::from_seed(field.to_bytes_le()?.try_into().map_err(|_v| anyhow!("Invalid seed length"))?)
-            }
-            // Sample a random field element.
-            None => ChaChaRng::from_entropy(),
-        };
+    fn sign<N: Network>(key: String, message: String, raw: bool) -> Result<String> {
+        // Sample a random field element.
+        let mut rng = ChaChaRng::from_entropy();
 
         // Parse the private key
         let private_key =
@@ -416,14 +398,7 @@ mod tests {
     fn test_signature_raw() {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "Hello, world!".to_string();
-        let account = Account::Sign {
-            network: 0,
-            private_key: Some(key),
-            private_key_file: None,
-            message,
-            seed: None,
-            raw: true,
-        };
+        let account = Account::Sign { network: 0, private_key: Some(key), private_key_file: None, message, raw: true };
         assert!(account.parse().is_ok());
     }
 
@@ -431,14 +406,7 @@ mod tests {
     fn test_signature() {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "5field".to_string();
-        let account = Account::Sign {
-            network: 0,
-            private_key: Some(key),
-            private_key_file: None,
-            message,
-            seed: None,
-            raw: false,
-        };
+        let account = Account::Sign { network: 0, private_key: Some(key), private_key_file: None, message, raw: false };
         assert!(account.parse().is_ok());
     }
 
@@ -446,39 +414,8 @@ mod tests {
     fn test_signature_fail() {
         let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
         let message = "not a literal value".to_string();
-        let account = Account::Sign {
-            network: 0,
-            private_key: Some(key),
-            private_key_file: None,
-            message,
-            seed: None,
-            raw: false,
-        };
+        let account = Account::Sign { network: 0, private_key: Some(key), private_key_file: None, message, raw: false };
         assert!(account.parse().is_err());
-    }
-
-    #[test]
-    fn test_seeded_signature_raw() {
-        let seed = Some("38868010450269069756484274649022187108349082664538872491798902858296683054657".to_string());
-        let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
-        let message = "Hello, world!".to_string();
-        let expected = "sign1t2hsaqfhcgvsfg2q3q2stxsffyrvdx98pl0ddkdqngqqtn3vsuprhkv9tkeyzs878ccqp62mfptvvp7m5hjcfnf06cc9pu4khxtkkp8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkksrwh0";
-        let account =
-            Account::Sign { network: 0, private_key: Some(key), private_key_file: None, message, seed, raw: true };
-        let actual = account.parse().unwrap();
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_seeded_signature() {
-        let seed = Some("38868010450269069756484274649022187108349082664538872491798902858296683054657".to_string());
-        let key = "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p".to_string();
-        let message = "5field".to_string();
-        let expected = "sign16f464jk7zrq0az5jne2zvamhlfkksfj23508tqvmj836jpplkuqefcshgk8k8rx9xxu284fuwaua7fcz3jajvnqynwtymfm0p692vq8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qk3re27j";
-        let account =
-            Account::Sign { network: 0, private_key: Some(key), private_key_file: None, message, seed, raw: false };
-        let actual = account.parse().unwrap();
-        assert_eq!(expected, actual);
     }
 
     #[test]
