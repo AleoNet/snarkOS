@@ -59,7 +59,7 @@ const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
 /// The CDN base url.
-const CDN_BASE_URL: &str = "https://s3.us-west-1.amazonaws.com";
+const CDN_BASE_URL: &str = "https://blocks.aleo.org";
 
 /// A mapping of `staker_address` to `(validator_address, withdrawal_address, amount)`.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -274,9 +274,9 @@ impl Start {
                 },
                 // If no CDN URL is provided, determine the CDN URL based on the network ID.
                 None => match N::ID {
-                    MainnetV0::ID => Some(format!("{CDN_BASE_URL}/mainnet.blocks/v0")),
-                    TestnetV0::ID => Some(format!("{CDN_BASE_URL}/testnet.blocks/v0")),
-                    CanaryV0::ID => Some(format!("{CDN_BASE_URL}/canary.blocks/v0")),
+                    MainnetV0::ID => Some(format!("{CDN_BASE_URL}/mainnet/v0")),
+                    TestnetV0::ID => Some(format!("{CDN_BASE_URL}/testnet/v0")),
+                    CanaryV0::ID => Some(format!("{CDN_BASE_URL}/canary/v0")),
                     _ => None,
                 },
             }
