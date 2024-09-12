@@ -180,50 +180,43 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
         mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
         // First, handle the non-aborted transmissions.
-        for transmission_id in transmission_ids {
+        'outer: for transmission_id in transmission_ids {
             // Try to fetch from the persistent storage.
-            match self.transmissions.get_confirmed(&transmission_id) {
+            let (transmission, certificate_ids) = match self.transmissions.get_confirmed(&transmission_id) {
                 Ok(Some(entry)) => {
                     // The transmission exists in storage; update its certificate IDs.
                     let (transmission, mut certificate_ids) = cow_to_cloned!(entry);
                     certificate_ids.insert(certificate_id);
-
-                    // Update the persistent storage.
-                    if let Err(e) =
-                        self.transmissions.insert(transmission_id, (transmission.clone(), certificate_ids.clone()))
-                    {
-                        error!("Failed to insert transmission {transmission_id} into storage - {e}");
-                    }
-
-                    // Also, update the cache.
-                    self.cache_transmissions.lock().put(transmission_id, (transmission, certificate_ids));
+                    (transmission, certificate_ids)
                 }
                 Ok(None) => {
                     // The transmission is missing from persistent storage.
                     // Check if it exists in the `missing_transmissions` map provided.
-                    if let Some(transmission) = missing_transmissions.remove(&transmission_id) {
-                        let certificate_ids = indexset! { certificate_id };
-
-                        // Insert into persistent storage.
-                        if let Err(e) =
-                            self.transmissions.insert(transmission_id, (transmission.clone(), certificate_ids.clone()))
+                    let Some(transmission) = missing_transmissions.remove(&transmission_id) else {
+                        if !aborted_transmission_ids.contains(&transmission_id)
+                            && !self.contains_transmission(transmission_id)
                         {
-                            error!("Failed to insert transmission {transmission_id} into storage - {e}");
+                            error!("Failed to provide a missing transmission {transmission_id}");
                         }
-
-                        // Also, insert into the cache.
-                        self.cache_transmissions.lock().put(transmission_id, (transmission, certificate_ids));
-                    } else if !aborted_transmission_ids.contains(&transmission_id) {
-                        // If the transmission is not found in either storage or the missing map,
-                        // and it's not an aborted transmission, log an error.
-                        error!("Failed to provide a missing transmission {transmission_id}");
-                    }
+                        continue 'outer;
+                    };
+                    // Prepare the set of certificate IDs.
+                    let certificate_ids = indexset! { certificate_id };
+                    (transmission, certificate_ids)
                 }
                 Err(e) => {
                     // Handle any errors during the retrieval.
                     error!("Failed to process the 'insert' for transmission {transmission_id} into storage - {e}");
+                    continue;
                 }
+            };
+            // Insert the transmission into persistent storage.
+            if let Err(e) = self.transmissions.insert(transmission_id, (transmission.clone(), certificate_ids.clone()))
+            {
+                error!("Failed to insert transmission {transmission_id} into storage - {e}");
             }
+            // Insert the transmission into the cache.
+            self.cache_transmissions.lock().put(transmission_id, (transmission, certificate_ids));
         }
 
         // Next, handle the aborted transmission IDs.
