@@ -37,7 +37,7 @@ async fn test_disconnect_without_handshake() {
     // Await both nodes being connected.
     let node0_ = node0.clone();
     let node1_ = node1.clone();
-    deadline!(Duration::from_secs(5), move || {
+    deadline!(Duration::from_secs(1), move || {
         node0_.tcp().num_connected() == 1 && node1_.tcp().num_connected() == 1
     });
 
@@ -56,7 +56,7 @@ async fn test_disconnect_without_handshake() {
     node0.tcp().disconnect(node1.local_ip()).await;
     // Await disconnection.
     let node0_ = node0.clone();
-    deadline!(Duration::from_secs(5), move || { node0_.tcp().num_connected() == 0 });
+    deadline!(Duration::from_secs(1), move || { node0_.tcp().num_connected() == 0 });
 
     print_tcp!(node0);
     print_tcp!(node1);
@@ -88,7 +88,7 @@ async fn test_disconnect_with_handshake() {
     // Await for the nodes to be connected.
     let node0_ = node0.clone();
     let node1_ = node1.clone();
-    deadline!(Duration::from_secs(5), move || {
+    deadline!(Duration::from_secs(1), move || {
         node0_.tcp().num_connected() == 1 && node1_.tcp().num_connected() == 1
     });
 
@@ -109,7 +109,7 @@ async fn test_disconnect_with_handshake() {
     node0.disconnect(node1.local_ip());
     // Await nodes being disconnected.
     let node0_ = node0.clone();
-    deadline!(Duration::from_secs(5), move || { node0_.tcp().num_connected() == 0 });
+    deadline!(Duration::from_secs(1), move || { node0_.tcp().num_connected() == 0 });
 
     print_tcp!(node0);
     print_tcp!(node1);
