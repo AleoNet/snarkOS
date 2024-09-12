@@ -4,7 +4,7 @@ version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A CLI for a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -68,7 +68,8 @@ default-features = false
 version = "1"
 
 [dependencies.self_update]
-version = "0.39"
+version = "0.41"
+features = [ "archive-zip", "compression-zip-deflate" ]
 
 [dependencies.serde]
 version = "1"

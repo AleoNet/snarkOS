@@ -32,7 +32,7 @@ run_installation() {
       git pull origin $BRANCH
     else
       # The workspace directory doesn't exist, clone the repository
-      git clone https://github.com/AleoHQ/snarkOS.git \$WORKSPACE
+      git clone https://github.com/AleoNet/snarkOS.git \$WORKSPACE
       cd \$WORKSPACE
       git checkout $BRANCH  # Checkout the specified branch
     fi
