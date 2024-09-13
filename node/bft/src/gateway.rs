@@ -65,6 +65,8 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rand::seq::{IteratorRandom, SliceRandom};
+#[cfg(not(any(test, feature = "test")))]
+use std::net::IpAddr;
 use std::{collections::HashSet, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
@@ -88,6 +90,12 @@ const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DEL
 const MIN_CONNECTED_VALIDATORS: usize = 175;
 /// The maximum number of validators to send in a validators response event.
 const MAX_VALIDATORS_TO_SEND: usize = 200;
+
+/// The minimum permitted interval between connection attempts for an IP; anything shorter is considered malicious.
+#[cfg(not(any(test, feature = "test")))]
+const MIN_CONNECTION_INTERVAL_IN_SECS: u64 = 10;
+/// The amount of time an IP address is prohibited from connecting.
+const IP_BAN_TIME_IN_SECS: u64 = 30;
 
 /// Part of the Gateway API that deals with networking.
 /// This is a separate trait to allow for easier testing/mocking.
@@ -458,6 +466,18 @@ impl<N: Network> Gateway<N> {
             }
         }
         Ok(())
+    }
+
+    /// Check whether the given IP address is currently banned.
+    #[cfg(not(any(test, feature = "test")))]
+    fn is_ip_banned(&self, ip: IpAddr) -> bool {
+        self.tcp.banned_peers().is_ip_banned(ip)
+    }
+
+    /// Insert or update a banned IP.
+    #[cfg(not(any(test, feature = "test")))]
+    fn update_ip_ban(&self, ip: IpAddr) {
+        self.tcp.banned_peers().update_ip_ban(ip);
     }
 
     #[cfg(feature = "metrics")]
@@ -876,6 +896,8 @@ impl<N: Network> Gateway<N> {
         self.handle_unauthorized_validators();
         // If the number of connected validators is less than the minimum, send a `ValidatorsRequest`.
         self.handle_min_connected_validators();
+        // Unban any addresses whose ban time has expired.
+        self.handle_banned_ips();
     }
 
     /// Logs the connected validators.
@@ -955,6 +977,11 @@ impl<N: Network> Gateway<N> {
                 });
             }
         }
+    }
+
+    // Remove addresses whose ban time has expired.
+    fn handle_banned_ips(&self) {
+        self.tcp.banned_peers().remove_old_bans(IP_BAN_TIME_IN_SECS);
     }
 }
 
@@ -1106,9 +1133,29 @@ impl<N: Network> OnConnect for Gateway<N> {
 impl<N: Network> Handshake for Gateway<N> {
     /// Performs the handshake protocol.
     async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
-        // Perform the handshake.
         let peer_addr = connection.addr();
         let peer_side = connection.side();
+
+        // Check (or impose) IP-level bans.
+        #[cfg(not(any(test, feature = "test")))]
+        if self.dev().is_none() && peer_side == ConnectionSide::Initiator {
+            // If the IP is already banned, update the ban timestamp and reject the connection.
+            if self.is_ip_banned(peer_addr.ip()) {
+                self.update_ip_ban(peer_addr.ip());
+                trace!("{CONTEXT} Gateway rejected a connection request from banned IP '{}'", peer_addr.ip());
+                return Err(error(format!("'{}' is a banned IP address", peer_addr.ip())));
+            }
+
+            // Check the previous low-level connection timestamp.
+            if let Some(peer_stats) = self.tcp.known_peers().get(peer_addr.ip()) {
+                if peer_stats.timestamp().elapsed().as_secs() <= MIN_CONNECTION_INTERVAL_IN_SECS {
+                    self.update_ip_ban(peer_addr.ip());
+                    trace!("{CONTEXT} Gateway rejected a consecutive connection request from IP '{}'", peer_addr.ip());
+                    return Err(error(format!("'{}' appears to be spamming connections", peer_addr.ip())));
+                }
+            }
+        }
+
         let stream = self.borrow_stream(&mut connection);
 
         // If this is an inbound connection, we log it, but don't know the listening address yet.

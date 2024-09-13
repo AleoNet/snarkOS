@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ ]
 metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics", "snarkos-node-bft-ledger-service/metrics" ]
+test = [ ]
 
 [dependencies.aleo-std]
 workspace = true
@@ -151,6 +152,10 @@ version = "0.4"
 
 [dev-dependencies.rayon]
 version = "1"
+
+[dev-dependencies.snarkos-node-bft]
+path = "."
+features = [ "test" ]
 
 [dev-dependencies.snarkos-node-bft-ledger-service]
 path = "./ledger-service"
