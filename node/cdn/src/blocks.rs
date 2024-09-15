@@ -195,32 +195,37 @@ pub async fn load_blocks<N: Network>(
         let next_blocks = std::mem::replace(&mut *candidate_blocks, retained_blocks);
         drop(candidate_blocks);
 
+        // Initialize a temporary threadpool that can use the full CPU.
+        let threadpool = rayon::ThreadPoolBuilder::new().build().unwrap();
+
         // Attempt to advance the ledger using the CDN block bundle.
         let mut process_clone = process.clone();
         let shutdown_clone = shutdown.clone();
         current_height = tokio::task::spawn_blocking(move || {
-            for block in next_blocks.into_iter().filter(|b| (start_height..end_height).contains(&b.height())) {
-                // If we are instructed to shut down, abort.
-                if shutdown_clone.load(Ordering::Relaxed) {
-                    info!("Stopping block sync at {} - the node is shutting down", current_height);
-                    // We can shut down cleanly from here, as the node hasn't been started yet.
-                    std::process::exit(0);
+            threadpool.install(|| {
+                for block in next_blocks.into_iter().filter(|b| (start_height..end_height).contains(&b.height())) {
+                    // If we are instructed to shut down, abort.
+                    if shutdown_clone.load(Ordering::Relaxed) {
+                        info!("Stopping block sync at {} - the node is shutting down", current_height);
+                        // We can shut down cleanly from here, as the node hasn't been started yet.
+                        std::process::exit(0);
+                    }
+
+                    // Register the next block's height, as the block gets consumed next.
+                    let block_height = block.height();
+
+                    // Insert the block into the ledger.
+                    process_clone(block)?;
+
+                    // Update the current height.
+                    current_height = block_height;
+
+                    // Log the progress.
+                    log_progress::<BLOCKS_PER_FILE>(timer, current_height, cdn_start, cdn_end, "block");
                 }
 
-                // Register the next block's height, as the block gets consumed next.
-                let block_height = block.height();
-
-                // Insert the block into the ledger.
-                process_clone(block)?;
-
-                // Update the current height.
-                current_height = block_height;
-
-                // Log the progress.
-                log_progress::<BLOCKS_PER_FILE>(timer, current_height, cdn_start, cdn_end, "block");
-            }
-
-            Ok(current_height)
+                Ok(current_height)
+            })
         })
         .await
         .map_err(|e| (current_height, e.into()))?
