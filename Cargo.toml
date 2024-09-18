@@ -44,11 +44,11 @@ members = [
 version = "=0.1.24"
 default-features = false
 
-[workspace.dependencies.snarkvm]
+[workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
 #path = "../snarkVM"
-git = "https://github.com/AleoNet/snarkVM.git"
-rev = "3d42aa0" # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
-#version = "=0.16.18"
+#git = "https://github.com/AleoNet/snarkVM.git"
+#rev = "3d42aa0"
+version = "=1.0.0"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
