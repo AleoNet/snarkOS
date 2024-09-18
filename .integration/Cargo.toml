@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-integration"
-version = "2.2.7"
+version = "3.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A integration testing suite for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,7 +12,7 @@ keywords = [
   "decentralized",
   "zero-knowledge"
 ]
-categories = [ "cryptography", "operating-systems" ]
+categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
 

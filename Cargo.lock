@@ -3125,7 +3125,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3150,7 +3150,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-account"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -3160,7 +3160,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-cli"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "aleo-std",
  "anstyle",
@@ -3198,7 +3198,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-display"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "crossterm",
@@ -3210,7 +3210,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-integration"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "aleo-std",
  "snarkos-node-cdn",
@@ -3222,7 +3222,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3259,7 +3259,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-bft"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3307,7 +3307,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-bft-events"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3326,7 +3326,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-bft-ledger-service"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "async-trait",
  "indexmap 2.5.0",
@@ -3341,7 +3341,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-bft-storage-service"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "aleo-std",
  "indexmap 2.5.0",
@@ -3352,7 +3352,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-cdn"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -3371,7 +3371,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-consensus"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3395,7 +3395,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-metrics"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "metrics-exporter-prometheus",
  "parking_lot",
@@ -3407,7 +3407,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-rest"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -3435,7 +3435,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-router"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3471,7 +3471,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-router-messages"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3490,7 +3490,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-sync"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "indexmap 2.5.0",
@@ -3511,7 +3511,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-sync-communication-service"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "async-trait",
  "tokio",
@@ -3519,7 +3519,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-sync-locators"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "indexmap 2.5.0",
@@ -3530,7 +3530,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-tcp"
-version = "2.2.7"
+version = "3.0.0"
 dependencies = [
  "async-trait",
  "bytes",

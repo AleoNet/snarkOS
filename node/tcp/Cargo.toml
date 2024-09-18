@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-tcp"
-version = "2.2.7"
+version = "3.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A TCP stack for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,7 +12,7 @@ keywords = [
   "decentralized",
   "zero-knowledge"
 ]
-categories = [ "cryptography", "operating-systems" ]
+categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
 
@@ -32,7 +32,7 @@ parking_lot = "0.12"
   [dependencies.metrics]
   package = "snarkos-node-metrics"
   path = "../metrics"
-  version = "=2.2.7"
+  version = "=3.0.0"
   optional = true
 
   [dependencies.once_cell]
