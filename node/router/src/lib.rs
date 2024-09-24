@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -401,7 +402,10 @@ impl<N: Network> Router<N> {
         } else if N::ID == snarkvm::console::network::MainnetV0::ID {
             // Mainnet contains the following bootstrap peers.
             vec![
-                // TODO: Populate me with Mainnet Beta IP addresses.
+                SocketAddr::from_str("34.105.20.52:4130").unwrap(),
+                SocketAddr::from_str("35.231.118.193:4130").unwrap(),
+                SocketAddr::from_str("35.204.253.77:4130").unwrap(),
+                SocketAddr::from_str("34.87.188.140:4130").unwrap(),
             ]
         } else if N::ID == snarkvm::console::network::TestnetV0::ID {
             // TestnetV0 contains the following bootstrap peers.

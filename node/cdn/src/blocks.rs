@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -47,8 +48,6 @@ const CONCURRENT_REQUESTS: u32 = 16;
 const MAXIMUM_PENDING_BLOCKS: u32 = BLOCKS_PER_FILE * CONCURRENT_REQUESTS * 2;
 /// Maximum number of attempts for a request to the CDN.
 const MAXIMUM_REQUEST_ATTEMPTS: u8 = 10;
-/// The supported network.
-const NETWORK_ID: u16 = 0;
 
 /// Loads blocks from a CDN into the ledger.
 ///
@@ -107,11 +106,6 @@ pub async fn load_blocks<N: Network>(
     shutdown: Arc<AtomicBool>,
     process: impl FnMut(Block<N>) -> Result<()> + Clone + Send + Sync + 'static,
 ) -> Result<u32, (u32, anyhow::Error)> {
-    // If the network is not supported, return.
-    if N::ID != NETWORK_ID {
-        return Err((start_height, anyhow!("The network ({}) is not supported", N::ID)));
-    }
-
     // Create a Client to maintain a connection pool throughout the sync.
     let client = match Client::builder().build() {
         Ok(client) => client,

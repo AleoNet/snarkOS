@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -261,10 +262,22 @@ mod tests {
         assert_eq!(pending.len(), 0);
 
         // Initialize the solution IDs.
-        let solution_id_1 = TransmissionID::Solution(rng.gen::<u64>().into());
-        let solution_id_2 = TransmissionID::Solution(rng.gen::<u64>().into());
-        let solution_id_3 = TransmissionID::Solution(rng.gen::<u64>().into());
-        let solution_id_4 = TransmissionID::Solution(rng.gen::<u64>().into());
+        let solution_id_1 = TransmissionID::Solution(
+            rng.gen::<u64>().into(),
+            rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>(),
+        );
+        let solution_id_2 = TransmissionID::Solution(
+            rng.gen::<u64>().into(),
+            rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>(),
+        );
+        let solution_id_3 = TransmissionID::Solution(
+            rng.gen::<u64>().into(),
+            rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>(),
+        );
+        let solution_id_4 = TransmissionID::Solution(
+            rng.gen::<u64>().into(),
+            rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>(),
+        );
 
         // Initialize the SocketAddrs.
         let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -303,7 +316,10 @@ mod tests {
         assert!(pending.contains_peer(solution_id_4, addr_4));
         assert!(!pending.contains_peer_with_sent_request(solution_id_4, addr_4));
 
-        let unknown_id = TransmissionID::Solution(rng.gen::<u64>().into());
+        let unknown_id = TransmissionID::Solution(
+            rng.gen::<u64>().into(),
+            rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>(),
+        );
         assert!(!pending.contains(unknown_id));
 
         // Check get.
@@ -336,7 +352,10 @@ mod tests {
         assert_eq!(pending.len(), 0);
 
         // Initialize the solution ID.
-        let solution_id_1 = TransmissionID::Solution(rng.gen::<u64>().into());
+        let solution_id_1 = TransmissionID::Solution(
+            rng.gen::<u64>().into(),
+            rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>(),
+        );
 
         // Initialize the SocketAddrs.
         let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
@@ -382,7 +401,10 @@ mod tests {
 
         for _ in 0..ITERATIONS {
             // Generate a solution ID.
-            let solution_id = TransmissionID::Solution(rng.gen::<u64>().into());
+            let solution_id = TransmissionID::Solution(
+                rng.gen::<u64>().into(),
+                rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>(),
+            );
             // Check if the number of sent requests is correct.
             let mut expected_num_sent_requests = 0;
             for i in 0..ITERATIONS {
@@ -416,8 +438,14 @@ mod tests {
         assert_eq!(pending.len(), 0);
 
         // Initialize the solution IDs.
-        let solution_id_1 = TransmissionID::Solution(rng.gen::<u64>().into());
-        let solution_id_2 = TransmissionID::Solution(rng.gen::<u64>().into());
+        let solution_id_1 = TransmissionID::Solution(
+            rng.gen::<u64>().into(),
+            rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>(),
+        );
+        let solution_id_2 = TransmissionID::Solution(
+            rng.gen::<u64>().into(),
+            rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>(),
+        );
 
         // Initialize the SocketAddrs.
         let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));

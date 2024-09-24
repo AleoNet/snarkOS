@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -111,7 +112,7 @@ impl<N: Network> From<DisconnectReason> for Message<N> {
 
 impl<N: Network> Message<N> {
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 15;
+    pub const VERSION: u32 = 17;
 
     /// Returns the message name.
     #[inline]
