@@ -47,7 +47,7 @@ use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 use anyhow::{bail, Result};
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     future::Future,
     net::SocketAddr,
     ops::Deref,
@@ -87,7 +87,7 @@ pub struct InnerRouter<N: Network> {
     /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
-    connecting_peers: Mutex<HashSet<SocketAddr>>,
+    connecting_peers: Mutex<HashMap<SocketAddr, Option<Peer<N>>>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<HashSet<SocketAddr>>,
     /// The set of restricted peer IPs.
@@ -189,9 +189,12 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection attempt to '{peer_ip}' (restricted)")
         }
         // Ensure the node is not already connecting to this peer.
-        if !self.connecting_peers.lock().insert(peer_ip) {
-            bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
-        }
+        match self.connecting_peers.lock().entry(peer_ip) {
+            Entry::Vacant(entry) => entry.insert(None),
+            Entry::Occupied(_) => {
+                bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
+            }
+        };
         Ok(())
     }
 
@@ -293,7 +296,7 @@ impl<N: Network> Router<N> {
 
     /// Returns `true` if the node is currently connecting to the given peer IP.
     pub fn is_connecting(&self, ip: &SocketAddr) -> bool {
-        self.connecting_peers.lock().contains(ip)
+        self.connecting_peers.lock().contains_key(ip)
     }
 
     /// Returns `true` if the given IP is restricted.
@@ -439,10 +442,14 @@ impl<N: Network> Router<N> {
     }
 
     /// Inserts the given peer into the connected peers.
-    pub fn insert_connected_peer(&self, peer: Peer<N>, peer_addr: SocketAddr) {
-        let peer_ip = peer.ip();
-        // Adds a bidirectional map between the listener address and (ambiguous) peer address.
-        self.resolver.insert_peer(peer_ip, peer_addr);
+    pub fn insert_connected_peer(&self, peer_ip: SocketAddr) {
+        // Move the peer from "connecting" to "connected".
+        let peer = if let Some(Some(peer)) = self.connecting_peers.lock().remove(&peer_ip) {
+            peer
+        } else {
+            warn!("Couldn't promote {peer_ip} from \"connecting\" to \"connected\"");
+            return;
+        };
         // Add an entry for this `Peer` in the connected peers.
         self.connected_peers.write().insert(peer_ip, peer);
         // Remove this peer from the candidate peers, if it exists.
@@ -451,6 +458,7 @@ impl<N: Network> Router<N> {
         self.restricted_peers.write().remove(&peer_ip);
         #[cfg(feature = "metrics")]
         self.update_metrics();
+        info!("Connected to '{peer_ip}'");
     }
 
     /// Inserts the given peer IPs to the set of candidate peers.
