@@ -51,7 +51,10 @@ pub struct Execute {
     pub network: u16,
     /// The private key used to generate the execution.
     #[clap(short, long)]
-    private_key: String,
+    private_key: Option<String>,
+    /// Specify the path to a file containing the account private key of the node
+    #[clap(long)]
+    private_key_file: Option<String>,
     /// The endpoint to query node state from.
     #[clap(short, long)]
     query: String,
@@ -78,7 +81,9 @@ pub struct Execute {
 impl Drop for Execute {
     /// Zeroize the private key when the `Execute` struct goes out of scope.
     fn drop(&mut self) {
-        self.private_key.zeroize();
+        if let Some(mut pk) = self.private_key.take() {
+            pk.zeroize()
+        }
     }
 }
 
@@ -106,7 +111,18 @@ impl Execute {
         let query = Query::from(&self.query);
 
         // Retrieve the private key.
-        let private_key = PrivateKey::from_str(&self.private_key)?;
+        let key_str = match (self.private_key.as_ref(), self.private_key_file.as_ref()) {
+            (Some(private_key), None) => private_key.to_owned(),
+            (None, Some(private_key_file)) => {
+                let path = private_key_file.parse::<PathBuf>().map_err(|e| anyhow!("Invalid path - {e}"))?;
+                std::fs::read_to_string(path)?.trim().to_string()
+            }
+            (None, None) => bail!("Missing the '--private-key' or '--private-key-file' argument"),
+            (Some(_), Some(_)) => {
+                bail!("Cannot specify both the '--private-key' and '--private-key-file' flags")
+            }
+        };
+        let private_key = PrivateKey::from_str(&key_str)?;
 
         // Retrieve the program ID.
         let program_id = ProgramID::from_str(&self.program_id)?;
@@ -238,7 +254,42 @@ mod tests {
 
         if let Command::Developer(Developer::Execute(execute)) = cli.command {
             assert_eq!(execute.network, 0);
-            assert_eq!(execute.private_key, "PRIVATE_KEY");
+            assert_eq!(execute.private_key, Some("PRIVATE_KEY".to_string()));
+            assert_eq!(execute.query, "QUERY");
+            assert_eq!(execute.priority_fee, Some(77));
+            assert_eq!(execute.record, Some("RECORD".into()));
+            assert_eq!(execute.program_id, "hello.aleo".to_string());
+            assert_eq!(execute.function, "hello".to_string());
+            assert_eq!(execute.inputs, vec!["1u32".to_string(), "2u32".to_string()]);
+        } else {
+            panic!("Unexpected result of clap parsing!");
+        }
+    }
+
+    #[test]
+    fn clap_snarkos_execute_pk_file() {
+        let arg_vec = vec![
+            "snarkos",
+            "developer",
+            "execute",
+            "--private-key-file",
+            "PRIVATE_KEY_FILE",
+            "--query",
+            "QUERY",
+            "--priority-fee",
+            "77",
+            "--record",
+            "RECORD",
+            "hello.aleo",
+            "hello",
+            "1u32",
+            "2u32",
+        ];
+        let cli = CLI::parse_from(arg_vec);
+
+        if let Command::Developer(Developer::Execute(execute)) = cli.command {
+            assert_eq!(execute.network, 0);
+            assert_eq!(execute.private_key_file, Some("PRIVATE_KEY_FILE".to_string()));
             assert_eq!(execute.query, "QUERY");
             assert_eq!(execute.priority_fee, Some(77));
             assert_eq!(execute.record, Some("RECORD".into()));
