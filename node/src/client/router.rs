@@ -311,7 +311,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         serialized: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
     ) -> bool {
-        // Try to add the transaction to a verification queue, without changing LRU status of known solutions.
+        // Try to add the transaction to a verification queue, without changing LRU status of known transactions.
         match &transaction {
             Transaction::<N>::Fee(..) => (), // Fee Transactions are not valid.
             Transaction::<N>::Deploy(..) => {
