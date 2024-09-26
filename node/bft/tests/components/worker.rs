@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -49,7 +50,7 @@ async fn test_resend_transmission_request() {
     let initial_peer_ip = peer_ips.pop().unwrap();
 
     // Prepare a dummy transmission ID.
-    let transmission_id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::default());
+    let transmission_id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::default(), <CurrentNetwork as Network>::TransmissionChecksum::default());
 
     // Ensure the worker does not have the dummy transmission ID.
     assert!(!worker.contains_transmission(transmission_id), "Transmission should not exist");
@@ -132,7 +133,7 @@ async fn test_flood_transmission_requests() {
     let mut remaining_peer_ips = peer_ips;
 
     // Prepare a dummy transmission ID.
-    let transmission_id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::default());
+    let transmission_id = TransmissionID::Transaction(<CurrentNetwork as Network>::TransactionID::default(), <CurrentNetwork as Network>::TransmissionChecksum::default());
 
     // Ensure the worker does not have the dummy transmission ID.
     assert!(!worker.contains_transmission(transmission_id), "Transmission should not exist");

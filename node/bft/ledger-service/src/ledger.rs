@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -205,8 +206,8 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         match transmission_id {
             TransmissionID::Ratification => Ok(false),
-            TransmissionID::Solution(solution_id) => self.ledger.contains_solution_id(solution_id),
-            TransmissionID::Transaction(transaction_id) => self.ledger.contains_transaction_id(transaction_id),
+            TransmissionID::Solution(solution_id, _) => self.ledger.contains_solution_id(solution_id),
+            TransmissionID::Transaction(transaction_id, _) => self.ledger.contains_transaction_id(transaction_id),
         }
     }
 
@@ -218,7 +219,10 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     ) -> Result<()> {
         match (transmission_id, transmission) {
             (TransmissionID::Ratification, Transmission::Ratification) => {}
-            (TransmissionID::Transaction(expected_transaction_id), Transmission::Transaction(transaction_data)) => {
+            (
+                TransmissionID::Transaction(expected_transaction_id, expected_checksum),
+                Transmission::Transaction(transaction_data),
+            ) => {
                 // Deserialize the transaction. If the transaction exceeds the maximum size, then return an error.
                 let transaction = match transaction_data.clone() {
                     Data::Object(transaction) => transaction,
@@ -227,11 +231,21 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                 // Ensure the transaction ID matches the expected transaction ID.
                 if transaction.id() != expected_transaction_id {
                     bail!(
-                        "Received mismatching transaction ID  - expected {}, found {}",
+                        "Received mismatching transaction ID - expected {}, found {}",
                         fmt_id(expected_transaction_id),
                         fmt_id(transaction.id()),
                     );
                 }
+
+                // Ensure the transmission checksum matches the expected checksum.
+                let checksum = transaction_data.to_checksum::<N>()?;
+                if checksum != expected_checksum {
+                    bail!(
+                        "Received mismatching checksum for transaction {} - expected {expected_checksum} but found {checksum}",
+                        fmt_id(expected_transaction_id)
+                    );
+                }
+
                 // Ensure the transaction is not a fee transaction.
                 if transaction.is_fee() {
                     bail!("Received a fee transaction in a transmission");
@@ -240,7 +254,10 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                 // Update the transmission with the deserialized transaction.
                 *transaction_data = Data::Object(transaction);
             }
-            (TransmissionID::Solution(expected_solution_id), Transmission::Solution(solution_data)) => {
+            (
+                TransmissionID::Solution(expected_solution_id, expected_checksum),
+                Transmission::Solution(solution_data),
+            ) => {
                 match solution_data.clone().deserialize_blocking() {
                     Ok(solution) => {
                         if solution.id() != expected_solution_id {
@@ -248,6 +265,15 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                                 "Received mismatching solution ID - expected {}, found {}",
                                 fmt_id(expected_solution_id),
                                 fmt_id(solution.id()),
+                            );
+                        }
+
+                        // Ensure the transmission checksum matches the expected checksum.
+                        let checksum = solution_data.to_checksum::<N>()?;
+                        if checksum != expected_checksum {
+                            bail!(
+                                "Received mismatching checksum for solution {} - expected {expected_checksum} but found {checksum}",
+                                fmt_id(expected_solution_id)
                             );
                         }
 

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -522,14 +523,39 @@ impl<N: Network> Primary<N> {
                     }
                     // Check the transmission is still valid.
                     match (id, transmission.clone()) {
-                        (TransmissionID::Solution(solution_id), Transmission::Solution(solution)) => {
+                        (TransmissionID::Solution(solution_id, checksum), Transmission::Solution(solution)) => {
+                            // Ensure the checksum matches.
+                            match solution.to_checksum::<N>() {
+                                Ok(solution_checksum) if solution_checksum == checksum => (),
+                                _ => {
+                                    trace!(
+                                        "Proposing - Skipping solution '{}' - Checksum mismatch",
+                                        fmt_id(solution_id)
+                                    );
+                                    continue 'inner;
+                                }
+                            }
                             // Check if the solution is still valid.
                             if let Err(e) = self.ledger.check_solution_basic(solution_id, solution).await {
                                 trace!("Proposing - Skipping solution '{}' - {e}", fmt_id(solution_id));
                                 continue 'inner;
                             }
                         }
-                        (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+                        (
+                            TransmissionID::Transaction(transaction_id, checksum),
+                            Transmission::Transaction(transaction),
+                        ) => {
+                            // Ensure the checksum matches.
+                            match transaction.to_checksum::<N>() {
+                                Ok(transaction_checksum) if transaction_checksum == checksum => (),
+                                _ => {
+                                    trace!(
+                                        "Proposing - Skipping transaction '{}' - Checksum mismatch",
+                                        fmt_id(transaction_id)
+                                    );
+                                    continue 'inner;
+                                }
+                            }
                             // Check if the transaction is still valid.
                             if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
                                 trace!("Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
@@ -1212,8 +1238,13 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((solution_id, solution, callback)) = rx_unconfirmed_solution.recv().await {
+                // Compute the checksum for the solution.
+                let Ok(checksum) = solution.to_checksum::<N>() else {
+                    error!("Failed to compute the checksum for the unconfirmed solution");
+                    continue;
+                };
                 // Compute the worker ID.
-                let Ok(worker_id) = assign_to_worker(solution_id, self_.num_workers()) else {
+                let Ok(worker_id) = assign_to_worker((solution_id, checksum), self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed solution");
                     continue;
                 };
@@ -1234,8 +1265,13 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((transaction_id, transaction, callback)) = rx_unconfirmed_transaction.recv().await {
                 trace!("Primary - Received an unconfirmed transaction '{}'", fmt_id(transaction_id));
+                // Compute the checksum for the transaction.
+                let Ok(checksum) = transaction.to_checksum::<N>() else {
+                    error!("Failed to compute the checksum for the unconfirmed transaction");
+                    continue;
+                };
                 // Compute the worker ID.
-                let Ok(worker_id) = assign_to_worker::<N>(&transaction_id, self_.num_workers()) else {
+                let Ok(worker_id) = assign_to_worker::<N>((&transaction_id, &checksum), self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");
                     continue;
                 };
@@ -1798,14 +1834,19 @@ mod tests {
     ) -> Proposal<CurrentNetwork> {
         let (solution_id, solution) = sample_unconfirmed_solution(rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
+        let solution_checksum = solution.to_checksum::<CurrentNetwork>().unwrap();
+        let transaction_checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
+
+        let solution_transmission_id = (solution_id, solution_checksum).into();
+        let transaction_transmission_id = (&transaction_id, &transaction_checksum).into();
 
         // Retrieve the private key.
         let private_key = author.private_key();
         // Prepare the transmission IDs.
-        let transmission_ids = [solution_id.into(), (&transaction_id).into()].into();
+        let transmission_ids = [solution_transmission_id, transaction_transmission_id].into();
         let transmissions = [
-            (solution_id.into(), Transmission::Solution(solution)),
-            ((&transaction_id).into(), Transmission::Transaction(transaction)),
+            (solution_transmission_id, Transmission::Solution(solution)),
+            (transaction_transmission_id, Transmission::Transaction(transaction)),
         ]
         .into();
         // Sign the batch header.
@@ -1879,10 +1920,16 @@ mod tests {
         let committee_id = Field::rand(rng);
         let (solution_id, solution) = sample_unconfirmed_solution(rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
-        let transmission_ids = [solution_id.into(), (&transaction_id).into()].into();
+        let solution_checksum = solution.to_checksum::<CurrentNetwork>().unwrap();
+        let transaction_checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
+
+        let solution_transmission_id = (solution_id, solution_checksum).into();
+        let transaction_transmission_id = (&transaction_id, &transaction_checksum).into();
+
+        let transmission_ids = [solution_transmission_id, transaction_transmission_id].into();
         let transmissions = [
-            (solution_id.into(), Transmission::Solution(solution)),
-            ((&transaction_id).into(), Transmission::Transaction(transaction)),
+            (solution_transmission_id, Transmission::Solution(solution)),
+            (transaction_transmission_id, Transmission::Transaction(transaction)),
         ]
         .into();
 
@@ -2021,6 +2068,8 @@ mod tests {
         // Generate a solution and a transaction.
         let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
         let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+        let solution_checksum = solution.to_checksum::<CurrentNetwork>().unwrap();
+        let transaction_checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
 
         // Store it on one of the workers.
         primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
@@ -2064,8 +2113,10 @@ mod tests {
         // Check that the proposal only contains the new transmissions that were not in previous certificates.
         let proposed_transmissions = primary.proposed_batch.read().as_ref().unwrap().transmissions().clone();
         assert_eq!(proposed_transmissions.len(), 2);
-        assert!(proposed_transmissions.contains_key(&TransmissionID::Solution(solution_commitment)));
-        assert!(proposed_transmissions.contains_key(&TransmissionID::Transaction(transaction_id)));
+        assert!(proposed_transmissions.contains_key(&TransmissionID::Solution(solution_commitment, solution_checksum)));
+        assert!(
+            proposed_transmissions.contains_key(&TransmissionID::Transaction(transaction_id, transaction_checksum))
+        );
     }
 
     #[tokio::test]

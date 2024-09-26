@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -117,7 +118,7 @@ impl<N: Network> From<DisconnectReason> for Event<N> {
 
 impl<N: Network> Event<N> {
     /// The version of the event protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 6;
+    pub const VERSION: u32 = 8;
 
     /// Returns the event name.
     #[inline]
@@ -292,10 +293,15 @@ pub mod prop_tests {
             .boxed()
     }
 
+    pub fn any_transmission_checksum() -> BoxedStrategy<<CurrentNetwork as Network>::TransmissionChecksum> {
+        Just(0).prop_perturb(|_, mut rng| rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>()).boxed()
+    }
+
     pub fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
-            any_transaction_id().prop_map(TransmissionID::Transaction),
-            any_solution_id().prop_map(TransmissionID::Solution),
+            (any_transaction_id(), any_transmission_checksum())
+                .prop_map(|(id, cs)| TransmissionID::Transaction(id, cs)),
+            (any_solution_id(), any_transmission_checksum()).prop_map(|(id, cs)| TransmissionID::Solution(id, cs)),
         ]
         .boxed()
     }
