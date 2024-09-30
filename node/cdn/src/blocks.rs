@@ -107,7 +107,7 @@ pub async fn load_blocks<N: Network>(
     process: impl FnMut(Block<N>) -> Result<()> + Clone + Send + Sync + 'static,
 ) -> Result<u32, (u32, anyhow::Error)> {
     // Create a Client to maintain a connection pool throughout the sync.
-    let client = match Client::builder().build() {
+    let client = match Client::builder().use_rustls_tls().build() {
         Ok(client) => client,
         Err(error) => {
             return Err((start_height.saturating_sub(1), anyhow!("Failed to create a CDN request client - {error}")));
@@ -439,7 +439,7 @@ mod tests {
 
     type CurrentNetwork = MainnetV0;
 
-    const TEST_BASE_URL: &str = "https://s3.us-west-1.amazonaws.com/testnet3.blocks/phase3";
+    const TEST_BASE_URL: &str = "https://blocks.aleo.org/mainnet/v0";
 
     fn check_load_blocks(start: u32, end: Option<u32>, expected: usize) {
         let blocks = Arc::new(RwLock::new(Vec::new()));
@@ -494,7 +494,7 @@ mod tests {
     #[test]
     fn test_cdn_height() {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest::Client::builder().use_rustls_tls().build().unwrap();
         rt.block_on(async {
             let height = cdn_height::<BLOCKS_PER_FILE>(&client, TEST_BASE_URL).await.unwrap();
             assert!(height > 0);
@@ -505,7 +505,7 @@ mod tests {
     fn test_cdn_get() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let client = reqwest::Client::new();
+            let client = reqwest::Client::builder().use_rustls_tls().build().unwrap();
             let height =
                 cdn_get::<u32>(client, &format!("{TEST_BASE_URL}/mainnet/latest/height"), "height").await.unwrap();
             assert!(height > 0);
