@@ -649,6 +649,10 @@ fn load_or_compute_genesis<N: Network>(
 
     // Input the network ID.
     preimage.extend(&N::ID.to_le_bytes());
+    // Input the genesis coinbase target.
+    preimage.extend(&to_bytes_le![N::GENESIS_COINBASE_TARGET]?);
+    // Input the genesis proof target.
+    preimage.extend(&to_bytes_le![N::GENESIS_PROOF_TARGET]?);
 
     // Input the genesis private key, committee, and public balances.
     preimage.extend(genesis_private_key.to_bytes_le()?);
@@ -714,6 +718,8 @@ fn load_or_compute_genesis<N: Network>(
     // Initialize the hasher.
     let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
     // Compute the hash.
+    // NOTE: this is a fast-to-compute but *IMPERFECT* identifier for the genesis block.
+    //       to know the actualy genesis block hash, you need to compute the block itself.
     let hash = hasher.hash(&preimage.to_bits_le())?.to_string();
 
     // A closure to load the block.
