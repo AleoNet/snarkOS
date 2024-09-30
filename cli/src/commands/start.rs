@@ -59,7 +59,7 @@ const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
 /// The CDN base url.
-const CDN_BASE_URL: &str = "https://blocks.aleo.org";
+pub(crate) const CDN_BASE_URL: &str = "https://blocks.aleo.org";
 
 /// A mapping of `staker_address` to `(validator_address, withdrawal_address, amount)`.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
