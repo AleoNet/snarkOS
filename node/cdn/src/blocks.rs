@@ -18,24 +18,24 @@
 #![allow(clippy::await_holding_lock)]
 
 use snarkvm::prelude::{
-    block::Block,
-    store::{cow_to_copied, ConsensusStorage},
     Deserialize,
     DeserializeOwned,
     Ledger,
     Network,
     Serialize,
+    block::Block,
+    store::{ConsensusStorage, cow_to_copied},
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use colored::Colorize;
 use parking_lot::Mutex;
 use reqwest::Client;
 use std::{
     cmp,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicU32, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -429,10 +429,10 @@ fn log_progress<const OBJECTS_PER_FILE: u32>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        blocks::{cdn_get, cdn_height, log_progress, BLOCKS_PER_FILE},
+        blocks::{BLOCKS_PER_FILE, cdn_get, cdn_height, log_progress},
         load_blocks,
     };
-    use snarkvm::prelude::{block::Block, MainnetV0};
+    use snarkvm::prelude::{MainnetV0, block::Block};
 
     use parking_lot::RwLock;
     use std::{sync::Arc, time::Instant};

@@ -19,7 +19,7 @@ use snarkvm::{
         network::Network,
         types::Field,
     },
-    prelude::{error, FromBytes, IoResult, Read, ToBytes, Write},
+    prelude::{FromBytes, IoResult, Read, ToBytes, Write, error},
 };
 
 use std::{collections::HashMap, ops::Deref};

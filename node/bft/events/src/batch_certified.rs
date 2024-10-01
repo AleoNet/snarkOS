@@ -59,7 +59,7 @@ impl<N: Network> FromBytes for BatchCertified<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{certificate_response::prop_tests::any_batch_certificate, BatchCertified};
+    use crate::{BatchCertified, certificate_response::prop_tests::any_batch_certificate};
     use snarkvm::console::prelude::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};

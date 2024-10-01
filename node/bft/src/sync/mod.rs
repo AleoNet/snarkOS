@@ -14,28 +14,28 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{fmt_id, max_redundant_requests, BFTSender, Pending, Storage, SyncReceiver},
-    spawn_blocking,
     Gateway,
-    Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
     PRIMARY_PING_IN_MS,
+    Transport,
+    helpers::{BFTSender, Pending, Storage, SyncReceiver, fmt_id, max_redundant_requests},
+    spawn_blocking,
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
+use snarkos_node_sync::{BlockSync, BlockSyncMode, locators::BlockLocators};
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
     prelude::{cfg_into_iter, cfg_iter},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use parking_lot::Mutex;
 use rayon::prelude::*;
 use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
-    sync::{oneshot, Mutex as TMutex, OnceCell},
+    sync::{Mutex as TMutex, OnceCell, oneshot},
     task::JoinHandle,
 };
 
@@ -668,7 +668,7 @@ mod tests {
         },
         ledger::{
             narwhal::{BatchCertificate, BatchHeader, Subdag},
-            store::{helpers::memory::ConsensusMemory, ConsensusStore},
+            store::{ConsensusStore, helpers::memory::ConsensusMemory},
         },
         prelude::{Ledger, VM},
         utilities::TestRng,

@@ -15,6 +15,11 @@
 
 use crate::common::sample_genesis_block;
 use snarkos_node_router::{
+    Heartbeat,
+    Inbound,
+    Outbound,
+    Router,
+    Routing,
     messages::{
         BlockRequest,
         DisconnectReason,
@@ -25,24 +30,19 @@ use snarkos_node_router::{
         UnconfirmedSolution,
         UnconfirmedTransaction,
     },
-    Heartbeat,
-    Inbound,
-    Outbound,
-    Router,
-    Routing,
 };
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Connection,
     ConnectionSide,
-    Tcp,
     P2P,
+    Tcp,
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
 };
 use snarkvm::prelude::{
-    block::{Block, Header, Transaction},
-    puzzle::Solution,
     Field,
     Network,
+    block::{Block, Header, Transaction},
+    puzzle::Solution,
 };
 
 use async_trait::async_trait;

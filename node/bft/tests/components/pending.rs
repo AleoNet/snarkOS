@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::{primary::new_test_committee, utils::sample_ledger, CurrentNetwork};
+use crate::common::{CurrentNetwork, primary::new_test_committee, utils::sample_ledger};
 use snarkos_node_bft::helpers::max_redundant_requests;
 use snarkvm::{ledger::committee::Committee, prelude::TestRng};
 

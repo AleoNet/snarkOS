@@ -73,12 +73,12 @@ impl<N: Network> Ping<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{challenge_request::prop_tests::any_node_type, Ping};
-    use snarkos_node_sync_locators::{test_helpers::sample_block_locators, BlockLocators};
+    use crate::{Ping, challenge_request::prop_tests::any_node_type};
+    use snarkos_node_sync_locators::{BlockLocators, test_helpers::sample_block_locators};
     use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use proptest::prelude::{BoxedStrategy, Strategy, any};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;

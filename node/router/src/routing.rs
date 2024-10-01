@@ -15,8 +15,8 @@
 
 use crate::{Heartbeat, Inbound, Outbound};
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, OnConnect},
     P2P,
+    protocols::{Disconnect, Handshake, OnConnect},
 };
 use snarkvm::prelude::Network;
 

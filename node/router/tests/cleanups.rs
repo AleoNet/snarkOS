@@ -20,8 +20,8 @@ use deadline::deadline;
 use peak_alloc::PeakAlloc;
 use snarkos_node_router::Routing;
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake},
     P2P,
+    protocols::{Disconnect, Handshake},
 };
 use snarkvm::{prelude::Rng, utilities::TestRng};
 

@@ -16,7 +16,7 @@
 use snarkos_node::bft::helpers::proposal_cache_path;
 
 use aleo_std::StorageMode;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use colored::Colorize;
 use std::path::PathBuf;

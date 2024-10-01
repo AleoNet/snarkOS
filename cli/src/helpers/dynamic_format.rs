@@ -14,17 +14,17 @@
 // limitations under the License.
 
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 use time::{
-    format_description::{self, OwnedFormatItem},
     OffsetDateTime,
+    format_description::{self, OwnedFormatItem},
 };
 use tracing::{Event, Subscriber};
 use tracing_subscriber::{
-    fmt::{format::Writer, FmtContext, FormatEvent, FormatFields},
+    fmt::{FmtContext, FormatEvent, FormatFields, format::Writer},
     registry::LookupSpan,
 };
 

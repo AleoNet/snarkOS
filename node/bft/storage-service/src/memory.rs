@@ -16,10 +16,10 @@
 use crate::StorageService;
 use snarkvm::{
     ledger::narwhal::{BatchHeader, Transmission, TransmissionID},
-    prelude::{bail, Field, Network, Result},
+    prelude::{Field, Network, Result, bail},
 };
 
-use indexmap::{indexset, map::Entry, IndexMap, IndexSet};
+use indexmap::{IndexMap, IndexSet, indexset, map::Entry};
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet};
 use tracing::error;

@@ -26,12 +26,12 @@ use tokio_util::codec::{Encoder, FramedWrite};
 use tracing::*;
 
 #[cfg(doc)]
-use crate::{protocols::Handshake, Config, Tcp};
+use crate::{Config, Tcp, protocols::Handshake};
 use crate::{
-    protocols::{Protocol, ProtocolHandler, ReturnableConnection},
     Connection,
     ConnectionSide,
     P2P,
+    protocols::{Protocol, ProtocolHandler, ReturnableConnection},
 };
 
 type WritingSenders = Arc<RwLock<HashMap<SocketAddr, mpsc::Sender<WrappedMessage>>>>;

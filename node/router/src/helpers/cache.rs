@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::messages::BlockRequest;
-use snarkvm::prelude::{puzzle::SolutionID, Network};
+use snarkvm::prelude::{Network, puzzle::SolutionID};
 
 use core::hash::Hash;
 use linked_hash_map::LinkedHashMap;

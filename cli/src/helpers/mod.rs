@@ -32,7 +32,7 @@ use snarkos_node::router::messages::NodeType;
 
 use colored::*;
 #[cfg(target_family = "unix")]
-use nix::sys::resource::{getrlimit, Resource};
+use nix::sys::resource::{Resource, getrlimit};
 
 /// Check if process's open files limit is above minimum and warn if not.
 #[cfg(target_family = "unix")]

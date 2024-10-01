@@ -41,10 +41,10 @@ pub use routing::*;
 
 use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_tcp::{is_bogon_ip, is_unspecified_or_broadcast_ip, Config, Tcp};
+use snarkos_node_tcp::{Config, Tcp, is_bogon_ip, is_unspecified_or_broadcast_ip};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},

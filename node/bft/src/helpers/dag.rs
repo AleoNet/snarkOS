@@ -153,7 +153,7 @@ pub(crate) mod test_helpers {
 mod tests {
     use super::*;
     use snarkvm::{
-        prelude::{narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round, MainnetV0},
+        prelude::{MainnetV0, narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round},
         utilities::TestRng,
     };
 

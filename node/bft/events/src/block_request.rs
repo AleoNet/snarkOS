@@ -65,7 +65,7 @@ pub mod prop_tests {
     use crate::BlockRequest;
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use proptest::prelude::{BoxedStrategy, Strategy, any};
     use snarkvm::utilities::{FromBytes, ToBytes};
     use test_strategy::proptest;
 

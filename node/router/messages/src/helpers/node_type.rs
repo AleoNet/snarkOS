@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::prelude::{error, FromBytes, ToBytes};
+use snarkvm::prelude::{FromBytes, ToBytes, error};
 
 use serde::{Deserialize, Serialize};
 use std::io;
