@@ -315,9 +315,18 @@ impl<N: Network> Sync<N> {
             // Try to advance the ledger *to tip* without updating the BFT.
             while let Some(block) = self.block_sync.process_next_block(current_height) {
                 info!("Syncing the ledger to block {}...", block.height());
-                self.sync_ledger_with_block_without_bft(block).await?;
-                // Update the current height.
-                current_height += 1;
+                // Sync the ledger with the block without BFT.
+                match self.sync_ledger_with_block_without_bft(block).await {
+                    Ok(_) => {
+                        // Update the current height if sync succeeds.
+                        current_height += 1;
+                    }
+                    Err(e) => {
+                        // Mark the current height as processed in block_sync. 
+                        self.block_sync.remove_block_response(current_height);
+                        return Err(e);  
+                    }
+                }
             }
             // Sync the storage with the ledger if we should transition to the BFT sync.
             if current_height > max_gc_height {
@@ -331,9 +340,17 @@ impl<N: Network> Sync<N> {
         while let Some(block) = self.block_sync.process_next_block(current_height) {
             info!("Syncing the BFT to block {}...", block.height());
             // Sync the storage with the block.
-            self.sync_storage_with_block(block).await?;
-            // Update the current height.
-            current_height += 1;
+            match self.sync_storage_with_block(block).await {
+                Ok(_) => {
+                    // Update the current height if sync succeeds.
+                    current_height += 1;
+                }
+                Err(e) => {
+                    // Mark the current height as processed in block_sync. 
+                    self.block_sync.remove_block_response(current_height);
+                    return Err(e);
+                }
+            }
         }
         Ok(())
     }
@@ -354,6 +371,8 @@ impl<N: Network> Sync<N> {
             self_.storage.sync_height_with_block(block.height());
             // Sync the round with the block.
             self_.storage.sync_round_with_block(block.round());
+            // Mark the block height as processed in block_sync. 
+            self_.block_sync.remove_block_response(block.height());
 
             Ok(())
         })
@@ -501,6 +520,8 @@ impl<N: Network> Sync<N> {
                     .await??;
                     // Remove the block height from the latest block responses.
                     latest_block_responses.remove(&block_height);
+                    // Mark the block height as processed in block_sync. 
+                    self.block_sync.remove_block_response(block_height);
                 }
             } else {
                 debug!(
