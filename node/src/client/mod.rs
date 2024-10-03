@@ -290,7 +290,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                                 // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
                                 Err(error) => {
                                     if _node.ledger.latest_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
-                                        warn!("Failed to verify the solution - {error}")
+                                        debug!("Failed to verify the solution from peer_ip {peer_ip} - {error}")
                                     }
                                 }
                             }
@@ -340,9 +340,14 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                     // For each deployment, spawn a task to verify it.
                     tokio::task::spawn_blocking(move || {
                         // Check the deployment.
-                        if _node.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok() {
-                            // Propagate the `UnconfirmedTransaction`.
-                            _node.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+                        match _node.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()) {
+                            Ok(_) => {
+                                // Propagate the `UnconfirmedTransaction`.
+                                _node.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+                            }
+                            Err(error) => {
+                                debug!("Failed to verify the deployment from peer_ip {peer_ip} - {error}");
+                            }
                         }
                         // Decrement the verification counter.
                         _node.num_verifying_deploys.fetch_sub(1, Relaxed);
@@ -387,9 +392,14 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                     // For each execution, spawn a task to verify it.
                     tokio::task::spawn_blocking(move || {
                         // Check the execution.
-                        if _node.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()).is_ok() {
-                            // Propagate the `UnconfirmedTransaction`.
-                            _node.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+                        match _node.ledger.check_transaction_basic(&transaction, None, &mut rand::thread_rng()) {
+                            Ok(_) => {
+                                // Propagate the `UnconfirmedTransaction`.
+                                _node.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
+                            }
+                            Err(error) => {
+                                debug!("Failed to verify the execution from peer_ip {peer_ip} - {error}");
+                            }
                         }
                         // Decrement the verification counter.
                         _node.num_verifying_executions.fetch_sub(1, Relaxed);
