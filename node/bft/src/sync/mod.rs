@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -741,25 +742,28 @@ mod tests {
                 // Create a certificate for the leader.
                 if round <= 5 {
                     let leader = committee.get_leader(round).unwrap();
-                    let i = addresses.iter().position(|&address| address == leader).unwrap();
-                    let batch_header = BatchHeader::new(
-                        &private_keys[i],
-                        round,
-                        now(),
-                        committee_id,
-                        Default::default(),
-                        previous_certificate_ids.clone(),
-                        rng,
-                    )
-                    .unwrap();
-                    // Sign the batch header.
-                    let mut signatures = IndexSet::with_capacity(4);
-                    for (j, private_key_2) in private_keys.iter().enumerate() {
-                        if i != j {
-                            signatures.insert(private_key_2.sign(&[batch_header.batch_id()], rng).unwrap());
+                    let leader_index = addresses.iter().position(|&address| address == leader).unwrap();
+                    let non_leader_index = addresses.iter().position(|&address| address != leader).unwrap();
+                    for i in [leader_index, non_leader_index].into_iter() {
+                        let batch_header = BatchHeader::new(
+                            &private_keys[i],
+                            round,
+                            now(),
+                            committee_id,
+                            Default::default(),
+                            previous_certificate_ids.clone(),
+                            rng,
+                        )
+                        .unwrap();
+                        // Sign the batch header.
+                        let mut signatures = IndexSet::with_capacity(4);
+                        for (j, private_key_2) in private_keys.iter().enumerate() {
+                            if i != j {
+                                signatures.insert(private_key_2.sign(&[batch_header.batch_id()], rng).unwrap());
+                            }
                         }
+                        current_certificates.insert(BatchCertificate::from(batch_header, signatures).unwrap());
                     }
-                    current_certificates.insert(BatchCertificate::from(batch_header, signatures).unwrap());
                 }
 
                 // Create a certificate for each validator.
@@ -836,8 +840,15 @@ mod tests {
             for cert in storage.get_certificates_for_round(leader_round_2 - 1) {
                 previous_cert_map_2.insert(cert);
             }
+            let mut prev_commit_cert_map_2 = IndexSet::new();
+            for cert in storage.get_certificates_for_round(leader_round_2 - 2) {
+                if cert != leader_certificate {
+                    prev_commit_cert_map_2.insert(cert);
+                }
+            }
             subdag_map_2.insert(leader_round_2, leader_cert_map_2.clone());
             subdag_map_2.insert(leader_round_2 - 1, previous_cert_map_2.clone());
+            subdag_map_2.insert(leader_round_2 - 2, prev_commit_cert_map_2.clone());
             let subdag_2 = Subdag::from(subdag_map_2.clone())?;
             core_ledger.prepare_advance_to_next_quorum_block(subdag_2, Default::default())?
         };
@@ -856,8 +867,15 @@ mod tests {
             for cert in storage.get_certificates_for_round(leader_round_3 - 1) {
                 previous_cert_map_3.insert(cert);
             }
+            let mut prev_commit_cert_map_3 = IndexSet::new();
+            for cert in storage.get_certificates_for_round(leader_round_3 - 2) {
+                if cert != leader_certificate_2 {
+                    prev_commit_cert_map_3.insert(cert);
+                }
+            }
             subdag_map_3.insert(leader_round_3, leader_cert_map_3.clone());
             subdag_map_3.insert(leader_round_3 - 1, previous_cert_map_3.clone());
+            subdag_map_3.insert(leader_round_3 - 2, prev_commit_cert_map_3.clone());
             let subdag_3 = Subdag::from(subdag_map_3.clone())?;
             core_ledger.prepare_advance_to_next_quorum_block(subdag_3, Default::default())?
         };
@@ -875,14 +893,13 @@ mod tests {
         let sync = Sync::new(gateway.clone(), storage.clone(), syncing_ledger.clone());
         // Try to sync block 1.
         sync.sync_storage_with_block(block_1).await?;
-        // Ensure that the sync ledger has not advanced.
-        assert_eq!(syncing_ledger.latest_block_height(), 0);
+        assert_eq!(syncing_ledger.latest_block_height(), 1);
         // Try to sync block 2.
         sync.sync_storage_with_block(block_2).await?;
-        // Ensure that the sync ledger has not advanced.
-        assert_eq!(syncing_ledger.latest_block_height(), 0);
+        assert_eq!(syncing_ledger.latest_block_height(), 2);
         // Try to sync block 3.
         sync.sync_storage_with_block(block_3).await?;
+        assert_eq!(syncing_ledger.latest_block_height(), 3);
         // Ensure blocks 1 and 2 were added to the ledger.
         assert!(syncing_ledger.contains_block_height(1));
         assert!(syncing_ledger.contains_block_height(2));
