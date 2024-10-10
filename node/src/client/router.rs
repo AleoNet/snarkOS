@@ -15,6 +15,7 @@
 
 use super::*;
 use snarkos_node_router::{
+    Routing,
     messages::{
         BlockRequest,
         BlockResponse,
@@ -26,13 +27,12 @@ use snarkos_node_router::{
         PuzzleResponse,
         UnconfirmedTransaction,
     },
-    Routing,
 };
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Transaction, Network},
+    prelude::{Network, block::Transaction},
 };
 
 use std::{io, net::SocketAddr, time::Duration};

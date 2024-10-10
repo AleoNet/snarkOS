@@ -14,10 +14,10 @@
 // limitations under the License.
 
 use super::*;
-use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
+use snarkos_node_router::{SYNC_LENIENCY, messages::UnconfirmedSolution};
 use snarkvm::{
     ledger::puzzle::Solution,
-    prelude::{block::Transaction, Address, Identifier, LimitedWriter, Plaintext, ToBytes},
+    prelude::{Address, Identifier, LimitedWriter, Plaintext, ToBytes, block::Transaction},
 };
 
 use indexmap::IndexMap;

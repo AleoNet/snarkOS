@@ -16,19 +16,19 @@
 use snarkvm::prelude::*;
 
 use ::time::OffsetDateTime;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use axum::{
+    RequestPartsExt,
     body::Body,
     http::{Request, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
-    RequestPartsExt,
 };
 use axum_extra::{
-    headers::authorization::{Authorization, Bearer},
     TypedHeader,
+    headers::authorization::{Authorization, Bearer},
 };
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 

@@ -67,7 +67,7 @@ pub mod prop_tests {
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::vec,
-        prelude::{any, BoxedStrategy, Strategy},
+        prelude::{BoxedStrategy, Strategy, any},
     };
     use std::net::{IpAddr, SocketAddr};
     use test_strategy::proptest;

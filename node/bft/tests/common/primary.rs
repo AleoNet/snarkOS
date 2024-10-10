@@ -14,30 +14,30 @@
 // limitations under the License.
 
 use crate::common::{
-    utils::{fire_unconfirmed_solutions, fire_unconfirmed_transactions, initialize_logger},
     CurrentNetwork,
     TranslucentLedgerService,
+    utils::{fire_unconfirmed_solutions, fire_unconfirmed_transactions, initialize_logger},
 };
 use snarkos_account::Account;
 use snarkos_node_bft::{
-    helpers::{init_primary_channels, PrimarySender, Storage},
-    Primary,
     BFT,
     MAX_BATCH_DELAY_IN_MS,
+    Primary,
+    helpers::{PrimarySender, Storage, init_primary_channels},
 };
 use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
-        algorithms::{Hash, BHP256},
+        algorithms::{BHP256, Hash},
         network::Network,
     },
     ledger::{
+        Ledger,
         block::Block,
         committee::{Committee, MIN_VALIDATOR_STAKE},
         narwhal::BatchHeader,
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Ledger,
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
     prelude::{CryptoRng, FromBytes, Rng, TestRng, ToBits, ToBytes, VM},
     utilities::to_bytes_le,

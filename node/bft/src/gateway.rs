@@ -14,13 +14,13 @@
 // limitations under the License.
 
 use crate::{
-    events::{EventCodec, PrimaryPing},
-    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, Storage, SyncSender, WorkerSender},
-    spawn_blocking,
-    Worker,
     CONTEXT,
     MAX_BATCH_DELAY_IN_MS,
     MEMORY_POOL_PORT,
+    Worker,
+    events::{EventCodec, PrimaryPing},
+    helpers::{Cache, PrimarySender, Resolver, Storage, SyncSender, WorkerSender, assign_to_worker},
+    spawn_blocking,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_events::{
@@ -40,16 +40,16 @@ use snarkos_node_bft_events::{
     ValidatorsResponse,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_sync::{communication_service::CommunicationService, MAX_BLOCKS_BEHIND};
+use snarkos_node_sync::{MAX_BLOCKS_BEHIND, communication_service::CommunicationService};
 use snarkos_node_tcp::{
-    is_bogon_ip,
-    is_unspecified_or_broadcast_ip,
-    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
     Connection,
     ConnectionSide,
-    Tcp,
     P2P,
+    Tcp,
+    is_bogon_ip,
+    is_unspecified_or_broadcast_ip,
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
 };
 use snarkvm::{
     console::prelude::*,
@@ -68,7 +68,7 @@ use rand::seq::{IteratorRandom, SliceRandom};
 use std::{collections::HashSet, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
-    sync::{oneshot, OnceCell},
+    sync::{OnceCell, oneshot},
     task::{self, JoinHandle},
 };
 use tokio_stream::StreamExt;
@@ -1383,12 +1383,12 @@ impl<N: Network> Gateway<N> {
 #[cfg(test)]
 mod prop_tests {
     use crate::{
-        gateway::prop_tests::GatewayAddress::{Dev, Prod},
-        helpers::{init_primary_channels, init_worker_channels, Storage},
         Gateway,
-        Worker,
         MAX_WORKERS,
         MEMORY_POOL_PORT,
+        Worker,
+        gateway::prop_tests::GatewayAddress::{Dev, Prod},
+        helpers::{Storage, init_primary_channels, init_worker_channels},
     };
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;
@@ -1397,11 +1397,11 @@ mod prop_tests {
     use snarkvm::{
         ledger::{
             committee::{
+                Committee,
                 prop_tests::{CommitteeContext, ValidatorSet},
                 test_helpers::sample_committee_for_round_and_members,
-                Committee,
             },
-            narwhal::{batch_certificate::test_helpers::sample_batch_certificate_for_round, BatchHeader},
+            narwhal::{BatchHeader, batch_certificate::test_helpers::sample_batch_certificate_for_round},
         },
         prelude::{MainnetV0, PrivateKey},
         utilities::TestRng,
@@ -1409,7 +1409,7 @@ mod prop_tests {
 
     use indexmap::{IndexMap, IndexSet};
     use proptest::{
-        prelude::{any, any_with, Arbitrary, BoxedStrategy, Just, Strategy},
+        prelude::{Arbitrary, BoxedStrategy, Just, Strategy, any, any_with},
         sample::Selector,
     };
     use std::{

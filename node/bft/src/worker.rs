@@ -14,13 +14,13 @@
 // limitations under the License.
 
 use crate::{
-    events::{Event, TransmissionRequest, TransmissionResponse},
-    helpers::{fmt_id, max_redundant_requests, Pending, Ready, Storage, WorkerReceiver},
-    spawn_blocking,
-    ProposedBatch,
-    Transport,
     MAX_FETCH_TIMEOUT_IN_MS,
     MAX_WORKERS,
+    ProposedBatch,
+    Transport,
+    events::{Event, TransmissionRequest, TransmissionResponse},
+    helpers::{Pending, Ready, Storage, WorkerReceiver, fmt_id, max_redundant_requests},
+    spawn_blocking,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkvm::{

@@ -21,16 +21,16 @@ use snarkvm::{
         block::{Block, Transaction},
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{anyhow, bail, ensure, Address, Field, Network, Result},
+    prelude::{Address, Field, Network, Result, anyhow, bail, ensure},
 };
 
-use indexmap::{map::Entry, IndexMap, IndexSet};
+use indexmap::{IndexMap, IndexSet, map::Entry};
 use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU32, AtomicU64, Ordering},
     },
 };
 
@@ -1043,9 +1043,9 @@ pub mod prop_tests {
     use indexmap::indexset;
     use proptest::{
         collection,
-        prelude::{any, Arbitrary, BoxedStrategy, Just, Strategy},
+        prelude::{Arbitrary, BoxedStrategy, Just, Strategy, any},
         prop_oneof,
-        sample::{size_range, Selector},
+        sample::{Selector, size_range},
         test_runner::TestRng,
     };
     use rand::{CryptoRng, Error, Rng, RngCore};

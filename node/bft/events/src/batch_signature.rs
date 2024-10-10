@@ -56,9 +56,9 @@ impl<N: Network> FromBytes for BatchSignature<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
+        BatchSignature,
         certificate_request::prop_tests::any_field,
         challenge_response::prop_tests::any_signature,
-        BatchSignature,
     };
     use snarkvm::console::prelude::{FromBytes, ToBytes};
 

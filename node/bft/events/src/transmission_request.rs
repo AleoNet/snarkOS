@@ -59,7 +59,7 @@ impl<N: Network> FromBytes for TransmissionRequest<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{prop_tests::any_transmission_id, TransmissionRequest};
+    use crate::{TransmissionRequest, prop_tests::any_transmission_id};
     use snarkvm::console::prelude::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};

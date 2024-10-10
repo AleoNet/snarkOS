@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_router::{messages::NodeType, Routing};
+use snarkos_node_router::{Routing, messages::NodeType};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use once_cell::sync::OnceCell;
@@ -21,8 +21,8 @@ use std::{
     future::Future,
     io,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
@@ -63,7 +63,7 @@ pub trait NodeInterface<N: Network>: Routing<N> {
 
         #[cfg(target_family = "unix")]
         fn signal_listener() -> impl Future<Output = io::Result<()>> {
-            use tokio::signal::unix::{signal, SignalKind};
+            use tokio::signal::unix::{SignalKind, signal};
 
             // Handle SIGINT, SIGTERM, SIGQUIT, and SIGHUP.
             let mut s_int = signal(SignalKind::interrupt()).unwrap();

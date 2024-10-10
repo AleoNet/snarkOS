@@ -95,8 +95,8 @@ mod tests {
     use super::*;
 
     use crate::{
-        unconfirmed_transaction::prop_tests::{any_large_unconfirmed_transaction, any_unconfirmed_transaction},
         UnconfirmedTransaction,
+        unconfirmed_transaction::prop_tests::{any_large_unconfirmed_transaction, any_unconfirmed_transaction},
     };
 
     use proptest::prelude::ProptestConfig;

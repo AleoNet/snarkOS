@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    messages::{Message, Ping},
     Router,
+    messages::{Message, Ping},
 };
 use snarkos_node_sync_locators::BlockLocators;
 use snarkos_node_tcp::protocols::Writing;
