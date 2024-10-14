@@ -1387,10 +1387,10 @@ impl<N: Network> Primary<N> {
     fn check_proposal_timestamp(&self, previous_round: u64, author: Address<N>, timestamp: i64) -> Result<()> {
         // Retrieve the timestamp of the previous timestamp to check against.
         let previous_timestamp = match self.storage.get_certificate_for_round_with_author(previous_round, author) {
-            // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
+            // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_SECS` seconds ago.
             Some(certificate) => certificate.timestamp(),
             None => match self.gateway.account().address() == author {
-                // If we are the author, then ensure the previous proposal was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
+                // If we are the author, then ensure the previous proposal was created at least `MIN_BATCH_DELAY_IN_SECS` seconds ago.
                 true => *self.latest_proposed_batch_timestamp.read(),
                 // If we do not see a previous certificate for the author, then proceed optimistically.
                 false => return Ok(()),
@@ -1401,7 +1401,7 @@ impl<N: Network> Primary<N> {
         let elapsed = timestamp
             .checked_sub(previous_timestamp)
             .ok_or_else(|| anyhow!("Timestamp cannot be before the previous certificate at round {previous_round}"))?;
-        // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
+        // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_SECS` seconds ago.
         match elapsed < MIN_BATCH_DELAY_IN_SECS as i64 {
             true => bail!("Timestamp is too soon after the previous certificate at round {previous_round}"),
             false => Ok(()),
