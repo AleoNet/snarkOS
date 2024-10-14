@@ -220,12 +220,12 @@ impl<W: Writing> WritingInternal for W {
                 match self_clone.write_to_stream(*msg, &mut framed).await {
                     Ok(len) => {
                         let _ = wrapped_msg.delivery_notification.send(Ok(()));
-                        node.known_peers().register_sent_message(addr, len);
+                        node.known_peers().register_sent_message(addr.ip(), len);
                         node.stats().register_sent_message(len);
                         trace!(parent: node.span(), "sent {}B to {}", len, addr);
                     }
                     Err(e) => {
-                        node.known_peers().register_failure(addr);
+                        node.known_peers().register_failure(addr.ip());
                         error!(parent: node.span(), "couldn't send a message to {}: {}", addr, e);
                         let is_fatal = node.config().fatal_io_errors.contains(&e.kind());
                         let _ = wrapped_msg.delivery_notification.send(Err(e));

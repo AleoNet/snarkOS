@@ -65,6 +65,8 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rand::seq::{IteratorRandom, SliceRandom};
+#[cfg(not(any(test, feature = "test")))]
+use std::net::IpAddr;
 use std::{collections::HashSet, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
@@ -88,6 +90,12 @@ const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DEL
 const MIN_CONNECTED_VALIDATORS: usize = 175;
 /// The maximum number of validators to send in a validators response event.
 const MAX_VALIDATORS_TO_SEND: usize = 200;
+
+/// The minimum permitted interval between connection attempts for an IP; anything shorter is considered malicious.
+#[cfg(not(any(test, feature = "test")))]
+const MIN_CONNECTION_INTERVAL_IN_SECS: u64 = 10;
+/// The amount of time an IP address is prohibited from connecting.
+const IP_BAN_TIME_IN_SECS: u64 = 300;
 
 /// Part of the Gateway API that deals with networking.
 /// This is a separate trait to allow for easier testing/mocking.
@@ -458,6 +466,18 @@ impl<N: Network> Gateway<N> {
             }
         }
         Ok(())
+    }
+
+    /// Check whether the given IP address is currently banned.
+    #[cfg(not(any(test, feature = "test")))]
+    fn is_ip_banned(&self, ip: IpAddr) -> bool {
+        self.tcp.banned_peers().is_ip_banned(&ip)
+    }
+
+    /// Insert or update a banned IP.
+    #[cfg(not(any(test, feature = "test")))]
+    fn update_ip_ban(&self, ip: IpAddr) {
+        self.tcp.banned_peers().update_ip_ban(ip);
     }
 
     #[cfg(feature = "metrics")]
