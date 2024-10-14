@@ -100,8 +100,6 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
         // Initialize the ledger service.
         let ledger_service = Arc::new(ProverLedgerService::new());
-        // Initialize the sync module.
-        let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
         // Determine if the prover should allow external peers.
         let allow_external_peers = true;
 
@@ -116,6 +114,10 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
+
+        // Initialize the sync module.
+        let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone(), router.tcp().clone());
+
         // Compute the maximum number of puzzle instances.
         let max_puzzle_instances = num_cpus::get().saturating_sub(2).clamp(1, 6);
         // Initialize the node.

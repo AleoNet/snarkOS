@@ -107,12 +107,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the ledger service.
         let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), shutdown.clone()));
-        // Initialize the sync module.
-        let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service.clone());
 
         // Initialize the consensus.
         let mut consensus =
-            Consensus::new(account.clone(), ledger_service, bft_ip, trusted_validators, storage_mode.clone())?;
+            Consensus::new(account.clone(), ledger_service.clone(), bft_ip, trusted_validators, storage_mode.clone())?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
@@ -129,6 +127,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
+
+        // Initialize the sync module.
+        let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service, router.tcp().clone());
 
         // Initialize the node.
         let mut node = Self {

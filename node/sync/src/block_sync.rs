@@ -21,6 +21,7 @@ use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_router::messages::DataBlocks;
 use snarkos_node_sync_communication_service::CommunicationService;
 use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
+use snarkos_node_tcp::Tcp;
 use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
@@ -29,7 +30,7 @@ use itertools::Itertools;
 use parking_lot::{Mutex, RwLock};
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -90,6 +91,8 @@ pub struct BlockSync<N: Network> {
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
     canon: Arc<dyn LedgerService<N>>,
+    /// The TCP stack.
+    tcp: Tcp,
     /// The map of peer IP to their block locators.
     /// The block locators are consistent with the canonical map and every other peer's block locators.
     locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
@@ -115,10 +118,11 @@ pub struct BlockSync<N: Network> {
 
 impl<N: Network> BlockSync<N> {
     /// Initializes a new block sync module.
-    pub fn new(mode: BlockSyncMode, ledger: Arc<dyn LedgerService<N>>) -> Self {
+    pub fn new(mode: BlockSyncMode, ledger: Arc<dyn LedgerService<N>>, tcp: Tcp) -> Self {
         Self {
             mode,
             canon: ledger,
+            tcp,
             locators: Default::default(),
             common_ancestors: Default::default(),
             requests: Default::default(),
@@ -676,6 +680,8 @@ impl<N: Network> BlockSync<N> {
         let mut responses = self.responses.write();
         // Acquire the write lock on the request timestamps map.
         let mut request_timestamps = self.request_timestamps.write();
+        //  Acquire the write lock on the locators map.
+        let mut locators = self.locators.write();
 
         // Retrieve the current time.
         let now = Instant::now();
@@ -685,6 +691,8 @@ impl<N: Network> BlockSync<N> {
 
         // Track the number of timed out block requests.
         let mut num_timed_out_block_requests = 0;
+
+        let mut peers_to_ban: HashSet<SocketAddr> = HashSet::new();
 
         // Remove timed out block requests.
         request_timestamps.retain(|height, timestamp| {
@@ -700,6 +708,17 @@ impl<N: Network> BlockSync<N> {
             // If the request has timed out, or is obsolete, then remove it.
             if is_timeout || is_obsolete {
                 trace!("Block request {height} has timed out: is_time_passed = {is_time_passed}, is_request_incomplete = {is_request_incomplete}, is_obsolete = {is_obsolete}");
+
+                if let Some((_, _, peer_ips)) = requests.get(height) { peer_ips.iter().for_each(|peer_ip| {
+                        debug!("Removing peer {peer_ip} from block request {height}");
+                        // Remove the locators entry for the given peer IP.
+                        locators.swap_remove(peer_ip);
+                        if is_timeout {
+                            peers_to_ban.insert(*peer_ip);
+                        }
+                    });
+                }
+
                 // Remove the request entry for the given height.
                 requests.remove(height);
                 // Remove the response entry for the given height.
@@ -710,6 +729,18 @@ impl<N: Network> BlockSync<N> {
             // Retain if this is not a timeout and is not obsolete.
             !is_timeout && !is_obsolete
         });
+
+        // After the retain loop, handle the banning of peers
+        for peer_ip in peers_to_ban {
+            trace!("Banning peer {peer_ip} for timing out on block requests");
+            self.tcp.banned_peers().update_ip_ban(peer_ip.ip());
+
+            let tcp = self.tcp.clone();
+            tokio::spawn(async move {
+                tcp.disconnect(peer_ip).await;
+                trace!("Peer disconnected!");
+            });
+        }
 
         num_timed_out_block_requests
     }
@@ -952,6 +983,7 @@ mod tests {
     use snarkvm::prelude::{Field, TestRng};
 
     use indexmap::{indexset, IndexSet};
+    use snarkos_node_tcp::Config;
     use snarkvm::ledger::committee::Committee;
     use std::net::{IpAddr, Ipv4Addr};
 
@@ -976,7 +1008,15 @@ mod tests {
 
     /// Returns the sync pool, with the canonical ledger initialized to the given height.
     fn sample_sync_at_height(height: u32) -> BlockSync<CurrentNetwork> {
-        BlockSync::<CurrentNetwork>::new(BlockSyncMode::Router, Arc::new(sample_ledger_service(height)))
+        BlockSync::<CurrentNetwork>::new(BlockSyncMode::Router, Arc::new(sample_ledger_service(height)), sample_tcp())
+    }
+
+    fn sample_tcp() -> Tcp {
+        Tcp::new(Config {
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            max_connections: 200,
+            ..Default::default()
+        })
     }
 
     /// Checks that the sync pool (starting at genesis) returns the correct requests.
