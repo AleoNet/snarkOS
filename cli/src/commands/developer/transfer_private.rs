@@ -133,7 +133,7 @@ impl TransferPrivate {
 
             // Prepare the inputs for a transfer.
             let input_record = Developer::parse_record(&private_key, &self.input_record)?;
-            let inputs = vec![
+            let inputs = [
                 Value::Record(input_record),
                 Value::from_str(&format!("{}", recipient))?,
                 Value::from_str(&format!("{}u64", self.amount))?,
