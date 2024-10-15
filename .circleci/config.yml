@@ -60,7 +60,7 @@ commands:
     parameters:
       cache_key:
         type: string
-        default: v3-rust-1.81.0-snarkos-stable-cache
+        default: v3.0.0-rust-1.81.0-snarkos-stable-cache
     steps:
       - run: set -e
       - run:
@@ -88,7 +88,7 @@ commands:
     parameters:
       cache_key:
         type: string
-        default: v3-rust-1.81.0-snarkos-stable-cache
+        default: v3.0.0-rust-1.81.0-snarkos-stable-cache
     steps:
       - run: (sccache -s||true)
       - run: set +e
@@ -178,7 +178,7 @@ jobs:
     steps:
       - run_serial_long:
           workspace_member: .integration
-          cache_key: v3-rust-1.81.0-integration-cache
+          cache_key: v3.0.0-rust-1.81.0-integration-cache
 
   snarkos:
     docker:
@@ -187,7 +187,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: .
-          cache_key: v3-rust-1.81.0-stable-cache
+          cache_key: v3.0.0-rust-1.81.0-stable-cache
 
   account:
     docker:
@@ -196,7 +196,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: account
-          cache_key: v3-rust-1.81.0-account-cache
+          cache_key: v3.0.0-rust-1.81.0-account-cache
 
   cli:
     docker:
@@ -205,7 +205,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: cli
-          cache_key: v3-rust-1.81.0-cli-cache
+          cache_key: v3.0.0-rust-1.81.0-cli-cache
 
   display:
     docker:
@@ -214,7 +214,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: display
-          cache_key: v3-rust-1.81.0-display-cache
+          cache_key: v3.0.0-rust-1.81.0-display-cache
 
   node:
     docker:
@@ -223,7 +223,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node
-          cache_key: v3-rust-1.81.0-node-cache
+          cache_key: v3.0.0-rust-1.81.0-node-cache
 
   node-bft:
     docker:
@@ -232,7 +232,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/bft
-          cache_key: v3-rust-1.81.0-node-bft-cache
+          cache_key: v3.0.0-rust-1.81.0-node-bft-cache
 
   node-bft-events:
     docker:
@@ -241,7 +241,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/bft/events
-          cache_key: v3-rust-1.81.0-node-bft-events-cache
+          cache_key: v3.0.0-rust-1.81.0-node-bft-events-cache
 
   node-bft-ledger-service:
     docker:
@@ -250,7 +250,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/bft/ledger-service
-          cache_key: v3-rust-1.81.0-node-bft-ledger-service-cache
+          cache_key: v3.0.0-rust-1.81.0-node-bft-ledger-service-cache
 
   node-bft-storage-service:
     docker:
@@ -259,7 +259,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/bft/storage-service
-          cache_key: v3-rust-1.81.0-node-bft-storage-service-cache
+          cache_key: v3.0.0-rust-1.81.0-node-bft-storage-service-cache
 
   node-cdn:
     docker:
@@ -268,7 +268,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/cdn
-          cache_key: v3-rust-1.81.0-node-cdn-cache
+          cache_key: v3.0.0-rust-1.81.0-node-cdn-cache
 
   node-consensus:
     docker:
@@ -277,7 +277,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/consensus
-          cache_key: v3-rust-1.81.0-node-consensus-cache
+          cache_key: v3.0.0-rust-1.81.0-node-consensus-cache
 
   node-rest:
     docker:
@@ -286,7 +286,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/rest
-          cache_key: v3-rust-1.81.0-node-rest-cache
+          cache_key: v3.0.0-rust-1.81.0-node-rest-cache
 
   node-router:
     docker:
@@ -295,7 +295,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/router
-          cache_key: v3-rust-1.81.0-node-router-cache
+          cache_key: v3.0.0-rust-1.81.0-node-router-cache
 
   node-router-messages:
     docker:
@@ -304,7 +304,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/router/messages
-          cache_key: v3-rust-1.81.0-node-router-messages-cache
+          cache_key: v3.0.0-rust-1.81.0-node-router-messages-cache
 
   node-sync:
     docker:
@@ -313,7 +313,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/sync
-          cache_key: v3-rust-1.81.0-node-sync-cache
+          cache_key: v3.0.0-rust-1.81.0-node-sync-cache
 
   node-sync-communication-service:
     docker:
@@ -322,7 +322,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/sync/communication-service
-          cache_key: v3-rust-1.81.0-node-sync-communication-service-cache
+          cache_key: v3.0.0-rust-1.81.0-node-sync-communication-service-cache
 
   node-sync-locators:
     docker:
@@ -331,7 +331,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/sync/locators
-          cache_key: v3-rust-1.81.0-node-sync-locators-cache
+          cache_key: v3.0.0-rust-1.81.0-node-sync-locators-cache
 
   node-tcp:
     docker:
@@ -340,7 +340,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/tcp
-          cache_key: v3-rust-1.81.0-node-tcp-cache
+          cache_key: v3.0.0-rust-1.81.0-node-tcp-cache
 
   check-fmt:
     docker:
@@ -350,13 +350,13 @@ jobs:
       - checkout
       - install_rust_nightly
       - setup_environment:
-          cache_key: v3-rust-1.81.0-fmt-cache
+          cache_key: v3.0.0-rust-1.81.0-fmt-cache
       - run:
           name: Check style
           no_output_timeout: 35m
           command: cargo +nightly fmt --all -- --check
       - clear_environment:
-          cache_key: v3-rust-1.81.0-fmt-cache
+          cache_key: v3.0.0-rust-1.81.0-fmt-cache
 
   check-clippy:
     docker:
@@ -365,7 +365,7 @@ jobs:
     steps:
       - checkout
       - setup_environment:
-          cache_key: v3-rust-1.81.0-clippy-cache
+          cache_key: v3.0.0-rust-1.81.0-clippy-cache
       - run:
           name: Check lint
           no_output_timeout: 35m
@@ -373,7 +373,7 @@ jobs:
             cargo clippy --workspace --all-targets -- -D warnings
             cargo clippy --workspace --all-targets --all-features -- -D warnings
       - clear_environment:
-          cache_key: v3-rust-1.81.0-clippy-cache
+          cache_key: v3.0.0-rust-1.81.0-clippy-cache
 
   verify-windows:
     executor:
