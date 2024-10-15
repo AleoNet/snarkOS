@@ -95,6 +95,16 @@ cargo install --locked --path .
 
 Please ensure ports `4130/tcp` and `3030/tcp` are open on your router and OS firewall.
 
+**Note:** Ensure that your open file limit is set to 16,384 or above. 
+For the recommended setting run:
+```
+# Increase the open file limit for the current user (replace <username> with your username)
+echo "<username> - nofile 65536" | sudo tee -a /etc/security/limits.conf
+
+# Increase the default system open file limit
+sudo bash -c 'echo "DefaultLimitNOFILE=65536" >> /etc/systemd/system.conf'
+```
+
 ## 3. Run an Aleo Node
 
 ## 3.1 Run an Aleo Client
