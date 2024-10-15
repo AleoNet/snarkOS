@@ -19,25 +19,25 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_bft::ledger_service::ProverLedgerService;
 use snarkos_node_router::{
-    messages::{Message, NodeType, UnconfirmedSolution},
     Heartbeat,
     Inbound,
     Outbound,
     Router,
     Routing,
+    messages::{Message, NodeType, UnconfirmedSolution},
 };
 use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
 };
 use snarkvm::{
     ledger::narwhal::Data,
     prelude::{
+        Network,
         block::{Block, Header},
         puzzle::{Puzzle, Solution},
         store::ConsensusStorage,
-        Network,
     },
     synthesizer::VM,
 };
@@ -47,13 +47,13 @@ use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
 use parking_lot::{Mutex, RwLock};
-use rand::{rngs::OsRng, CryptoRng, Rng};
+use rand::{CryptoRng, Rng, rngs::OsRng};
 use snarkos_node_bft::helpers::fmt_id;
 use std::{
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicU8, Ordering},
     },
 };
 use tokio::task::JoinHandle;

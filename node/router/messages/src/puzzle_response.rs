@@ -51,7 +51,7 @@ impl<N: Network> FromBytes for PuzzleResponse<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{challenge_response::prop_tests::any_genesis_header, PuzzleResponse};
+    use crate::{PuzzleResponse, challenge_response::prop_tests::any_genesis_header};
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
         ledger::narwhal::Data,
@@ -59,7 +59,7 @@ pub mod prop_tests {
     };
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use proptest::prelude::{BoxedStrategy, Strategy, any};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;

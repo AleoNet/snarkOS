@@ -13,23 +13,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{traits::NodeInterface, Client, Prover, Validator};
+use crate::{Client, Prover, Validator, traits::NodeInterface};
 use snarkos_account::Account;
 use snarkos_node_router::messages::NodeType;
 use snarkvm::prelude::{
-    block::Block,
-    store::helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},
     Address,
     Network,
     PrivateKey,
     ViewKey,
+    block::Block,
+    store::helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},
 };
 
 use aleo_std::StorageMode;
 use anyhow::Result;
 use std::{
     net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 
 pub enum Node<N: Network> {

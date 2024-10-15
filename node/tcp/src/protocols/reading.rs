@@ -14,12 +14,12 @@
 // limitations under the License.
 
 #[cfg(doc)]
-use crate::{protocols::Handshake, Config};
+use crate::{Config, protocols::Handshake};
 use crate::{
-    protocols::{ProtocolHandler, ReturnableConnection},
     ConnectionSide,
-    Tcp,
     P2P,
+    Tcp,
+    protocols::{ProtocolHandler, ReturnableConnection},
 };
 
 use async_trait::async_trait;

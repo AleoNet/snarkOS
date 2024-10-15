@@ -77,12 +77,12 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{certificate_response::prop_tests::any_batch_certificate, PrimaryPing};
-    use snarkos_node_sync_locators::{test_helpers::sample_block_locators, BlockLocators};
+    use crate::{PrimaryPing, certificate_response::prop_tests::any_batch_certificate};
+    use snarkos_node_sync_locators::{BlockLocators, test_helpers::sample_block_locators};
     use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use proptest::prelude::{BoxedStrategy, Strategy, any};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;

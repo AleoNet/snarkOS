@@ -14,19 +14,19 @@
 // limitations under the License.
 
 use crate::{
+    MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
+    Primary,
     helpers::{
-        fmt_id,
-        init_bft_channels,
-        now,
         BFTReceiver,
         ConsensusSender,
+        DAG,
         PrimaryReceiver,
         PrimarySender,
         Storage,
-        DAG,
+        fmt_id,
+        init_bft_channels,
+        now,
     },
-    Primary,
-    MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -38,7 +38,7 @@ use snarkvm::{
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
     },
-    prelude::{bail, ensure, Field, Network, Result},
+    prelude::{Field, Network, Result, bail, ensure},
 };
 
 use colored::Colorize;
@@ -49,12 +49,12 @@ use std::{
     future::Future,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicI64, Ordering},
         Arc,
+        atomic::{AtomicI64, Ordering},
     },
 };
 use tokio::{
-    sync::{oneshot, Mutex as TMutex, OnceCell},
+    sync::{Mutex as TMutex, OnceCell, oneshot},
     task::JoinHandle,
 };
 
@@ -892,7 +892,7 @@ impl<N: Network> BFT<N> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{helpers::Storage, BFT, MAX_LEADER_CERTIFICATE_DELAY_IN_SECS};
+    use crate::{BFT, MAX_LEADER_CERTIFICATE_DELAY_IN_SECS, helpers::Storage};
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;

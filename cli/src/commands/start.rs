@@ -15,7 +15,7 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{bft::MEMORY_POOL_PORT, router::messages::NodeType, Node};
+use snarkos_node::{Node, bft::MEMORY_POOL_PORT, router::messages::NodeType};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
@@ -25,7 +25,7 @@ use snarkvm::{
     ledger::{
         block::Block,
         committee::{Committee, MIN_DELEGATOR_STAKE, MIN_VALIDATOR_STAKE},
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
     prelude::{FromBytes, ToBits, ToBytes},
     synthesizer::VM,
@@ -33,7 +33,7 @@ use snarkvm::{
 };
 
 use aleo_std::StorageMode;
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
@@ -44,7 +44,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
     path::PathBuf,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 use tokio::runtime::{self, Runtime};
 
@@ -767,7 +767,7 @@ fn load_or_compute_genesis<N: Network>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::{Command, CLI};
+    use crate::commands::{CLI, Command};
     use snarkvm::prelude::MainnetV0;
 
     type CurrentNetwork = MainnetV0;

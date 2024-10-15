@@ -17,14 +17,14 @@
 
 use snarkvm::{
     console::network::{CanaryV0, MainnetV0, Network, TestnetV0},
-    prelude::{block::Block, Ciphertext, Field, FromBytes, Plaintext, PrivateKey, Record, ViewKey},
+    prelude::{Ciphertext, Field, FromBytes, Plaintext, PrivateKey, Record, ViewKey, block::Block},
 };
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use clap::Parser;
 use parking_lot::RwLock;
 use std::{
-    io::{stdout, Write},
+    io::{Write, stdout},
     str::FromStr,
     sync::Arc,
 };

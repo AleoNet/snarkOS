@@ -14,9 +14,9 @@
 // limitations under the License.
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 use std::collections::VecDeque;
 use tokio::sync::mpsc;

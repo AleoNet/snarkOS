@@ -21,24 +21,24 @@ use snarkos_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedge
 use snarkos_node_consensus::Consensus;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
-    messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
     Heartbeat,
     Inbound,
     Outbound,
     Router,
     Routing,
+    messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
 };
 use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
 };
 use snarkvm::prelude::{
+    Ledger,
+    Network,
     block::{Block, Header},
     puzzle::Solution,
     store::ConsensusStorage,
-    Ledger,
-    Network,
 };
 
 use aleo_std::StorageMode;
@@ -47,7 +47,7 @@ use core::future::Future;
 use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     time::Duration,
 };
 use tokio::task::JoinHandle;
@@ -443,9 +443,9 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
 mod tests {
     use super::*;
     use snarkvm::prelude::{
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
         MainnetV0,
         VM,
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     };
 
     use anyhow::bail;

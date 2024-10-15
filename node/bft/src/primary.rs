@@ -14,14 +14,17 @@
 // limitations under the License.
 
 use crate::{
+    Gateway,
+    MAX_BATCH_DELAY_IN_MS,
+    MAX_WORKERS,
+    MIN_BATCH_DELAY_IN_SECS,
+    PRIMARY_PING_IN_MS,
+    Sync,
+    Transport,
+    WORKER_PING_IN_MS,
+    Worker,
     events::{BatchPropose, BatchSignature, Event},
     helpers::{
-        assign_to_worker,
-        assign_to_workers,
-        fmt_id,
-        init_sync_channels,
-        init_worker_channels,
-        now,
         BFTSender,
         PrimaryReceiver,
         PrimarySender,
@@ -29,17 +32,14 @@ use crate::{
         ProposalCache,
         SignedProposals,
         Storage,
+        assign_to_worker,
+        assign_to_workers,
+        fmt_id,
+        init_sync_channels,
+        init_worker_channels,
+        now,
     },
     spawn_blocking,
-    Gateway,
-    Sync,
-    Transport,
-    Worker,
-    MAX_BATCH_DELAY_IN_MS,
-    MAX_WORKERS,
-    MIN_BATCH_DELAY_IN_SECS,
-    PRIMARY_PING_IN_MS,
-    WORKER_PING_IN_MS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;

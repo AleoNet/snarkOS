@@ -20,7 +20,7 @@ use snarkos_node_router::{
 };
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Block, error, Address, Field, FromBytes, MainnetV0 as CurrentNetwork, Network, TestRng},
+    prelude::{Address, Field, FromBytes, MainnetV0 as CurrentNetwork, Network, TestRng, block::Block, error},
 };
 
 use std::{
@@ -29,14 +29,14 @@ use std::{
     str::FromStr,
 };
 
-use futures_util::{sink::SinkExt, TryStreamExt};
+use futures_util::{TryStreamExt, sink::SinkExt};
 use pea2pea::{
-    protocols::{Handshake, OnDisconnect, Reading, Writing},
     Config,
     Connection,
     ConnectionSide,
     Node,
     Pea2Pea,
+    protocols::{Handshake, OnDisconnect, Reading, Writing},
 };
 use rand::Rng;
 use tokio_util::codec::Framed;

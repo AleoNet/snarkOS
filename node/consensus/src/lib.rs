@@ -20,17 +20,17 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_bft::{
+    BFT,
+    Primary,
     helpers::{
-        fmt_id,
-        init_consensus_channels,
         ConsensusReceiver,
         PrimaryReceiver,
         PrimarySender,
         Storage as NarwhalStorage,
+        fmt_id,
+        init_consensus_channels,
     },
     spawn_blocking,
-    Primary,
-    BFT,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_bft_storage_service::BFTPersistentStorage;
@@ -51,7 +51,7 @@ use lru::LruCache;
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 use tokio::{
-    sync::{oneshot, OnceCell},
+    sync::{OnceCell, oneshot},
     task::JoinHandle,
 };
 

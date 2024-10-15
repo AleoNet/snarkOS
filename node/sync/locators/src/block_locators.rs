@@ -13,12 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::prelude::{error, has_duplicates, FromBytes, IoResult, Network, Read, ToBytes, Write};
+use snarkvm::prelude::{FromBytes, IoResult, Network, Read, ToBytes, Write, error, has_duplicates};
 
-use anyhow::{bail, ensure, Result};
-use indexmap::{indexmap, IndexMap};
+use anyhow::{Result, bail, ensure};
+use indexmap::{IndexMap, indexmap};
 use serde::{Deserialize, Serialize};
-use std::collections::{btree_map::IntoIter, BTreeMap};
+use std::collections::{BTreeMap, btree_map::IntoIter};
 
 /// The number of recent blocks (near tip).
 pub const NUM_RECENT_BLOCKS: usize = 100; // 100 blocks

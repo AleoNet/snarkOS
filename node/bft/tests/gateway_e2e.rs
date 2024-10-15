@@ -17,13 +17,13 @@
 mod common;
 
 use crate::common::{
+    CurrentNetwork,
     primary::new_test_committee,
     test_peer::TestPeer,
     utils::{sample_gateway, sample_ledger, sample_storage},
-    CurrentNetwork,
 };
 use snarkos_account::Account;
-use snarkos_node_bft::{helpers::init_primary_channels, Gateway};
+use snarkos_node_bft::{Gateway, helpers::init_primary_channels};
 use snarkos_node_bft_events::{ChallengeRequest, ChallengeResponse, Disconnect, DisconnectReason, Event, WorkerPing};
 use snarkos_node_tcp::P2P;
 use snarkvm::{ledger::narwhal::Data, prelude::TestRng};

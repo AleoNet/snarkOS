@@ -64,12 +64,12 @@ pub mod prop_tests {
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
         ledger::{ledger_test_helpers::sample_genesis_block, narwhal::Data},
-        prelude::{block::Header, Field, PrivateKey, Signature},
+        prelude::{Field, PrivateKey, Signature, block::Header},
         utilities::rand::{TestRng, Uniform},
     };
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use proptest::prelude::{BoxedStrategy, Strategy, any};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;

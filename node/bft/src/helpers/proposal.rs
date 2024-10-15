@@ -23,7 +23,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, error, FromBytes, IoResult, Itertools, Read, Result, ToBytes, Write},
+    prelude::{FromBytes, IoResult, Itertools, Read, Result, ToBytes, Write, bail, ensure, error},
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -260,9 +260,9 @@ pub(crate) mod tests {
 #[cfg(test)]
 mod prop_tests {
     use crate::helpers::{
+        Proposal,
         now,
         storage::prop_tests::{AnyTransmission, AnyTransmissionID, CryptoTestRng},
-        Proposal,
     };
     use snarkvm::ledger::{
         committee::prop_tests::{CommitteeContext, ValidatorSet},
@@ -270,7 +270,7 @@ mod prop_tests {
     };
 
     use indexmap::IndexMap;
-    use proptest::sample::{size_range, Selector};
+    use proptest::sample::{Selector, size_range};
     use test_strategy::proptest;
 
     #[proptest]

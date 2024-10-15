@@ -13,17 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{fmt_id, spawn_blocking, LedgerService};
+use crate::{LedgerService, fmt_id, spawn_blocking};
 use snarkvm::{
     ledger::{
+        Ledger,
         block::{Block, Transaction},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
         store::ConsensusStorage,
-        Ledger,
     },
-    prelude::{bail, Address, Field, FromBytes, Network, Result},
+    prelude::{Address, Field, FromBytes, Network, Result, bail},
 };
 
 use indexmap::IndexMap;
@@ -34,8 +34,8 @@ use std::{
     io::Read,
     ops::Range,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 

@@ -21,7 +21,7 @@ use snarkvm::{
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
     },
-    prelude::{bail, Address, Field, Network, Result, Zero},
+    prelude::{Address, Field, Network, Result, Zero, bail},
 };
 
 use indexmap::IndexMap;

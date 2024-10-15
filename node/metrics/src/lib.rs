@@ -27,13 +27,13 @@ use rayon::prelude::*;
 use parking_lot::Mutex;
 use snarkvm::{
     ledger::narwhal::TransmissionID,
-    prelude::{cfg_iter, Block, Network},
+    prelude::{Block, Network, cfg_iter},
 };
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 use time::OffsetDateTime;

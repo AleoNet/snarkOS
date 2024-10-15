@@ -20,8 +20,8 @@ use std::{
     net::{IpAddr, SocketAddr},
     ops::Deref,
     sync::{
-        atomic::{AtomicUsize, Ordering::*},
         Arc,
+        atomic::{AtomicUsize, Ordering::*},
     },
     time::Duration,
 };
@@ -38,11 +38,11 @@ use tokio::{
 use tracing::*;
 
 use crate::{
-    connections::{Connection, ConnectionSide, Connections},
-    protocols::{Protocol, Protocols},
     Config,
     KnownPeers,
     Stats,
+    connections::{Connection, ConnectionSide, Connections},
+    protocols::{Protocol, Protocols},
 };
 
 // A sequential numeric identifier assigned to `Tcp`s that were not provided with a name.

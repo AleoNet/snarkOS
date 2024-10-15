@@ -18,19 +18,19 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 use snarkvm::{
     ledger::{
+        Ledger,
         block::{Block, Transaction},
         committee::Committee,
         narwhal::{Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
         store::ConsensusStorage,
-        Ledger,
     },
-    prelude::{narwhal::BatchCertificate, Address, Field, Network, Result},
+    prelude::{Address, Field, Network, Result, narwhal::BatchCertificate},
 };
 use std::{
     fmt,
     ops::Range,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 
 pub struct TranslucentLedgerService<N: Network, C: ConsensusStorage<N>> {

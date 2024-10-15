@@ -19,7 +19,7 @@ use snarkvm::{
     prelude::{Network, ToBytes},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use sha2::{Digest, Sha256};
 
 fn double_sha256(data: &[u8]) -> [u8; 32] {

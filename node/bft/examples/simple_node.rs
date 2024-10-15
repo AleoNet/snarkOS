@@ -18,36 +18,36 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_bft::{
-    helpers::{init_consensus_channels, init_primary_channels, ConsensusReceiver, PrimarySender, Storage},
-    Primary,
     BFT,
     MEMORY_POOL_PORT,
+    Primary,
+    helpers::{ConsensusReceiver, PrimarySender, Storage, init_consensus_channels, init_primary_channels},
 };
 use snarkos_node_bft_ledger_service::TranslucentLedgerService;
 use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
     console::{account::PrivateKey, algorithms::BHP256, types::Address},
     ledger::{
+        Block,
+        Ledger,
         block::Transaction,
         committee::{Committee, MIN_VALIDATOR_STAKE},
         narwhal::{BatchHeader, Data},
         puzzle::{Solution, SolutionID},
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Block,
-        Ledger,
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
     prelude::{Field, Hash, Network, Uniform, VM},
-    utilities::{to_bytes_le, FromBytes, TestRng, ToBits, ToBytes},
+    utilities::{FromBytes, TestRng, ToBits, ToBytes, to_bytes_le},
 };
 
 use ::bytes::Bytes;
-use anyhow::{anyhow, ensure, Error, Result};
+use anyhow::{Error, Result, anyhow, ensure};
 use axum::{
+    Router,
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
-    Router,
 };
 use axum_extra::response::ErasedJson;
 use clap::{Parser, ValueEnum};
@@ -58,7 +58,7 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     str::FromStr,
-    sync::{atomic::AtomicBool, Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock, atomic::AtomicBool},
 };
 use tokio::{net::TcpListener, sync::oneshot};
 use tracing_subscriber::{
