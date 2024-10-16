@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-cli"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A CLI for a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -16,15 +16,17 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = [ "snarkos-node/metrics" ]
+
 [dependencies.aleo-std]
-version = "0.1.18"
-default-features = false
+workspace = true
 
 [dependencies.anstyle]
 version = "1"
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0.79"
 
 [dependencies.bincode]
 version = "1.0"
@@ -42,6 +44,11 @@ version = "0.27"
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../node/metrics"
+version = "=2.2.7"
 
 [dependencies.num_cpus]
 version = "1"
@@ -61,7 +68,8 @@ default-features = false
 version = "1"
 
 [dependencies.self_update]
-version = "0.39"
+version = "0.41"
+features = [ "archive-zip", "compression-zip-deflate" ]
 
 [dependencies.serde]
 version = "1"
@@ -72,29 +80,32 @@ features = [ "preserve_order" ]
 
 [dependencies.snarkos-account]
 path = "../account"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-display]
 path = "../display"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node]
 path = "../node"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-cdn]
 path = "../node/cdn"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-rest]
 path = "../node/rest"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkvm]
 workspace = true
 
 [dependencies.sys-info]
 version = "0.9"
+
+[dependencies.time]
+version = "0.3"
 
 [dependencies.thiserror]
 version = "1.0"
@@ -103,12 +114,19 @@ version = "1.0"
 version = "1.28"
 features = [ "rt" ]
 
+[dependencies.tracing]
+version = "0.1"
+
 [dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter" ]
 
 [dependencies.ureq]
-version = "2.8"
+version = "2.9"
+
+[dependencies.zeroize]
+version = "1"
+features = [ "derive" ]
 
 [target."cfg(target_family = \"unix\")".dependencies.nix]
 version = "0.26"

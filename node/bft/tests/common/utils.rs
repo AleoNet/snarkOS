@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -12,13 +13,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::CurrentNetwork;
-use snarkos_node_bft::helpers::PrimarySender;
+use crate::common::{primary, CurrentNetwork, TranslucentLedgerService};
+use snarkos_account::Account;
+use snarkos_node_bft::{
+    helpers::{PrimarySender, Storage},
+    Gateway,
+    Worker,
+};
+
+use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
-    ledger::narwhal::Data,
+    console::account::Address,
+    ledger::{
+        committee::Committee,
+        narwhal::{BatchHeader, Data},
+        store::helpers::memory::ConsensusMemory,
+    },
     prelude::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
+        committee::MIN_VALIDATOR_STAKE,
+        puzzle::{Solution, SolutionID},
         Field,
         Network,
         TestRng,
@@ -26,11 +40,13 @@ use snarkvm::{
     },
 };
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use ::bytes::Bytes;
+use indexmap::IndexMap;
+use parking_lot::RwLock;
 use rand::Rng;
-use tokio::{sync::oneshot, task, task::JoinHandle, time::sleep};
+use tokio::{sync::oneshot, task::JoinHandle, time::sleep};
 use tracing::*;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -83,32 +99,29 @@ pub fn fire_unconfirmed_solutions(
         // This RNG samples *different* fake solutions for each node.
         let mut unique_rng = TestRng::fixed(node_id as u64);
 
-        // A closure to generate a commitment and solution.
-        async fn sample(mut rng: impl Rng) -> (PuzzleCommitment<CurrentNetwork>, Data<ProverSolution<CurrentNetwork>>) {
-            // Sample a random fake puzzle commitment.
-            // TODO (howardwu): Use a mutex to bring in the real 'proof target' and change this sampling to a while loop.
-            let affine = rng.gen();
-            let commitment =
-                task::spawn_blocking(move || PuzzleCommitment::<CurrentNetwork>::from_g1_affine(affine)).await.unwrap();
+        // A closure to generate a solution ID and solution.
+        async fn sample(mut rng: impl Rng) -> (SolutionID<CurrentNetwork>, Data<Solution<CurrentNetwork>>) {
+            // Sample a random fake solution ID.
+            let solution_id = rng.gen::<u64>().into();
             // Sample random fake solution bytes.
             let mut vec = vec![0u8; 1024];
             rng.fill_bytes(&mut vec);
             let solution = Data::Buffer(Bytes::from(vec));
-            // Return the ID and solution.
-            (commitment, solution)
+            // Return the solution ID and solution.
+            (solution_id, solution)
         }
 
         // Initialize a counter.
         let mut counter = 0;
 
         loop {
-            // Sample a random fake puzzle commitment and solution.
-            let (commitment, solution) =
+            // Sample a random fake solution ID and solution.
+            let (solution_id, solution) =
                 if counter % 2 == 0 { sample(&mut shared_rng).await } else { sample(&mut unique_rng).await };
             // Initialize a callback sender and receiver.
             let (callback, callback_receiver) = oneshot::channel();
             // Send the fake solution.
-            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution, callback)).await {
+            if let Err(e) = tx_unconfirmed_solution.send((solution_id, solution, callback)).await {
                 error!("Failed to send unconfirmed solution: {e}");
             }
             let _ = callback_receiver.await;
@@ -166,4 +179,57 @@ pub fn fire_unconfirmed_transactions(
             sleep(Duration::from_millis(interval_ms)).await;
         }
     })
+}
+
+/// Samples a new ledger with the given number of nodes.
+pub fn sample_ledger(
+    accounts: &[Account<CurrentNetwork>],
+    committee: &Committee<CurrentNetwork>,
+    rng: &mut TestRng,
+) -> Arc<TranslucentLedgerService<CurrentNetwork, ConsensusMemory<CurrentNetwork>>> {
+    let num_nodes = committee.num_members();
+    let bonded_balances: IndexMap<_, _> =
+        committee.members().iter().map(|(address, (amount, _, _))| (*address, (*address, *address, *amount))).collect();
+    let gen_key = *accounts[0].private_key();
+    let public_balance_per_validator =
+        (CurrentNetwork::STARTING_SUPPLY - (num_nodes as u64) * MIN_VALIDATOR_STAKE) / (num_nodes as u64);
+    let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
+    for account in accounts.iter() {
+        balances.insert(account.address(), public_balance_per_validator);
+    }
+
+    let gen_ledger =
+        primary::genesis_ledger(gen_key, committee.clone(), balances.clone(), bonded_balances.clone(), rng);
+    Arc::new(TranslucentLedgerService::new(gen_ledger, Default::default()))
+}
+
+/// Samples a new storage with the given ledger.
+pub fn sample_storage<N: Network>(ledger: Arc<TranslucentLedgerService<N, ConsensusMemory<N>>>) -> Storage<N> {
+    Storage::new(ledger, Arc::new(BFTMemoryService::new()), BatchHeader::<N>::MAX_GC_ROUNDS as u64)
+}
+
+/// Samples a new gateway with the given ledger.
+pub fn sample_gateway<N: Network>(
+    account: Account<N>,
+    storage: Storage<N>,
+    ledger: Arc<TranslucentLedgerService<N, ConsensusMemory<N>>>,
+) -> Gateway<N> {
+    // Initialize the gateway.
+    Gateway::new(account, storage, ledger, None, &[], None).unwrap()
+}
+
+/// Samples a new worker with the given ledger.
+pub fn sample_worker<N: Network>(
+    id: u8,
+    account: Account<N>,
+    ledger: Arc<TranslucentLedgerService<N, ConsensusMemory<N>>>,
+) -> Worker<N> {
+    // Sample a storage.
+    let storage = sample_storage(ledger.clone());
+    // Sample a gateway.
+    let gateway = sample_gateway(account, storage.clone(), ledger.clone());
+    // Sample a dummy proposed batch.
+    let proposed_batch = Arc::new(RwLock::new(None));
+    // Construct the worker instance.
+    Worker::new(id, Arc::new(gateway.clone()), storage.clone(), ledger, proposed_batch).unwrap()
 }

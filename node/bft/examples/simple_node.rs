@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -20,22 +21,23 @@ use snarkos_node_bft::{
     helpers::{init_consensus_channels, init_primary_channels, ConsensusReceiver, PrimarySender, Storage},
     Primary,
     BFT,
-    MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
-use snarkos_node_bft_ledger_service::MockLedgerService;
+use snarkos_node_bft_ledger_service::TranslucentLedgerService;
+use snarkos_node_bft_storage_service::BFTMemoryService;
 use snarkvm::{
+    console::{account::PrivateKey, algorithms::BHP256, types::Address},
     ledger::{
-        committee::{Committee, MIN_VALIDATOR_STAKE},
-        narwhal::Data,
-    },
-    prelude::{
         block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
-        Field,
-        Network,
-        Uniform,
+        committee::{Committee, MIN_VALIDATOR_STAKE},
+        narwhal::{BatchHeader, Data},
+        puzzle::{Solution, SolutionID},
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        Block,
+        Ledger,
     },
+    prelude::{Field, Hash, Network, Uniform, VM},
+    utilities::{to_bytes_le, FromBytes, TestRng, ToBits, ToBytes},
 };
 
 use ::bytes::Bytes;
@@ -50,15 +52,21 @@ use axum::{
 use axum_extra::response::ErasedJson;
 use clap::{Parser, ValueEnum};
 use indexmap::IndexMap;
-use rand::{Rng, SeedableRng};
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
-use tokio::sync::oneshot;
+use rand::{CryptoRng, Rng, SeedableRng};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    path::PathBuf,
+    str::FromStr,
+    sync::{atomic::AtomicBool, Arc, Mutex, OnceLock},
+};
+use tokio::{net::TcpListener, sync::oneshot};
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
 };
 
-type CurrentNetwork = snarkvm::prelude::Testnet3;
+type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
 /**************************************************************************************************/
 
@@ -112,10 +120,14 @@ pub async fn start_bft(
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (committee, account) = initialize_components(node_id, num_nodes)?;
-    // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the translucent ledger service.
+    let ledger = create_ledger(&account, num_nodes, committee, node_id);
     // Initialize the storage.
-    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
+    let storage = Storage::new(
+        ledger.clone(),
+        Arc::new(BFTMemoryService::new()),
+        BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+    );
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -149,10 +161,14 @@ pub async fn start_primary(
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (committee, account) = initialize_components(node_id, num_nodes)?;
-    // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the translucent ledger service.
+    let ledger = create_ledger(&account, num_nodes, committee, node_id);
     // Initialize the storage.
-    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
+    let storage = Storage::new(
+        ledger.clone(),
+        Arc::new(BFTMemoryService::new()),
+        BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64,
+    );
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -168,6 +184,81 @@ pub async fn start_primary(
     handle_signals(&primary);
     // Return the primary instance.
     Ok((primary, sender))
+}
+
+/// Initialize the translucent ledger service.
+fn create_ledger(
+    account: &Account<CurrentNetwork>,
+    num_nodes: u16,
+    committee: Committee<snarkvm::prelude::MainnetV0>,
+    node_id: u16,
+) -> Arc<TranslucentLedgerService<snarkvm::prelude::MainnetV0, ConsensusMemory<snarkvm::prelude::MainnetV0>>> {
+    let gen_key = account.private_key();
+    let public_balance_per_validator =
+        (CurrentNetwork::STARTING_SUPPLY - (num_nodes as u64) * MIN_VALIDATOR_STAKE) / (num_nodes as u64);
+    let mut balances = IndexMap::<Address<CurrentNetwork>, u64>::new();
+    for address in committee.members().keys() {
+        balances.insert(*address, public_balance_per_validator);
+    }
+    let mut rng = TestRng::default();
+    let gen_ledger = genesis_ledger(*gen_key, committee.clone(), balances.clone(), node_id, &mut rng);
+    Arc::new(TranslucentLedgerService::new(gen_ledger, Arc::new(AtomicBool::new(false))))
+}
+
+pub type CurrentLedger = Ledger<CurrentNetwork, ConsensusMemory<CurrentNetwork>>;
+
+fn genesis_cache() -> &'static Mutex<HashMap<Vec<u8>, Block<CurrentNetwork>>> {
+    static CACHE: OnceLock<Mutex<HashMap<Vec<u8>, Block<CurrentNetwork>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn genesis_block(
+    genesis_private_key: PrivateKey<CurrentNetwork>,
+    committee: Committee<CurrentNetwork>,
+    public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    rng: &mut (impl Rng + CryptoRng),
+) -> Block<CurrentNetwork> {
+    // Initialize the store.
+    let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
+    // Initialize a new VM.
+    let vm = VM::from(store).unwrap();
+    // Initialize the genesis block.
+    let bonded_balances: IndexMap<_, _> =
+        committee.members().iter().map(|(address, (amount, _, _))| (*address, (*address, *address, *amount))).collect();
+    vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng).unwrap()
+}
+
+fn genesis_ledger(
+    genesis_private_key: PrivateKey<CurrentNetwork>,
+    committee: Committee<CurrentNetwork>,
+    public_balances: IndexMap<Address<CurrentNetwork>, u64>,
+    node_id: u16,
+    rng: &mut (impl Rng + CryptoRng),
+) -> CurrentLedger {
+    let cache_key =
+        to_bytes_le![genesis_private_key, committee, public_balances.iter().collect::<Vec<(_, _)>>()].unwrap();
+    // Initialize the genesis block on the first call; other callers
+    // will wait for it on the mutex.
+    let block = genesis_cache()
+        .lock()
+        .unwrap()
+        .entry(cache_key.clone())
+        .or_insert_with(|| {
+            let hasher = BHP256::<CurrentNetwork>::setup("aleo.dev.block").unwrap();
+            let file_name = hasher.hash(&cache_key.to_bits_le()).unwrap().to_string() + ".genesis";
+            let file_path = std::env::temp_dir().join(file_name);
+            if file_path.exists() {
+                let buffer = std::fs::read(file_path).unwrap();
+                return Block::from_bytes_le(&buffer).unwrap();
+            }
+
+            let block = genesis_block(genesis_private_key, committee, public_balances, rng);
+            std::fs::write(&file_path, block.to_bytes_le().unwrap()).unwrap();
+            block
+        })
+        .clone();
+    // Initialize the ledger with the genesis block.
+    CurrentLedger::load(block, aleo_std::StorageMode::Development(node_id)).unwrap()
 }
 
 /// Initializes the components of the node.
@@ -186,7 +277,7 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<Curr
         // Sample the account.
         let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
         // Add the validator.
-        members.insert(account.address(), (MIN_VALIDATOR_STAKE, false));
+        members.insert(account.address(), (MIN_VALIDATOR_STAKE, false, i as u8));
         println!("  Validator {}: {}", i, account.address());
     }
     println!();
@@ -265,28 +356,27 @@ fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u
         // This RNG samples *different* fake solutions for each node.
         let mut unique_rng = rand_chacha::ChaChaRng::seed_from_u64(node_id as u64);
 
-        // A closure to generate a commitment and solution.
-        fn sample(mut rng: impl Rng) -> (PuzzleCommitment<CurrentNetwork>, Data<ProverSolution<CurrentNetwork>>) {
-            // Sample a random fake puzzle commitment.
-            // TODO (howardwu): Use a mutex to bring in the real 'proof target' and change this sampling to a while loop.
-            let commitment = PuzzleCommitment::<CurrentNetwork>::from_g1_affine(rng.gen());
+        // A closure to generate a solution ID and solution.
+        fn sample(mut rng: impl Rng) -> (SolutionID<CurrentNetwork>, Data<Solution<CurrentNetwork>>) {
+            // Sample a random fake solution ID.
+            let solution_id = rng.gen::<u64>().into();
             // Sample random fake solution bytes.
             let solution = Data::Buffer(Bytes::from((0..1024).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
             // Return the ID and solution.
-            (commitment, solution)
+            (solution_id, solution)
         }
 
         // Initialize a counter.
         let mut counter = 0;
 
         loop {
-            // Sample a random fake puzzle commitment and solution.
-            let (commitment, solution) =
+            // Sample a random fake solution ID and solution.
+            let (solution_id, solution) =
                 if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
             // Initialize a callback sender and receiver.
             let (callback, callback_receiver) = oneshot::channel();
             // Send the fake solution.
-            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution, callback)).await {
+            if let Err(e) = tx_unconfirmed_solution.send((solution_id, solution, callback)).await {
                 error!("Failed to send unconfirmed solution: {e}");
             }
             let _ = callback_receiver.await;
@@ -400,10 +490,9 @@ async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<Current
 
     // Run the server.
     info!("Starting the server at '{addr}'...");
-    axum::Server::bind(&addr.parse().unwrap())
-        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-        .await
-        .unwrap();
+    let rest_addr: SocketAddr = addr.parse().unwrap();
+    let rest_listener = TcpListener::bind(rest_addr).await.unwrap();
+    axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
 }
 
 /**************************************************************************************************/
@@ -441,6 +530,9 @@ struct Args {
     /// Enables the solution and transaction cannons, and optionally the interval in ms to run them on.
     #[arg(long, value_name = "INTERVAL_MS")]
     fire_transmissions: Option<Option<u64>>,
+    /// Enables the metrics exporter.
+    #[clap(long, default_value = "false")]
+    metrics: bool,
 }
 
 /// A helper method to parse the peers provided to the CLI.
@@ -506,6 +598,13 @@ async fn main() -> Result<()> {
         }
         _ => (),
     };
+
+    // Initialize the metrics.
+    #[cfg(feature = "metrics")]
+    if args.metrics {
+        info!("Initializing metrics...");
+        metrics::initialize_metrics();
+    }
 
     // Start the monitoring server.
     start_server(bft_holder, primary, args.id).await;

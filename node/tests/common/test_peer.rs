@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -19,7 +20,7 @@ use snarkos_node_router::{
 };
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Block, error, Address, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork},
+    prelude::{block::Block, error, Address, Field, FromBytes, MainnetV0 as CurrentNetwork, Network, TestRng},
 };
 
 use std::{
@@ -30,7 +31,7 @@ use std::{
 
 use futures_util::{sink::SinkExt, TryStreamExt};
 use pea2pea::{
-    protocols::{Disconnect, Handshake, Reading, Writing},
+    protocols::{Handshake, OnDisconnect, Reading, Writing},
     Config,
     Connection,
     ConnectionSide,
@@ -82,8 +83,8 @@ impl TestPeer {
     pub async fn new(node_type: NodeType, account: Account<CurrentNetwork>) -> Self {
         let peer = Self {
             node: Node::new(Config {
-                listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
                 max_connections: 200,
+                listener_addr: Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0)),
                 ..Default::default()
             }),
             node_type,
@@ -113,7 +114,6 @@ impl TestPeer {
     }
 }
 
-#[async_trait::async_trait]
 impl Handshake for TestPeer {
     async fn perform_handshake(&self, mut conn: Connection) -> io::Result<Connection> {
         let rng = &mut TestRng::default();
@@ -127,6 +127,11 @@ impl Handshake for TestPeer {
 
         // Retrieve the genesis block header.
         let genesis_header = *sample_genesis_block().header();
+        // Retrieve the restrictions ID.
+        let restrictions_id = Field::<CurrentNetwork>::from_str(
+            "7562506206353711030068167991213732850758501012603348777370400520506564970105field",
+        )
+        .unwrap();
 
         // TODO(nkls): add assertions on the contents of messages.
         match node_side {
@@ -140,10 +145,17 @@ impl Handshake for TestPeer {
                 let peer_request = expect_message!(Message::ChallengeRequest, framed, peer_addr);
 
                 // Sign the nonce.
-                let signature = self.account().sign_bytes(&peer_request.nonce.to_le_bytes(), rng).unwrap();
+                let response_nonce: u64 = rng.gen();
+                let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+                let signature = self.account().sign_bytes(&data, rng).unwrap();
 
                 // Send the challenge response.
-                let our_response = ChallengeResponse { genesis_header, signature: Data::Object(signature) };
+                let our_response = ChallengeResponse {
+                    genesis_header,
+                    restrictions_id,
+                    signature: Data::Object(signature),
+                    nonce: response_nonce,
+                };
                 framed.send(Message::ChallengeResponse(our_response)).await?;
             }
             ConnectionSide::Responder => {
@@ -151,10 +163,17 @@ impl Handshake for TestPeer {
                 let peer_request = expect_message!(Message::ChallengeRequest, framed, peer_addr);
 
                 // Sign the nonce.
-                let signature = self.account().sign_bytes(&peer_request.nonce.to_le_bytes(), rng).unwrap();
+                let response_nonce: u64 = rng.gen();
+                let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+                let signature = self.account().sign_bytes(&data, rng).unwrap();
 
                 // Send our challenge bundle.
-                let our_response = ChallengeResponse { genesis_header, signature: Data::Object(signature) };
+                let our_response = ChallengeResponse {
+                    genesis_header,
+                    restrictions_id,
+                    signature: Data::Object(signature),
+                    nonce: response_nonce,
+                };
                 framed.send(Message::ChallengeResponse(our_response)).await?;
                 let our_request = ChallengeRequest::new(local_ip.port(), self.node_type(), self.address(), rng.gen());
                 framed.send(Message::ChallengeRequest(our_request)).await?;
@@ -168,7 +187,6 @@ impl Handshake for TestPeer {
     }
 }
 
-#[async_trait::async_trait]
 impl Writing for TestPeer {
     type Codec = MessageCodec<CurrentNetwork>;
     type Message = Message<CurrentNetwork>;
@@ -178,7 +196,6 @@ impl Writing for TestPeer {
     }
 }
 
-#[async_trait::async_trait]
 impl Reading for TestPeer {
     type Codec = MessageCodec<CurrentNetwork>;
     type Message = Message<CurrentNetwork>;
@@ -192,7 +209,6 @@ impl Reading for TestPeer {
     }
 }
 
-#[async_trait::async_trait]
-impl Disconnect for TestPeer {
-    async fn handle_disconnect(&self, _peer_addr: SocketAddr) {}
+impl OnDisconnect for TestPeer {
+    async fn on_disconnect(&self, _peer_addr: SocketAddr) {}
 }

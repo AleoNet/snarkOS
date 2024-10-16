@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -35,7 +36,7 @@ pub struct BlockLocators<N: Network> {
 }
 
 impl<N: Network> BlockLocators<N> {
-    /// Initializes a new instance of the block locators.
+    /// Initializes a new instance of the block locators, checking the validity of the block locators.
     pub fn new(recents: IndexMap<u32, N::BlockHash>, checkpoints: IndexMap<u32, N::BlockHash>) -> Result<Self> {
         // Construct the block locators.
         let locators = Self { recents, checkpoints };
@@ -45,7 +46,7 @@ impl<N: Network> BlockLocators<N> {
         Ok(locators)
     }
 
-    /// Initializes a new instance of the block locators.
+    /// Initializes a new instance of the block locators, without checking the validity of the block locators.
     pub fn new_unchecked(recents: IndexMap<u32, N::BlockHash>, checkpoints: IndexMap<u32, N::BlockHash>) -> Self {
         Self { recents, checkpoints }
     }
@@ -149,13 +150,13 @@ impl<N: Network> BlockLocators<N> {
         // Ensure the block checkpoints are well-formed.
         let last_checkpoint_height = Self::check_block_checkpoints(checkpoints)?;
 
-        // Ensure the `last_recent_height` is at or above `last_checkpoint_height - NUM_RECENTS`.
+        // Ensure the `last_recent_height` is at or above `last_checkpoint_height - NUM_RECENT_BLOCKS`.
         let threshold = last_checkpoint_height.saturating_sub(NUM_RECENT_BLOCKS as u32);
         if last_recent_height < threshold {
             bail!("Recent height ({last_recent_height}) cannot be below checkpoint threshold ({threshold})")
         }
 
-        // If the `last_recent_height` is below NUM_RECENTS, ensure the genesis hash matches in both maps.
+        // If the `last_recent_height` is below NUM_RECENT_BLOCKS, ensure the genesis hash matches in both maps.
         if last_recent_height < NUM_RECENT_BLOCKS as u32
             && recents.get(&0).copied().unwrap_or_default() != checkpoints.get(&0).copied().unwrap_or_default()
         {
@@ -186,7 +187,7 @@ impl<N: Network> BlockLocators<N> {
         if recents.is_empty() {
             bail!("There must be at least 1 recent block")
         }
-        // Ensure the number of recent blocks is at most NUM_RECENTS.
+        // Ensure the number of recent blocks is at most NUM_RECENT_BLOCKS.
         // This redundant check ensures we early exit if the number of recent blocks is too large.
         if recents.len() > NUM_RECENT_BLOCKS {
             bail!("There can be at most {NUM_RECENT_BLOCKS} blocks in the map")
@@ -211,7 +212,7 @@ impl<N: Network> BlockLocators<N> {
         if last_height < NUM_RECENT_BLOCKS as u32 && recents.len().saturating_sub(1) as u32 != last_height {
             bail!("As the last height is below {NUM_RECENT_BLOCKS}, the number of recent blocks must match the height")
         }
-        // Otherwise, ensure the number of recent blocks matches NUM_RECENTS.
+        // Otherwise, ensure the number of recent blocks matches NUM_RECENT_BLOCKS.
         if last_height >= NUM_RECENT_BLOCKS as u32 && recents.len() != NUM_RECENT_BLOCKS {
             bail!("Number of recent blocks must match {NUM_RECENT_BLOCKS}")
         }
@@ -311,7 +312,7 @@ pub mod test_helpers {
     use super::*;
     use snarkvm::prelude::Field;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Simulates a block locator at the given height.
     pub fn sample_block_locators(height: u32) -> BlockLocators<CurrentNetwork> {
@@ -392,7 +393,7 @@ mod tests {
 
     use core::ops::Range;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Simulates block locators for a ledger within the given `heights` range.
     fn check_is_valid(checkpoints: IndexMap<u32, <CurrentNetwork as Network>::BlockHash>, heights: Range<u32>) {

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -16,7 +17,7 @@
 mod common;
 
 use crate::common::primary::{TestNetwork, TestNetworkConfig};
-use snarkos_node_bft::MAX_BATCH_DELAY_IN_MS;
+use snarkos_node_bft::MAX_FETCH_TIMEOUT_IN_MS;
 
 use std::time::Duration;
 
@@ -72,7 +73,7 @@ async fn test_quorum_threshold() {
     // Start the cannons for node 0.
     network.fire_transmissions_at(0, TRANSMISSION_INTERVAL_MS);
 
-    sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS * 2)).await;
+    sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
 
     // Check each node is still at round 1.
     for validator in network.validators.values() {
@@ -83,7 +84,7 @@ async fn test_quorum_threshold() {
     network.connect_validators(0, 1).await;
     network.fire_transmissions_at(1, TRANSMISSION_INTERVAL_MS);
 
-    sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS * 2)).await;
+    sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
 
     // Check each node is still at round 1.
     for validator in network.validators.values() {

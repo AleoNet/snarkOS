@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -76,9 +77,9 @@ pub fn assign_to_workers<N: Network>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::coinbase::PuzzleCommitment;
+    use snarkvm::prelude::puzzle::SolutionID;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     #[test]
     fn test_assign_to_worker() {
@@ -90,7 +91,8 @@ mod tests {
         ]);
         let hash = sha256d_to_u128(data);
         assert_eq!(hash, 274520597840828436951879875061540363633u128);
-        let transmission_id: TransmissionID<CurrentNetwork> = TransmissionID::Solution(PuzzleCommitment::default());
+        let transmission_id: TransmissionID<CurrentNetwork> =
+            TransmissionID::Solution(SolutionID::from(123456789), 12345);
         let worker_id = assign_to_worker(transmission_id, 5).unwrap();
         assert_eq!(worker_id, 4);
     }

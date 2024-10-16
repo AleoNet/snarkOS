@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-node-cdn"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A CDN client for a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -21,11 +21,7 @@ default = [ "parallel" ]
 parallel = [ "rayon" ]
 
 [dependencies.anyhow]
-version = "1.0.75"
-
-[dependencies.backoff]
-version = "0.4"
-features = [ "tokio" ]
+version = "1.0.79"
 
 [dependencies.bincode]
 version = "1.0"
@@ -63,6 +59,10 @@ features = [ "rt" ]
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.tokio]
+version = "1.28"
+features = [ "rt", "rt-multi-thread" ]
 
 [dev-dependencies.tokio-test]
 version = "0.4"

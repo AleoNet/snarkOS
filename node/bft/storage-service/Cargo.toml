@@ -1,0 +1,45 @@
+[package]
+name = "snarkos-node-bft-storage-service"
+version = "2.2.7"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A storage service for the memory pool in a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoNet/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "Apache-2.0"
+edition = "2021"
+
+[features]
+default = [ ]
+memory = [ "parking_lot", "tracing" ]
+persistent = [ ]
+test = [ "memory" ]
+
+[dependencies.aleo-std]
+workspace = true
+
+[dependencies.indexmap]
+version = "2.1"
+features = [ "serde", "rayon" ]
+
+[dependencies.parking_lot]
+version = "0.12"
+optional = true
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.tracing]
+version = "0.1"
+optional = true
+
+[dev-dependencies.snarkvm]
+workspace = true
+features = [ "test" ]

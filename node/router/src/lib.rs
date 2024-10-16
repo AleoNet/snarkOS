@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -21,14 +22,13 @@ extern crate tracing;
 
 pub use snarkos_node_router_messages as messages;
 
-mod helpers;
-pub use helpers::*;
-
 mod handshake;
-pub use handshake::*;
 
 mod heartbeat;
 pub use heartbeat::*;
+
+mod helpers;
+pub use helpers::*;
 
 mod inbound;
 pub use inbound::*;
@@ -41,13 +41,20 @@ pub use routing::*;
 
 use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_tcp::{is_bogon_ip, is_unspecified_ip, Config, Tcp};
+use snarkos_node_tcp::{is_bogon_ip, is_unspecified_or_broadcast_ip, Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
-use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, str::FromStr, sync::Arc, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    future::Future,
+    net::SocketAddr,
+    ops::Deref,
+    str::FromStr,
+    sync::Arc,
+    time::Instant,
+};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -73,20 +80,22 @@ pub struct InnerRouter<N: Network> {
     /// The resolver.
     resolver: Resolver,
     /// The set of trusted peers.
-    trusted_peers: IndexSet<SocketAddr>,
+    trusted_peers: HashSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
-    connected_peers: RwLock<IndexMap<SocketAddr, Peer<N>>>,
+    connected_peers: RwLock<HashMap<SocketAddr, Peer<N>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
     /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
     connecting_peers: Mutex<HashSet<SocketAddr>>,
     /// The set of candidate peer IPs.
-    candidate_peers: RwLock<IndexSet<SocketAddr>>,
+    candidate_peers: RwLock<HashSet<SocketAddr>>,
     /// The set of restricted peer IPs.
-    restricted_peers: RwLock<IndexMap<SocketAddr, Instant>>,
+    restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The spawned handles.
     handles: Mutex<Vec<JoinHandle<()>>>,
+    /// If the flag is set, the node will engage in P2P gossip to request more peers.
+    allow_external_peers: bool,
     /// The boolean flag for the development mode.
     is_dev: bool,
 }
@@ -109,6 +118,7 @@ impl<N: Network> Router<N> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         max_peers: u16,
+        allow_external_peers: bool,
         is_dev: bool,
     ) -> Result<Self> {
         // Initialize the TCP stack.
@@ -126,6 +136,7 @@ impl<N: Network> Router<N> {
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
+            allow_external_peers,
             is_dev,
         })))
     }
@@ -217,7 +228,7 @@ impl<N: Network> Router<N> {
 
     /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
     pub fn is_valid_peer_ip(&self, ip: &SocketAddr) -> bool {
-        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_ip(ip.ip())
+        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_or_broadcast_ip(ip.ip())
     }
 
     /// Returns the node type.
@@ -243,6 +254,11 @@ impl<N: Network> Router<N> {
     /// Returns `true` if the node is in development mode.
     pub fn is_dev(&self) -> bool {
         self.is_dev
+    }
+
+    /// Returns `true` if the node is engaging in P2P gossip to request more peers.
+    pub fn allow_external_peers(&self) -> bool {
+        self.allow_external_peers
     }
 
     /// Returns the listener IP address from the (ambiguous) peer address.
@@ -287,6 +303,11 @@ impl<N: Network> Router<N> {
             .get(ip)
             .map(|time| time.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS)
             .unwrap_or(false)
+    }
+
+    /// Returns `true` if the given IP is trusted.
+    pub fn is_trusted(&self, ip: &SocketAddr) -> bool {
+        self.trusted_peers.contains(ip)
     }
 
     /// Returns the maximum number of connected peers.
@@ -355,7 +376,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of candidate peers.
-    pub fn candidate_peers(&self) -> IndexSet<SocketAddr> {
+    pub fn candidate_peers(&self) -> HashSet<SocketAddr> {
         self.candidate_peers.read().clone()
     }
 
@@ -365,27 +386,56 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of trusted peers.
-    pub fn trusted_peers(&self) -> &IndexSet<SocketAddr> {
+    pub fn trusted_peers(&self) -> &HashSet<SocketAddr> {
         &self.trusted_peers
     }
 
     /// Returns the list of bootstrap peers.
+    #[allow(clippy::if_same_then_else)]
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
         if cfg!(feature = "test") || self.is_dev {
+            // Development testing contains no bootstrap peers.
             vec![]
-        } else {
+        } else if N::ID == snarkvm::console::network::MainnetV0::ID {
+            // Mainnet contains the following bootstrap peers.
             vec![
-                SocketAddr::from_str("35.224.50.150:4133").unwrap(),
-                SocketAddr::from_str("35.227.159.141:4133").unwrap(),
-                SocketAddr::from_str("34.139.203.87:4133").unwrap(),
-                SocketAddr::from_str("34.150.221.166:4133").unwrap(),
+                SocketAddr::from_str("34.105.20.52:4130").unwrap(),
+                SocketAddr::from_str("35.231.118.193:4130").unwrap(),
+                SocketAddr::from_str("35.204.253.77:4130").unwrap(),
+                SocketAddr::from_str("34.87.188.140:4130").unwrap(),
             ]
+        } else if N::ID == snarkvm::console::network::TestnetV0::ID {
+            // TestnetV0 contains the following bootstrap peers.
+            vec![
+                SocketAddr::from_str("34.168.118.156:4130").unwrap(),
+                SocketAddr::from_str("35.231.152.213:4130").unwrap(),
+                SocketAddr::from_str("34.17.53.129:4130").unwrap(),
+                SocketAddr::from_str("35.200.149.162:4130").unwrap(),
+            ]
+        } else if N::ID == snarkvm::console::network::CanaryV0::ID {
+            // CanaryV0 contains the following bootstrap peers.
+            vec![
+                SocketAddr::from_str("34.74.24.41:4130").unwrap(),
+                SocketAddr::from_str("35.228.3.69:4130").unwrap(),
+                SocketAddr::from_str("34.124.178.133:4130").unwrap(),
+                SocketAddr::from_str("34.125.137.231:4130").unwrap(),
+            ]
+        } else {
+            // Unrecognized networks contain no bootstrap peers.
+            vec![]
         }
     }
 
     /// Returns the list of metrics for the connected peers.
     pub fn connected_metrics(&self) -> Vec<(SocketAddr, NodeType)> {
         self.connected_peers.read().iter().map(|(ip, peer)| (*ip, peer.node_type())).collect()
+    }
+
+    #[cfg(feature = "metrics")]
+    fn update_metrics(&self) {
+        metrics::gauge(metrics::router::CONNECTED, self.connected_peers.read().len() as f64);
+        metrics::gauge(metrics::router::CANDIDATE, self.candidate_peers.read().len() as f64);
+        metrics::gauge(metrics::router::RESTRICTED, self.restricted_peers.read().len() as f64);
     }
 
     /// Inserts the given peer into the connected peers.
@@ -399,6 +449,8 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().remove(&peer_ip);
         // Remove this peer from the restricted peers, if it exists.
         self.restricted_peers.write().remove(&peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Inserts the given peer IPs to the set of candidate peers.
@@ -419,6 +471,8 @@ impl<N: Network> Router<N> {
 
         // Proceed to insert the eligible candidate peer IPs.
         self.candidate_peers.write().extend(eligible_peers);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Inserts the given peer into the restricted peers.
@@ -427,6 +481,8 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().remove(&peer_ip);
         // Add the peer to the restricted peers.
         self.restricted_peers.write().insert(peer_ip, Instant::now());
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Updates the connected peer with the given function.
@@ -448,6 +504,12 @@ impl<N: Network> Router<N> {
         Ok(())
     }
 
+    pub fn update_last_seen_for_connected_peer(&self, peer_ip: SocketAddr) {
+        if let Some(peer) = self.connected_peers.write().get_mut(&peer_ip) {
+            peer.set_last_seen(Instant::now());
+        }
+    }
+
     /// Removes the connected peer and adds them to the candidate peers.
     pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
@@ -456,16 +518,22 @@ impl<N: Network> Router<N> {
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.
         self.candidate_peers.write().insert(peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     #[cfg(feature = "test")]
     pub fn clear_candidate_peers(&self) {
         self.candidate_peers.write().clear();
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Removes the given address from the candidate peers, if it exists.
     pub fn remove_candidate_peer(&self, peer_ip: SocketAddr) {
         self.candidate_peers.write().remove(&peer_ip);
+        #[cfg(feature = "metrics")]
+        self.update_metrics();
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -62,7 +63,7 @@ impl<N: Network> FromBytes for TransmissionResponse<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        prop_tests::{any_puzzle_commitment, any_transaction_id},
+        prop_tests::{any_solution_id, any_transaction_id, any_transmission_checksum},
         TransmissionResponse,
     };
     use snarkvm::{
@@ -78,18 +79,22 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_transmission() -> BoxedStrategy<(TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>)> {
         prop_oneof![
-            (any_puzzle_commitment(), collection::vec(any::<u8>(), 256..=256)).prop_map(|(pc, bytes)| (
-                TransmissionID::Solution(pc),
-                Transmission::Solution(Data::Buffer(Bytes::from(bytes)))
-            )),
-            (any_transaction_id(), collection::vec(any::<u8>(), 512..=512)).prop_map(|(tid, bytes)| (
-                TransmissionID::Transaction(tid),
-                Transmission::Transaction(Data::Buffer(Bytes::from(bytes)))
-            )),
+            (any_solution_id(), any_transmission_checksum(), collection::vec(any::<u8>(), 256..=256)).prop_map(
+                |(pc, cs, bytes)| (
+                    TransmissionID::Solution(pc, cs),
+                    Transmission::Solution(Data::Buffer(Bytes::from(bytes)))
+                )
+            ),
+            (any_transaction_id(), any_transmission_checksum(), collection::vec(any::<u8>(), 512..=512)).prop_map(
+                |(tid, cs, bytes)| (
+                    TransmissionID::Transaction(tid, cs),
+                    Transmission::Transaction(Data::Buffer(Bytes::from(bytes)))
+                )
+            ),
         ]
         .boxed()
     }

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -35,12 +36,13 @@ use snarkvm::{
     console::network::Network,
     ledger::{
         block::{Block, Header},
-        coinbase::{CoinbasePuzzle, EpochChallenge, ProverSolution},
+        puzzle::{Puzzle, Solution},
         store::ConsensusStorage,
         Ledger,
     },
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use core::future::Future;
 use parking_lot::Mutex;
@@ -63,8 +65,8 @@ pub struct Client<N: Network, C: ConsensusStorage<N>> {
     sync: Arc<BlockSync<N>>,
     /// The genesis block.
     genesis: Block<N>,
-    /// The coinbase puzzle.
-    coinbase_puzzle: CoinbasePuzzle<N>,
+    /// The puzzle.
+    puzzle: Puzzle<N>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -76,38 +78,37 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
+        rest_rps: u32,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
-        println!("initializing signal node");
         // Initialize the signal handler.
-        let signal_node = Self::handle_signals();
+        let signal_node = Self::handle_signals(shutdown.clone());
 
-        println!("initializing ledger");
         // Initialize the ledger.
-        let ledger = Ledger::<N, C>::load(genesis.clone(), dev)?;
-        println!("initialized ledger");
-        // TODO: Remove me after Phase 3.
-        let ledger = crate::phase_3_reset(ledger, dev)?;
-        println!("completed phase 3 reset");
+        let ledger = Ledger::<N, C>::load(genesis.clone(), storage_mode.clone())?;
+
         // Initialize the CDN.
-        // if let Some(base_url) = cdn {
-        //     println!("initializing cdn... {}", base_url);
-        //     // Sync the ledger with the CDN.
-        //     if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
-        //         crate::log_clean_error(dev);
-        //         return Err(error);
-        //     }
-        // }
+        if let Some(base_url) = cdn {
+            // Sync the ledger with the CDN.
+            if let Err((_, error)) =
+                snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone(), shutdown.clone()).await
+            {
+                crate::log_clean_error(&storage_mode);
+                return Err(error);
+            }
+        }
 
         // Initialize the ledger service.
-        let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
-        println!("initilalized ledger service");
+        let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone(), shutdown.clone()));
         // Initialize the sync module.
         let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
+        // Determine if the client should allow external peers.
+        let allow_external_peers = true;
 
         // Initialize the node router.
         let router = Router::new(
@@ -116,11 +117,10 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
-            dev.is_some(),
+            allow_external_peers,
+            matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
-        // Load the coinbase puzzle.
-        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let mut node = Self {
             ledger: ledger.clone(),
@@ -128,23 +128,19 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             rest: None,
             sync: Arc::new(sync),
             genesis,
-            coinbase_puzzle,
+            puzzle: ledger.puzzle().clone(),
             handles: Default::default(),
-            shutdown: Default::default(),
+            shutdown,
         };
-        println!("initilalized node");
-        println!("initilalizing rest server");
+
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Rest::start(rest_ip, None, ledger.clone(), Arc::new(node.clone()))?);
-            println!("initilalized rest server");
+            node.rest = Some(Rest::start(rest_ip, rest_rps, None, ledger.clone(), Arc::new(node.clone())).await?);
         }
         // Initialize the routing.
         node.initialize_routing().await;
-        println!("initilalized routing");
         // Initialize the sync module.
         node.initialize_sync();
-        println!("initilalized sync");
         // Initialize the notification message loop.
         node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
@@ -178,7 +174,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
                 }
 
                 // Sleep briefly to avoid triggering spam detection.
-                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 // Perform the sync routine.
                 node.sync.try_block_sync(&node).await;
             }

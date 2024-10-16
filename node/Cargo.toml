@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-node"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node for a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -20,13 +20,20 @@ edition = "2021"
 default = [ "parallel" ]
 parallel = [ "rayon" ]
 timer = [ "aleo-std/timer" ]
+metrics = [
+  "dep:metrics",
+  "snarkos-node-bft/metrics",
+  "snarkos-node-consensus/metrics",
+  "snarkos-node-router/metrics",
+  "snarkos-node-tcp/metrics"
+]
+history = [ "snarkos-node-rest/history" ]
 
 [dependencies.aleo-std]
-version = "0.1.18"
-default-features = false
+workspace = true
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0.79"
 
 [dependencies.async-trait]
 version = "0.1"
@@ -40,6 +47,12 @@ features = [ "sink" ]
 
 [dependencies.indexmap]
 version = "2.1"
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "./metrics"
+version = "=2.2.7"
+optional = true
 
 [dependencies.num_cpus]
 version = "1"
@@ -64,35 +77,35 @@ features = [ "preserve_order" ]
 
 [dependencies.snarkos-account]
 path = "../account"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-bft]
 path = "./bft"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-cdn]
 path = "./cdn"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-rest]
 path = "./rest"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-router]
 path = "./router"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-sync]
 path = "./sync"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-tcp]
 path = "./tcp"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkvm]
 workspace = true
@@ -113,8 +126,11 @@ version = "0.1"
 [dev-dependencies.deadline]
 version = "0.2"
 
+[dev-dependencies.paste]
+version = "1"
+
 [dev-dependencies.pea2pea]
-version = "0.46"
+version = "0.49"
 
 [dev-dependencies.snarkos-node-router]
 path = "./router"

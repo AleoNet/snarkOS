@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-node-sync-communication-service"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A communication service for the sync module in a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",

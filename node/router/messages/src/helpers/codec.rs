@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -75,14 +76,49 @@ impl<N: Network> Decoder for MessageCodec<N> {
             None => return Ok(None),
         };
 
+        Self::Item::check_size(&bytes)?;
+
         // Convert the bytes to a message, or fail if it is not valid.
         let reader = bytes.reader();
         match Message::read_le(reader) {
             Ok(message) => Ok(Some(message)),
             Err(error) => {
-                error!("Failed to deserialize a message: {}", error);
+                warn!("Failed to deserialize a message - {}", error);
                 Err(std::io::ErrorKind::InvalidData.into())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::{
+        unconfirmed_transaction::prop_tests::{any_large_unconfirmed_transaction, any_unconfirmed_transaction},
+        UnconfirmedTransaction,
+    };
+
+    use proptest::prelude::ProptestConfig;
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
+
+    #[proptest]
+    fn unconfirmed_transaction(#[strategy(any_unconfirmed_transaction())] tx: UnconfirmedTransaction<CurrentNetwork>) {
+        let mut bytes = BytesMut::new();
+        let mut codec = MessageCodec::<CurrentNetwork>::default();
+        assert!(codec.encode(Message::UnconfirmedTransaction(tx), &mut bytes).is_ok());
+        assert!(codec.decode(&mut bytes).is_ok());
+    }
+
+    #[proptest(ProptestConfig { cases : 10, ..ProptestConfig::default() })]
+    fn overly_large_unconfirmed_transaction(
+        #[strategy(any_large_unconfirmed_transaction())] tx: UnconfirmedTransaction<CurrentNetwork>,
+    ) {
+        let mut bytes = BytesMut::new();
+        let mut codec = MessageCodec::<CurrentNetwork>::default();
+        assert!(codec.encode(Message::UnconfirmedTransaction(tx), &mut bytes).is_ok());
+        assert!(matches!(codec.decode(&mut bytes), Err(err) if err.kind() == std::io::ErrorKind::InvalidData));
     }
 }

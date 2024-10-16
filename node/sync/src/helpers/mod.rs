@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -17,6 +18,9 @@ use snarkvm::prelude::Network;
 use core::hash::Hash;
 use indexmap::IndexSet;
 use std::net::SocketAddr;
+
+/// A tuple of the block hash (optional), previous block hash (optional), and the number of sync IPS to request from.
+pub type PrepareSyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, usize);
 
 /// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
 pub type SyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);

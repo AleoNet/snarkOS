@@ -12,6 +12,12 @@ NUM_INSTANCES="${NUM_INSTANCES:-$NODE_ID}"
 
 echo "Using $NUM_INSTANCES AWS EC2 instances for querying."
 
+# Read the network ID from user or use a default value of 1
+read -p "Enter the network ID (mainnet = 0, testnet = 1, canary = 2) (default: 1): " NETWORK_ID
+NETWORK_ID=${NETWORK_ID:-1}
+
+echo "Using network ID $NETWORK_ID."
+
 # Define a function to terminate the tmux session on a node
 terminate_tmux_session() {
   local NODE_ID=$1
@@ -24,7 +30,7 @@ terminate_tmux_session() {
     cd \$WORKSPACE
 
     tmux kill-session -t snarkos-session
-    snarkos clean --dev $NODE_ID
+    snarkos clean --dev $NODE_ID --network $NETWORK_ID
 
     exit  # Exit root user
 EOF
@@ -38,7 +44,7 @@ EOF
 }
 
 # Loop through aws-n nodes and terminate tmux sessions in parallel
-for NODE_ID in $(seq 0 $NUM_INSTANCES); do
+for NODE_ID in $(seq 0 $(($NUM_INSTANCES - 1))); do
   terminate_tmux_session $NODE_ID &
 done
 

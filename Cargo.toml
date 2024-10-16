@@ -1,10 +1,10 @@
 [package]
 name = "snarkos"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -15,7 +15,7 @@ keywords = [
 categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
-rust-version = "1.66"
+rust-version = "1.76.0" # Attention - Change the MSRV in rust-toolchain and in .circleci/config.yml as well
 
 [workspace]
 members = [
@@ -26,6 +26,7 @@ members = [
   "node/bft",
   "node/bft/events",
   "node/bft/ledger-service",
+  "node/bft/storage-service",
   "node/cdn",
   "node/consensus",
   "node/metrics",
@@ -39,8 +40,15 @@ members = [
   ".integration"
 ]
 
+[workspace.dependencies.aleo-std]
+version = "=0.1.24"
+default-features = false
+
 [workspace.dependencies.snarkvm]
-version = "=0.16.9"
+#path = "../snarkVM"
+git = "https://github.com/AleoNet/snarkVM.git"
+rev = "3d42aa0" # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
+#version = "=0.16.18"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
@@ -48,65 +56,73 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [features]
-jemalloc = [ "tikv-jemallocator" ]
+metrics = [ "snarkos-node-metrics", "snarkos-node/metrics" ]
+history = [ "snarkos-node/history" ]
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0.79"
 
 [dependencies.clap]
 version = "4.4"
 features = [ "derive" ]
+
+[dependencies.crossterm]
+version = "0.27.0"
 
 [dependencies.once_cell]
 version = "1"
 
 [dependencies.snarkos-account]
 path = "./account"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-cli]
 path = "./cli"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-display]
 path = "./display"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node]
 path = "./node"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-bft]
 path = "./node/bft"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-cdn]
 path = "./node/cdn"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-version = "=2.2.4"
+version = "=2.2.7"
+
+[dependencies.snarkos-node-metrics]
+path = "./node/metrics"
+version = "=2.2.7"
+optional = true
 
 [dependencies.snarkos-node-rest]
 path = "./node/rest"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-router]
 path = "./node/router"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-sync]
 path = "./node/sync"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-tcp]
 path = "./node/tcp"
-version = "=2.2.4"
+version = "=2.2.7"
 
-[dependencies.tikv-jemallocator]
-version = "0.5"
-optional = true
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
+tikv-jemallocator = "0.5"
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"

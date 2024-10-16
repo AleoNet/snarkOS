@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -24,8 +25,12 @@ use snarkvm::prelude::{
     ViewKey,
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 pub enum Node<N: Network> {
     /// A validator is a full node, capable of validating blocks.
@@ -40,18 +45,36 @@ impl<N: Network> Node<N> {
     /// Initializes a new validator node.
     pub async fn new_validator(
         node_ip: SocketAddr,
-        rest_ip: Option<SocketAddr>,
         bft_ip: Option<SocketAddr>,
+        rest_ip: Option<SocketAddr>,
+        rest_rps: u32,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         trusted_validators: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
+        allow_external_peers: bool,
+        dev_txs: bool,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
-            Validator::new(node_ip, rest_ip, bft_ip, account, trusted_peers, trusted_validators, genesis, cdn, dev)
-                .await?,
+            Validator::new(
+                node_ip,
+                bft_ip,
+                rest_ip,
+                rest_rps,
+                account,
+                trusted_peers,
+                trusted_validators,
+                genesis,
+                cdn,
+                storage_mode,
+                allow_external_peers,
+                dev_txs,
+                shutdown,
+            )
+            .await?,
         )))
     }
 
@@ -61,22 +84,28 @@ impl<N: Network> Node<N> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
-        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, dev).await?)))
+        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, storage_mode, shutdown).await?)))
     }
 
     /// Initializes a new client node.
     pub async fn new_client(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
+        rest_rps: u32,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
-        Ok(Self::Client(Arc::new(Client::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev).await?)))
+        Ok(Self::Client(Arc::new(
+            Client::new(node_ip, rest_ip, rest_rps, account, trusted_peers, genesis, cdn, storage_mode, shutdown)
+                .await?,
+        )))
     }
 
     /// Returns the node type.

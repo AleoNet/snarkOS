@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-integration"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A integration testing suite for a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -15,6 +15,9 @@ keywords = [
 categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
+
+[dev-dependencies.aleo-std]
+workspace = true
 
 [dev-dependencies.snarkos-node-cdn]
 path = "../node/cdn"

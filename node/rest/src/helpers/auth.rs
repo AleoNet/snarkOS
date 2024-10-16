@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -17,11 +18,14 @@ use snarkvm::prelude::*;
 use ::time::OffsetDateTime;
 use anyhow::{anyhow, Result};
 use axum::{
-    headers::authorization::{Authorization, Bearer},
+    body::Body,
     http::{Request, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
     RequestPartsExt,
+};
+use axum_extra::{
+    headers::authorization::{Authorization, Bearer},
     TypedHeader,
 };
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
@@ -70,10 +74,7 @@ impl Claims {
     }
 }
 
-pub async fn auth_middleware<B>(request: Request<B>, next: Next<B>) -> Result<Response, Response>
-where
-    B: Send,
-{
+pub async fn auth_middleware(request: Request<Body>, next: Next) -> Result<Response, Response> {
     // Deconstruct the request to extract the auth token.
     let (mut parts, body) = request.into_parts();
     let auth: TypedHeader<Authorization<Bearer>> =

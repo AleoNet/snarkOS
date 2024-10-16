@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-display"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A display for a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -17,14 +17,17 @@ license = "Apache-2.0"
 edition = "2021"
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0.79"
 
 [dependencies.crossterm]
 version = "0.27"
 
+[dependencies.ratatui]
+version = "0.25"
+
 [dependencies.snarkos-node]
 path = "../node"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkvm]
 workspace = true
@@ -32,6 +35,3 @@ workspace = true
 [dependencies.tokio]
 version = "1.28"
 features = [ "rt" ]
-
-[dependencies.tui]
-version = "0.19"

@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-node-bft"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A memory pool for a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -16,8 +16,15 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = [ ]
+metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics", "snarkos-node-bft-ledger-service/metrics" ]
+
+[dependencies.aleo-std]
+workspace = true
+
 [dependencies.anyhow]
-version = "1.0.70"
+version = "1.0.79"
 
 [dependencies.async-recursion]
 version = "1.0"
@@ -32,12 +39,18 @@ version = "1"
 version = "2"
 
 [dependencies.futures]
-version = "0.3.29"
+version = "0.3.30"
 features = [ "thread-pool" ]
 
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
+
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../metrics"
+version = "=2.2.7"
+optional = true
 
 [dependencies.parking_lot]
 version = "0.12"
@@ -57,30 +70,32 @@ default-features = false
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-bft-events]
 path = "./events"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-bft-ledger-service]
 path = "./ledger-service"
-version = "=2.2.4"
+version = "=2.2.7"
 features = [ "ledger", "prover" ]
+
+[dependencies.snarkos-node-bft-storage-service]
+path = "./storage-service"
+version = "=2.2.7"
+features = [ "memory" ]
 
 [dependencies.snarkos-node-sync]
 path = "../sync"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkvm]
 workspace = true
-
-[dependencies.snow]
-version = "0.9"
 
 [dependencies.time]
 version = "0.3"
@@ -100,10 +115,10 @@ features = [ "codec" ]
 version = "0.1"
 
 [dev-dependencies.axum]
-version = "0.6"
+version = "0.7"
 
 [dev-dependencies.axum-extra]
-version = "0.8.0"
+version = "0.9"
 default-features = false
 features = [ "erased-json" ]
 
@@ -114,13 +129,16 @@ version = "4.4"
 version = "0.2"
 
 [dev-dependencies.itertools]
-version = "0.11"
+version = "0.12"
 
 [dev-dependencies.open]
 version = "5"
 
 [dev-dependencies.paste]
 version = "1"
+
+[dev-dependencies.pea2pea]
+ version = "0.49"
 
 [dev-dependencies.proptest]
 version = "1.4.0"
@@ -139,6 +157,10 @@ path = "./ledger-service"
 default-features = false
 features = [ "test" ]
 
+[dev-dependencies.snarkos-node-bft-storage-service]
+path = "./storage-service"
+features = [ "test" ]
+
 [dev-dependencies.snarkvm]
 workspace = true
 features = [ "test-helpers" ]
@@ -147,7 +169,7 @@ features = [ "test-helpers" ]
 version = "0.3.1"
 
 [dev-dependencies.tower-http]
-version = "0.4"
+version = "0.5"
 features = [ "fs", "trace" ]
 
 [dev-dependencies.tracing-subscriber]
@@ -158,4 +180,4 @@ features = [ "env-filter" ]
 version = "0.1"
 
 [dev-dependencies.mockall]
-version = "0.11.4"
+version = "0.12.1"

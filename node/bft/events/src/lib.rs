@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -70,7 +71,6 @@ use snarkvm::{
     console::prelude::{error, FromBytes, Network, Read, ToBytes, Write},
     ledger::{
         block::Block,
-        committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     },
     prelude::{Address, Field, Signature},
@@ -88,6 +88,9 @@ pub trait EventTrait: ToBytes + FromBytes {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+// TODO (howardwu): For mainnet - Remove this clippy lint. The CertificateResponse should not
+//  be a large enum variant, after removing the versioning.
+#[allow(clippy::large_enum_variant)]
 pub enum Event<N: Network> {
     BatchPropose(BatchPropose<N>),
     BatchSignature(BatchSignature<N>),
@@ -115,7 +118,7 @@ impl<N: Network> From<DisconnectReason> for Event<N> {
 
 impl<N: Network> Event<N> {
     /// The version of the event protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 3;
+    pub const VERSION: u32 = 8;
 
     /// Returns the event name.
     #[inline]
@@ -196,24 +199,29 @@ impl<N: Network> FromBytes for Event<N> {
 
         // Deserialize the data field.
         let event = match id {
-            0 => Self::BatchPropose(BatchPropose::read_le(reader)?),
-            1 => Self::BatchSignature(BatchSignature::read_le(reader)?),
-            2 => Self::BatchCertified(BatchCertified::read_le(reader)?),
-            3 => Self::BlockRequest(BlockRequest::read_le(reader)?),
-            4 => Self::BlockResponse(BlockResponse::read_le(reader)?),
-            5 => Self::CertificateRequest(CertificateRequest::read_le(reader)?),
-            6 => Self::CertificateResponse(CertificateResponse::read_le(reader)?),
-            7 => Self::ChallengeRequest(ChallengeRequest::read_le(reader)?),
-            8 => Self::ChallengeResponse(ChallengeResponse::read_le(reader)?),
-            9 => Self::Disconnect(Disconnect::read_le(reader)?),
-            10 => Self::PrimaryPing(PrimaryPing::read_le(reader)?),
-            11 => Self::TransmissionRequest(TransmissionRequest::read_le(reader)?),
-            12 => Self::TransmissionResponse(TransmissionResponse::read_le(reader)?),
-            13 => Self::ValidatorsRequest(ValidatorsRequest::read_le(reader)?),
-            14 => Self::ValidatorsResponse(ValidatorsResponse::read_le(reader)?),
-            15 => Self::WorkerPing(WorkerPing::read_le(reader)?),
+            0 => Self::BatchPropose(BatchPropose::read_le(&mut reader)?),
+            1 => Self::BatchSignature(BatchSignature::read_le(&mut reader)?),
+            2 => Self::BatchCertified(BatchCertified::read_le(&mut reader)?),
+            3 => Self::BlockRequest(BlockRequest::read_le(&mut reader)?),
+            4 => Self::BlockResponse(BlockResponse::read_le(&mut reader)?),
+            5 => Self::CertificateRequest(CertificateRequest::read_le(&mut reader)?),
+            6 => Self::CertificateResponse(CertificateResponse::read_le(&mut reader)?),
+            7 => Self::ChallengeRequest(ChallengeRequest::read_le(&mut reader)?),
+            8 => Self::ChallengeResponse(ChallengeResponse::read_le(&mut reader)?),
+            9 => Self::Disconnect(Disconnect::read_le(&mut reader)?),
+            10 => Self::PrimaryPing(PrimaryPing::read_le(&mut reader)?),
+            11 => Self::TransmissionRequest(TransmissionRequest::read_le(&mut reader)?),
+            12 => Self::TransmissionResponse(TransmissionResponse::read_le(&mut reader)?),
+            13 => Self::ValidatorsRequest(ValidatorsRequest::read_le(&mut reader)?),
+            14 => Self::ValidatorsResponse(ValidatorsResponse::read_le(&mut reader)?),
+            15 => Self::WorkerPing(WorkerPing::read_le(&mut reader)?),
             16.. => return Err(error("Unknown event ID {id}")),
         };
+
+        // Ensure that there are no "dangling" bytes.
+        if reader.bytes().next().is_some() {
+            return Err(error("Leftover bytes in an Event"));
+        }
 
         Ok(event)
     }
@@ -224,7 +232,7 @@ mod tests {
     use crate::Event;
     use bytes::{Buf, BufMut, BytesMut};
     use snarkvm::console::prelude::{FromBytes, ToBytes};
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     #[test]
     fn deserializing_invalid_data_panics() {
@@ -257,7 +265,7 @@ pub mod prop_tests {
     };
     use snarkvm::{
         console::{network::Network, types::Field},
-        ledger::{coinbase::PuzzleCommitment, narwhal::TransmissionID},
+        ledger::{narwhal::TransmissionID, puzzle::SolutionID},
         prelude::{FromBytes, Rng, ToBytes, Uniform},
     };
 
@@ -268,15 +276,15 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     /// Returns the current UTC epoch timestamp.
     pub fn now() -> i64 {
         time::OffsetDateTime::now_utc().unix_timestamp()
     }
 
-    pub fn any_puzzle_commitment() -> BoxedStrategy<PuzzleCommitment<CurrentNetwork>> {
-        Just(0).prop_perturb(|_, mut rng| PuzzleCommitment::from_g1_affine(rng.gen())).boxed()
+    pub fn any_solution_id() -> BoxedStrategy<SolutionID<CurrentNetwork>> {
+        Just(0).prop_perturb(|_, mut rng| rng.gen::<u64>().into()).boxed()
     }
 
     pub fn any_transaction_id() -> BoxedStrategy<<CurrentNetwork as Network>::TransactionID> {
@@ -285,10 +293,15 @@ pub mod prop_tests {
             .boxed()
     }
 
+    pub fn any_transmission_checksum() -> BoxedStrategy<<CurrentNetwork as Network>::TransmissionChecksum> {
+        Just(0).prop_perturb(|_, mut rng| rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>()).boxed()
+    }
+
     pub fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
-            any_transaction_id().prop_map(TransmissionID::Transaction),
-            any_puzzle_commitment().prop_map(TransmissionID::Solution),
+            (any_transaction_id(), any_transmission_checksum())
+                .prop_map(|(id, cs)| TransmissionID::Transaction(id, cs)),
+            (any_solution_id(), any_transmission_checksum()).prop_map(|(id, cs)| TransmissionID::Solution(id, cs)),
         ]
         .boxed()
     }

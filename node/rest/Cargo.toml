@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-node-rest"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A REST API server for a decentralized virtual machine"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -19,30 +19,30 @@ edition = "2021"
 [features]
 default = [ "parallel" ]
 parallel = [ "rayon" ]
+history = [ "snarkvm-synthesizer/history" ]
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0.79"
 
 [dependencies.axum]
-version = "0.6"
-features = [ "headers" ]
+version = "0.7"
 
 [dependencies.axum-extra]
-version = "0.8.0"
-features = [ "erased-json" ]
+version = "0.9.0"
+features = [ "erased-json", "typed-header" ]
 
 [dependencies.http]
-version = "0.2"
+version = "1.0"
 
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
 
 [dependencies.jsonwebtoken]
-version = "9.1"
+version = "9.2"
 
 [dependencies.once_cell]
-version = "1.18"
+version = "1.19"
 
 [dependencies.parking_lot]
 version = "0.12"
@@ -52,13 +52,24 @@ version = "1"
 default-features = false
 features = [ "derive" ]
 
+[dependencies.serde_json]
+version = "1"
+features = [ "preserve_order" ]
+
 [dependencies.snarkos-node-consensus]
 path = "../consensus"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-router]
 path = "../router"
-version = "=2.2.4"
+version = "=2.2.7"
+
+[dependencies.snarkvm-synthesizer]
+#path = "../../../snarkVM/synthesizer"
+git = "https://github.com/AleoNet/snarkVM.git"
+rev = "3d42aa0"
+default-features = false
+optional = true
 
 [dependencies.rand]
 version = "0.8"
@@ -76,8 +87,14 @@ version = "0.3"
 [dependencies.tokio]
 version = "1"
 
-[dependencies.tower-http]
+[dependencies.tower]
 version = "0.4"
+
+[dependencies.tower_governor]
+version = "0.3"
+
+[dependencies.tower-http]
+version = "0.5"
 features = [ "cors", "trace" ]
 
 [dependencies.tracing]

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -12,35 +13,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{CurrentNetwork, Developer};
-
-use snarkvm::prelude::{
-    query::Query,
-    store::{helpers::memory::ConsensusMemory, ConsensusStore},
-    Address,
-    Identifier,
-    Locator,
-    PrivateKey,
-    Process,
-    ProgramID,
-    Value,
-    VM,
+use super::Developer;
+use snarkvm::{
+    console::network::{CanaryV0, MainnetV0, Network, TestnetV0},
+    prelude::{
+        query::Query,
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        Address,
+        Identifier,
+        Locator,
+        PrivateKey,
+        Process,
+        ProgramID,
+        Value,
+        VM,
+    },
 };
 
+use aleo_std::StorageMode;
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use colored::Colorize;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
+use zeroize::Zeroize;
 
 /// Executes an Aleo program function.
 #[derive(Debug, Parser)]
 pub struct Execute {
     /// The program identifier.
-    program_id: ProgramID<CurrentNetwork>,
+    program_id: String,
     /// The function name.
-    function: Identifier<CurrentNetwork>,
+    function: String,
     /// The function inputs.
-    inputs: Vec<Value<CurrentNetwork>>,
+    inputs: Vec<String>,
+    /// Specify the network to create an execution for.
+    #[clap(default_value = "0", long = "network")]
+    pub network: u16,
     /// The private key used to generate the execution.
     #[clap(short, long)]
     private_key: String,
@@ -62,6 +70,16 @@ pub struct Execute {
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
+    /// Specify the path to a directory containing the ledger
+    #[clap(long = "storage_path")]
+    pub storage_path: Option<PathBuf>,
+}
+
+impl Drop for Execute {
+    /// Zeroize the private key when the `Execute` struct goes out of scope.
+    fn drop(&mut self) {
+        self.private_key.zeroize();
+    }
 }
 
 impl Execute {
@@ -73,13 +91,33 @@ impl Execute {
             bail!("❌ Please specify one of the following actions: --broadcast, --dry-run, --store");
         }
 
+        // Construct the execution for the specified network.
+        match self.network {
+            MainnetV0::ID => self.construct_execution::<MainnetV0>(),
+            TestnetV0::ID => self.construct_execution::<TestnetV0>(),
+            CanaryV0::ID => self.construct_execution::<CanaryV0>(),
+            unknown_id => bail!("Unknown network ID ({unknown_id})"),
+        }
+    }
+
+    /// Construct and process the execution transaction.
+    fn construct_execution<N: Network>(&self) -> Result<String> {
         // Specify the query
         let query = Query::from(&self.query);
 
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
-        let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
+        // Retrieve the program ID.
+        let program_id = ProgramID::from_str(&self.program_id)?;
+
+        // Retrieve the function.
+        let function = Identifier::from_str(&self.function)?;
+
+        // Retrieve the inputs.
+        let inputs = self.inputs.iter().map(|input| Value::from_str(input)).collect::<Result<Vec<Value<N>>>>()?;
+
+        let locator = Locator::<N>::from_str(&format!("{}/{}", program_id, function))?;
         println!("📦 Creating execution transaction for '{}'...\n", &locator.to_string().bold());
 
         // Generate the execution transaction.
@@ -87,12 +125,18 @@ impl Execute {
             // Initialize an RNG.
             let rng = &mut rand::thread_rng();
 
+            // Initialize the storage.
+            let storage_mode = match &self.storage_path {
+                Some(path) => StorageMode::Custom(path.clone()),
+                None => StorageMode::Production,
+            };
+            let store = ConsensusStore::<N, ConsensusMemory<N>>::open(storage_mode)?;
+
             // Initialize the VM.
-            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
 
             // Load the program and it's imports into the process.
-            load_program(&self.query, &mut vm.process().write(), &self.program_id)?;
+            load_program(&self.query, &mut vm.process().write(), &program_id)?;
 
             // Prepare the fee.
             let fee_record = match &self.record {
@@ -102,15 +146,7 @@ impl Execute {
             let priority_fee = self.priority_fee.unwrap_or(0);
 
             // Create a new transaction.
-            vm.execute(
-                &private_key,
-                (self.program_id, self.function),
-                self.inputs.iter(),
-                fee_record,
-                priority_fee,
-                Some(query),
-                rng,
-            )?
+            vm.execute(&private_key, (program_id, function), inputs.iter(), fee_record, priority_fee, Some(query), rng)?
         };
 
         // Check if the public balance is sufficient.
@@ -142,17 +178,13 @@ impl Execute {
 
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
-        // Determine if the transaction should be broadcast, stored, or displayed to user.
-        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
+        // Determine if the transaction should be broadcast, stored, or displayed to the user.
+        Developer::handle_transaction(&self.broadcast, self.dry_run, &self.store, transaction, locator.to_string())
     }
 }
 
 /// A helper function to recursively load the program and all of its imports into the process.
-fn load_program(
-    endpoint: &str,
-    process: &mut Process<CurrentNetwork>,
-    program_id: &ProgramID<CurrentNetwork>,
-) -> Result<()> {
+fn load_program<N: Network>(endpoint: &str, process: &mut Process<N>, program_id: &ProgramID<N>) -> Result<()> {
     // Fetch the program.
     let program = Developer::fetch_program(program_id, endpoint)?;
 
@@ -205,13 +237,14 @@ mod tests {
         let cli = CLI::parse_from(arg_vec);
 
         if let Command::Developer(Developer::Execute(execute)) = cli.command {
+            assert_eq!(execute.network, 0);
             assert_eq!(execute.private_key, "PRIVATE_KEY");
             assert_eq!(execute.query, "QUERY");
             assert_eq!(execute.priority_fee, Some(77));
             assert_eq!(execute.record, Some("RECORD".into()));
-            assert_eq!(execute.program_id, "hello.aleo".try_into().unwrap());
-            assert_eq!(execute.function, "hello".try_into().unwrap());
-            assert_eq!(execute.inputs, vec!["1u32".try_into().unwrap(), "2u32".try_into().unwrap()]);
+            assert_eq!(execute.program_id, "hello.aleo".to_string());
+            assert_eq!(execute.function, "hello".to_string());
+            assert_eq!(execute.inputs, vec!["1u32".to_string(), "2u32".to_string()]);
         } else {
             panic!("Unexpected result of clap parsing!");
         }

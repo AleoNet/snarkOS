@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -16,7 +17,9 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChallengeResponse<N: Network> {
+    pub restrictions_id: Field<N>,
     pub signature: Data<Signature<N>>,
+    pub nonce: u64,
 }
 
 impl<N: Network> EventTrait for ChallengeResponse<N> {
@@ -29,16 +32,20 @@ impl<N: Network> EventTrait for ChallengeResponse<N> {
 
 impl<N: Network> ToBytes for ChallengeResponse<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.restrictions_id.write_le(&mut writer)?;
         self.signature.write_le(&mut writer)?;
+        self.nonce.write_le(&mut writer)?;
         Ok(())
     }
 }
 
 impl<N: Network> FromBytes for ChallengeResponse<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let restrictions_id = Field::read_le(&mut reader)?;
         let signature = Data::read_le(&mut reader)?;
+        let nonce = u64::read_le(&mut reader)?;
 
-        Ok(Self { signature })
+        Ok(Self { restrictions_id, signature, nonce })
     }
 }
 
@@ -48,15 +55,19 @@ pub mod prop_tests {
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
         ledger::narwhal::Data,
-        prelude::{PrivateKey, Signature},
+        prelude::{Field, PrivateKey, Signature},
         utilities::rand::{TestRng, Uniform},
     };
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{BoxedStrategy, Strategy};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
+
+    pub fn any_restrictions_id() -> Field<CurrentNetwork> {
+        Uniform::rand(&mut TestRng::default())
+    }
 
     pub fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
         (0..64)
@@ -70,7 +81,13 @@ pub mod prop_tests {
     }
 
     pub fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
-        any_signature().prop_map(|sig| ChallengeResponse { signature: Data::Object(sig) }).boxed()
+        (any_signature(), any::<u64>())
+            .prop_map(|(sig, nonce)| ChallengeResponse {
+                restrictions_id: any_restrictions_id(),
+                signature: Data::Object(sig),
+                nonce,
+            })
+            .boxed()
     }
 
     #[proptest]

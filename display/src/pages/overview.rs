@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -15,8 +16,7 @@
 use snarkos_node::Node;
 use snarkvm::prelude::Network;
 
-use tui::{
-    backend::Backend,
+use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::Span,
@@ -27,7 +27,7 @@ use tui::{
 pub(crate) struct Overview;
 
 impl Overview {
-    pub(crate) fn draw<B: Backend, N: Network>(&self, f: &mut Frame<B>, area: Rect, _node: &Node<N>) {
+    pub(crate) fn draw<N: Network>(&self, f: &mut Frame, area: Rect, _node: &Node<N>) {
         // Initialize the layout of the page.
         let chunks = Layout::default()
             .direction(Direction::Vertical)

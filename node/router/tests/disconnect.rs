@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -22,7 +23,7 @@ use core::time::Duration;
 #[tokio::test]
 async fn test_disconnect_without_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 1).await;
+    let node0 = validator(0, 1, &[], true).await;
     let node1 = client(0, 1).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
@@ -64,7 +65,7 @@ async fn test_disconnect_without_handshake() {
 #[tokio::test]
 async fn test_disconnect_with_handshake() {
     // Create 2 routers.
-    let node0 = validator(0, 1).await;
+    let node0 = validator(0, 1, &[], true).await;
     let node1 = client(0, 1).await;
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
@@ -80,7 +81,7 @@ async fn test_disconnect_with_handshake() {
     // Connect node0 to node1.
     node0.connect(node1.local_ip());
     // Sleep briefly.
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(1000)).await;
 
     print_tcp!(node0);
     print_tcp!(node1);

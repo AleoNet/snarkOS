@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -19,7 +20,6 @@ pub struct PrimaryPing<N: Network> {
     pub version: u32,
     pub block_locators: BlockLocators<N>,
     pub primary_certificate: Data<BatchCertificate<N>>,
-    pub batch_certificates: IndexMap<Field<N>, Data<BatchCertificate<N>>>,
 }
 
 impl<N: Network> PrimaryPing<N> {
@@ -28,28 +28,15 @@ impl<N: Network> PrimaryPing<N> {
         version: u32,
         block_locators: BlockLocators<N>,
         primary_certificate: Data<BatchCertificate<N>>,
-        batch_certificates: IndexMap<Field<N>, Data<BatchCertificate<N>>>,
     ) -> Self {
-        Self { version, block_locators, primary_certificate, batch_certificates }
+        Self { version, block_locators, primary_certificate }
     }
 }
 
-impl<N: Network> From<(u32, BlockLocators<N>, BatchCertificate<N>, IndexSet<BatchCertificate<N>>)> for PrimaryPing<N> {
+impl<N: Network> From<(u32, BlockLocators<N>, BatchCertificate<N>)> for PrimaryPing<N> {
     /// Initializes a new ping event.
-    fn from(
-        (version, block_locators, primary_certificate, batch_certificates): (
-            u32,
-            BlockLocators<N>,
-            BatchCertificate<N>,
-            IndexSet<BatchCertificate<N>>,
-        ),
-    ) -> Self {
-        Self::new(
-            version,
-            block_locators,
-            Data::Object(primary_certificate),
-            batch_certificates.into_iter().map(|c| (c.id(), Data::Object(c))).collect(),
-        )
+    fn from((version, block_locators, primary_certificate): (u32, BlockLocators<N>, BatchCertificate<N>)) -> Self {
+        Self::new(version, block_locators, Data::Object(primary_certificate))
     }
 }
 
@@ -70,17 +57,6 @@ impl<N: Network> ToBytes for PrimaryPing<N> {
         // Write the primary certificate.
         self.primary_certificate.write_le(&mut writer)?;
 
-        // Determine the number of batch certificates.
-        let num_certificates =
-            u16::try_from(self.batch_certificates.len()).map_err(error)?.min(Committee::<N>::MAX_COMMITTEE_SIZE);
-
-        // Write the number of batch certificates.
-        num_certificates.write_le(&mut writer)?;
-        // Write the batch certificates.
-        for (certificate_id, certificate) in self.batch_certificates.iter().take(usize::from(num_certificates)) {
-            certificate_id.write_le(&mut writer)?;
-            certificate.write_le(&mut writer)?;
-        }
         Ok(())
     }
 }
@@ -94,27 +70,8 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
         // Read the primary certificate.
         let primary_certificate = Data::read_le(&mut reader)?;
 
-        // Read the number of batch certificates.
-        let num_certificates = u16::read_le(&mut reader)?;
-        // Ensure the number of batch certificates is not greater than the maximum committee size.
-        // Note: We allow there to be 0 batch certificates. This is necessary to ensure primary pings are sent.
-        if num_certificates > Committee::<N>::MAX_COMMITTEE_SIZE {
-            return Err(error("The number of batch certificates is greater than the maximum committee size"));
-        }
-
-        // Read the batch certificates.
-        let mut batch_certificates = IndexMap::with_capacity(usize::from(num_certificates));
-        for _ in 0..num_certificates {
-            // Read the certificate ID.
-            let certificate_id = Field::read_le(&mut reader)?;
-            // Read the certificate.
-            let certificate = Data::read_le(&mut reader)?;
-            // Insert the certificate.
-            batch_certificates.insert(certificate_id, certificate);
-        }
-
         // Return the ping event.
-        Ok(Self::new(version, block_locators, primary_certificate, batch_certificates))
+        Ok(Self::new(version, block_locators, primary_certificate))
     }
 }
 
@@ -125,11 +82,10 @@ pub mod prop_tests {
     use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
-    use indexmap::indexset;
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_block_locators() -> BoxedStrategy<BlockLocators<CurrentNetwork>> {
         any::<u32>().prop_map(sample_block_locators).boxed()
@@ -138,7 +94,7 @@ pub mod prop_tests {
     pub fn any_primary_ping() -> BoxedStrategy<PrimaryPing<CurrentNetwork>> {
         (any::<u32>(), any_block_locators(), any_batch_certificate())
             .prop_map(|(version, block_locators, batch_certificate)| {
-                PrimaryPing::from((version, block_locators, batch_certificate.clone(), indexset![batch_certificate]))
+                PrimaryPing::from((version, block_locators, batch_certificate.clone()))
             })
             .boxed()
     }
@@ -154,13 +110,5 @@ pub mod prop_tests {
             primary_ping.primary_certificate.deserialize_blocking().unwrap(),
             decoded.primary_certificate.deserialize_blocking().unwrap(),
         );
-        assert!(
-            primary_ping
-                .batch_certificates
-                .into_iter()
-                .map(|(a, bc)| (a, bc.deserialize_blocking().unwrap()))
-                .zip(decoded.batch_certificates.into_iter().map(|(a, bc)| (a, bc.deserialize_blocking().unwrap())))
-                .all(|(a, b)| a == b)
-        )
     }
 }

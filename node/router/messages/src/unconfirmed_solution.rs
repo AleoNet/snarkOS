@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -23,8 +24,8 @@ use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnconfirmedSolution<N: Network> {
-    pub solution_id: PuzzleCommitment<N>,
-    pub solution: Data<ProverSolution<N>>,
+    pub solution_id: SolutionID<N>,
+    pub solution: Data<Solution<N>>,
 }
 
 impl<N: Network> MessageTrait for UnconfirmedSolution<N> {
@@ -44,16 +45,15 @@ impl<N: Network> ToBytes for UnconfirmedSolution<N> {
 
 impl<N: Network> FromBytes for UnconfirmedSolution<N> {
     fn read_le<R: io::Read>(mut reader: R) -> io::Result<Self> {
-        Ok(Self { solution_id: PuzzleCommitment::read_le(&mut reader)?, solution: Data::read_le(reader)? })
+        Ok(Self { solution_id: SolutionID::read_le(&mut reader)?, solution: Data::read_le(reader)? })
     }
 }
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{ProverSolution, PuzzleCommitment, UnconfirmedSolution};
+    use crate::{Solution, SolutionID, UnconfirmedSolution};
     use snarkvm::{
-        algorithms::polycommit::kzg10::{KZGCommitment, KZGProof},
-        ledger::{coinbase::PartialSolution, narwhal::Data},
+        ledger::{narwhal::Data, puzzle::PartialSolution},
         prelude::{Address, FromBytes, PrivateKey, Rng, TestRng, ToBytes},
     };
 
@@ -61,28 +61,26 @@ pub mod prop_tests {
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
-    pub fn any_solution_id() -> BoxedStrategy<PuzzleCommitment<CurrentNetwork>> {
-        any::<u64>()
-            .prop_map(|seed| PuzzleCommitment::<CurrentNetwork>::new(KZGCommitment(TestRng::fixed(seed).gen())))
-            .boxed()
+    pub fn any_solution_id() -> BoxedStrategy<SolutionID<CurrentNetwork>> {
+        any::<u64>().prop_map(|seed| TestRng::fixed(seed).gen::<u64>().into()).boxed()
     }
 
-    pub fn any_prover_solution() -> BoxedStrategy<ProverSolution<CurrentNetwork>> {
+    pub fn any_solution() -> BoxedStrategy<Solution<CurrentNetwork>> {
         any::<u64>()
             .prop_map(|seed| {
                 let mut rng = TestRng::fixed(seed);
                 let private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
                 let address = Address::try_from(private_key).unwrap();
-                let partial_solution = PartialSolution::new(address, rng.gen(), KZGCommitment(rng.gen()));
-                ProverSolution::new(partial_solution, KZGProof { w: rng.gen(), random_v: None })
+                let partial_solution = PartialSolution::new(rng.gen(), address, rng.gen()).unwrap();
+                Solution::new(partial_solution, rng.gen())
             })
             .boxed()
     }
 
     pub fn any_unconfirmed_solution() -> BoxedStrategy<UnconfirmedSolution<CurrentNetwork>> {
-        (any_solution_id(), any_prover_solution())
+        (any_solution_id(), any_solution())
             .prop_map(|(solution_id, ps)| UnconfirmedSolution { solution_id, solution: Data::Object(ps) })
             .boxed()
     }

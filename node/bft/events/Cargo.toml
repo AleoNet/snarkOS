@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-node-bft-events"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Events for the gateway in a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -16,6 +16,10 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = [ ]
+metrics = ["dep:metrics", "snarkvm/metrics"]
+
 [dependencies.anyhow]
 version = "1.0"
 
@@ -26,6 +30,12 @@ version = "1"
 version = "2.1"
 features = [ "serde", "rayon" ]
 
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../../metrics"
+version = "=2.2.7"
+optional = true
+
 [dependencies.rayon]
 version = "1"
 
@@ -34,13 +44,10 @@ version = "1"
 
 [dependencies.snarkos-node-sync-locators]
 path = "../../sync/locators"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkvm]
 workspace = true
-
-[dependencies.snow]
-version = "0.9"
 
 [dependencies.tokio-util]
 version = "0.7"

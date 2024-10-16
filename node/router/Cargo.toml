@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-node-router"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node router for a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -18,9 +18,10 @@ edition = "2021"
 
 [features]
 test = [ ]
+metrics = [ "dep:metrics" ]
 
 [dependencies.anyhow]
-version = "1.0.75"
+version = "1.0.79"
 
 [dependencies.async-trait]
 version = "0.1"
@@ -35,7 +36,7 @@ version = "1"
 version = "2"
 
 [dependencies.futures]
-version = "0.3.29"
+version = "0.3.30"
 features = [ "thread-pool" ]
 
 [dependencies.indexmap]
@@ -45,11 +46,20 @@ features = [ "serde", "rayon" ]
 [dependencies.linked-hash-map]
 version = "0.5"
 
+[dependencies.metrics]
+package = "snarkos-node-metrics"
+path = "../metrics"
+version = "=2.2.7"
+optional = true
+
 [dependencies.parking_lot]
 version = "0.12"
 
 [dependencies.rand]
 version = "0.8"
+
+[dependencies.rayon]
+version = "1.10"
 
 [dependencies.reqwest]
 version = "0.11"
@@ -59,19 +69,19 @@ version = "1"
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-sync-locators]
 path = "../sync/locators"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-router-messages]
 path = "messages"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkvm]
 workspace = true

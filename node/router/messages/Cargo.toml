@@ -1,10 +1,10 @@
 [package]
 name = "snarkos-node-router-messages"
-version = "2.2.4"
+version = "2.2.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Node messages for a decentralized operating system"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkOS"
+repository = "https://github.com/AleoNet/snarkOS"
 keywords = [
   "aleo",
   "cryptography",
@@ -38,17 +38,14 @@ version = "1"
 
 [dependencies.snarkos-node-bft-events]
 path = "../../bft/events"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkos-node-sync-locators]
 path = "../../sync/locators"
-version = "=2.2.4"
+version = "=2.2.7"
 
 [dependencies.snarkvm]
 workspace = true
-
-[dependencies.snow]
-version = "0.9.4"
 
 [dependencies.tokio]
 version = "1.28"

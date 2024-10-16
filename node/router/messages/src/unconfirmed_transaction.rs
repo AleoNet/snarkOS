@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -60,7 +61,10 @@ impl<N: Network> FromBytes for UnconfirmedTransaction<N> {
 pub mod prop_tests {
     use crate::{Transaction, UnconfirmedTransaction};
     use snarkvm::{
-        ledger::{ledger_test_helpers::sample_fee_public_transaction, narwhal::Data},
+        ledger::{
+            ledger_test_helpers::{sample_fee_public_transaction, sample_large_execution_transaction},
+            narwhal::Data,
+        },
         prelude::{FromBytes, TestRng, ToBytes},
     };
 
@@ -68,7 +72,7 @@ pub mod prop_tests {
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_transaction() -> BoxedStrategy<Transaction<CurrentNetwork>> {
         any::<u64>()
@@ -79,8 +83,23 @@ pub mod prop_tests {
             .boxed()
     }
 
+    pub fn any_large_transaction() -> BoxedStrategy<Transaction<CurrentNetwork>> {
+        any::<u64>()
+            .prop_map(|seed| {
+                let mut rng = TestRng::fixed(seed);
+                sample_large_execution_transaction(&mut rng)
+            })
+            .boxed()
+    }
+
     pub fn any_unconfirmed_transaction() -> BoxedStrategy<UnconfirmedTransaction<CurrentNetwork>> {
         any_transaction()
+            .prop_map(|tx| UnconfirmedTransaction { transaction_id: tx.id(), transaction: Data::Object(tx) })
+            .boxed()
+    }
+
+    pub fn any_large_unconfirmed_transaction() -> BoxedStrategy<UnconfirmedTransaction<CurrentNetwork>> {
+        any_large_transaction()
             .prop_map(|tx| UnconfirmedTransaction { transaction_id: tx.id(), transaction: Data::Object(tx) })
             .boxed()
     }

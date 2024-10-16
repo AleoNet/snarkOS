@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -45,113 +46,30 @@ pub use node::*;
 mod traits;
 pub use traits::*;
 
+use aleo_std::StorageMode;
+
 /// A helper to log instructions to recover.
-pub fn log_clean_error(dev: Option<u16>) {
-    match dev {
-        Some(id) => error!("Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage"),
-        None => error!("Storage corruption detected! Run `snarkos clean` to reset storage"),
-    }
-}
-
-use snarkvm::{
-    ledger::store::ConsensusStorage,
-    prelude::{const_assert, hrp2, AleoID, Field, Ledger, Network},
-};
-
-use anyhow::{bail, Result};
-
-// TODO: Remove me after Phase 3.
-pub fn phase_3_reset<N: Network, C: ConsensusStorage<N>>(
-    ledger: Ledger<N, C>,
-    dev: Option<u16>,
-) -> Result<Ledger<N, C>> {
-    use core::str::FromStr;
-
-    /// Removes the specified ledger from storage.
-    pub(crate) fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
-        // Construct the path to the ledger in storage.
-        let mut path = aleo_std::aleo_ledger_dir(network, dev);
-
-        // Delete the parent folder.
-        path.pop();
-
-        // Prepare the path string.
-        let path_string = format!("(in \"{}\")", path.display());
-
-        // Check if the path to the ledger exists in storage.
-        if path.exists() {
-            // Remove the ledger files from storage.
-            match std::fs::remove_dir_all(&path) {
-                Ok(_) => Ok(format!("✅ Cleaned the snarkOS node storage {path_string}")),
-                Err(error) => {
-                    bail!("Failed to remove the snarkOS node storage {path_string}\n{}", error.to_string())
-                }
-            }
-        } else {
-            Ok(format!("✅ No snarkOS node storage was found {path_string}"))
+pub fn log_clean_error(storage_mode: &StorageMode) {
+    match storage_mode {
+        StorageMode::Production => error!("Storage corruption detected! Run `snarkos clean` to reset storage"),
+        StorageMode::Development(id) => {
+            error!("Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage")
+        }
+        StorageMode::Custom(path) => {
+            error!("Storage corruption detected! Run `snarkos clean --path {}` to reset storage", path.display())
         }
     }
-
-    type ID<N> = AleoID<Field<N>, { hrp2!("ab") }>;
-
-    if let Ok(block) = ledger.get_block(28250) {
-        if *block.hash() == *ID::<N>::from_str("ab1fxetqjm0ppruay8vlg6gtt52d5fkeydmrk0talp04ymjm65acg9sh8d0r5")? {
-            let genesis = ledger.get_block(0)?;
-            drop(ledger);
-            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
-            // Sleep for 5 seconds to allow the user to read the message.
-            std::thread::sleep(std::time::Duration::from_secs(5));
-            return Ledger::<N, C>::load(genesis.clone(), dev);
-        }
-    } else if let Ok(block) = ledger.get_block(28251) {
-        if *block.hash() == *ID::<N>::from_str("ab1ngmc9wf3kz73lxg9ylx75vday82a26xqthjykzrwyhngnr25uvqqau9eyh")? {
-            let genesis = ledger.get_block(0)?;
-            drop(ledger);
-            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
-            // Sleep for 5 seconds to allow the user to read the message.
-            std::thread::sleep(std::time::Duration::from_secs(5));
-            return Ledger::<N, C>::load(genesis.clone(), dev);
-        }
-    } else if let Ok(block) = ledger.get_block(28252) {
-        if *block.hash() == *ID::<N>::from_str("ab1k6msq00mzrlmm3e0xzgynks5mqh2zrhd35akqqts24sd9u5x9yxs355qgv")? {
-            let genesis = ledger.get_block(0)?;
-            drop(ledger);
-            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
-            // Sleep for 5 seconds to allow the user to read the message.
-            std::thread::sleep(std::time::Duration::from_secs(5));
-            return Ledger::<N, C>::load(genesis.clone(), dev);
-        }
-    } else if let Ok(block) = ledger.get_block(115314) {
-        if *block.hash() == *ID::<N>::from_str("ab13eckyhvhpv5zdhw8xz2zskrmm0a5hgeq7f5sjaw4errx0678pgpsjhuaqf")? {
-            let genesis = ledger.get_block(0)?;
-            drop(ledger);
-            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
-            // Sleep for 5 seconds to allow the user to read the message.
-            std::thread::sleep(std::time::Duration::from_secs(5));
-            return Ledger::<N, C>::load(genesis.clone(), dev);
-        }
-    } else if let Ok(block) = ledger.get_block(115315) {
-        if *block.hash() == *ID::<N>::from_str("ab1axs5ltm6kjezsjxw35taf3xjpherrhpu6868h3ezhc3ap8pyrggqrrkjcg")? {
-            let genesis = ledger.get_block(0)?;
-            drop(ledger);
-            println!("{}.\n\n\nMIGRATION SUCCEEDED. RESTART THIS SNARKOS NODE AGAIN.\n\n", remove_ledger(N::ID, dev)?);
-            // Sleep for 5 seconds to allow the user to read the message.
-            std::thread::sleep(std::time::Duration::from_secs(5));
-            return Ledger::<N, C>::load(genesis.clone(), dev);
-        }
-    }
-    Ok(ledger)
 }
 
 /// Starts the notification message loop.
 pub fn start_notification_message_loop() -> tokio::task::JoinHandle<()> {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(180));
+    // let mut interval = tokio::time::interval(std::time::Duration::from_secs(180));
     tokio::spawn(async move {
-        loop {
-            interval.tick().await;
-            // TODO (howardwu): Swap this with the official message for Testnet 3 announcements.
-            // info!("{}", notification_message());
-        }
+        //     loop {
+        //         interval.tick().await;
+        //         // TODO (howardwu): Swap this with the official message for announcements.
+        //         // info!("{}", notification_message());
+        //     }
     })
 }
 
@@ -164,7 +82,7 @@ pub fn notification_message() -> String {
 
  ==================================================================================================
 
-                     🚧 Welcome to Aleo Testnet 3 Phase 3 - Calibration Period 🚧
+                     🚧 Welcome to Aleo - Calibration Period 🚧
 
  ==================================================================================================
 
@@ -191,8 +109,8 @@ pub fn notification_message() -> String {
     - IMPORTANT: EXPECT MULTIPLE NETWORK RESETS.
     - If participating, BE PREPARED TO RESET YOUR NODE AT ANY TIME.
     - When a reset occurs, RUN THE FOLLOWING TO RESET YOUR NODE:
-        - git checkout testnet3 && git pull
-        - cargo install --path .
+        - git checkout mainnet && git pull
+        - cargo install --locked --path .
         - snarkos clean
         - snarkos start --nodisplay --client
 

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -24,7 +25,7 @@ use std::{
 
 use snarkos_account::Account;
 use snarkos_node_router::{messages::NodeType, Router};
-use snarkvm::prelude::{block::Block, FromBytes, Network, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{block::Block, FromBytes, MainnetV0 as CurrentNetwork, Network};
 
 /// A helper macro to print the TCP listening address, along with the connected and connecting peers.
 #[macro_export]
@@ -78,6 +79,7 @@ pub async fn client(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
         &[],
         max_peers,
         true,
+        true,
     )
     .await
     .expect("couldn't create client router")
@@ -94,6 +96,7 @@ pub async fn prover(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
         &[],
         max_peers,
         true,
+        true,
     )
     .await
     .expect("couldn't create prover router")
@@ -102,13 +105,19 @@ pub async fn prover(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
 
 /// Initializes a validator router. Setting the `listening_port = 0` will result in a random port being assigned.
 #[allow(dead_code)]
-pub async fn validator(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNetwork> {
+pub async fn validator(
+    listening_port: u16,
+    max_peers: u16,
+    trusted_peers: &[SocketAddr],
+    allow_external_peers: bool,
+) -> TestRouter<CurrentNetwork> {
     Router::new(
         SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), listening_port),
         NodeType::Validator,
         sample_account(),
-        &[],
+        trusted_peers,
         max_peers,
+        allow_external_peers,
         true,
     )
     .await

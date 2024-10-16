@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -34,17 +35,20 @@ use snarkvm::{
     ledger::narwhal::Data,
     prelude::{
         block::{Block, Header},
-        coinbase::{CoinbasePuzzle, EpochChallenge, ProverSolution},
+        puzzle::{Puzzle, Solution},
         store::ConsensusStorage,
         Network,
     },
+    synthesizer::VM,
 };
 
+use aleo_std::StorageMode;
 use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
 use parking_lot::{Mutex, RwLock};
 use rand::{rngs::OsRng, CryptoRng, Rng};
+use snarkos_node_bft::helpers::fmt_id;
 use std::{
     net::SocketAddr,
     sync::{
@@ -63,10 +67,10 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     sync: Arc<BlockSync<N>>,
     /// The genesis block.
     genesis: Block<N>,
-    /// The coinbase puzzle.
-    coinbase_puzzle: CoinbasePuzzle<N>,
-    /// The latest epoch challenge.
-    latest_epoch_challenge: Arc<RwLock<Option<Arc<EpochChallenge<N>>>>>,
+    /// The puzzle.
+    puzzle: Puzzle<N>,
+    /// The latest epoch hash.
+    latest_epoch_hash: Arc<RwLock<Option<N::BlockHash>>>,
     /// The latest block header.
     latest_block_header: Arc<RwLock<Option<Header<N>>>>,
     /// The number of puzzle instances.
@@ -88,15 +92,18 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
-        dev: Option<u16>,
+        storage_mode: StorageMode,
+        shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         // Initialize the signal handler.
-        let signal_node = Self::handle_signals();
+        let signal_node = Self::handle_signals(shutdown.clone());
 
         // Initialize the ledger service.
         let ledger_service = Arc::new(ProverLedgerService::new());
         // Initialize the sync module.
         let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
+        // Determine if the prover should allow external peers.
+        let allow_external_peers = true;
 
         // Initialize the node router.
         let router = Router::new(
@@ -105,11 +112,10 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
-            dev.is_some(),
+            allow_external_peers,
+            matches!(storage_mode, StorageMode::Development(_)),
         )
         .await?;
-        // Load the coinbase puzzle.
-        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Compute the maximum number of puzzle instances.
         let max_puzzle_instances = num_cpus::get().saturating_sub(2).clamp(1, 6);
         // Initialize the node.
@@ -117,19 +123,19 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             router,
             sync: Arc::new(sync),
             genesis,
-            coinbase_puzzle,
-            latest_epoch_challenge: Default::default(),
+            puzzle: VM::<N, C>::new_puzzle()?,
+            latest_epoch_hash: Default::default(),
             latest_block_header: Default::default(),
             puzzle_instances: Default::default(),
             max_puzzle_instances: u8::try_from(max_puzzle_instances)?,
             handles: Default::default(),
-            shutdown: Default::default(),
+            shutdown,
             _phantom: Default::default(),
         };
         // Initialize the routing.
         node.initialize_routing().await;
-        // Initialize the coinbase puzzle.
-        node.initialize_coinbase_puzzle().await;
+        // Initialize the puzzle.
+        node.initialize_puzzle().await;
         // Initialize the notification message loop.
         node.handles.lock().push(crate::start_notification_message_loop());
         // Pass the node to the signal handler.
@@ -145,12 +151,12 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
     async fn shut_down(&self) {
         info!("Shutting down...");
 
-        // Shut down the coinbase puzzle.
-        trace!("Shutting down the coinbase puzzle...");
+        // Shut down the puzzle.
+        debug!("Shutting down the puzzle...");
         self.shutdown.store(true, Ordering::Relaxed);
 
         // Abort the tasks.
-        trace!("Shutting down the prover...");
+        debug!("Shutting down the prover...");
         self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
@@ -161,35 +167,35 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
-    /// Initialize a new instance of the coinbase puzzle.
-    async fn initialize_coinbase_puzzle(&self) {
+    /// Initialize a new instance of the puzzle.
+    async fn initialize_puzzle(&self) {
         for _ in 0..self.max_puzzle_instances {
             let prover = self.clone();
             self.handles.lock().push(tokio::spawn(async move {
-                prover.coinbase_puzzle_loop().await;
+                prover.puzzle_loop().await;
             }));
         }
     }
 
-    /// Executes an instance of the coinbase puzzle.
-    async fn coinbase_puzzle_loop(&self) {
+    /// Executes an instance of the puzzle.
+    async fn puzzle_loop(&self) {
         loop {
             // If the node is not connected to any peers, then skip this iteration.
             if self.router.number_of_connected_peers() == 0 {
-                trace!("Skipping an iteration of the coinbase puzzle (no connected peers)");
+                debug!("Skipping an iteration of the puzzle (no connected peers)");
                 tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                 continue;
             }
 
-            // If the number of instances of the coinbase puzzle exceeds the maximum, then skip this iteration.
+            // If the number of instances of the puzzle exceeds the maximum, then skip this iteration.
             if self.num_puzzle_instances() > self.max_puzzle_instances {
                 // Sleep for a brief period of time.
                 tokio::time::sleep(Duration::from_millis(500)).await;
                 continue;
             }
 
-            // Read the latest epoch challenge.
-            let latest_epoch_challenge = self.latest_epoch_challenge.read().clone();
+            // Read the latest epoch hash.
+            let latest_epoch_hash = *self.latest_epoch_hash.read();
             // Read the latest state.
             let latest_state = self
                 .latest_block_header
@@ -197,20 +203,20 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 .as_ref()
                 .map(|header| (header.coinbase_target(), header.proof_target()));
 
-            // If the latest epoch challenge and latest state exists, then proceed to generate a prover solution.
-            if let (Some(challenge), Some((coinbase_target, proof_target))) = (latest_epoch_challenge, latest_state) {
-                // Execute the coinbase puzzle.
+            // If the latest epoch hash and latest state exists, then proceed to generate a solution.
+            if let (Some(epoch_hash), Some((coinbase_target, proof_target))) = (latest_epoch_hash, latest_state) {
+                // Execute the puzzle.
                 let prover = self.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    prover.coinbase_puzzle_iteration(&challenge, coinbase_target, proof_target, &mut OsRng)
+                    prover.puzzle_iteration(epoch_hash, coinbase_target, proof_target, &mut OsRng)
                 })
                 .await;
 
                 // If the prover found a solution, then broadcast it.
                 if let Ok(Some((solution_target, solution))) = result {
-                    info!("Found a Solution '{}' (Proof Target {solution_target})", solution.commitment());
-                    // Broadcast the prover solution.
-                    self.broadcast_prover_solution(solution);
+                    info!("Found a Solution '{}' (Proof Target {solution_target})", solution.id());
+                    // Broadcast the solution.
+                    self.broadcast_solution(solution);
                 }
             } else {
                 // Otherwise, sleep for a brief period of time, to await for puzzle state.
@@ -219,38 +225,34 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
             // If the Ctrl-C handler registered the signal, stop the prover.
             if self.shutdown.load(Ordering::Relaxed) {
-                trace!("Shutting down the coinbase puzzle...");
+                debug!("Shutting down the puzzle...");
                 break;
             }
         }
     }
 
-    /// Performs one iteration of the coinbase puzzle.
-    fn coinbase_puzzle_iteration<R: Rng + CryptoRng>(
+    /// Performs one iteration of the puzzle.
+    fn puzzle_iteration<R: Rng + CryptoRng>(
         &self,
-        epoch_challenge: &EpochChallenge<N>,
+        epoch_hash: N::BlockHash,
         coinbase_target: u64,
         proof_target: u64,
         rng: &mut R,
-    ) -> Option<(u64, ProverSolution<N>)> {
+    ) -> Option<(u64, Solution<N>)> {
         // Increment the puzzle instances.
         self.increment_puzzle_instances();
 
-        trace!(
-            "Proving 'CoinbasePuzzle' {}",
-            format!(
-                "(Epoch {}, Coinbase Target {coinbase_target}, Proof Target {proof_target})",
-                epoch_challenge.epoch_number(),
-            )
-            .dimmed()
+        debug!(
+            "Proving 'Puzzle' for Epoch '{}' {}",
+            fmt_id(epoch_hash),
+            format!("(Coinbase Target {coinbase_target}, Proof Target {proof_target})").dimmed()
         );
 
-        // Compute the prover solution.
-        let result = self
-            .coinbase_puzzle
-            .prove(epoch_challenge, self.address(), rng.gen(), Some(proof_target))
-            .ok()
-            .and_then(|solution| solution.to_target().ok().map(|solution_target| (solution_target, solution)));
+        // Compute the solution.
+        let result =
+            self.puzzle.prove(epoch_hash, self.address(), rng.gen(), Some(proof_target)).ok().and_then(|solution| {
+                self.puzzle.get_proof_target(&solution).ok().map(|solution_target| (solution_target, solution))
+            });
 
         // Decrement the puzzle instances.
         self.decrement_puzzle_instances();
@@ -258,12 +260,12 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         result
     }
 
-    /// Broadcasts the prover solution to the network.
-    fn broadcast_prover_solution(&self, prover_solution: ProverSolution<N>) {
+    /// Broadcasts the solution to the network.
+    fn broadcast_solution(&self, solution: Solution<N>) {
         // Prepare the unconfirmed solution message.
         let message = Message::UnconfirmedSolution(UnconfirmedSolution {
-            solution_id: prover_solution.commitment(),
-            solution: Data::Object(prover_solution),
+            solution_id: solution.id(),
+            solution: Data::Object(solution),
         });
         // Propagate the "UnconfirmedSolution".
         self.propagate(message, &[]);

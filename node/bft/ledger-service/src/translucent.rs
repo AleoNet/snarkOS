@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -18,15 +19,19 @@ use indexmap::IndexMap;
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
         store::ConsensusStorage,
         Ledger,
     },
-    prelude::{narwhal::BatchCertificate, Field, Network, Result},
+    prelude::{narwhal::BatchCertificate, Address, Field, Network, Result},
 };
-use std::{fmt, ops::Range};
+use std::{
+    fmt,
+    ops::Range,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 pub struct TranslucentLedgerService<N: Network, C: ConsensusStorage<N>> {
     inner: CoreLedgerService<N, C>,
@@ -41,8 +46,8 @@ impl<N: Network, C: ConsensusStorage<N>> fmt::Debug for TranslucentLedgerService
 
 impl<N: Network, C: ConsensusStorage<N>> TranslucentLedgerService<N, C> {
     /// Initializes a new ledger service wrapper.
-    pub fn new(ledger: Ledger<N, C>) -> Self {
-        Self { inner: CoreLedgerService::new(ledger) }
+    pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
+        Self { inner: CoreLedgerService::new(ledger, shutdown) }
     }
 }
 
@@ -63,6 +68,21 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.latest_block()
     }
 
+    /// Returns the latest restrictions ID in the ledger.
+    fn latest_restrictions_id(&self) -> Field<N> {
+        self.inner.latest_restrictions_id()
+    }
+
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        self.inner.latest_leader()
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, round: u64, leader: Address<N>) {
+        self.inner.update_latest_leader(round, leader);
+    }
+
     /// Returns `true` if the given block height exists in the ledger.
     fn contains_block_height(&self, height: u32) -> bool {
         self.inner.contains_block_height(height)
@@ -78,6 +98,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         self.inner.get_block_hash(height)
     }
 
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        self.inner.get_block_round(height)
+    }
+
     /// Returns the block for the given block height.
     fn get_block(&self, height: u32) -> Result<Block<N>> {
         self.inner.get_block(height)
@@ -90,7 +115,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         self.inner.get_solution(solution_id)
     }
 
@@ -110,13 +135,13 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Returns the committee for the given round.
-    /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
         self.inner.get_committee_for_round(round)
     }
 
-    fn get_previous_committee_for_round(&self, round: u64) -> Result<Committee<N>> {
-        self.inner.get_previous_committee_for_round(round)
+    /// Returns the committee lookback for the given round.
+    fn get_committee_lookback_for_round(&self, round: u64) -> Result<Committee<N>> {
+        self.inner.get_committee_lookback_for_round(round)
     }
 
     /// Returns `true` if the ledger contains the given certificate ID in block history.
@@ -130,11 +155,16 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Always succeeds.
-    async fn check_solution_basic(
+    fn ensure_transmission_is_well_formed(
         &self,
-        _puzzle_commitment: PuzzleCommitment<N>,
-        _solution: Data<ProverSolution<N>>,
+        _transmission_id: TransmissionID<N>,
+        _transmission: &mut Transmission<N>,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    /// Always succeeds.
+    async fn check_solution_basic(&self, _solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
         Ok(())
     }
 

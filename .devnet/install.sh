@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Prompt the user for the branch to install (default is "testnet3")
-read -p "Enter the branch to install (default: testnet3): " BRANCH
-BRANCH=${BRANCH:-testnet3}
+# Prompt the user for the branch to install (default is "mainnet")
+read -p "Enter the branch to install (default: mainnet): " BRANCH
+BRANCH=${BRANCH:-mainnet}
 
 # Determine the number of AWS EC2 instances by checking ~/.ssh/config
 NODE_ID=0
@@ -32,7 +32,7 @@ run_installation() {
       git pull origin $BRANCH
     else
       # The workspace directory doesn't exist, clone the repository
-      git clone https://github.com/AleoHQ/snarkOS.git \$WORKSPACE
+      git clone https://github.com/AleoNet/snarkOS.git \$WORKSPACE
       cd \$WORKSPACE
       git checkout $BRANCH  # Checkout the specified branch
     fi
@@ -50,7 +50,7 @@ EOF
 }
 
 # Loop through aws-n nodes and run installations in parallel
-for NODE_ID in $(seq 0 $NUM_INSTANCES); do
+for NODE_ID in $(seq 0 $(($NUM_INSTANCES - 1))); do
   run_installation $NODE_ID $BRANCH &
 done
 

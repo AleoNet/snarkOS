@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -16,11 +17,11 @@ use crate::{fmt_id, LedgerService};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
-        coinbase::{ProverSolution, PuzzleCommitment},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
+        puzzle::{Solution, SolutionID},
     },
-    prelude::{bail, ensure, Field, Network, Result},
+    prelude::{bail, ensure, Address, Field, Network, Result, Zero},
 };
 
 use indexmap::IndexMap;
@@ -32,22 +33,22 @@ use tracing::*;
 #[derive(Debug)]
 pub struct MockLedgerService<N: Network> {
     committee: Committee<N>,
-    height_to_hash: Mutex<BTreeMap<u32, N::BlockHash>>,
+    height_to_round_and_hash: Mutex<BTreeMap<u32, (u64, N::BlockHash)>>,
 }
 
 impl<N: Network> MockLedgerService<N> {
     /// Initializes a new mock ledger service.
     pub fn new(committee: Committee<N>) -> Self {
-        Self { committee, height_to_hash: Default::default() }
+        Self { committee, height_to_round_and_hash: Default::default() }
     }
 
     /// Initializes a new mock ledger service at the specified height.
     pub fn new_at_height(committee: Committee<N>, height: u32) -> Self {
         let mut height_to_hash = BTreeMap::new();
         for i in 0..=height {
-            height_to_hash.insert(i, (Field::<N>::from_u32(i)).into());
+            height_to_hash.insert(i, (i as u64 * 2, Field::<N>::from_u32(i).into()));
         }
-        Self { committee, height_to_hash: Mutex::new(height_to_hash) }
+        Self { committee, height_to_round_and_hash: Mutex::new(height_to_hash) }
     }
 }
 
@@ -55,12 +56,12 @@ impl<N: Network> MockLedgerService<N> {
 impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// Returns the latest round in the ledger.
     fn latest_round(&self) -> u64 {
-        *self.height_to_hash.lock().keys().last().unwrap_or(&0) as u64
+        *self.height_to_round_and_hash.lock().keys().last().unwrap_or(&0) as u64
     }
 
     /// Returns the latest block height in the canonical ledger.
     fn latest_block_height(&self) -> u32 {
-        self.height_to_hash.lock().last_key_value().map(|(height, _)| *height).unwrap_or(0)
+        self.height_to_round_and_hash.lock().last_key_value().map(|(height, _)| *height).unwrap_or(0)
     }
 
     /// Returns the latest block in the ledger.
@@ -68,14 +69,32 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         unreachable!("MockLedgerService does not support latest_block")
     }
 
+    /// Returns the latest restrictions ID in the ledger.
+    fn latest_restrictions_id(&self) -> Field<N> {
+        Field::zero()
+    }
+
+    /// Returns the latest cached leader and its associated round.
+    fn latest_leader(&self) -> Option<(u64, Address<N>)> {
+        None
+    }
+
+    /// Updates the latest cached leader and its associated round.
+    fn update_latest_leader(&self, _round: u64, _leader: Address<N>) {}
+
     /// Returns `true` if the given block height exists in the canonical ledger.
     fn contains_block_height(&self, height: u32) -> bool {
-        self.height_to_hash.lock().contains_key(&height)
+        self.height_to_round_and_hash.lock().contains_key(&height)
     }
 
     /// Returns the canonical block height for the given block hash, if it exists.
     fn get_block_height(&self, hash: &N::BlockHash) -> Result<u32> {
-        match self.height_to_hash.lock().iter().find_map(|(height, h)| if h == hash { Some(*height) } else { None }) {
+        match self
+            .height_to_round_and_hash
+            .lock()
+            .iter()
+            .find_map(|(height, (_, h))| if h == hash { Some(*height) } else { None })
+        {
             Some(height) => Ok(height),
             None => bail!("Missing block {hash}"),
         }
@@ -83,8 +102,21 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
 
     /// Returns the canonical block hash for the given block height, if it exists.
     fn get_block_hash(&self, height: u32) -> Result<N::BlockHash> {
-        match self.height_to_hash.lock().get(&height).cloned() {
-            Some(hash) => Ok(hash),
+        match self.height_to_round_and_hash.lock().get(&height).cloned() {
+            Some((_, hash)) => Ok(hash),
+            None => bail!("Missing block {height}"),
+        }
+    }
+
+    /// Returns the block round for the given block height, if it exists.
+    fn get_block_round(&self, height: u32) -> Result<u64> {
+        match self
+            .height_to_round_and_hash
+            .lock()
+            .iter()
+            .find_map(|(h, (round, _))| if *h == height { Some(*round) } else { None })
+        {
+            Some(round) => Ok(round),
             None => bail!("Missing block {height}"),
         }
     }
@@ -101,7 +133,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Returns the solution for the given solution ID.
-    fn get_solution(&self, _solution_id: &PuzzleCommitment<N>) -> Result<ProverSolution<N>> {
+    fn get_solution(&self, _solution_id: &SolutionID<N>) -> Result<Solution<N>> {
         unreachable!("MockLedgerService does not support get_solution")
     }
 
@@ -121,13 +153,12 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Returns the committee for the given round.
-    /// If the given round is in the future, then the current committee is returned.
     fn get_committee_for_round(&self, _round: u64) -> Result<Committee<N>> {
         Ok(self.committee.clone())
     }
 
-    /// Returns the previous committee for the given round.
-    fn get_previous_committee_for_round(&self, _round: u64) -> Result<Committee<N>> {
+    /// Returns the committee lookback for the given round.
+    fn get_committee_lookback_for_round(&self, _round: u64) -> Result<Committee<N>> {
         Ok(self.committee.clone())
     }
 
@@ -139,17 +170,31 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
 
     /// Returns `false` for all queries.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
-        trace!("[MockLedgerService] Contains transmission ID {} - false", fmt_id(transmission_id));
+        trace!(
+            "[MockLedgerService] Contains transmission ID {}.{} - false",
+            fmt_id(transmission_id),
+            fmt_id(transmission_id.checksum().unwrap_or_default())
+        );
         Ok(false)
     }
 
-    /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
+    /// Ensures that the given transmission is not a fee and matches the given transmission ID.
+    fn ensure_transmission_is_well_formed(
         &self,
-        puzzle_commitment: PuzzleCommitment<N>,
-        _solution: Data<ProverSolution<N>>,
+        transmission_id: TransmissionID<N>,
+        _transmission: &mut Transmission<N>,
     ) -> Result<()> {
-        trace!("[MockLedgerService] Check solution basic {:?} - Ok", fmt_id(puzzle_commitment));
+        trace!(
+            "[MockLedgerService] Ensure transmission ID matches {}.{} - Ok",
+            fmt_id(transmission_id),
+            fmt_id(transmission_id.checksum().unwrap_or_default())
+        );
+        Ok(())
+    }
+
+    /// Checks the given solution is well-formed.
+    async fn check_solution_basic(&self, solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
+        trace!("[MockLedgerService] Check solution basic {:?} - Ok", fmt_id(solution_id));
         Ok(())
     }
 
@@ -187,7 +232,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
             block.height(),
             self.latest_block_height()
         );
-        self.height_to_hash.lock().insert(block.height(), block.hash());
+        self.height_to_round_and_hash.lock().insert(block.height(), (block.round(), block.hash()));
         Ok(())
     }
 }

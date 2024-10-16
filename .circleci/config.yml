@@ -1,7 +1,21 @@
 version: 2.1
 
+parameters:
+  medium:
+    type: string
+    default: medium
+  large:
+    type: string
+    default: large
+  xlarge:
+    type: string
+    default: xlarge
+  twoxlarge:
+    type: string
+    default: aleonet/2xlarge
+
 orbs:
-  windows: circleci/windows@2.4.0
+  windows: circleci/windows@5.0
 
 commands:
   check_windows:
@@ -17,13 +31,17 @@ commands:
           name: "Install Rust and run cargo check"
           command: |
             $ProgressPreference = "SilentlyContinue"
+            # Remove the circleci installed rustc.
+            choco uninstall rust
+            # Install llvm (libclang for rocksdb).
+            choco install llvm -y 
+            refreshenv
+            # Install rust with rustup.
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
             & C:\rustup-init.exe -y --default-toolchain "stable-x86_64-pc-windows-msvc" --no-modify-path --profile minimal
-            choco install llvm -y
-            refreshenv
-            $env:Path += ";C:\Users\circleci\.cargo\bin"
-            rustc -Vv
-            cargo --version
+            $Env:Path += ";$Env:USERPROFILE\.cargo\bin"
+            # Verify the installation.
+            cargo --version --verbose
             rustc --version | Out-File -FilePath "rust-version"
             if (!(Test-Path "Cargo.lock" -PathType Leaf)) {
                 cargo generate-lockfile
@@ -45,7 +63,6 @@ commands:
         default: snarkos-stable-cache
     steps:
       - run: set -e
-      - setup_remote_docker
       - run:
           name: Prepare environment and install dependencies
           command: |
@@ -156,8 +173,8 @@ commands:
 jobs:
   integration:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: 2xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial_long:
           workspace_member: .integration
@@ -165,8 +182,8 @@ jobs:
 
   snarkos:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: 2xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.large >>
     steps:
       - run_serial:
           workspace_member: .
@@ -174,8 +191,8 @@ jobs:
 
   account:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: account
@@ -183,8 +200,8 @@ jobs:
 
   cli:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.xlarge >>
     steps:
       - run_serial:
           workspace_member: cli
@@ -192,8 +209,8 @@ jobs:
 
   display:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: display
@@ -201,8 +218,8 @@ jobs:
 
   node:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: 2xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.twoxlarge >>
     steps:
       - run_serial:
           workspace_member: node
@@ -210,8 +227,8 @@ jobs:
 
   node-bft:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: 2xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.twoxlarge >>
     steps:
       - run_serial:
           workspace_member: node/bft
@@ -219,8 +236,8 @@ jobs:
 
   node-bft-events:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: 2xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/bft/events
@@ -228,17 +245,26 @@ jobs:
 
   node-bft-ledger-service:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/bft/ledger-service
           cache_key: snarkos-node-bft-ledger-service-cache
 
+  node-bft-storage-service:
+    docker:
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
+    steps:
+      - run_serial:
+          workspace_member: node/bft/storage-service
+          cache_key: snarkos-node-bft-storage-service-cache
+
   node-cdn:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/cdn
@@ -246,8 +272,8 @@ jobs:
 
   node-consensus:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: 2xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/consensus
@@ -255,8 +281,8 @@ jobs:
 
   node-rest:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/rest
@@ -264,8 +290,8 @@ jobs:
 
   node-router:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.large >>
     steps:
       - run_serial:
           workspace_member: node/router
@@ -273,8 +299,8 @@ jobs:
 
   node-router-messages:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/router/messages
@@ -282,8 +308,8 @@ jobs:
 
   node-sync:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.xlarge >>
     steps:
       - run_serial:
           workspace_member: node/sync
@@ -291,8 +317,8 @@ jobs:
 
   node-sync-communication-service:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/sync/communication-service
@@ -300,8 +326,8 @@ jobs:
 
   node-sync-locators:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/sync/locators
@@ -309,8 +335,8 @@ jobs:
 
   node-tcp:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/tcp
@@ -318,8 +344,8 @@ jobs:
 
   check-fmt:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - checkout
       - install_rust_nightly
@@ -334,8 +360,8 @@ jobs:
 
   check-clippy:
     docker:
-      - image: cimg/rust:1.71.1
-    resource_class: 2xlarge
+      - image: cimg/rust:1.76.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
     steps:
       - checkout
       - setup_environment:
@@ -375,6 +401,7 @@ workflows:
       - node-bft
       - node-bft-events
       - node-bft-ledger-service
+      - node-bft-storage-service
       - node-cdn
       - node-consensus
       - node-rest
@@ -406,6 +433,7 @@ workflows:
           filters:
             branches:
               only:
-                - testnet3
+                - mainnet
     jobs:
       - integration
+      

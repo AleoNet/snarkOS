@@ -1,10 +1,11 @@
 **/*.idea/
 **/target
 **.DS_Store
-storage*/
 wasm/Cargo.lock
 **/build
+**.history-*
 **.ledger-*
+**.current-proposal-cache-*
 **.logs-*
 validator-*
 **.bft-storage-*/

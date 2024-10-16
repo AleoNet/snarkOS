@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -64,7 +65,7 @@ pub struct DataBlocks<N: Network>(pub Vec<Block<N>>);
 
 impl<N: Network> DataBlocks<N> {
     /// The maximum number of blocks that can be sent in a single message.
-    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 1;
+    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 5;
 
     /// Ensures that the blocks are well-formed in a block response.
     pub fn ensure_response_is_well_formed(
@@ -148,7 +149,7 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = snarkvm::prelude::Testnet3;
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_block() -> BoxedStrategy<Block<CurrentNetwork>> {
         any::<u64>().prop_map(|seed| sample_genesis_block(&mut TestRng::fixed(seed))).boxed()

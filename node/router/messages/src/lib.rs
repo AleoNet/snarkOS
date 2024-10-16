@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -64,8 +65,8 @@ pub use snarkos_node_bft_events::DataBlocks;
 use snarkos_node_sync_locators::BlockLocators;
 use snarkvm::prelude::{
     block::{Header, Transaction},
-    coinbase::{EpochChallenge, ProverSolution, PuzzleCommitment},
     error,
+    puzzle::{Solution, SolutionID},
     Address,
     FromBytes,
     Network,
@@ -111,7 +112,7 @@ impl<N: Network> From<DisconnectReason> for Message<N> {
 
 impl<N: Network> Message<N> {
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 11;
+    pub const VERSION: u32 = 17;
 
     /// Returns the message name.
     #[inline]
@@ -152,6 +153,28 @@ impl<N: Network> Message<N> {
             Self::UnconfirmedTransaction(..) => 12,
         }
     }
+
+    /// Checks the message byte length. To be used before deserialization.
+    pub fn check_size(bytes: &[u8]) -> io::Result<()> {
+        // Store the length to be checked against the max message size for each variant.
+        let len = bytes.len();
+        if len < 2 {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid message"));
+        }
+
+        // Check the first two bytes for the message ID.
+        let id_bytes: [u8; 2] = (&bytes[..2])
+            .try_into()
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "id couldn't be deserialized"))?;
+        let id = u16::from_le_bytes(id_bytes);
+
+        // SPECIAL CASE: check the transaction message isn't too large.
+        if id == 12 && len > N::MAX_TRANSACTION_SIZE {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "transaction is too large"))?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<N: Network> ToBytes for Message<N> {
@@ -185,21 +208,26 @@ impl<N: Network> FromBytes for Message<N> {
 
         // Deserialize the data field.
         let message = match id {
-            0 => Self::BlockRequest(BlockRequest::read_le(reader)?),
-            1 => Self::BlockResponse(BlockResponse::read_le(reader)?),
-            2 => Self::ChallengeRequest(ChallengeRequest::read_le(reader)?),
-            3 => Self::ChallengeResponse(ChallengeResponse::read_le(reader)?),
-            4 => Self::Disconnect(Disconnect::read_le(reader)?),
-            5 => Self::PeerRequest(PeerRequest::read_le(reader)?),
-            6 => Self::PeerResponse(PeerResponse::read_le(reader)?),
-            7 => Self::Ping(Ping::read_le(reader)?),
-            8 => Self::Pong(Pong::read_le(reader)?),
-            9 => Self::PuzzleRequest(PuzzleRequest::read_le(reader)?),
-            10 => Self::PuzzleResponse(PuzzleResponse::read_le(reader)?),
-            11 => Self::UnconfirmedSolution(UnconfirmedSolution::read_le(reader)?),
-            12 => Self::UnconfirmedTransaction(UnconfirmedTransaction::read_le(reader)?),
+            0 => Self::BlockRequest(BlockRequest::read_le(&mut reader)?),
+            1 => Self::BlockResponse(BlockResponse::read_le(&mut reader)?),
+            2 => Self::ChallengeRequest(ChallengeRequest::read_le(&mut reader)?),
+            3 => Self::ChallengeResponse(ChallengeResponse::read_le(&mut reader)?),
+            4 => Self::Disconnect(Disconnect::read_le(&mut reader)?),
+            5 => Self::PeerRequest(PeerRequest::read_le(&mut reader)?),
+            6 => Self::PeerResponse(PeerResponse::read_le(&mut reader)?),
+            7 => Self::Ping(Ping::read_le(&mut reader)?),
+            8 => Self::Pong(Pong::read_le(&mut reader)?),
+            9 => Self::PuzzleRequest(PuzzleRequest::read_le(&mut reader)?),
+            10 => Self::PuzzleResponse(PuzzleResponse::read_le(&mut reader)?),
+            11 => Self::UnconfirmedSolution(UnconfirmedSolution::read_le(&mut reader)?),
+            12 => Self::UnconfirmedTransaction(UnconfirmedTransaction::read_le(&mut reader)?),
             13.. => return Err(error("Unknown message ID {id}")),
         };
+
+        // Ensure that there are no "dangling" bytes.
+        if reader.bytes().next().is_some() {
+            return Err(error("Leftover bytes in a Message"));
+        }
 
         Ok(message)
     }

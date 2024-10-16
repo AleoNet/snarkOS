@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -119,6 +120,11 @@ impl<N: Network> Cache<N> {
     pub fn decrement_outbound_validators_requests(&self, peer_ip: SocketAddr) -> u32 {
         Self::decrement_counter(&self.seen_outbound_validators_requests, peer_ip)
     }
+
+    /// Clears the the IP's number of validator requests.
+    pub fn clear_outbound_validators_requests(&self, peer_ip: SocketAddr) {
+        self.seen_outbound_validators_requests.write().remove(&peer_ip);
+    }
 }
 
 impl<N: Network> Cache<N> {
@@ -191,11 +197,11 @@ impl<N: Network> Cache<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::Testnet3;
+    use snarkvm::prelude::MainnetV0;
 
     use std::{net::Ipv4Addr, thread, time::Duration};
 
-    type CurrentNetwork = Testnet3;
+    type CurrentNetwork = MainnetV0;
 
     trait Input {
         fn input() -> Self;
@@ -221,7 +227,7 @@ mod tests {
 
     impl Input for TransmissionID<CurrentNetwork> {
         fn input() -> Self {
-            TransmissionID::Transaction(Default::default())
+            TransmissionID::Transaction(Default::default(), Default::default())
         }
     }
 
@@ -292,5 +298,28 @@ mod tests {
        outbound_event,
        outbound_certificate,
        outbound_transmission
+    }
+
+    #[test]
+    fn test_seen_outbound_validators_requests() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let input = Input::input();
+
+        // Check the map is empty.
+        assert!(!cache.contains_outbound_validators_request(input));
+
+        // Insert some requests.
+        for _ in 0..3 {
+            cache.increment_outbound_validators_requests(input);
+            assert!(cache.contains_outbound_validators_request(input));
+        }
+
+        // Remove a request.
+        cache.decrement_outbound_validators_requests(input);
+        assert!(cache.contains_outbound_validators_request(input));
+
+        // Clear all requests.
+        cache.clear_outbound_validators_requests(input);
+        assert!(!cache.contains_outbound_validators_request(input));
     }
 }

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -25,7 +26,7 @@ use snarkos_node_router::messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{block::Transaction, Network};
+use snarkvm::prelude::{block::Transaction, Field, Network, Zero};
 
 use std::{io, net::SocketAddr};
 
@@ -45,7 +46,8 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Prover<N, C> {
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = *self.genesis.header();
-        self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
+        let restrictions_id = Field::zero(); // Provers may bypass restrictions, since they do not validate transactions.
+        self.router.handshake(peer_addr, stream, conn_side, genesis_header, restrictions_id).await?;
 
         Ok(connection)
     }
@@ -117,13 +119,13 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Prover<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Routing<N> for Prover<N, C> {}
 
 impl<N: Network, C: ConsensusStorage<N>> Heartbeat<N> for Prover<N, C> {
-    /// This function updates the coinbase puzzle if network has updated.
+    /// This function updates the puzzle if network has updated.
     fn handle_puzzle_request(&self) {
         // Find the sync peers.
         if let Some((sync_peers, _)) = self.sync.find_sync_peers() {
             // Choose the peer with the highest block height.
             if let Some((peer_ip, _)) = sync_peers.into_iter().max_by_key(|(_, height)| *height) {
-                // Request the coinbase puzzle from the peer.
+                // Request the puzzle from the peer.
                 Outbound::send(self, peer_ip, Message::PuzzleRequest(PuzzleRequest));
             }
         }
@@ -134,6 +136,16 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Prover<N, C> {
     /// Returns a reference to the router.
     fn router(&self) -> &Router<N> {
         &self.router
+    }
+
+    /// Returns `true` if the node is synced up to the latest block (within the given tolerance).
+    fn is_block_synced(&self) -> bool {
+        true
+    }
+
+    /// Returns the number of blocks this node is behind the greatest peer height.
+    fn num_blocks_behind(&self) -> u32 {
+        0
     }
 }
 
@@ -192,25 +204,23 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         false
     }
 
-    /// Saves the latest epoch challenge and latest block header in the node.
-    fn puzzle_response(&self, peer_ip: SocketAddr, epoch_challenge: EpochChallenge<N>, header: Header<N>) -> bool {
-        // Retrieve the epoch number.
-        let epoch_number = epoch_challenge.epoch_number();
+    /// Saves the latest epoch hash and latest block header in the node.
+    fn puzzle_response(&self, peer_ip: SocketAddr, epoch_hash: N::BlockHash, header: Header<N>) -> bool {
         // Retrieve the block height.
         let block_height = header.height();
 
         info!(
-            "Coinbase Puzzle (Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
+            "Puzzle (Block {block_height}, Coinbase Target {}, Proof Target {})",
             header.coinbase_target(),
             header.proof_target()
         );
 
-        // Save the latest epoch challenge in the node.
-        self.latest_epoch_challenge.write().replace(Arc::new(epoch_challenge));
+        // Save the latest epoch hash in the node.
+        self.latest_epoch_hash.write().replace(epoch_hash);
         // Save the latest block header in the node.
         self.latest_block_header.write().replace(header);
 
-        trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
+        trace!("Received 'PuzzleResponse' from '{peer_ip}' (Block {block_height})");
         true
     }
 
@@ -219,32 +229,37 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
-        solution: ProverSolution<N>,
+        solution: Solution<N>,
     ) -> bool {
-        // Retrieve the latest epoch challenge.
-        let epoch_challenge = self.latest_epoch_challenge.read().clone();
+        // Retrieve the latest epoch hash.
+        let epoch_hash = *self.latest_epoch_hash.read();
         // Retrieve the latest proof target.
         let proof_target = self.latest_block_header.read().as_ref().map(|header| header.proof_target());
 
-        if let (Some(epoch_challenge), Some(proof_target)) = (epoch_challenge, proof_target) {
-            // Ensure that the prover solution is valid for the given epoch.
-            let coinbase_puzzle = self.coinbase_puzzle.clone();
-            let is_valid = tokio::task::spawn_blocking(move || {
-                solution.verify(coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)
-            })
-            .await;
+        if let (Some(epoch_hash), Some(proof_target)) = (epoch_hash, proof_target) {
+            // Ensure that the solution is valid for the given epoch.
+            let puzzle = self.puzzle.clone();
+            let is_valid =
+                tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target)).await;
 
             match is_valid {
                 // If the solution is valid, propagate the `UnconfirmedSolution`.
-                Ok(Ok(true)) => {
+                Ok(Ok(())) => {
                     let message = Message::UnconfirmedSolution(serialized);
                     // Propagate the "UnconfirmedSolution".
                     self.propagate(message, &[peer_ip]);
                 }
-                Ok(Ok(false)) | Ok(Err(_)) => {
-                    trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
+                Ok(Err(_)) => {
+                    trace!("Invalid solution '{}' for the proof target.", solution.id())
                 }
-                Err(error) => warn!("Failed to verify the prover solution: {error}"),
+                // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
+                Err(error) => {
+                    if let Some(height) = self.latest_block_header.read().as_ref().map(|header| header.height()) {
+                        if height % N::NUM_BLOCKS_PER_EPOCH > 10 {
+                            warn!("Failed to verify the solution - {error}")
+                        }
+                    }
+                }
             }
         }
         true
