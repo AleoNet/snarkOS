@@ -371,15 +371,18 @@ impl<N: Network> Consensus<N> {
 
             // Check that the transaction is not a fee transaction.
             if transaction.is_fee() {
+                tracing::info!("\n\n Txn is a fee transaction, skipping tx: '{}'", fmt_id(transaction_id));
                 bail!("Transaction '{}' is a fee transaction {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
             // Check if the transaction was recently seen.
             if self.seen_transactions.lock().put(transaction_id, ()).is_some() {
+                tracing::info!("\n\n Returning early, txn was already seen: '{}'", fmt_id(transaction_id));
                 // If the transaction was recently seen, return early.
                 return Ok(());
             }
             // Check if the transaction already exists in the ledger.
             if self.ledger.contains_transmission(&TransmissionID::Transaction(transaction_id, checksum))? {
+                tracing::info!("\n\n Returning early, txn already exists in the ledger: '{}'", fmt_id(transaction_id));
                 bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
             // Add the transaction to the memory pool.
@@ -396,6 +399,7 @@ impl<N: Network> Consensus<N> {
         // If the memory pool of this node is full, return early.
         let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
         if num_unconfirmed_transmissions >= Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE {
+            tracing::info!("\n\n Returning early, node mem pool is full.");
             return Ok(());
         }
         // Retrieve the transactions.
@@ -425,6 +429,7 @@ impl<N: Network> Consensus<N> {
         // Iterate over the transactions.
         for transaction in transactions.into_iter() {
             let transaction_id = transaction.id();
+            tracing::info!("\n\n Adding the unconfirmed txn to the mem pool: '{}'", fmt_id(transaction_id));
             trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
             // Send the unconfirmed transaction to the primary.
             if let Err(e) =
@@ -432,6 +437,10 @@ impl<N: Network> Consensus<N> {
             {
                 // If the BFT is synced, then log the warning.
                 if self.bft.is_synced() {
+                    tracing::info!(
+                        "\n\n BFT not synced, failed to add to the mempool the tx: '{}'",
+                        fmt_id(transaction_id)
+                    );
                     warn!(
                         "Failed to add unconfirmed transaction '{}' to the memory pool - {e}",
                         fmt_id(transaction_id)

@@ -367,6 +367,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     ) -> Result<ErasedJson, RestError> {
         // Do not process the transaction if the node is too far behind.
         if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
+            tracing::info!("\n\n Node > 10 blocks behind, Tx not broadcasted: '{}'", fmt_id(tx.id()));
             return Err(RestError(format!("Unable to broadcast transaction '{}' (node is syncing)", fmt_id(tx.id()))));
         }
 
@@ -376,12 +377,14 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         // TODO: Should this be a blocking task?
         let buffer = Vec::with_capacity(3000);
         if tx.write_le(LimitedWriter::new(buffer, N::MAX_TRANSACTION_SIZE)).is_err() {
+            tracing::info!("\n\n Txn size exceeds the byte limit: '{}'", fmt_id(tx.id()));
             return Err(RestError("Transaction size exceeds the byte limit".to_string()));
         }
 
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
+            tracing::info!("\n\n Adding unconfirmed transaction to the mem pool: '{}'", fmt_id(tx.id()));
             consensus.add_unconfirmed_transaction(tx.clone()).await?;
         }
 
