@@ -605,12 +605,11 @@ impl<N: Network> Primary<N> {
             Proposal::new(committee_lookback, batch_header.clone(), transmissions.clone())
                 .map(|proposal| (batch_header, proposal))
         })
-        .map_err(|err| {
+        .inspect_err(|_| {
             // On error, reinsert the transmissions and then propagate the error.
             if let Err(e) = self.reinsert_transmissions_into_workers(transmissions) {
                 error!("Failed to reinsert transmissions: {e:?}");
             }
-            err
         })?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
@@ -911,7 +910,7 @@ impl<N: Network> Primary<N> {
     /// This method performs the following steps:
     /// 1. Stores the given batch certificate, after ensuring it is valid.
     /// 2. If there are enough certificates to reach quorum threshold for the current round,
-    ///  then proceed to advance to the next round.
+    ///     then proceed to advance to the next round.
     async fn process_batch_certificate_from_peer(
         &self,
         peer_ip: SocketAddr,

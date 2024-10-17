@@ -15,7 +15,7 @@ keywords = [
 categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
-rust-version = "1.76.0" # Attention - Change the MSRV in rust-toolchain and in .circleci/config.yml as well
+rust-version = "1.81.0" # Attention - Change the MSRV in rust-toolchain and in .circleci/config.yml as well
 
 [workspace]
 members = [
