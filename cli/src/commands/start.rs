@@ -109,9 +109,12 @@ pub struct Start {
     /// Specify the IP address and port of the validator(s) to connect to
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
-    /// If the flag is set, a node will allow untrusted peers to connect
+    /// If the flag is set, a validator will allow untrusted peers to connect
     #[clap(long = "allow-external-peers")]
     pub allow_external_peers: bool,
+    /// If the flag is set, a client will periodically evict more external peers
+    #[clap(long = "rotate-external-peers")]
+    pub rotate_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
     #[clap(long = "rest")]
@@ -601,7 +604,7 @@ impl Start {
         match node_type {
             NodeType::Validator => Node::new_validator(node_ip, self.bft, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs, shutdown.clone()).await,
             NodeType::Prover => Node::new_prover(node_ip, account, &trusted_peers, genesis, storage_mode, shutdown.clone()).await,
-            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, shutdown).await,
+            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, self.rotate_external_peers, shutdown).await,
         }
     }
 

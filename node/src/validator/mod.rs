@@ -117,6 +117,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
         consensus.run(primary_sender, primary_receiver).await?;
+        // Determine if the validator should rotate external peers.
+        let rotate_external_peers = false;
 
         // Initialize the node router.
         let router = Router::new(
@@ -125,6 +127,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            rotate_external_peers,
             allow_external_peers,
             matches!(storage_mode, StorageMode::Development(_)),
         )
