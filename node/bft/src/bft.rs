@@ -521,11 +521,16 @@ impl<N: Network> BFT<N> {
             return Ok(());
         }
 
-        /* Proceeding to commit the leader. */
-        info!("Proceeding to commit round {commit_round} with leader '{}'", fmt_id(leader));
+        // Commit the leader certificate if the primary is not syncing. 
+        if !IS_SYNCING {
+            /* Proceeding to commit the leader. */
+            info!("Proceeding to commit round {commit_round} with leader '{}'", fmt_id(leader));
+            // Commit the leader certificate, and all previous leader certificates since the last committed round.
+            self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, IS_SYNCING>(leader_certificate).await?;
+        }
 
-        // Commit the leader certificate, and all previous leader certificates since the last committed round.
-        self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, IS_SYNCING>(leader_certificate).await
+        Ok(())
+
     }
 
     /// Commits the leader certificate, and all previous leader certificates since the last committed round.
@@ -814,6 +819,8 @@ impl<N: Network> BFT<N> {
             mut rx_primary_certificate,
             mut rx_sync_bft_dag_at_bootup,
             mut rx_sync_bft,
+            mut rx_commit_bft,
+            mut rx_is_recently_committed,
         } = bft_receiver;
 
         // Process the current round from the primary.
@@ -853,6 +860,30 @@ impl<N: Network> BFT<N> {
                 // Send the callback **after** updating the DAG.
                 // Note: We must await the DAG update before proceeding.
                 callback.send(result).ok();
+            }
+        });
+
+        // Process the request to commit the leader certificate. 
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some((certificate, callback)) = rx_commit_bft.recv().await {
+                // Update the DAG with the certificate.
+                let result = self_.commit_leader_certificate::<true, true>(certificate).await;
+                // Send the callback **after** updating the DAG.
+                // Note: We must await the DAG update before proceeding.
+                callback.send(result).ok();
+            }
+        });
+
+        // Process the request to check if the batch certificate was recently committed.
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some(((round, certificate_id), callback)) = rx_is_recently_committed.recv().await {
+                // Check if the certificate was recently committed.
+                let is_committed = self_.dag.read().is_recently_committed(round, certificate_id);
+                // Send the callback **after** updating the DAG.
+                // Note: We must await the DAG update before proceeding.
+                callback.send(is_committed).ok();
             }
         });
     }
