@@ -326,7 +326,7 @@ impl<N: Network> BFT<N> {
         self.is_even_round_ready_for_next_round(current_certificates, committee_lookback, current_round)
     }
 
-    /// Returns 'true' if the quorum threshold `(2f + 1)` is reached for this round under one of the following conditions:
+    /// Returns 'true' if the quorum threshold `(N - f)` is reached for this round under one of the following conditions:
     ///  - If the leader certificate is set for the current even round.
     ///  - The timer for the leader certificate has expired.
     fn is_even_round_ready_for_next_round(
@@ -348,7 +348,7 @@ impl<N: Network> BFT<N> {
                 return true;
             }
         }
-        // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
+        // If the timer has expired, and we can achieve quorum threshold (N - f) without the leader, return 'true'.
         if self.is_timer_expired() {
             debug!("BFT (timer expired) - Advancing from round {current_round} to the next round (without the leader)");
             return true;
@@ -362,7 +362,7 @@ impl<N: Network> BFT<N> {
         self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY_IN_SECS <= now()
     }
 
-    /// Returns 'true' if the quorum threshold `(2f + 1)` is reached for this round under one of the following conditions:
+    /// Returns 'true' if the quorum threshold `(N - f)` is reached for this round under one of the following conditions:
     ///  - The leader certificate is `None`.
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.

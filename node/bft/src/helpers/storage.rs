@@ -364,7 +364,7 @@ impl<N: Network> Storage<N> {
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
     /// - All previous certificates contain a unique author.
-    /// - The previous certificates reached the quorum threshold (2f+1).
+    /// - The previous certificates reached the quorum threshold (N - f).
     pub fn check_batch_header(
         &self,
         batch_header: &BatchHeader<N>,
@@ -459,9 +459,9 @@ impl<N: Network> Storage<N> {
     /// - All transmissions declared in the batch header are provided or exist in storage (up to GC).
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
-    /// - The previous certificates reached the quorum threshold (2f+1).
+    /// - The previous certificates reached the quorum threshold (N - f).
     /// - The timestamps from the signers are all within the allowed time range.
-    /// - The signers have reached the quorum threshold (2f+1).
+    /// - The signers have reached the quorum threshold (N - f).
     pub fn check_certificate(
         &self,
         certificate: &BatchCertificate<N>,
@@ -531,7 +531,7 @@ impl<N: Network> Storage<N> {
     /// - All transmissions declared in the certificate are provided or exist in storage (up to GC).
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
-    /// - The previous certificates reached the quorum threshold (2f+1).
+    /// - The previous certificates reached the quorum threshold (N - f).
     pub fn insert_certificate(
         &self,
         certificate: BatchCertificate<N>,

@@ -1549,8 +1549,8 @@ impl<N: Network> Primary<N> {
 
         // Check if our primary should move to the next round.
         // Note: Checking that quorum threshold is reached is important for mitigating a race condition,
-        // whereby Narwhal requires 2f+1, however the BFT only requires f+1. Without this check, the primary
-        // will advance to the next round assuming f+1, not 2f+1, which can lead to a network stall.
+        // whereby Narwhal requires N-f, however the BFT only requires f+1. Without this check, the primary
+        // will advance to the next round assuming f+1, not N-f, which can lead to a network stall.
         let is_behind_schedule = is_quorum_threshold_reached && batch_round > self.current_round();
         // Check if our primary is far behind the peer.
         let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();

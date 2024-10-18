@@ -18,7 +18,8 @@ Each round runs until one of two conditions is met:
 
 #### Advancing Rounds
 
-As described in the paper, the BFT advances rounds whenever n − f vertices are delivered.
+As described in the paper [Bullshark: The Partially Synchronous Version](https://arxiv.org/abs/2209.05633),
+the BFT generally advances rounds when `n − f` vertices are delivered, however:
 ```
 The problem in advancing rounds whenever n − f vertices are delivered is that parties
 might not vote for the anchor even if the party that broadcast it is just slightly slower
@@ -28,6 +29,7 @@ do not include the anchor of round r, then p sets a timer and waits for the anch
 until the timer expires. Similarly, in an odd-numbered round, parties wait for either
 f + 1 vertices that vote for the anchor, or 2f + 1 vertices that do not, or a timeout.
 ```
+Note that in this quote `2f + 1` should really be `n - f`.
 
 ## Workers
 
