@@ -394,16 +394,19 @@ impl Tcp {
     }
 
     /// Checks if the given IP address is the same as the listening address of this `Tcp`.
-    fn is_self_connect(&self, addr: SocketAddr) -> bool {
+    pub fn is_self_connect(&self, addr: SocketAddr) -> bool {
         // SAFETY: if we're opening connections, this should never fail.
         let listening_addr = self.listening_addr().unwrap();
+        let is_same_ip = listening_addr.ip() == addr.ip();
 
         match listening_addr.ip().is_loopback() {
             // If localhost, check the ports, this only works on outbound connections, since we
             // don't know the ephemeral port a peer might be using if they initiate the connection.
-            true => listening_addr.port() == addr.port(),
+            //
+            // The is_same_ip check is significant as 127.0.0.1 != 127.0.0.2
+            true => is_same_ip && listening_addr.port() == addr.port(),
             // If it's not localhost, matching IPs indicate a self-connect in both directions.
-            false => listening_addr.ip() == addr.ip(),
+            false => is_same_ip,
         }
     }
 

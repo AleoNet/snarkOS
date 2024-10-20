@@ -275,12 +275,16 @@ impl<N: Network> Gateway<N> {
     /// Returns `true` if the given IP is this node.
     pub fn is_local_ip(&self, ip: SocketAddr) -> bool {
         ip == self.local_ip()
-            || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
+            || (ip.ip().is_unspecified() || ip.ip().is_loopback() && ip.ip() == self.local_ip().ip())
+                && ip.port() == self.local_ip().port()
     }
 
     /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
     pub fn is_valid_peer_ip(&self, ip: SocketAddr) -> bool {
-        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_or_broadcast_ip(ip.ip())
+        !self.is_local_ip(ip)
+            // Ignore bogon case for unique loopback ip connections (127.0.0.1 -> 127.0.0.2)
+            && (!is_bogon_ip(ip.ip()) || self.local_ip().ip().is_loopback() && ip.ip().is_loopback())
+            && !is_unspecified_or_broadcast_ip(ip.ip())
     }
 
     /// Returns the resolver.
@@ -449,7 +453,7 @@ impl<N: Network> Gateway<N> {
             bail!("{CONTEXT} Dropping connection request from '{peer_ip}' (already connected)")
         }
         // Ensure the peer is not spamming connection attempts.
-        if !peer_ip.ip().is_loopback() {
+        if !self.tcp.is_self_connect(peer_ip) {
             // Add this connection attempt and retrieve the number of attempts.
             let num_attempts = self.cache.insert_inbound_connection(peer_ip.ip(), RESTRICTED_INTERVAL);
             // Ensure the connecting peer has not surpassed the connection attempt limit.

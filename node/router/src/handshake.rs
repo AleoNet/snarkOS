@@ -302,7 +302,7 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection request from '{peer_ip}' (restricted)")
         }
         // Ensure the peer is not spamming connection attempts.
-        if !peer_ip.ip().is_loopback() {
+        if !self.tcp.is_self_connect(peer_ip) {
             // Add this connection attempt and retrieve the number of attempts.
             let num_attempts = self.cache.insert_inbound_connection(peer_ip.ip(), Self::RADIO_SILENCE_IN_SECS as i64);
             // Ensure the connecting peer has not surpassed the connection attempt limit.

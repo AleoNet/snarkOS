@@ -158,6 +158,9 @@ pub struct Start {
     /// If development mode is enabled, specify the custom bonded balances as a JSON object (default: None)
     #[clap(long)]
     pub dev_bonded_balances: Option<BondedBalances>,
+    /// Specify the path to an alternative genesis block
+    #[clap(long)]
+    pub genesis: Option<PathBuf>,
 }
 
 impl Start {
@@ -492,7 +495,11 @@ impl Start {
                 eprintln!("The '--dev-num-validators' flag is ignored because '--dev' is not set");
             }
 
-            Block::from_bytes_le(N::genesis_bytes())
+            if let Some(path) = self.genesis.as_ref() {
+                Ok(Block::read_le(std::fs::File::open(path)?)?)
+            } else {
+                Block::from_bytes_le(N::genesis_bytes())
+            }
         }
     }
 

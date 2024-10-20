@@ -223,12 +223,16 @@ impl<N: Network> Router<N> {
     /// Returns `true` if the given IP is this node.
     pub fn is_local_ip(&self, ip: &SocketAddr) -> bool {
         *ip == self.local_ip()
-            || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
+            || (ip.ip().is_unspecified() || ip.ip().is_loopback() && ip.ip() == self.local_ip().ip())
+                && ip.port() == self.local_ip().port()
     }
 
     /// Returns `true` if the given IP is not this node, is not a bogon address, and is not unspecified.
     pub fn is_valid_peer_ip(&self, ip: &SocketAddr) -> bool {
-        !self.is_local_ip(ip) && !is_bogon_ip(ip.ip()) && !is_unspecified_or_broadcast_ip(ip.ip())
+        !self.is_local_ip(ip)
+            // Ignore bogon case for unique loopback ip connections (127.0.0.1 -> 127.0.0.2)
+            && (!is_bogon_ip(ip.ip()) || self.local_ip().ip().is_loopback() && ip.ip().is_loopback())
+            && !is_unspecified_or_broadcast_ip(ip.ip())
     }
 
     /// Returns the node type.
@@ -393,7 +397,10 @@ impl<N: Network> Router<N> {
     /// Returns the list of bootstrap peers.
     #[allow(clippy::if_same_then_else)]
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
-        if cfg!(feature = "test") || self.is_dev {
+        // If the BOOTSTRAP_PEERS environment variable is set, use it.
+        if let Ok(bootstraps) = std::env::var("BOOTSTRAP_PEERS") {
+            bootstraps.split(',').filter_map(|peer| SocketAddr::from_str(peer).ok()).collect()
+        } else if cfg!(feature = "test") || self.is_dev {
             // Development testing contains no bootstrap peers.
             vec![]
         } else if N::ID == snarkvm::console::network::MainnetV0::ID {
