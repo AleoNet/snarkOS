@@ -381,11 +381,10 @@ impl Start {
             // Initialize the (fixed) RNG.
             let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
             // Initialize the development private keys.
-            let development_private_keys =
+            let dev_keys =
                 (0..num_committee_members).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
             // Initialize the development addresses.
-            let development_addresses =
-                development_private_keys.iter().map(Address::<N>::try_from).collect::<Result<Vec<_>>>()?;
+            let development_addresses = dev_keys.iter().map(Address::<N>::try_from).collect::<Result<Vec<_>>>()?;
 
             // Construct the committee based on the state of the bonded balances.
             let (committee, bonded_balances) = match &self.dev_bonded_balances {
@@ -465,7 +464,7 @@ impl Start {
             let public_balance_per_validator = remaining_balance.saturating_div(num_committee_members as u64);
 
             // Construct the public balances with fairly equal distribution.
-            let mut public_balances = development_private_keys
+            let mut public_balances = dev_keys
                 .iter()
                 .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
@@ -485,7 +484,7 @@ impl Start {
             }
 
             // Construct the genesis block.
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, bonded_balances, &mut rng)
+            load_or_compute_genesis(dev_keys[0], committee, public_balances, bonded_balances, self.dev, &mut rng)
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
@@ -660,6 +659,7 @@ fn load_or_compute_genesis<N: Network>(
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
     bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, Address<N>, u64)>,
+    dev_id: Option<u16>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
@@ -755,7 +755,7 @@ fn load_or_compute_genesis<N: Network>(
     /* Otherwise, compute the genesis block and store it. */
 
     // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(Some(0))?)?;
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(dev_id)?)?;
     // Initialize the genesis block.
     let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng)?;
     // Write the genesis block to the file.
