@@ -106,7 +106,6 @@ impl<N: Network> Router<N> {
         if !self.is_dev() && peer_side == ConnectionSide::Initiator {
             // If the IP is already banned, update the ban timestamp and reject the connection.
             if self.is_ip_banned(peer_addr.ip()) {
-                self.update_ip_ban(peer_addr.ip());
                 trace!("Rejected a connection request from banned IP '{}'", peer_addr.ip());
                 return Err(error(format!("'{}' is a banned IP address", peer_addr.ip())));
             }

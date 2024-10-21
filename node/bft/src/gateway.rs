@@ -1142,7 +1142,6 @@ impl<N: Network> Handshake for Gateway<N> {
         if self.dev().is_none() && peer_side == ConnectionSide::Initiator {
             // If the IP is already banned, update the ban timestamp and reject the connection.
             if self.is_ip_banned(peer_addr.ip()) {
-                self.update_ip_ban(peer_addr.ip());
                 trace!("{CONTEXT} Gateway rejected a connection request from banned IP '{}'", peer_addr.ip());
                 return Err(error(format!("'{}' is a banned IP address", peer_addr.ip())));
             }
