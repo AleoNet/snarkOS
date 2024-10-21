@@ -136,16 +136,16 @@ impl<N: Network> FromBytes for DataBlocks<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{block_request::prop_tests::any_block_request, BlockResponse, DataBlocks};
+    use crate::{BlockResponse, DataBlocks, block_request::prop_tests::any_block_request};
     use snarkvm::{
         ledger::ledger_test_helpers::sample_genesis_block,
-        prelude::{block::Block, narwhal::Data, FromBytes, TestRng, ToBytes},
+        prelude::{FromBytes, TestRng, ToBytes, block::Block, narwhal::Data},
     };
 
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::vec,
-        prelude::{any, BoxedStrategy, Strategy},
+        prelude::{BoxedStrategy, Strategy, any},
     };
     use test_strategy::proptest;
 

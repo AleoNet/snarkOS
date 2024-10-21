@@ -14,19 +14,19 @@
 // limitations under the License.
 
 use crate::{
+    MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
+    Primary,
     helpers::{
-        fmt_id,
-        init_bft_channels,
-        now,
         BFTReceiver,
         ConsensusSender,
+        DAG,
         PrimaryReceiver,
         PrimarySender,
         Storage,
-        DAG,
+        fmt_id,
+        init_bft_channels,
+        now,
     },
-    Primary,
-    MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_ledger_service::LedgerService;
@@ -38,7 +38,7 @@ use snarkvm::{
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
     },
-    prelude::{bail, ensure, Field, Network, Result},
+    prelude::{Field, Network, Result, bail, ensure},
 };
 
 use colored::Colorize;
@@ -49,12 +49,12 @@ use std::{
     future::Future,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicI64, Ordering},
         Arc,
+        atomic::{AtomicI64, Ordering},
     },
 };
 use tokio::{
-    sync::{oneshot, Mutex as TMutex, OnceCell},
+    sync::{Mutex as TMutex, OnceCell, oneshot},
     task::JoinHandle,
 };
 
@@ -326,7 +326,7 @@ impl<N: Network> BFT<N> {
         self.is_even_round_ready_for_next_round(current_certificates, committee_lookback, current_round)
     }
 
-    /// Returns 'true' if the quorum threshold `(2f + 1)` is reached for this round under one of the following conditions:
+    /// Returns 'true' if the quorum threshold `(N - f)` is reached for this round under one of the following conditions:
     ///  - If the leader certificate is set for the current even round.
     ///  - The timer for the leader certificate has expired.
     fn is_even_round_ready_for_next_round(
@@ -348,7 +348,7 @@ impl<N: Network> BFT<N> {
                 return true;
             }
         }
-        // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
+        // If the timer has expired, and we can achieve quorum threshold (N - f) without the leader, return 'true'.
         if self.is_timer_expired() {
             debug!("BFT (timer expired) - Advancing from round {current_round} to the next round (without the leader)");
             return true;
@@ -362,7 +362,7 @@ impl<N: Network> BFT<N> {
         self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY_IN_SECS <= now()
     }
 
-    /// Returns 'true' if the quorum threshold `(2f + 1)` is reached for this round under one of the following conditions:
+    /// Returns 'true' if the quorum threshold `(N - f)` is reached for this round under one of the following conditions:
     ///  - The leader certificate is `None`.
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.
@@ -892,7 +892,7 @@ impl<N: Network> BFT<N> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{helpers::Storage, BFT, MAX_LEADER_CERTIFICATE_DELAY_IN_SECS};
+    use crate::{BFT, MAX_LEADER_CERTIFICATE_DELAY_IN_SECS, helpers::Storage};
     use snarkos_account::Account;
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkos_node_bft_storage_service::BFTMemoryService;

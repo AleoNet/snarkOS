@@ -59,7 +59,7 @@ impl<N: Network> FromBytes for CertificateResponse<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{prop_tests::now, transmission_response::prop_tests::any_transmission, CertificateResponse};
+    use crate::{CertificateResponse, prop_tests::now, transmission_response::prop_tests::any_transmission};
     use snarkvm::{
         console::{
             account::Signature,
@@ -76,7 +76,7 @@ pub mod prop_tests {
     use indexmap::IndexSet;
     use proptest::{
         collection::vec,
-        prelude::{any, BoxedStrategy, Just, Strategy},
+        prelude::{BoxedStrategy, Just, Strategy, any},
         sample::Selector,
     };
     use test_strategy::proptest;

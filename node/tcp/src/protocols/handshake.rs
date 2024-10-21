@@ -16,7 +16,7 @@
 use std::{io, time::Duration};
 
 use tokio::{
-    io::{split, AsyncRead, AsyncWrite},
+    io::{AsyncRead, AsyncWrite, split},
     net::TcpStream,
     sync::{mpsc, oneshot},
     time::timeout,
@@ -24,9 +24,9 @@ use tokio::{
 use tracing::*;
 
 use crate::{
-    protocols::{ProtocolHandler, ReturnableConnection},
     Connection,
     P2P,
+    protocols::{ProtocolHandler, ReturnableConnection},
 };
 
 /// Can be used to specify and enable network handshakes. Upon establishing a connection, both sides will

@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use colored::Colorize;
-use self_update::{backends::github, version::bump_is_greater, Status};
+use self_update::{Status, backends::github, version::bump_is_greater};
 use std::fmt::Write;
 
 pub struct Updater;

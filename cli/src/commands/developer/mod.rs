@@ -32,7 +32,6 @@ use snarkvm::{
     console::network::Network,
     package::Package,
     prelude::{
-        block::Transaction,
         Address,
         Ciphertext,
         Identifier,
@@ -45,10 +44,11 @@ use snarkvm::{
         ToBytes,
         Value,
         ViewKey,
+        block::Transaction,
     },
 };
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use clap::Parser;
 use colored::Colorize;
 use std::{path::PathBuf, str::FromStr};

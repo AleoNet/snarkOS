@@ -18,14 +18,14 @@ mod common;
 use common::test_peer::TestPeer;
 
 use snarkos_node_router::{
-    messages::{Message, PeerResponse},
     Outbound,
+    messages::{Message, PeerResponse},
 };
 use snarkos_node_tcp::P2P;
 
 use deadline::deadline;
 use paste::paste;
-use pea2pea::{protocols::Writing, Pea2Pea};
+use pea2pea::{Pea2Pea, protocols::Writing};
 use std::time::Duration;
 
 macro_rules! test_reject_unsolicited_peer_response {

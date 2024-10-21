@@ -17,21 +17,21 @@ use super::Developer;
 use snarkvm::{
     console::network::{CanaryV0, MainnetV0, Network, TestnetV0},
     prelude::{
-        query::Query,
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
         Address,
         Identifier,
         Locator,
         PrivateKey,
         Process,
         ProgramID,
-        Value,
         VM,
+        Value,
+        query::Query,
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
 };
 
 use aleo_std::StorageMode;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use clap::Parser;
 use colored::Colorize;
 use std::{path::PathBuf, str::FromStr};
@@ -213,7 +213,7 @@ fn load_program<N: Network>(endpoint: &str, process: &mut Process<N>, program_id
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::{Command, CLI};
+    use crate::commands::{CLI, Command};
 
     #[test]
     fn clap_snarkos_execute() {

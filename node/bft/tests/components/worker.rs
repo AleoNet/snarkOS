@@ -14,9 +14,9 @@
 // limitations under the License.
 
 use crate::common::{
+    CurrentNetwork,
     primary::new_test_committee,
     utils::{sample_ledger, sample_worker},
-    CurrentNetwork,
 };
 use snarkos_node_bft::helpers::max_redundant_requests;
 use snarkvm::{

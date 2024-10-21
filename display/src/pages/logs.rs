@@ -14,9 +14,9 @@
 // limitations under the License.
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 use std::collections::VecDeque;
 use tokio::sync::mpsc;
@@ -43,10 +43,7 @@ impl Logs {
 
         let mut new_logs = Vec::new();
         while let Ok(log) = self.log_receiver.try_recv() {
-            new_logs.push(match String::from_utf8(log) {
-                Ok(log) => log,
-                _ => String::new(),
-            });
+            new_logs.push(String::from_utf8(log).unwrap_or_default());
         }
 
         let all_logs = self.log_cache.len() + new_logs.len();

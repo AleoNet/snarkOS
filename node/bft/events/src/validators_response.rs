@@ -58,13 +58,13 @@ impl<N: Network> FromBytes for ValidatorsResponse<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{challenge_request::prop_tests::any_valid_address, ValidatorsResponse};
+    use crate::{ValidatorsResponse, challenge_request::prop_tests::any_valid_address};
 
     use bytes::{Buf, BufMut, BytesMut};
     use indexmap::IndexMap;
     use proptest::{
         collection::hash_map,
-        prelude::{any, BoxedStrategy, Strategy},
+        prelude::{BoxedStrategy, Strategy, any},
     };
     use snarkvm::{
         prelude::Address,

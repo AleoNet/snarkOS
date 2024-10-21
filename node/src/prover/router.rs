@@ -26,7 +26,7 @@ use snarkos_node_router::messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{block::Transaction, Field, Network, Zero};
+use snarkvm::prelude::{Field, Network, Zero, block::Transaction};
 
 use std::{io, net::SocketAddr};
 

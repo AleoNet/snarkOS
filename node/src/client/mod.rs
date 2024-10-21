@@ -20,25 +20,25 @@ use snarkos_account::Account;
 use snarkos_node_bft::ledger_service::CoreLedgerService;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
-    messages::{Message, NodeType, UnconfirmedSolution},
     Heartbeat,
     Inbound,
     Outbound,
     Router,
     Routing,
+    messages::{Message, NodeType, UnconfirmedSolution},
 };
 use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
 };
 use snarkvm::{
     console::network::Network,
     ledger::{
+        Ledger,
         block::{Block, Header},
         puzzle::{Puzzle, Solution},
         store::ConsensusStorage,
-        Ledger,
     },
 };
 
@@ -48,7 +48,7 @@ use core::future::Future;
 use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 use tokio::task::JoinHandle;
 

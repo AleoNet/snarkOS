@@ -21,21 +21,21 @@ use snarkvm::{
         store::{
             cow_to_cloned,
             helpers::{
-                rocksdb::{
-                    internal::{self, BFTMap, Database, MapID},
-                    DataMap,
-                },
                 Map,
                 MapRead,
+                rocksdb::{
+                    DataMap,
+                    internal::{self, BFTMap, Database, MapID},
+                },
             },
         },
     },
-    prelude::{bail, Field, Network, Result},
+    prelude::{Field, Network, Result, bail},
 };
 
 use aleo_std::StorageMode;
 use anyhow::anyhow;
-use indexmap::{indexset, IndexSet};
+use indexmap::{IndexSet, indexset};
 use lru::LruCache;
 use parking_lot::Mutex;
 use std::{

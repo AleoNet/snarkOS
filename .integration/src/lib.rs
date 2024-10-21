@@ -20,12 +20,12 @@ mod tests {
     use aleo_std::StorageMode;
     use snarkos_node_cdn::sync_ledger_with_cdn;
     use snarkvm::prelude::{
-        block::Block,
-        store::helpers::memory::ConsensusMemory,
         FromBytes,
         Ledger,
         MainnetV0,
         Network,
+        block::Block,
+        store::helpers::memory::ConsensusMemory,
     };
 
     use tracing_test::traced_test;

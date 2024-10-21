@@ -18,12 +18,12 @@ use std::net::SocketAddr;
 use tokio::sync::{mpsc, oneshot};
 use tracing::*;
 
-use crate::{protocols::ProtocolHandler, P2P};
 #[cfg(doc)]
 use crate::{
-    protocols::{Reading, Writing},
     Connection,
+    protocols::{Reading, Writing},
 };
+use crate::{P2P, protocols::ProtocolHandler};
 
 /// Can be used to automatically perform some initial actions once the connection with a peer is
 /// fully established.

@@ -484,7 +484,7 @@ mod tests {
 mod prop_tests {
     use super::*;
 
-    use test_strategy::{proptest, Arbitrary};
+    use test_strategy::{Arbitrary, proptest};
 
     #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
     pub struct Item {

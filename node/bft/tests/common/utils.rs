@@ -13,12 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::{primary, CurrentNetwork, TranslucentLedgerService};
+use crate::common::{CurrentNetwork, TranslucentLedgerService, primary};
 use snarkos_account::Account;
 use snarkos_node_bft::{
-    helpers::{PrimarySender, Storage},
     Gateway,
     Worker,
+    helpers::{PrimarySender, Storage},
 };
 
 use snarkos_node_bft_storage_service::BFTMemoryService;
@@ -30,13 +30,13 @@ use snarkvm::{
         store::helpers::memory::ConsensusMemory,
     },
     prelude::{
-        block::Transaction,
-        committee::MIN_VALIDATOR_STAKE,
-        puzzle::{Solution, SolutionID},
         Field,
         Network,
         TestRng,
         Uniform,
+        block::Transaction,
+        committee::MIN_VALIDATOR_STAKE,
+        puzzle::{Solution, SolutionID},
     },
 };
 

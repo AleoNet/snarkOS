@@ -16,7 +16,7 @@
 mod common;
 use common::*;
 
-use snarkos_node_tcp::{protocols::Handshake, P2P};
+use snarkos_node_tcp::{P2P, protocols::Handshake};
 
 use core::time::Duration;
 use deadline::deadline;

@@ -17,11 +17,11 @@ use snarkos_node::Node;
 use snarkvm::prelude::Network;
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::Span,
-    widgets::{canvas::Canvas, Block, Borders},
-    Frame,
+    widgets::{Block, Borders, canvas::Canvas},
 };
 
 pub(crate) struct Overview;

@@ -77,22 +77,24 @@ for validator_index in "${validator_indices[@]}"; do
   fi
 done
 
-# Generate client indices from 0 to (total_clients - 1)
-client_indices=($(seq 0 $((total_clients - 1))))
+if [ "$total_clients" -ne 0 ]; then
+  # Generate client indices from 0 to (total_clients - 1)
+  client_indices=($(seq 0 $((total_clients - 1))))
 
-# Loop through the list of client indices and create a new window for each
-for client_index in "${client_indices[@]}"; do
-  # Generate a unique and incrementing log file name based on the client index
-  log_file="$log_dir/client-$client_index.log"
+  # Loop through the list of client indices and create a new window for each
+  for client_index in "${client_indices[@]}"; do
+    # Generate a unique and incrementing log file name based on the client index
+    log_file="$log_dir/client-$client_index.log"
 
-  window_index=$((client_index + total_validators + index_offset))
+    window_index=$((client_index + total_validators + index_offset))
 
-  # Create a new window with a unique name
-  tmux new-window -t "devnet:$window_index" -n "window-$window_index"
+    # Create a new window with a unique name
+    tmux new-window -t "devnet:$window_index" -n "window-$window_index"
 
-  # Send the command to start the validator to the new window and capture output to the log file
-  tmux send-keys -t "devnet:window-$window_index" "snarkos start --nodisplay --network $network_id --dev $window_index --dev-num-validators $total_validators --client --logfile $log_file" C-m
-done
+    # Send the command to start the client to the new window and capture output to the log file
+    tmux send-keys -t "devnet:window-$window_index" "snarkos start --nodisplay --network $network_id --dev $window_index --dev-num-validators $total_validators --client --logfile $log_file" C-m
+  done
+fi
 
 # Attach to the tmux session to view and interact with the windows
 tmux attach-session -t "devnet"

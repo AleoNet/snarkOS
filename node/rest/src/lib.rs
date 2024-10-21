@@ -25,31 +25,31 @@ mod routes;
 
 use snarkos_node_consensus::Consensus;
 use snarkos_node_router::{
-    messages::{Message, UnconfirmedTransaction},
     Routing,
+    messages::{Message, UnconfirmedTransaction},
 };
 use snarkvm::{
     console::{program::ProgramID, types::Field},
     ledger::narwhal::Data,
-    prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},
+    prelude::{Ledger, Network, cfg_into_iter, store::ConsensusStorage},
 };
 
 use anyhow::Result;
 use axum::{
+    Json,
     body::Body,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
-    http::{header::CONTENT_TYPE, Method, Request, StatusCode},
+    http::{Method, Request, StatusCode, header::CONTENT_TYPE},
     middleware,
     middleware::Next,
     response::Response,
     routing::{get, post},
-    Json,
 };
 use axum_extra::response::ErasedJson;
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, task::JoinHandle};
-use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,

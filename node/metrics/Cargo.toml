@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-metrics"
-version = "2.2.7"
+version = "3.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,14 +12,14 @@ keywords = [
   "decentralized",
   "zero-knowledge"
 ]
-categories = [ "cryptography", "operating-systems" ]
+categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
 
 [features]
-default = [ "rayon", "snarkvm/metrics"]
+default = [ "rayon", "snarkvm/metrics" ]
 metrics = [ "snarkvm/metrics" ]
-serial = ["snarkvm/metrics"]
+serial = [ "snarkvm/metrics" ]
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.13"

@@ -66,7 +66,7 @@ pub mod prop_tests {
     };
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use proptest::prelude::{BoxedStrategy, Strategy, any};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;

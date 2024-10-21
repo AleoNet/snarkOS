@@ -21,19 +21,19 @@ use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_router::messages::DataBlocks;
 use snarkos_node_sync_communication_service::CommunicationService;
 use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
-use snarkvm::prelude::{block::Block, Network};
+use snarkvm::prelude::{Network, block::Block};
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use parking_lot::{Mutex, RwLock};
-use rand::{prelude::IteratorRandom, CryptoRng, Rng};
+use rand::{CryptoRng, Rng, prelude::IteratorRandom};
 use std::{
     collections::BTreeMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicU32, Ordering},
     },
     time::Instant,
 };
@@ -944,14 +944,14 @@ where
 mod tests {
     use super::*;
     use crate::locators::{
-        test_helpers::{sample_block_locators, sample_block_locators_with_fork},
         CHECKPOINT_INTERVAL,
         NUM_RECENT_BLOCKS,
+        test_helpers::{sample_block_locators, sample_block_locators_with_fork},
     };
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::prelude::{Field, TestRng};
 
-    use indexmap::{indexset, IndexSet};
+    use indexmap::{IndexSet, indexset};
     use snarkvm::ledger::committee::Committee;
     use std::net::{IpAddr, Ipv4Addr};
 

@@ -14,9 +14,9 @@
 // limitations under the License.
 
 use crate::{
-    messages::{DisconnectReason, Message, PeerRequest},
     Outbound,
     Router,
+    messages::{DisconnectReason, Message, PeerRequest},
 };
 use snarkvm::prelude::Network;
 
