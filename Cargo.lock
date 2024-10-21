@@ -3344,6 +3344,7 @@ name = "snarkos-node-bft-storage-service"
 version = "2.2.7"
 dependencies = [
  "aleo-std",
+ "anyhow",
  "indexmap 2.5.0",
  "lru",
  "parking_lot",

@@ -34,6 +34,7 @@ use snarkvm::{
 };
 
 use aleo_std::StorageMode;
+use anyhow::anyhow;
 use indexmap::{indexset, IndexSet};
 use lru::LruCache;
 use parking_lot::Mutex;
@@ -63,7 +64,7 @@ impl<N: Network> BFTPersistentStorage<N> {
         let capacity = NonZeroUsize::new(
             (Committee::<N>::MAX_COMMITTEE_SIZE as usize) * (BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH) * 2,
         )
-        .unwrap();
+        .ok_or_else(|| anyhow!("Could not construct NonZeroUsize"))?;
 
         Ok(Self {
             transmissions: internal::RocksDB::open_map(N::ID, storage_mode.clone(), MapID::BFT(BFTMap::Transmissions))?,
@@ -83,7 +84,7 @@ impl<N: Network> BFTPersistentStorage<N> {
         let capacity = NonZeroUsize::new(
             (Committee::<N>::MAX_COMMITTEE_SIZE as usize) * (BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH) * 2,
         )
-        .unwrap();
+        .ok_or_else(|| anyhow!("Could not construct NonZeroUsize"))?;
 
         Ok(Self {
             transmissions: internal::RocksDB::open_map_testing(
