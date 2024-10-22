@@ -135,9 +135,13 @@ pub struct Start {
     /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
+
     /// Enables the metrics exporter
     #[clap(default_value = "false", long = "metrics")]
     pub metrics: bool,
+    /// Specify the IP address and port for the metrics exporter
+    #[clap(long = "metrics-ip")]
+    pub metrics_ip: Option<SocketAddr>,
 
     /// Specify the path to a directory containing the storage database for the ledger
     #[clap(long = "storage")]
@@ -579,7 +583,7 @@ impl Start {
 
         // Initialize the metrics.
         if self.metrics {
-            metrics::initialize_metrics();
+            metrics::initialize_metrics(self.metrics_ip);
         }
 
         // Initialize the storage mode.
