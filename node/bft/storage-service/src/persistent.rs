@@ -16,6 +16,7 @@
 use crate::StorageService;
 use snarkvm::{
     ledger::{
+        committee::Committee,
         narwhal::{BatchHeader, Transmission, TransmissionID},
         store::{
             cow_to_cloned,
@@ -33,10 +34,14 @@ use snarkvm::{
 };
 
 use aleo_std::StorageMode;
+use anyhow::anyhow;
 use indexmap::{IndexSet, indexset};
+use lru::LruCache;
+use parking_lot::Mutex;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
+    num::NonZeroUsize,
 };
 use tracing::error;
 
@@ -47,11 +52,20 @@ pub struct BFTPersistentStorage<N: Network> {
     transmissions: DataMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>,
     /// The map of `aborted transmission ID` to `certificate IDs` entries.
     aborted_transmission_ids: DataMap<TransmissionID<N>, IndexSet<Field<N>>>,
+    /// The LRU cache for `transmission ID` to `(transmission, certificate IDs)` entries that are part of the persistent storage.
+    cache_transmissions: Mutex<LruCache<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>>,
+    /// The LRU cache for `aborted transmission ID` to `certificate IDs` entries that are part of the persistent storage.
+    cache_aborted_transmission_ids: Mutex<LruCache<TransmissionID<N>, IndexSet<Field<N>>>>,
 }
 
 impl<N: Network> BFTPersistentStorage<N> {
     /// Initializes a new BFT persistent storage service.
     pub fn open(storage_mode: StorageMode) -> Result<Self> {
+        let capacity = NonZeroUsize::new(
+            (Committee::<N>::MAX_COMMITTEE_SIZE as usize) * (BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH) * 2,
+        )
+        .ok_or_else(|| anyhow!("Could not construct NonZeroUsize"))?;
+
         Ok(Self {
             transmissions: internal::RocksDB::open_map(N::ID, storage_mode.clone(), MapID::BFT(BFTMap::Transmissions))?,
             aborted_transmission_ids: internal::RocksDB::open_map(
@@ -59,12 +73,19 @@ impl<N: Network> BFTPersistentStorage<N> {
                 storage_mode,
                 MapID::BFT(BFTMap::AbortedTransmissionIDs),
             )?,
+            cache_transmissions: Mutex::new(LruCache::new(capacity)),
+            cache_aborted_transmission_ids: Mutex::new(LruCache::new(capacity)),
         })
     }
 
-    /// Initializes a new BFT persistent storage service.
+    /// Initializes a new BFT persistent storage service for testing.
     #[cfg(any(test, feature = "test"))]
     pub fn open_testing(temp_dir: std::path::PathBuf, dev: Option<u16>) -> Result<Self> {
+        let capacity = NonZeroUsize::new(
+            (Committee::<N>::MAX_COMMITTEE_SIZE as usize) * (BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH) * 2,
+        )
+        .ok_or_else(|| anyhow!("Could not construct NonZeroUsize"))?;
+
         Ok(Self {
             transmissions: internal::RocksDB::open_map_testing(
                 temp_dir.clone(),
@@ -76,6 +97,8 @@ impl<N: Network> BFTPersistentStorage<N> {
                 dev,
                 MapID::BFT(BFTMap::AbortedTransmissionIDs),
             )?,
+            cache_transmissions: Mutex::new(LruCache::new(capacity)),
+            cache_aborted_transmission_ids: Mutex::new(LruCache::new(capacity)),
         })
     }
 }
@@ -102,7 +125,12 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     /// Returns the transmission for the given `transmission ID`.
     /// If the transmission ID does not exist in storage, `None` is returned.
     fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
-        // Get the transmission.
+        // Try to get the transmission from the cache first.
+        if let Some((transmission, _)) = self.cache_transmissions.lock().get_mut(&transmission_id) {
+            return Some(transmission.clone());
+        }
+
+        // If not found in cache, check persistent storage.
         match self.transmissions.get_confirmed(&transmission_id) {
             Ok(Some(Cow::Owned((transmission, _)))) => Some(transmission),
             Ok(Some(Cow::Borrowed((transmission, _)))) => Some(transmission.clone()),
@@ -153,24 +181,19 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
         aborted_transmission_ids: HashSet<TransmissionID<N>>,
         mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
-        // Inserts the following:
-        //   - Inserts **only the missing** transmissions from storage.
-        //   - Inserts the certificate ID into the corresponding set for **all** transmissions.
+        // First, handle the non-aborted transmissions.
         'outer: for transmission_id in transmission_ids {
-            // Retrieve the transmission entry.
-            match self.transmissions.get_confirmed(&transmission_id) {
+            // Try to fetch from the persistent storage.
+            let (transmission, certificate_ids) = match self.transmissions.get_confirmed(&transmission_id) {
                 Ok(Some(entry)) => {
+                    // The transmission exists in storage; update its certificate IDs.
                     let (transmission, mut certificate_ids) = cow_to_cloned!(entry);
-                    // Insert the certificate ID into the set.
                     certificate_ids.insert(certificate_id);
-                    // Update the transmission entry.
-                    if let Err(e) = self.transmissions.insert(transmission_id, (transmission, certificate_ids)) {
-                        error!("Failed to insert transmission {transmission_id} into storage - {e}");
-                        continue 'outer;
-                    }
+                    (transmission, certificate_ids)
                 }
                 Ok(None) => {
-                    // Retrieve the missing transmission.
+                    // The transmission is missing from persistent storage.
+                    // Check if it exists in the `missing_transmissions` map provided.
                     let Some(transmission) = missing_transmissions.remove(&transmission_id) else {
                         if !aborted_transmission_ids.contains(&transmission_id)
                             && !self.contains_transmission(transmission_id)
@@ -181,45 +204,46 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                     };
                     // Prepare the set of certificate IDs.
                     let certificate_ids = indexset! { certificate_id };
-                    // Insert the transmission and a new set with the certificate ID.
-                    if let Err(e) = self.transmissions.insert(transmission_id, (transmission, certificate_ids)) {
-                        error!("Failed to insert transmission {transmission_id} into storage - {e}");
-                        continue 'outer;
-                    }
+                    (transmission, certificate_ids)
                 }
                 Err(e) => {
+                    // Handle any errors during the retrieval.
                     error!("Failed to process the 'insert' for transmission {transmission_id} into storage - {e}");
-                    continue 'outer;
+                    continue;
                 }
+            };
+            // Insert the transmission into persistent storage.
+            if let Err(e) = self.transmissions.insert(transmission_id, (transmission.clone(), certificate_ids.clone()))
+            {
+                error!("Failed to insert transmission {transmission_id} into storage - {e}");
             }
+            // Insert the transmission into the cache.
+            self.cache_transmissions.lock().put(transmission_id, (transmission, certificate_ids));
         }
-        // Inserts the aborted transmission IDs.
+
+        // Next, handle the aborted transmission IDs.
         for aborted_transmission_id in aborted_transmission_ids {
-            // Retrieve the transmission entry.
-            match self.aborted_transmission_ids.get_confirmed(&aborted_transmission_id) {
+            let certificate_ids = match self.aborted_transmission_ids.get_confirmed(&aborted_transmission_id) {
                 Ok(Some(entry)) => {
                     let mut certificate_ids = cow_to_cloned!(entry);
                     // Insert the certificate ID into the set.
                     certificate_ids.insert(certificate_id);
-                    // Update the transmission entry.
-                    if let Err(e) = self.aborted_transmission_ids.insert(aborted_transmission_id, certificate_ids) {
-                        error!("Failed to insert aborted transmission ID {aborted_transmission_id} into storage - {e}");
-                    }
+                    certificate_ids
                 }
-                Ok(None) => {
-                    // Prepare the set of certificate IDs.
-                    let certificate_ids = indexset! { certificate_id };
-                    // Insert the transmission and a new set with the certificate ID.
-                    if let Err(e) = self.aborted_transmission_ids.insert(aborted_transmission_id, certificate_ids) {
-                        error!("Failed to insert aborted transmission ID {aborted_transmission_id} into storage - {e}");
-                    }
-                }
+                Ok(None) => indexset! { certificate_id },
                 Err(e) => {
                     error!(
                         "Failed to process the 'insert' for aborted transmission ID {aborted_transmission_id} into storage - {e}"
                     );
+                    continue;
                 }
+            };
+            // Insert the certificate IDs into the persistent storage.
+            if let Err(e) = self.aborted_transmission_ids.insert(aborted_transmission_id, certificate_ids.clone()) {
+                error!("Failed to insert aborted transmission ID {aborted_transmission_id} into storage - {e}");
             }
+            // Insert the certificate IDs into the cache.
+            self.cache_aborted_transmission_ids.lock().put(aborted_transmission_id, certificate_ids);
         }
     }
 

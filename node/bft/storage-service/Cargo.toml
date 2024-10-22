@@ -25,9 +25,15 @@ test = [ "memory" ]
 [dependencies.aleo-std]
 workspace = true
 
+[dependencies.anyhow]
+version = "1.0.79"
+
 [dependencies.indexmap]
 version = "2.1"
 features = [ "serde", "rayon" ]
+
+[dependencies.lru]
+version = "0.12.1"
 
 [dependencies.parking_lot]
 version = "0.12"
