@@ -104,6 +104,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         let sync = BlockSync::new(BlockSyncMode::Router, ledger_service.clone());
         // Determine if the prover should allow external peers.
         let allow_external_peers = true;
+        // Determine if the prover should rotate external peers.
+        let rotate_external_peers = false;
 
         // Initialize the node router.
         let router = Router::new(
@@ -112,6 +114,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            rotate_external_peers,
             allow_external_peers,
             matches!(storage_mode, StorageMode::Development(_)),
         )

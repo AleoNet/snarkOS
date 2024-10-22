@@ -78,6 +78,7 @@ pub async fn client(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
         sample_account(),
         &[],
         max_peers,
+        false,
         true,
         true,
     )
@@ -95,6 +96,7 @@ pub async fn prover(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
         sample_account(),
         &[],
         max_peers,
+        false,
         true,
         true,
     )
@@ -117,6 +119,7 @@ pub async fn validator(
         sample_account(),
         trusted_peers,
         max_peers,
+        false,
         allow_external_peers,
         true,
     )

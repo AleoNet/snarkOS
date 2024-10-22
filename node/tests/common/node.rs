@@ -31,6 +31,7 @@ pub async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
         sample_genesis_block(),
         None, // No CDN.
         StorageMode::Production,
+        false, // No extra peer rotation.
         Default::default(),
     )
     .await

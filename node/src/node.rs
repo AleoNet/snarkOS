@@ -100,11 +100,23 @@ impl<N: Network> Node<N> {
         genesis: Block<N>,
         cdn: Option<String>,
         storage_mode: StorageMode,
+        rotate_external_peers: bool,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         Ok(Self::Client(Arc::new(
-            Client::new(node_ip, rest_ip, rest_rps, account, trusted_peers, genesis, cdn, storage_mode, shutdown)
-                .await?,
+            Client::new(
+                node_ip,
+                rest_ip,
+                rest_rps,
+                account,
+                trusted_peers,
+                genesis,
+                cdn,
+                storage_mode,
+                rotate_external_peers,
+                shutdown,
+            )
+            .await?,
         )))
     }
 
