@@ -1,0 +1,18 @@
+# Ignore everything
+*
+
+!account/
+!build.rs
+!Cargo.toml
+!Cargo.lock
+!cli/
+!devnet.sh
+!display/
+!.integration/
+!node/
+!.resources/
+!run-client.sh
+!run-prover.sh
+!run-validator.sh
+!rust-toolchain
+!snarkos/
