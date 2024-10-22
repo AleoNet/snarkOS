@@ -41,13 +41,13 @@ pub use routing::*;
 
 use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_tcp::{is_bogon_ip, is_unspecified_or_broadcast_ip, Config, Tcp};
+use snarkos_node_tcp::{Config, Tcp, is_bogon_ip, is_unspecified_or_broadcast_ip};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{HashMap, HashSet, hash_map::Entry},
     future::Future,
     net::SocketAddr,
     ops::Deref,
@@ -94,6 +94,8 @@ pub struct InnerRouter<N: Network> {
     restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The spawned handles.
     handles: Mutex<Vec<JoinHandle<()>>>,
+    /// If the flag is set, the node will periodically evict more external peers.
+    rotate_external_peers: bool,
     /// If the flag is set, the node will engage in P2P gossip to request more peers.
     allow_external_peers: bool,
     /// The boolean flag for the development mode.
@@ -112,12 +114,14 @@ impl<N: Network> Router<N> {
 
 impl<N: Network> Router<N> {
     /// Initializes a new `Router` instance.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         node_ip: SocketAddr,
         node_type: NodeType,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         max_peers: u16,
+        rotate_external_peers: bool,
         allow_external_peers: bool,
         is_dev: bool,
     ) -> Result<Self> {
@@ -136,6 +140,7 @@ impl<N: Network> Router<N> {
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
+            rotate_external_peers,
             allow_external_peers,
             is_dev,
         })))
@@ -257,6 +262,11 @@ impl<N: Network> Router<N> {
     /// Returns `true` if the node is in development mode.
     pub fn is_dev(&self) -> bool {
         self.is_dev
+    }
+
+    /// Returns `true` if the node is periodically evicting more external peers.
+    pub fn rotate_external_peers(&self) -> bool {
+        self.rotate_external_peers
     }
 
     /// Returns `true` if the node is engaging in P2P gossip to request more peers.
@@ -526,6 +536,8 @@ impl<N: Network> Router<N> {
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.
         self.candidate_peers.write().insert(peer_ip);
+        // Clear cached entries applicable to the peer.
+        self.cache.clear_peer_entries(peer_ip);
         #[cfg(feature = "metrics")]
         self.update_metrics();
     }

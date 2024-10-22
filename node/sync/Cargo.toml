@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-sync"
-version = "2.2.7"
+version = "3.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A synchronization module for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,7 +12,7 @@ keywords = [
   "decentralized",
   "zero-knowledge"
 ]
-categories = [ "cryptography", "operating-systems" ]
+categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
 
@@ -45,26 +45,26 @@ version = "1"
 
 [dependencies.snarkos-node-bft-ledger-service]
 path = "../bft/ledger-service"
-version = "=2.2.7"
+version = "=3.0.0"
 features = [ "ledger-write" ]
 
 [dependencies.metrics]
 package = "snarkos-node-metrics"
 path = "../metrics"
-version = "=2.2.7"
+version = "=3.0.0"
 optional = true
 
 [dependencies.snarkos-node-router]
 path = "../router"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-sync-communication-service]
 path = "communication-service"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-sync-locators]
 path = "locators"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkvm]
 workspace = true

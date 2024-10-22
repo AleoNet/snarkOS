@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node"
-version = "2.2.7"
+version = "3.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,7 +12,7 @@ keywords = [
   "decentralized",
   "zero-knowledge"
 ]
-categories = [ "cryptography", "operating-systems" ]
+categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
 
@@ -51,7 +51,7 @@ version = "2.1"
 [dependencies.metrics]
 package = "snarkos-node-metrics"
 path = "./metrics"
-version = "=2.2.7"
+version = "=3.0.0"
 optional = true
 
 [dependencies.num_cpus]
@@ -77,35 +77,35 @@ features = [ "preserve_order" ]
 
 [dependencies.snarkos-account]
 path = "../account"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-bft]
 path = "./bft"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-cdn]
 path = "./cdn"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-rest]
 path = "./rest"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-router]
 path = "./router"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-sync]
 path = "./sync"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-tcp]
 path = "./tcp"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkvm]
 workspace = true

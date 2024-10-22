@@ -25,31 +25,31 @@ mod routes;
 
 use snarkos_node_consensus::Consensus;
 use snarkos_node_router::{
-    messages::{Message, UnconfirmedTransaction},
     Routing,
+    messages::{Message, UnconfirmedTransaction},
 };
 use snarkvm::{
     console::{program::ProgramID, types::Field},
     ledger::narwhal::Data,
-    prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},
+    prelude::{Ledger, Network, cfg_into_iter, store::ConsensusStorage},
 };
 
 use anyhow::Result;
 use axum::{
+    Json,
     body::Body,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
-    http::{header::CONTENT_TYPE, Method, Request, StatusCode},
+    http::{Method, Request, StatusCode, header::CONTENT_TYPE},
     middleware,
     middleware::Next,
     response::Response,
     routing::{get, post},
-    Json,
 };
 use axum_extra::response::ErasedJson;
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, task::JoinHandle};
-use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -134,23 +134,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
             // All the endpoints before the call to `route_layer` are protected with JWT auth.
             .route(&format!("/{network}/node/address"), get(Self::get_node_address))
+            .route(&format!("/{network}/program/:id/mapping/:name"), get(Self::get_mapping_values))
             .route_layer(middleware::from_fn(auth_middleware))
-
-            // ----------------- DEPRECATED ROUTES -----------------
-            // The following `GET ../latest/..` routes will be removed before mainnet.
-            // Please refer to the recommended routes for each endpoint:
-
-            // Deprecated: use `/<network>/block/height/latest` instead.
-            .route(&format!("/{network}/latest/height"), get(Self::latest_height))
-            // Deprecated: use `/<network>/block/hash/latest` instead.
-            .route(&format!("/{network}/latest/hash"), get(Self::latest_hash))
-            // Deprecated: use `/<network>/latest/block/height` instead.
-            .route(&format!("/{network}/latest/block"), get(Self::latest_block))
-            // Deprecated: use `/<network>/stateRoot/latest` instead.
-            .route(&format!("/{network}/latest/stateRoot"), get(Self::latest_state_root))
-            // Deprecated: use `/<network>/committee/latest` instead.
-            .route(&format!("/{network}/latest/committee"), get(Self::latest_committee))
-            // ------------------------------------------------------
 
             // GET ../block/..
             .route(&format!("/{network}/block/height/latest"), get(Self::get_block_height_latest))

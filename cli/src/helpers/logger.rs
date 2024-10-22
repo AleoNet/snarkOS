@@ -20,13 +20,13 @@ use std::{
     fs::File,
     io,
     path::Path,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 use tokio::sync::mpsc;
 use tracing_subscriber::{
+    EnvFilter,
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
-    EnvFilter,
 };
 
 /// Initializes the logger.

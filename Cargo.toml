@@ -1,6 +1,6 @@
 [package]
 name = "snarkos"
-version = "2.2.7"
+version = "3.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,10 +12,10 @@ keywords = [
   "decentralized",
   "zero-knowledge"
 ]
-categories = [ "cryptography", "operating-systems" ]
+categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
-rust-version = "1.76.0" # Attention - Change the MSRV in rust-toolchain and in .circleci/config.yml as well
+rust-version = "1.81.0" # Attention - Change the MSRV in rust-toolchain and in .circleci/config.yml as well
 
 [workspace]
 members = [
@@ -44,11 +44,11 @@ members = [
 version = "=0.1.24"
 default-features = false
 
-[workspace.dependencies.snarkvm]
+[workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
 #path = "../snarkVM"
-git = "https://github.com/AleoNet/snarkVM.git"
-rev = "3d42aa0" # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
-#version = "=0.16.18"
+#git = "https://github.com/AleoNet/snarkVM.git"
+#rev = "3d42aa0"
+version = "=1.0.0"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
@@ -74,52 +74,52 @@ version = "1"
 
 [dependencies.snarkos-account]
 path = "./account"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-cli]
 path = "./cli"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-display]
 path = "./display"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node]
 path = "./node"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-bft]
 path = "./node/bft"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-cdn]
 path = "./node/cdn"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-metrics]
 path = "./node/metrics"
-version = "=2.2.7"
+version = "=3.0.0"
 optional = true
 
 [dependencies.snarkos-node-rest]
 path = "./node/rest"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-router]
 path = "./node/router"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-sync]
 path = "./node/sync"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-tcp]
 path = "./node/tcp"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"

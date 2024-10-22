@@ -17,18 +17,18 @@ use super::Developer;
 use snarkvm::{
     console::network::{CanaryV0, MainnetV0, Network, TestnetV0},
     prelude::{
-        query::Query,
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
         Address,
         Locator,
         PrivateKey,
-        Value,
         VM,
+        Value,
+        query::Query,
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
 };
 
 use aleo_std::StorageMode;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use std::{path::PathBuf, str::FromStr};
 use zeroize::Zeroize;
@@ -133,7 +133,7 @@ impl TransferPrivate {
 
             // Prepare the inputs for a transfer.
             let input_record = Developer::parse_record(&private_key, &self.input_record)?;
-            let inputs = vec![
+            let inputs = [
                 Value::Record(input_record),
                 Value::from_str(&format!("{}", recipient))?,
                 Value::from_str(&format!("{}u64", self.amount))?,

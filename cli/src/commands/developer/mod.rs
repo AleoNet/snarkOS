@@ -32,7 +32,6 @@ use snarkvm::{
     console::network::Network,
     package::Package,
     prelude::{
-        block::Transaction,
         Address,
         Ciphertext,
         Identifier,
@@ -45,10 +44,11 @@ use snarkvm::{
         ToBytes,
         Value,
         ViewKey,
+        block::Transaction,
     },
 };
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use clap::Parser;
 use colored::Colorize;
 use std::{path::PathBuf, str::FromStr};
@@ -132,7 +132,8 @@ impl Developer {
             Ok(response) => response.into_json().map_err(|err| err.into()),
             Err(err) => match err {
                 ureq::Error::Status(_status, response) => {
-                    bail!(response.into_string().unwrap_or("Response too large!".to_owned()))
+                    // Debug formatting displays more useful info, especially if the response body is empty.
+                    bail!("Failed to fetch program {program_id}: {response:?}")
                 }
                 err => bail!(err),
             },

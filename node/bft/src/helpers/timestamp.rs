@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::MAX_TIMESTAMP_DELTA_IN_SECS;
-use snarkvm::prelude::{bail, Result};
+use snarkvm::prelude::{Result, bail};
 
 use time::OffsetDateTime;
 

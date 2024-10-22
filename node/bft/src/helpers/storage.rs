@@ -21,16 +21,16 @@ use snarkvm::{
         block::{Block, Transaction},
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{anyhow, bail, ensure, Address, Field, Network, Result},
+    prelude::{Address, Field, Network, Result, anyhow, bail, ensure},
 };
 
-use indexmap::{map::Entry, IndexMap, IndexSet};
+use indexmap::{IndexMap, IndexSet, map::Entry};
 use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU32, AtomicU64, Ordering},
     },
 };
 
@@ -364,7 +364,7 @@ impl<N: Network> Storage<N> {
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
     /// - All previous certificates contain a unique author.
-    /// - The previous certificates reached the quorum threshold (2f+1).
+    /// - The previous certificates reached the quorum threshold (N - f).
     pub fn check_batch_header(
         &self,
         batch_header: &BatchHeader<N>,
@@ -459,9 +459,9 @@ impl<N: Network> Storage<N> {
     /// - All transmissions declared in the batch header are provided or exist in storage (up to GC).
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
-    /// - The previous certificates reached the quorum threshold (2f+1).
+    /// - The previous certificates reached the quorum threshold (N - f).
     /// - The timestamps from the signers are all within the allowed time range.
-    /// - The signers have reached the quorum threshold (2f+1).
+    /// - The signers have reached the quorum threshold (N - f).
     pub fn check_certificate(
         &self,
         certificate: &BatchCertificate<N>,
@@ -531,7 +531,7 @@ impl<N: Network> Storage<N> {
     /// - All transmissions declared in the certificate are provided or exist in storage (up to GC).
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
-    /// - The previous certificates reached the quorum threshold (2f+1).
+    /// - The previous certificates reached the quorum threshold (N - f).
     pub fn insert_certificate(
         &self,
         certificate: BatchCertificate<N>,
@@ -1043,9 +1043,9 @@ pub mod prop_tests {
     use indexmap::indexset;
     use proptest::{
         collection,
-        prelude::{any, Arbitrary, BoxedStrategy, Just, Strategy},
+        prelude::{Arbitrary, BoxedStrategy, Just, Strategy, any},
         prop_oneof,
-        sample::{size_range, Selector},
+        sample::{Selector, size_range},
         test_runner::TestRng,
     };
     use rand::{CryptoRng, Error, Rng, RngCore};

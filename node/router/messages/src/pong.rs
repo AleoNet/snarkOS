@@ -65,7 +65,7 @@ pub mod tests {
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         option::of,
-        prelude::{any, BoxedStrategy, Strategy},
+        prelude::{BoxedStrategy, Strategy, any},
     };
     use test_strategy::proptest;
 

@@ -14,14 +14,14 @@
 // limitations under the License.
 
 use crate::{
-    messages::{DisconnectReason, Message, PeerRequest},
     Outbound,
     Router,
+    messages::{DisconnectReason, Message, PeerRequest},
 };
 use snarkvm::prelude::Network;
 
 use colored::Colorize;
-use rand::{prelude::IteratorRandom, rngs::OsRng};
+use rand::{Rng, prelude::IteratorRandom, rngs::OsRng};
 
 /// A helper function to compute the maximum of two numbers.
 /// See Rust issue 92391: https://github.com/rust-lang/rust/issues/92391.
@@ -141,15 +141,27 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     /// TODO (howardwu): If the node is a validator, keep the validator.
     /// This function keeps the number of connected peers within the allowed range.
     fn handle_connected_peers(&self) {
+        // Initialize an RNG.
+        let rng = &mut OsRng;
+
         // Obtain the number of connected peers.
         let num_connected = self.router().number_of_connected_peers();
-        // Compute the total number of surplus peers.
-        let num_surplus_peers = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
-
         // Obtain the number of connected provers.
         let num_connected_provers = self.router().number_of_connected_provers();
+
+        // Consider rotating more external peers every ~10 heartbeats.
+        let reduce_peers = self.router().rotate_external_peers() && rng.gen_range(0..10) == 0;
+        // Determine the maximum number of peers and provers to keep.
+        let (max_peers, max_provers) = if reduce_peers {
+            (Self::MEDIAN_NUMBER_OF_PEERS, 0)
+        } else {
+            (Self::MAXIMUM_NUMBER_OF_PEERS, Self::MAXIMUM_NUMBER_OF_PROVERS)
+        };
+
+        // Compute the number of surplus peers.
+        let num_surplus_peers = num_connected.saturating_sub(max_peers);
         // Compute the number of surplus provers.
-        let num_surplus_provers = num_connected_provers.saturating_sub(Self::MAXIMUM_NUMBER_OF_PROVERS);
+        let num_surplus_provers = num_connected_provers.saturating_sub(max_provers);
         // Compute the number of provers remaining connected.
         let num_remaining_provers = num_connected_provers.saturating_sub(num_surplus_provers);
         // Compute the number of surplus clients and validators.
@@ -164,9 +176,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             let trusted = self.router().trusted_peers();
             // Retrieve the bootstrap peers.
             let bootstrap = self.router().bootstrap_peers();
-
-            // Initialize an RNG.
-            let rng = &mut OsRng;
 
             // Determine the provers to disconnect from.
             let prover_ips_to_disconnect = self
@@ -185,7 +194,12 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 .into_iter()
                 .filter_map(|peer| {
                     let peer_ip = peer.ip();
-                    if !peer.is_prover() && !trusted.contains(&peer_ip) && !bootstrap.contains(&peer_ip) {
+                    if !peer.is_prover() && // Skip if the peer is a prover.
+                       !trusted.contains(&peer_ip) && // Skip if the peer is trusted.
+                       !bootstrap.contains(&peer_ip) && // Skip if the peer is a bootstrap peer.
+                       // Skip if you are syncing from this peer.
+                       (self.is_block_synced() || (!self.is_block_synced() && self.router().cache.num_outbound_block_requests(&peer.ip()) == 0))
+                    {
                         Some(peer_ip)
                     } else {
                         None

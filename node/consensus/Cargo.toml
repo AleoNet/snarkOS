@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-consensus"
-version = "2.2.7"
+version = "3.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node consensus for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,7 +12,7 @@ keywords = [
   "decentralized",
   "zero-knowledge"
 ]
-categories = [ "cryptography", "operating-systems" ]
+categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
 
@@ -39,7 +39,7 @@ version = "0.12.1"
 [dependencies.metrics]
 package = "snarkos-node-metrics"
 path = "../metrics"
-version = "=2.2.7"
+version = "=3.0.0"
 optional = true
 
 [dependencies.parking_lot]
@@ -50,21 +50,21 @@ version = "0.8"
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-bft]
 path = "../bft"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-bft-ledger-service]
 path = "../bft/ledger-service"
-version = "=2.2.7"
+version = "=3.0.0"
 default-features = false
 features = [ "ledger", "ledger-write" ]
 
 [dependencies.snarkos-node-bft-storage-service]
 path = "../bft/storage-service"
-version = "=2.2.7"
+version = "=3.0.0"
 default-features = false
 features = [ "persistent" ]
 

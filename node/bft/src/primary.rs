@@ -14,14 +14,17 @@
 // limitations under the License.
 
 use crate::{
+    Gateway,
+    MAX_BATCH_DELAY_IN_MS,
+    MAX_WORKERS,
+    MIN_BATCH_DELAY_IN_SECS,
+    PRIMARY_PING_IN_MS,
+    Sync,
+    Transport,
+    WORKER_PING_IN_MS,
+    Worker,
     events::{BatchPropose, BatchSignature, Event},
     helpers::{
-        assign_to_worker,
-        assign_to_workers,
-        fmt_id,
-        init_sync_channels,
-        init_worker_channels,
-        now,
         BFTSender,
         PrimaryReceiver,
         PrimarySender,
@@ -29,17 +32,14 @@ use crate::{
         ProposalCache,
         SignedProposals,
         Storage,
+        assign_to_worker,
+        assign_to_workers,
+        fmt_id,
+        init_sync_channels,
+        init_worker_channels,
+        now,
     },
     spawn_blocking,
-    Gateway,
-    Sync,
-    Transport,
-    Worker,
-    MAX_BATCH_DELAY_IN_MS,
-    MAX_WORKERS,
-    MIN_BATCH_DELAY_IN_SECS,
-    PRIMARY_PING_IN_MS,
-    WORKER_PING_IN_MS,
 };
 use snarkos_account::Account;
 use snarkos_node_bft_events::PrimaryPing;
@@ -605,12 +605,11 @@ impl<N: Network> Primary<N> {
             Proposal::new(committee_lookback, batch_header.clone(), transmissions.clone())
                 .map(|proposal| (batch_header, proposal))
         })
-        .map_err(|err| {
+        .inspect_err(|_| {
             // On error, reinsert the transmissions and then propagate the error.
             if let Err(e) = self.reinsert_transmissions_into_workers(transmissions) {
                 error!("Failed to reinsert transmissions: {e:?}");
             }
-            err
         })?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
@@ -911,7 +910,7 @@ impl<N: Network> Primary<N> {
     /// This method performs the following steps:
     /// 1. Stores the given batch certificate, after ensuring it is valid.
     /// 2. If there are enough certificates to reach quorum threshold for the current round,
-    ///  then proceed to advance to the next round.
+    ///     then proceed to advance to the next round.
     async fn process_batch_certificate_from_peer(
         &self,
         peer_ip: SocketAddr,
@@ -1550,8 +1549,8 @@ impl<N: Network> Primary<N> {
 
         // Check if our primary should move to the next round.
         // Note: Checking that quorum threshold is reached is important for mitigating a race condition,
-        // whereby Narwhal requires 2f+1, however the BFT only requires f+1. Without this check, the primary
-        // will advance to the next round assuming f+1, not 2f+1, which can lead to a network stall.
+        // whereby Narwhal requires N-f, however the BFT only requires f+1. Without this check, the primary
+        // will advance to the next round assuming f+1, not N-f, which can lead to a network stall.
         let is_behind_schedule = is_quorum_threshold_reached && batch_round > self.current_round();
         // Check if our primary is far behind the peer.
         let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();

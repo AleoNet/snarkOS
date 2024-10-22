@@ -15,7 +15,7 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{bft::MEMORY_POOL_PORT, router::messages::NodeType, Node};
+use snarkos_node::{Node, bft::MEMORY_POOL_PORT, router::messages::NodeType};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
@@ -25,7 +25,7 @@ use snarkvm::{
     ledger::{
         block::Block,
         committee::{Committee, MIN_DELEGATOR_STAKE, MIN_VALIDATOR_STAKE},
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
     prelude::{FromBytes, ToBits, ToBytes},
     synthesizer::VM,
@@ -33,7 +33,7 @@ use snarkvm::{
 };
 
 use aleo_std::StorageMode;
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
@@ -44,7 +44,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
     path::PathBuf,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 use tokio::runtime::{self, Runtime};
 
@@ -109,9 +109,12 @@ pub struct Start {
     /// Specify the IP address and port of the validator(s) to connect to
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
-    /// If the flag is set, a node will allow untrusted peers to connect
+    /// If the flag is set, a validator will allow untrusted peers to connect
     #[clap(long = "allow-external-peers")]
     pub allow_external_peers: bool,
+    /// If the flag is set, a client will periodically evict more external peers
+    #[clap(long = "rotate-external-peers")]
+    pub rotate_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
     #[clap(long = "rest")]
@@ -132,9 +135,13 @@ pub struct Start {
     /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
+
     /// Enables the metrics exporter
     #[clap(default_value = "false", long = "metrics")]
     pub metrics: bool,
+    /// Specify the IP address and port for the metrics exporter
+    #[clap(long = "metrics-ip")]
+    pub metrics_ip: Option<SocketAddr>,
 
     /// Specify the path to a directory containing the storage database for the ledger
     #[clap(long = "storage")]
@@ -576,7 +583,7 @@ impl Start {
 
         // Initialize the metrics.
         if self.metrics {
-            metrics::initialize_metrics();
+            metrics::initialize_metrics(self.metrics_ip);
         }
 
         // Initialize the storage mode.
@@ -601,7 +608,7 @@ impl Start {
         match node_type {
             NodeType::Validator => Node::new_validator(node_ip, self.bft, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs, shutdown.clone()).await,
             NodeType::Prover => Node::new_prover(node_ip, account, &trusted_peers, genesis, storage_mode, shutdown.clone()).await,
-            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, shutdown).await,
+            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, self.rotate_external_peers, shutdown).await,
         }
     }
 
@@ -767,7 +774,7 @@ fn load_or_compute_genesis<N: Network>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::{Command, CLI};
+    use crate::commands::{CLI, Command};
     use snarkvm::prelude::MainnetV0;
 
     type CurrentNetwork = MainnetV0;

@@ -14,20 +14,20 @@
 // limitations under the License.
 
 use crate::{
-    messages::{ChallengeRequest, ChallengeResponse, DisconnectReason, Message, MessageCodec, MessageTrait},
     NodeType,
     Peer,
     Router,
+    messages::{ChallengeRequest, ChallengeResponse, DisconnectReason, Message, MessageCodec, MessageTrait},
 };
-use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
+use snarkos_node_tcp::{ConnectionSide, P2P, Tcp};
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Header, error, Address, Field, Network},
+    prelude::{Address, Field, Network, block::Header, error},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use futures::SinkExt;
-use rand::{rngs::OsRng, Rng};
+use rand::{Rng, rngs::OsRng};
 use std::{collections::hash_map::Entry, io, net::SocketAddr};
 use tokio::net::TcpStream;
 use tokio_stream::StreamExt;

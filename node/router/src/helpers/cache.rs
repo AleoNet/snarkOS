@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::messages::BlockRequest;
-use snarkvm::prelude::{puzzle::SolutionID, Network};
+use snarkvm::prelude::{Network, puzzle::SolutionID};
 
 use core::hash::Hash;
 use linked_hash_map::LinkedHashMap;
@@ -196,6 +196,11 @@ impl<N: Network> Cache<N> {
     /// Decrement the peer IP's number of peer requests, returning the updated number of peer requests.
     pub fn decrement_outbound_peer_requests(&self, peer_ip: SocketAddr) -> u32 {
         Self::decrement_counter(&self.seen_outbound_peer_requests, peer_ip)
+    }
+
+    /// Removes all cache entries applicable to the given key.
+    pub fn clear_peer_entries(&self, peer_ip: SocketAddr) {
+        self.seen_outbound_block_requests.write().remove(&peer_ip);
     }
 }
 

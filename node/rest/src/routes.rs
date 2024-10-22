@@ -14,10 +14,10 @@
 // limitations under the License.
 
 use super::*;
-use snarkos_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
+use snarkos_node_router::{SYNC_LENIENCY, messages::UnconfirmedSolution};
 use snarkvm::{
     ledger::puzzle::Solution,
-    prelude::{block::Transaction, Address, Identifier, LimitedWriter, Plaintext, ToBytes},
+    prelude::{Address, Identifier, LimitedWriter, Plaintext, ToBytes, block::Transaction},
 };
 
 use indexmap::IndexMap;
@@ -34,49 +34,14 @@ pub(crate) struct BlockRange {
     end: u32,
 }
 
-/// The `get_mapping_value` query object.
-#[derive(Deserialize, Serialize)]
+/// The query object for `get_mapping_value` and `get_mapping_values`.
+#[derive(Copy, Clone, Deserialize, Serialize)]
 pub(crate) struct Metadata {
-    metadata: bool,
+    metadata: Option<bool>,
+    all: Option<bool>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
-    // ----------------- DEPRECATED FUNCTIONS -----------------
-    // The functions below are associated with deprecated routes.
-    // Please use the recommended alternatives when implementing new features or refactoring.
-
-    // Deprecated: Use `get_block_height_latest` instead.
-    // GET /<network>/latest/height
-    pub(crate) async fn latest_height(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.ledger.latest_height())
-    }
-
-    // Deprecated: Use `get_block_hash_latest` instead.
-    // GET /<network>/latest/hash
-    pub(crate) async fn latest_hash(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.ledger.latest_hash())
-    }
-
-    // Deprecated: Use `get_block_latest` instead.
-    // GET /<network>/latest/block
-    pub(crate) async fn latest_block(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.ledger.latest_block())
-    }
-
-    // Deprecated: Use `get_state_root_latest` instead.
-    // GET /<network>/latest/stateRoot
-    pub(crate) async fn latest_state_root(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.ledger.latest_state_root())
-    }
-
-    // Deprecated: Use `get_committee_latest` instead.
-    // GET /<network>/latest/committee
-    pub(crate) async fn latest_committee(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
-    }
-
-    // ---------------------------------------------------------
-
     // GET /<network>/block/height/latest
     pub(crate) async fn get_block_height_latest(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_height())
@@ -231,13 +196,13 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     pub(crate) async fn get_mapping_value(
         State(rest): State<Self>,
         Path((id, name, key)): Path<(ProgramID<N>, Identifier<N>, Plaintext<N>)>,
-        metadata: Option<Query<Metadata>>,
+        metadata: Query<Metadata>,
     ) -> Result<ErasedJson, RestError> {
         // Retrieve the mapping value.
         let mapping_value = rest.ledger.vm().finalize_store().get_value_confirmed(id, name, &key)?;
 
         // Check if metadata is requested and return the value with metadata if so.
-        if metadata.map(|q| q.metadata).unwrap_or(false) {
+        if metadata.metadata.unwrap_or(false) {
             return Ok(ErasedJson::pretty(json!({
                 "data": mapping_value,
                 "height": rest.ledger.latest_height(),
@@ -246,6 +211,41 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
         // Return the value without metadata.
         Ok(ErasedJson::pretty(mapping_value))
+    }
+
+    // GET /<network>/program/{programID}/mapping/{mappingName}?all={true}&metadata={true}
+    pub(crate) async fn get_mapping_values(
+        State(rest): State<Self>,
+        Path((id, name)): Path<(ProgramID<N>, Identifier<N>)>,
+        metadata: Query<Metadata>,
+    ) -> Result<ErasedJson, RestError> {
+        // Return an error if the `all` query parameter is not set to `true`.
+        if metadata.all != Some(true) {
+            return Err(RestError("Invalid query parameter. At this time, 'all=true' must be included".to_string()));
+        }
+
+        // Retrieve the latest height.
+        let height = rest.ledger.latest_height();
+
+        // Retrieve all the mapping values from the mapping.
+        match tokio::task::spawn_blocking(move || rest.ledger.vm().finalize_store().get_mapping_confirmed(id, name))
+            .await
+        {
+            Ok(Ok(mapping_values)) => {
+                // Check if metadata is requested and return the mapping with metadata if so.
+                if metadata.metadata.unwrap_or(false) {
+                    return Ok(ErasedJson::pretty(json!({
+                        "data": mapping_values,
+                        "height": height,
+                    })));
+                }
+
+                // Return the full mapping without metadata.
+                Ok(ErasedJson::pretty(mapping_values))
+            }
+            Ok(Err(err)) => Err(RestError(format!("Unable to read mapping - {err}"))),
+            Err(err) => Err(RestError(format!("Unable to read mapping - {err}"))),
+        }
     }
 
     // GET /<network>/statePath/{commitment}

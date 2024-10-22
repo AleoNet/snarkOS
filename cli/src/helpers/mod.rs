@@ -32,7 +32,7 @@ use snarkos_node::router::messages::NodeType;
 
 use colored::*;
 #[cfg(target_family = "unix")]
-use nix::sys::resource::{getrlimit, Resource};
+use nix::sys::resource::{Resource, getrlimit};
 
 /// Check if process's open files limit is above minimum and warn if not.
 #[cfg(target_family = "unix")]
@@ -92,14 +92,14 @@ pub(crate) fn check_validator_machine(node_type: NodeType) {
         // Retrieve the number of cores.
         let num_cores = num_cpus::get();
         // Enforce the minimum number of cores.
-        let min_num_cores = 32;
+        let min_num_cores = 64;
         if num_cores < min_num_cores {
             let message = format!("⚠️  The number of cores ({num_cores} cores) on this machine is insufficient for a validator (minimum {min_num_cores} cores)\n");
             println!("{}", message.yellow().bold());
         }
         // Enforce the minimum amount of RAM.
         if let Ok(ram) = crate::helpers::detect_ram_memory() {
-            let min_ram = 60;
+            let min_ram = 256;
             if ram < min_ram {
                 let message = format!("⚠️  The amount of RAM ({ram} GiB) on this machine is insufficient for a validator (minimum {min_ram} GiB)\n");
                 println!("{}", message.yellow().bold());

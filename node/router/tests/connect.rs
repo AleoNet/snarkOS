@@ -17,8 +17,8 @@ mod common;
 use common::*;
 
 use snarkos_node_tcp::{
-    protocols::{Handshake, OnConnect},
     P2P,
+    protocols::{Handshake, OnConnect},
 };
 
 use core::time::Duration;

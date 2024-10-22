@@ -63,8 +63,8 @@ impl<N: Network> FromBytes for TransmissionResponse<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        prop_tests::{any_solution_id, any_transaction_id, any_transmission_checksum},
         TransmissionResponse,
+        prop_tests::{any_solution_id, any_transaction_id, any_transmission_checksum},
     };
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
@@ -74,7 +74,7 @@ pub mod prop_tests {
     use bytes::{Buf, BufMut, Bytes, BytesMut};
     use proptest::{
         collection,
-        prelude::{any, BoxedStrategy, Strategy},
+        prelude::{BoxedStrategy, Strategy, any},
         prop_oneof,
     };
     use test_strategy::proptest;

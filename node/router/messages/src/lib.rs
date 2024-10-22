@@ -64,14 +64,14 @@ pub use snarkos_node_bft_events::DataBlocks;
 
 use snarkos_node_sync_locators::BlockLocators;
 use snarkvm::prelude::{
-    block::{Header, Transaction},
-    error,
-    puzzle::{Solution, SolutionID},
     Address,
     FromBytes,
     Network,
     Signature,
     ToBytes,
+    block::{Header, Transaction},
+    error,
+    puzzle::{Solution, SolutionID},
 };
 
 use std::{

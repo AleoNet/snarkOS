@@ -18,24 +18,24 @@
 #![allow(clippy::await_holding_lock)]
 
 use snarkvm::prelude::{
-    block::Block,
-    store::{cow_to_copied, ConsensusStorage},
     Deserialize,
     DeserializeOwned,
     Ledger,
     Network,
     Serialize,
+    block::Block,
+    store::{ConsensusStorage, cow_to_copied},
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use colored::Colorize;
 use parking_lot::Mutex;
 use reqwest::Client;
 use std::{
     cmp,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicU32, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -165,7 +165,7 @@ pub async fn load_blocks<N: Network>(
     let mut current_height = start_height.saturating_sub(1);
     while current_height < end_height - 1 {
         // If we are instructed to shut down, abort.
-        if shutdown.load(Ordering::Relaxed) {
+        if shutdown.load(Ordering::Acquire) {
             info!("Stopping block sync at {} - shutting down", current_height);
             // We can shut down cleanly from here, as the node hasn't been started yet.
             std::process::exit(0);
@@ -244,7 +244,7 @@ async fn download_block_bundles<N: Network>(
     let mut start = cdn_start;
     while start < cdn_end - 1 {
         // If we are instructed to shut down, stop downloading.
-        if shutdown.load(Ordering::Relaxed) {
+        if shutdown.load(Ordering::Acquire) {
             break;
         }
 
@@ -429,10 +429,10 @@ fn log_progress<const OBJECTS_PER_FILE: u32>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        blocks::{cdn_get, cdn_height, log_progress, BLOCKS_PER_FILE},
+        blocks::{BLOCKS_PER_FILE, cdn_get, cdn_height, log_progress},
         load_blocks,
     };
-    use snarkvm::prelude::{block::Block, MainnetV0};
+    use snarkvm::prelude::{MainnetV0, block::Block};
 
     use parking_lot::RwLock;
     use std::{sync::Arc, time::Instant};

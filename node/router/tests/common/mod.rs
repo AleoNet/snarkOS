@@ -24,8 +24,8 @@ use std::{
 };
 
 use snarkos_account::Account;
-use snarkos_node_router::{messages::NodeType, Router};
-use snarkvm::prelude::{block::Block, FromBytes, MainnetV0 as CurrentNetwork, Network};
+use snarkos_node_router::{Router, messages::NodeType};
+use snarkvm::prelude::{FromBytes, MainnetV0 as CurrentNetwork, Network, block::Block};
 
 /// A helper macro to print the TCP listening address, along with the connected and connecting peers.
 #[macro_export]
@@ -78,6 +78,7 @@ pub async fn client(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
         sample_account(),
         &[],
         max_peers,
+        false,
         true,
         true,
     )
@@ -95,6 +96,7 @@ pub async fn prover(listening_port: u16, max_peers: u16) -> TestRouter<CurrentNe
         sample_account(),
         &[],
         max_peers,
+        false,
         true,
         true,
     )
@@ -117,6 +119,7 @@ pub async fn validator(
         sample_account(),
         trusted_peers,
         max_peers,
+        false,
         allow_external_peers,
         true,
     )

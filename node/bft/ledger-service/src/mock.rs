@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{fmt_id, LedgerService};
+use crate::{LedgerService, fmt_id};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
@@ -21,7 +21,7 @@ use snarkvm::{
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
     },
-    prelude::{bail, ensure, Address, Field, Network, Result, Zero},
+    prelude::{Address, Field, Network, Result, Zero, bail, ensure},
 };
 
 use indexmap::IndexMap;

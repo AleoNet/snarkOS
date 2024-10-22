@@ -21,7 +21,7 @@ use snarkvm::{
     prelude::{Record, ViewKey},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use std::str::FromStr;
 use zeroize::Zeroize;

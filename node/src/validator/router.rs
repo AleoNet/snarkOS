@@ -28,7 +28,7 @@ use snarkos_node_router::messages::{
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Transaction, error, Network},
+    prelude::{Network, block::Transaction, error},
 };
 
 use std::{io, net::SocketAddr, time::Duration};

@@ -14,6 +14,8 @@
 // limitations under the License.
 
 use crate::{
+    Outbound,
+    Peer,
     messages::{
         BlockRequest,
         BlockResponse,
@@ -25,17 +27,15 @@ use crate::{
         UnconfirmedSolution,
         UnconfirmedTransaction,
     },
-    Outbound,
-    Peer,
 };
 use snarkos_node_tcp::protocols::Reading;
 use snarkvm::prelude::{
+    Network,
     block::{Block, Header, Transaction},
     puzzle::Solution,
-    Network,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use snarkos_node_tcp::is_bogon_ip;
 use std::net::SocketAddr;
 use tokio::task::spawn_blocking;

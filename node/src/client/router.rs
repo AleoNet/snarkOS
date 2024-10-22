@@ -15,24 +15,25 @@
 
 use super::*;
 use snarkos_node_router::{
+    Routing,
     messages::{
         BlockRequest,
         BlockResponse,
         DataBlocks,
         DisconnectReason,
         MessageCodec,
+        PeerRequest,
         Ping,
         Pong,
         PuzzleResponse,
         UnconfirmedTransaction,
     },
-    Routing,
 };
 use snarkos_node_sync::communication_service::CommunicationService;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Transaction, Network},
+    prelude::{Network, block::Transaction},
 };
 
 use std::{io, net::SocketAddr, time::Duration};
@@ -70,6 +71,10 @@ where
         let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) else { return };
         // Promote the peer's status from "connecting" to "connected".
         self.router().insert_connected_peer(peer_ip);
+        // If it's a bootstrap peer, first request its peers.
+        if self.router.bootstrap_peers().contains(&peer_ip) {
+            Outbound::send(self, peer_ip, Message::PeerRequest(PeerRequest));
+        }
         // Retrieve the block locators.
         let block_locators = match self.sync.get_block_locators() {
             Ok(block_locators) => Some(block_locators),

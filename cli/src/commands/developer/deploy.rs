@@ -21,18 +21,18 @@ use snarkvm::{
         program::ProgramOwner,
     },
     prelude::{
-        block::Transaction,
-        deployment_cost,
-        query::Query,
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
         PrivateKey,
         ProgramID,
         VM,
+        block::Transaction,
+        deployment_cost,
+        query::Query,
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
 };
 
 use aleo_std::StorageMode;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use colored::Colorize;
 use std::{path::PathBuf, str::FromStr};
@@ -178,7 +178,7 @@ impl Deploy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::{Command, CLI};
+    use crate::commands::{CLI, Command};
 
     #[test]
     fn clap_snarkos_deploy() {

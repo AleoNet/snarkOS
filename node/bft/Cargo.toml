@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-bft"
-version = "2.2.7"
+version = "3.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A memory pool for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -12,13 +12,17 @@ keywords = [
   "decentralized",
   "zero-knowledge"
 ]
-categories = [ "cryptography", "operating-systems" ]
+categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
 
 [features]
 default = [ ]
-metrics = [ "dep:metrics", "snarkos-node-bft-events/metrics", "snarkos-node-bft-ledger-service/metrics" ]
+metrics = [
+  "dep:metrics",
+  "snarkos-node-bft-events/metrics",
+  "snarkos-node-bft-ledger-service/metrics"
+]
 
 [dependencies.aleo-std]
 workspace = true
@@ -49,7 +53,7 @@ features = [ "serde", "rayon" ]
 [dependencies.metrics]
 package = "snarkos-node-metrics"
 path = "../metrics"
-version = "=2.2.7"
+version = "=3.0.0"
 optional = true
 
 [dependencies.parking_lot]
@@ -70,29 +74,29 @@ default-features = false
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-bft-events]
 path = "./events"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-bft-ledger-service]
 path = "./ledger-service"
-version = "=2.2.7"
+version = "=3.0.0"
 features = [ "ledger", "prover" ]
 
 [dependencies.snarkos-node-bft-storage-service]
 path = "./storage-service"
-version = "=2.2.7"
+version = "=3.0.0"
 features = [ "memory" ]
 
 [dependencies.snarkos-node-sync]
 path = "../sync"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
-version = "=2.2.7"
+version = "=3.0.0"
 
 [dependencies.snarkvm]
 workspace = true
@@ -138,7 +142,7 @@ version = "5"
 version = "1"
 
 [dev-dependencies.pea2pea]
- version = "0.49"
+version = "0.49"
 
 [dev-dependencies.proptest]
 version = "1.4.0"

@@ -25,7 +25,7 @@ pub use known_peers::KnownPeers;
 mod stats;
 pub use stats::Stats;
 
-use tracing::{debug_span, error_span, info_span, trace_span, warn_span, Span};
+use tracing::{Span, debug_span, error_span, info_span, trace_span, warn_span};
 
 /// Creates the Tcp's tracing span based on its name.
 pub fn create_span(tcp_name: &str) -> Span {

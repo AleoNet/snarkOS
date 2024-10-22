@@ -27,21 +27,25 @@ use rayon::prelude::*;
 use parking_lot::Mutex;
 use snarkvm::{
     ledger::narwhal::TransmissionID,
-    prelude::{cfg_iter, Block, Network},
+    prelude::{Block, Network, cfg_iter},
 };
 use std::{
     collections::HashMap,
+    net::SocketAddr,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 use time::OffsetDateTime;
 
 /// Initializes the metrics and returns a handle to the task running the metrics exporter.
-pub fn initialize_metrics() {
+pub fn initialize_metrics(ip: Option<SocketAddr>) {
     // Build the Prometheus exporter.
-    metrics_exporter_prometheus::PrometheusBuilder::new().install().expect("can't build the prometheus exporter");
+    let builder = metrics_exporter_prometheus::PrometheusBuilder::new();
+    if let Some(ip) = ip { builder.with_http_listener(ip) } else { builder }
+        .install()
+        .expect("can't build the prometheus exporter");
 
     // Register the snarkVM metrics.
     snarkvm::metrics::register_metrics();
