@@ -156,7 +156,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
 
         // Shut down the puzzle.
         debug!("Shutting down the puzzle...");
-        self.shutdown.store(true, Ordering::Relaxed);
+        self.shutdown.store(true, Ordering::Release);
 
         // Abort the tasks.
         debug!("Shutting down the prover...");
@@ -227,7 +227,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             }
 
             // If the Ctrl-C handler registered the signal, stop the prover.
-            if self.shutdown.load(Ordering::Relaxed) {
+            if self.shutdown.load(Ordering::Acquire) {
                 debug!("Shutting down the puzzle...");
                 break;
             }
