@@ -547,30 +547,35 @@ impl<N: Network> Gateway<N> {
             bail!("Dropping '{peer_ip}' for spamming events (num_events = {num_events})")
         }
         // Rate limit for duplicate requests.
-        if matches!(&event, &Event::CertificateRequest(_) | &Event::CertificateResponse(_)) {
-            // Retrieve the certificate ID.
-            let certificate_id = match &event {
-                Event::CertificateRequest(CertificateRequest { certificate_id }) => *certificate_id,
-                Event::CertificateResponse(CertificateResponse { certificate }) => certificate.id(),
-                _ => unreachable!(),
-            };
-            // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
-            let num_events = self.cache.insert_inbound_certificate(certificate_id, CACHE_REQUESTS_INTERVAL);
-            if num_events >= self.max_cache_duplicates() {
-                return Ok(());
+        match event {
+            Event::CertificateRequest(_) | Event::CertificateResponse(_) => {
+                // Retrieve the certificate ID.
+                let certificate_id = match &event {
+                    Event::CertificateRequest(CertificateRequest { certificate_id }) => *certificate_id,
+                    Event::CertificateResponse(CertificateResponse { certificate }) => certificate.id(),
+                    _ => unreachable!(),
+                };
+                // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
+                let num_events = self.cache.insert_inbound_certificate(certificate_id, CACHE_REQUESTS_INTERVAL);
+                if num_events >= self.max_cache_duplicates() {
+                    return Ok(());
+                }
             }
-        } else if matches!(&event, &Event::TransmissionRequest(_) | Event::TransmissionResponse(_)) {
-            // Retrieve the transmission ID.
-            let transmission_id = match &event {
-                Event::TransmissionRequest(TransmissionRequest { transmission_id }) => *transmission_id,
-                Event::TransmissionResponse(TransmissionResponse { transmission_id, .. }) => *transmission_id,
-                _ => unreachable!(),
-            };
-            // Skip processing this certificate if the rate limit was exceeded (i.e. someone is spamming a specific certificate).
-            let num_events = self.cache.insert_inbound_transmission(transmission_id, CACHE_REQUESTS_INTERVAL);
-            if num_events >= self.max_cache_duplicates() {
-                return Ok(());
+            Event::TransmissionRequest(TransmissionRequest { transmission_id })
+            | Event::TransmissionResponse(TransmissionResponse { transmission_id, .. }) => {
+                // Skip processing this certificate if the rate limit was exceeded (i.e. someone is spamming a specific certificate).
+                let num_events = self.cache.insert_inbound_transmission(transmission_id, CACHE_REQUESTS_INTERVAL);
+                if num_events >= self.max_cache_duplicates() {
+                    return Ok(());
+                }
             }
+            Event::BlockRequest(_) => {
+                let num_events = self.cache.insert_inbound_block_request(peer_ip, CACHE_REQUESTS_INTERVAL);
+                if num_events >= self.max_cache_duplicates() {
+                    return Ok(());
+                }
+            }
+            _ => {}
         }
         trace!("{CONTEXT} Received '{}' from '{peer_ip}'", event.name());
 
@@ -632,6 +637,10 @@ impl<N: Network> Gateway<N> {
                 if let Some(sync_sender) = self.sync_sender.get() {
                     // Retrieve the block response.
                     let BlockResponse { request, blocks } = block_response;
+                    // Check the response corresponds to a request.
+                    if !self.cache.remove_outbound_block_request(peer_ip, &request) {
+                        bail!("Unsolicited block response from '{peer_ip}'")
+                    }
                     // Perform the deferred non-blocking deserialization of the blocks.
                     let blocks = blocks.deserialize().await.map_err(|error| anyhow!("[BlockResponse] {error}"))?;
                     // Ensure the block response is well-formed.
@@ -980,24 +989,30 @@ impl<N: Network> Transport<N> for Gateway<N> {
             }};
         }
 
-        // If the event type is a certificate request, increment the cache.
-        if matches!(event, Event::CertificateRequest(_)) | matches!(event, Event::CertificateResponse(_)) {
-            // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
-            self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
-            // Send the event to the peer.
-            send!(self, insert_outbound_certificate, CACHE_REQUESTS_INTERVAL, max_cache_certificates)
-        }
-        // If the event type is a transmission request, increment the cache.
-        else if matches!(event, Event::TransmissionRequest(_)) | matches!(event, Event::TransmissionResponse(_)) {
-            // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
-            self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
-            // Send the event to the peer.
-            send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, max_cache_transmissions)
-        }
-        // Otherwise, employ a general rate limit.
-        else {
-            // Send the event to the peer.
-            send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, max_cache_events)
+        // Increment the cache for certificate, transmission and block events.
+        match event {
+            Event::CertificateRequest(_) | Event::CertificateResponse(_) => {
+                // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
+                self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
+                // Send the event to the peer.
+                send!(self, insert_outbound_certificate, CACHE_REQUESTS_INTERVAL, max_cache_certificates)
+            }
+            Event::TransmissionRequest(_) | Event::TransmissionResponse(_) => {
+                // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
+                self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
+                // Send the event to the peer.
+                send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, max_cache_transmissions)
+            }
+            Event::BlockRequest(request) => {
+                // Insert the outbound request so we can match it to responses.
+                self.cache.insert_outbound_block_request(peer_ip, request);
+                // Send the event to the peer and updatet the outbound event cache, use the general rate limit.
+                send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, max_cache_events)
+            }
+            _ => {
+                // Send the event to the peer, use the general rate limit.
+                send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, max_cache_events)
+            }
         }
     }
 
@@ -1091,6 +1106,7 @@ impl<N: Network> Disconnect for Gateway<N> {
             // This is sufficient to avoid infinite growth as the committee has a fixed number
             // of members.
             self.cache.clear_outbound_validators_requests(peer_ip);
+            self.cache.clear_outbound_block_requests(peer_ip);
         }
     }
 }
