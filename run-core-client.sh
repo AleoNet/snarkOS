@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# USAGE examples: 
+# USAGE examples:
   # CLI with env vars: PEERS=“validator_ip:4130,core_client_ip_1:4130,core_client_ip_2:4130,core_client_ip_3:4130,outer_client_ip_1:4130,... ./run-core-client.sh
   # CLI with prompts for vars:  ./run-core-client.sh
 
