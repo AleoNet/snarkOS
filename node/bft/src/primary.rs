@@ -1560,14 +1560,17 @@ impl<N: Network> Primary<N> {
             self.try_increment_to_the_next_round(batch_round).await?;
         }
 
+        // Ensure the primary has all of the transmissions.
+        let transmissions_promise = self.fetch_missing_transmissions(peer_ip, batch_header);        
+
         // Ensure the primary has all of the previous certificates.
         let missing_previous_certificates =
             self.fetch_missing_previous_certificates(peer_ip, batch_header).await.map_err(|e| {
                 anyhow!("Failed to fetch missing previous certificates for round {batch_round} from '{peer_ip}' - {e}")
             })?;
 
-        // Ensure the primary has all of the transmissions.
-        let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await.map_err(|e| {
+        // Collect any missing transmissions.
+        let missing_transmissions = transmissions_promise.await.map_err(|e| {
             anyhow!("Failed to fetch missing transmissions for round {batch_round} from '{peer_ip}' - {e}")
         })?;
 
