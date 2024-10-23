@@ -112,7 +112,7 @@ impl<N: Network> Router<N> {
     const MAX_CONNECTION_ATTEMPTS: usize = 10;
     /// The minimum permitted interval between connection attempts for an IP; anything shorter is considered malicious.
     #[cfg(not(any(test, feature = "test")))]
-    const MIN_CONNECTION_INTERVAL_IN_SECS: u64 = 10;
+    const CONNECTION_ATTEMPTS_SINCE_SECS: i64 = 10;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes

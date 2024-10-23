@@ -93,7 +93,7 @@ const MAX_VALIDATORS_TO_SEND: usize = 200;
 
 /// The minimum permitted interval between connection attempts for an IP; anything shorter is considered malicious.
 #[cfg(not(any(test, feature = "test")))]
-const MIN_CONNECTION_INTERVAL_IN_SECS: u64 = 10;
+const CONNECTION_ATTEMPTS_SINCE_SECS: i64 = 10;
 /// The amount of time an IP address is prohibited from connecting.
 const IP_BAN_TIME_IN_SECS: u64 = 300;
 
@@ -1140,26 +1140,22 @@ impl<N: Network> Handshake for Gateway<N> {
         // Check (or impose) IP-level bans.
         #[cfg(not(any(test, feature = "test")))]
         if self.dev().is_none() && peer_side == ConnectionSide::Initiator {
-            // If the IP is already banned, update the ban timestamp and reject the connection.
+            // If the IP is already banned reject the connection.
             if self.is_ip_banned(peer_addr.ip()) {
                 trace!("{CONTEXT} Gateway rejected a connection request from banned IP '{}'", peer_addr.ip());
                 return Err(error(format!("'{}' is a banned IP address", peer_addr.ip())));
             }
 
-            // Check the previous low-level connection timestamp.
-            if let Some(peer_stats) = self.tcp.known_peers().get(peer_addr.ip()) {
-                let num_attempts = self.cache.insert_inbound_connection(peer_addr.ip(), 10);
+            let num_attempts = self.cache.insert_inbound_connection(peer_addr.ip(), CONNECTION_ATTEMPTS_SINCE_SECS);
 
-                debug!("Number of connection attempts from '{}': {}", peer_addr.ip(), num_attempts);
-                debug!("Seconds since connection attempt: {}", peer_stats.timestamp().elapsed().as_secs());
-                if peer_stats.timestamp().elapsed().as_secs() <= MIN_CONNECTION_INTERVAL_IN_SECS
-                    && num_attempts >= MAX_CONNECTION_ATTEMPTS
-                {
-                    self.update_ip_ban(peer_addr.ip());
-                    trace!("{CONTEXT} Gateway rejected a consecutive connection request from IP '{}'", peer_addr.ip());
-                    return Err(error(format!("'{}' appears to be spamming connections", peer_addr.ip())));
-                }
+            debug!("Number of connection attempts from '{}': {}", peer_addr.ip(), num_attempts);
+            if num_attempts >= MAX_CONNECTION_ATTEMPTS
+            {
+                self.update_ip_ban(peer_addr.ip());
+                trace!("{CONTEXT} Gateway rejected a consecutive connection request from IP '{}'", peer_addr.ip());
+                return Err(error(format!("'{}' appears to be spamming connections", peer_addr.ip())));
             }
+
         }
 
         let stream = self.borrow_stream(&mut connection);

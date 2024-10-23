@@ -104,25 +104,20 @@ impl<N: Network> Router<N> {
         // Check (or impose) IP-level bans.
         #[cfg(not(any(test, feature = "test")))]
         if !self.is_dev() && peer_side == ConnectionSide::Initiator {
-            // If the IP is already banned, update the ban timestamp and reject the connection.
+            // If the IP is already banned reject the connection.
             if self.is_ip_banned(peer_addr.ip()) {
                 trace!("Rejected a connection request from banned IP '{}'", peer_addr.ip());
                 return Err(error(format!("'{}' is a banned IP address", peer_addr.ip())));
             }
 
-            // Check the previous low-level connection timestamp.
-            if let Some(peer_stats) = self.tcp.known_peers().get(peer_addr.ip()) {
-                let num_attempts = self.cache.insert_inbound_connection(peer_addr.ip(), 10);
+            let num_attempts = self.cache.insert_inbound_connection(peer_addr.ip(),  Router::<N>::CONNECTION_ATTEMPTS_SINCE_SECS);
 
-                debug!("Number of connection attempts from '{}': {}", peer_addr.ip(), num_attempts);
-                debug!("Seconds since connection attempt: {}", peer_stats.timestamp().elapsed().as_secs());
-                if peer_stats.timestamp().elapsed().as_secs() <= Router::<N>::MIN_CONNECTION_INTERVAL_IN_SECS
-                    && num_attempts >= Router::<N>::MAX_CONNECTION_ATTEMPTS
-                {
-                    self.update_ip_ban(peer_addr.ip());
-                    trace!("Rejected a consecutive connection request from IP '{}'", peer_addr.ip());
-                    return Err(error(format!("'{}' appears to be spamming connections", peer_addr.ip())));
-                }
+            debug!("Number of connection attempts from '{}': {}", peer_addr.ip(), num_attempts);
+            if num_attempts >= Router::<N>::MAX_CONNECTION_ATTEMPTS
+            {
+                self.update_ip_ban(peer_addr.ip());
+                trace!("Rejected a consecutive connection request from IP '{}'", peer_addr.ip());
+                return Err(error(format!("'{}' appears to be spamming connections", peer_addr.ip())));
             }
         }
 
