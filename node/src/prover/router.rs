@@ -61,6 +61,8 @@ where
     async fn on_connect(&self, peer_addr: SocketAddr) {
         // Resolve the peer address to the listener address.
         let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) else { return };
+        // Promote the peer's status from "connecting" to "connected".
+        self.router().insert_connected_peer(peer_ip);
         // Send the first `Ping` message to the peer.
         self.send_ping(peer_ip, None);
     }

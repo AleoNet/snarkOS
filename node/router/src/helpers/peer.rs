@@ -23,6 +23,8 @@ use std::{net::SocketAddr, time::Instant};
 pub struct Peer<N: Network> {
     /// The IP address of the peer, with the port set to the listener port.
     peer_ip: SocketAddr,
+    /// The connected address of the peer.
+    peer_addr: SocketAddr,
     /// The Aleo address of the peer.
     address: Address<N>,
     /// The node type of the peer.
@@ -37,9 +39,10 @@ pub struct Peer<N: Network> {
 
 impl<N: Network> Peer<N> {
     /// Initializes a new instance of `Peer`.
-    pub fn new(listening_ip: SocketAddr, challenge_request: &ChallengeRequest<N>) -> Self {
+    pub fn new(listening_ip: SocketAddr, connected_ip: SocketAddr, challenge_request: &ChallengeRequest<N>) -> Self {
         Self {
             peer_ip: listening_ip,
+            peer_addr: connected_ip,
             address: challenge_request.address,
             node_type: challenge_request.node_type,
             version: challenge_request.version,
@@ -51,6 +54,11 @@ impl<N: Network> Peer<N> {
     /// Returns the IP address of the peer, with the port set to the listener port.
     pub const fn ip(&self) -> SocketAddr {
         self.peer_ip
+    }
+
+    /// Returns the connected address of the peer.
+    pub const fn addr(&self) -> SocketAddr {
+        self.peer_addr
     }
 
     /// Returns the Aleo address of the peer.
