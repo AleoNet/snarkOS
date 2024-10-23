@@ -297,7 +297,7 @@ impl<N: Network> Consensus<N> {
                 .lock()
                 .insert(TransmissionID::Solution(solution.id(), checksum), timestamp);
         }
-        // Process the unconfirmed solution.
+        // Queue the unconfirmed solution.
         {
             let solution_id = solution.id();
 
@@ -317,6 +317,12 @@ impl<N: Network> Consensus<N> {
             }
         }
 
+        // Try to process the unconfirmed solutions in the memory pool.
+        self.process_unconfirmed_solutions().await
+    }
+
+    /// Processes unconfirmed transactions in the memory pool.
+    pub async fn process_unconfirmed_solutions(&self) -> Result<()> {
         // If the memory pool of this node is full, return early.
         let num_unconfirmed_solutions = self.num_unconfirmed_solutions();
         let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
@@ -366,7 +372,7 @@ impl<N: Network> Consensus<N> {
                 .lock()
                 .insert(TransmissionID::Transaction(transaction.id(), checksum), timestamp);
         }
-        // Process the unconfirmed transaction.
+        // Queue the unconfirmed transaction.
         {
             let transaction_id = transaction.id();
 
@@ -472,6 +478,10 @@ impl<N: Network> Consensus<N> {
                 // Process the unconfirmed transactions in the memory pool.
                 if let Err(e) = self_.process_unconfirmed_transactions().await {
                     warn!("Cannot process unconfirmed transactions - {e}");
+                }
+                // Process the unconfirmed solutions in the memory pool.
+                if let Err(e) = self_.process_unconfirmed_solutions().await {
+                    warn!("Cannot process unconfirmed solutions - {e}");
                 }
             }
         });
