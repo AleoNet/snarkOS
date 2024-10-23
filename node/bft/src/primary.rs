@@ -35,7 +35,7 @@ use crate::{
     Sync,
     Transport,
     Worker,
-    MAX_BATCH_DELAY_IN_MS,
+    BATCH_DELAY_IN_MS,
     MAX_WORKERS,
     MIN_BATCH_DELAY_IN_SECS,
     PRIMARY_PING_IN_MS,
@@ -406,7 +406,7 @@ impl<N: Network> Primary<N> {
         metrics::gauge(metrics::bft::PROPOSAL_ROUND, round as f64);
 
         // Ensure that the primary does not create a new proposal too quickly.
-        if let Err(e) = self.check_proposal_timestamp(previous_round, self.gateway.account().address(), now()) {
+        if let Err(e) = self.check_proposal_timestamp::<true>(previous_round, self.gateway.account().address(), now()) {
             debug!("Primary is safely skipping a batch proposal - {}", format!("{e}").dimmed());
             return Ok(());
         }
@@ -722,7 +722,7 @@ impl<N: Network> Primary<N> {
         // Compute the previous round.
         let previous_round = batch_round.saturating_sub(1);
         // Ensure that the peer did not propose a batch too quickly.
-        if let Err(e) = self.check_proposal_timestamp(previous_round, batch_author, batch_header.timestamp()) {
+        if let Err(e) = self.check_proposal_timestamp::<false>(previous_round, batch_author, batch_header.timestamp()) {
             // Proceed to disconnect the validator.
             self.gateway.disconnect(peer_ip);
             bail!("Malicious peer - {e} from '{peer_ip}'");
@@ -1108,7 +1108,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             loop {
                 // Sleep briefly, but longer than if there were no batch.
-                tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
+                tokio::time::sleep(Duration::from_millis(BATCH_DELAY_IN_MS)).await;
                 // If the primary is not synced, then do not propose a batch.
                 if !self_.sync.is_synced() {
                     debug!("Skipping batch proposal {}", "(node is syncing)".dimmed());
@@ -1201,7 +1201,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             loop {
                 // Sleep briefly.
-                tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
+                tokio::time::sleep(Duration::from_millis(BATCH_DELAY_IN_MS)).await;
                 // If the primary is not synced, then do not increment to the next round.
                 if !self_.sync.is_synced() {
                     trace!("Skipping round increment {}", "(node is syncing)".dimmed());
@@ -1384,7 +1384,7 @@ impl<N: Network> Primary<N> {
 
     /// Ensure the primary is not creating batch proposals too frequently.
     /// This checks that the certificate timestamp for the previous round is within the expected range.
-    fn check_proposal_timestamp(&self, previous_round: u64, author: Address<N>, timestamp: i64) -> Result<()> {
+    fn check_proposal_timestamp<const IS_PROPOSER: bool>(&self, previous_round: u64, author: Address<N>, timestamp: i64) -> Result<()> {
         // Retrieve the timestamp of the previous timestamp to check against.
         let previous_timestamp = match self.storage.get_certificate_for_round_with_author(previous_round, author) {
             // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_SECS` seconds ago.
@@ -1401,10 +1401,48 @@ impl<N: Network> Primary<N> {
         let elapsed = timestamp
             .checked_sub(previous_timestamp)
             .ok_or_else(|| anyhow!("Timestamp cannot be before the previous certificate at round {previous_round}"))?;
-        // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_SECS` seconds ago.
-        match elapsed < MIN_BATCH_DELAY_IN_SECS as i64 {
-            true => bail!("Timestamp is too soon after the previous certificate at round {previous_round}"),
-            false => Ok(()),
+        // Checked the proposal timestamp based on if you are the proposer.
+        // Note that currently validators check that peers do not propose too quickly based on `MIN_BATCH_DELAY_IN_SECS`.
+        // However, for internally an honest validator will potentially wait longer before proposing based on internal load
+        // factors. This is done to ensure that proposals (and subsequently blocks) are not produced too quickly.
+        match IS_PROPOSER {
+                // If we are the proposer, then ensure the previous proposal was created at least X seconds ago.
+                true => {
+                    // Fetch the number of connected validators.
+                    let _num_committee_members = self.ledger.get_committee_lookback_for_round(previous_round.saturating_add(1))?.num_members();
+
+                    // Fetch the number of transmissions in the ready queue.
+                    let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
+                    let max_transmissions_per_batch = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH;
+
+                    // Fetch the wait ranges.
+                    let minimum_wait_time = MIN_BATCH_DELAY_IN_SECS;
+                    let maximum_wait_time = <N as Network>::BLOCK_TIME.saturating_div(2) as u64;
+                    let wait_time_delta = maximum_wait_time.saturating_sub(minimum_wait_time) as f64;
+
+                    // Calculate the percentage of the batch that is filled.
+                    let transmission_percentage = (num_unconfirmed_transmissions as f64 / max_transmissions_per_batch as f64).min(1.0);
+                    let inverted_transmission_percentage = 1.0 - transmission_percentage;
+
+                    // Calculate the `min_proposer_batch_delay_in_secs` time based on the percentage of the batch that is filled.
+                    let additional_wait_time = (wait_time_delta * inverted_transmission_percentage) as u64;
+                    let min_proposer_batch_delay_in_secs = minimum_wait_time.saturating_add(additional_wait_time);
+
+                    // Ensure that the previous certificate was created at least `min_proposer_batch_delay_in_secs` seconds ago.
+                    match elapsed < min_proposer_batch_delay_in_secs as i64 {
+                        true => bail!("Timestamp is too soon after the previous certificate at round {previous_round}"),
+                        false => Ok(()),
+                    }
+                }
+                // If we are not the proposer, then ensure the previous proposal was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
+                false => {
+                    // TODO (raychu86): Consider adding addition checks based on the number of transmissions in proposal.
+                    // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
+                    match elapsed < MIN_BATCH_DELAY_IN_SECS as i64 {
+                        true => bail!("Timestamp is too soon after the previous certificate at round {previous_round}"),
+                        false => Ok(()),
+                    }
+                }
         }
     }
 

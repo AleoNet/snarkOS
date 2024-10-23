@@ -19,7 +19,7 @@ use crate::{
     spawn_blocking,
     Worker,
     CONTEXT,
-    MAX_BATCH_DELAY_IN_MS,
+    BATCH_DELAY_IN_MS,
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
@@ -75,14 +75,14 @@ use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
 /// The maximum interval of events to cache.
-const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY_IN_MS / 1000) as i64; // seconds
+const CACHE_EVENTS_INTERVAL: i64 = (BATCH_DELAY_IN_MS / 1000) as i64; // seconds
 /// The maximum interval of requests to cache.
-const CACHE_REQUESTS_INTERVAL: i64 = (MAX_BATCH_DELAY_IN_MS / 1000) as i64; // seconds
+const CACHE_REQUESTS_INTERVAL: i64 = (BATCH_DELAY_IN_MS / 1000) as i64; // seconds
 
 /// The maximum number of connection attempts in an interval.
 const MAX_CONNECTION_ATTEMPTS: usize = 10;
 /// The maximum interval to restrict a peer.
-const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DELAY_IN_MS / 1000) as i64; // seconds
+const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * BATCH_DELAY_IN_MS / 1000) as i64; // seconds
 
 /// The minimum number of validators to maintain a connection to.
 const MIN_CONNECTED_VALIDATORS: usize = 175;
