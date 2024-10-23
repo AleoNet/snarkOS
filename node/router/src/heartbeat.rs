@@ -21,7 +21,7 @@ use crate::{
 use snarkvm::prelude::Network;
 
 use colored::Colorize;
-use rand::{prelude::IteratorRandom, rngs::OsRng, Rng};
+use rand::{Rng, prelude::IteratorRandom, rngs::OsRng};
 
 /// A helper function to compute the maximum of two numbers.
 /// See Rust issue 92391: https://github.com/rust-lang/rust/issues/92391.
