@@ -110,21 +110,21 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
         // Prepare the rate limiting setup.
         let governor_config = Box::new(
-          GovernorConfigBuilder::default()
-          .per_nanosecond((1_000_000_000 / rest_rps) as u64)
-          .burst_size(rest_rps)
-          .error_handler(|error|  {
-            // Properly return a 429 Too Many Requests error
-            let error_message = error.to_string();
-            let mut response = Response::new(error_message.clone().into());
-            *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-            if error_message.contains("Too Many Requests") {
-              *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
-            }
-            response
-          })
-          .finish()
-          .expect("Couldn't set up rate limiting for the REST server!"),
+            GovernorConfigBuilder::default()
+                .per_nanosecond((1_000_000_000 / rest_rps) as u64)
+                .burst_size(rest_rps)
+                .error_handler(|error| {
+                    // Properly return a 429 Too Many Requests error
+                    let error_message = error.to_string();
+                    let mut response = Response::new(error_message.clone().into());
+                    *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                    if error_message.contains("Too Many Requests") {
+                        *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
+                    }
+                    response
+                })
+                .finish()
+                .expect("Couldn't set up rate limiting for the REST server!"),
         );
 
         // Get the network being used.
