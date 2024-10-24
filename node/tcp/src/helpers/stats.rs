@@ -13,11 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use parking_lot::RwLock;
+use std::{
+    sync::atomic::{AtomicU64, Ordering::Relaxed},
+    time::Instant,
+};
 
 /// Contains statistics related to Tcp.
-#[derive(Default)]
 pub struct Stats {
+    /// The timestamp of the creation (for the node) or connection (to a peer).
+    pub(crate) timestamp: RwLock<Instant>,
     /// The number of all messages sent.
     msgs_sent: AtomicU64,
     /// The number of all messages received.
@@ -31,6 +36,23 @@ pub struct Stats {
 }
 
 impl Stats {
+    /// Creates a new instance of the object.
+    pub fn new(timestamp: Instant) -> Self {
+        Self {
+            timestamp: RwLock::new(timestamp),
+            msgs_sent: Default::default(),
+            msgs_received: Default::default(),
+            bytes_sent: Default::default(),
+            bytes_received: Default::default(),
+            failures: Default::default(),
+        }
+    }
+
+    /// Returns the creation or connection timestamp.
+    pub fn timestamp(&self) -> Instant {
+        *self.timestamp.read()
+    }
+
     /// Returns the number of sent messages and their collective size in bytes.
     pub fn sent(&self) -> (u64, u64) {
         let msgs = self.msgs_sent.load(Relaxed);

@@ -101,6 +101,26 @@ impl<N: Network> Router<N> {
             Some(peer_addr)
         };
 
+        // Check (or impose) IP-level bans.
+        #[cfg(not(any(test, feature = "test")))]
+        if !self.is_dev() && peer_side == ConnectionSide::Initiator {
+            // If the IP is already banned reject the connection.
+            if self.is_ip_banned(peer_addr.ip()) {
+                trace!("Rejected a connection request from banned IP '{}'", peer_addr.ip());
+                return Err(error(format!("'{}' is a banned IP address", peer_addr.ip())));
+            }
+
+            let num_attempts = self.cache.insert_inbound_connection(peer_addr.ip(),  Router::<N>::CONNECTION_ATTEMPTS_SINCE_SECS);
+
+            debug!("Number of connection attempts from '{}': {}", peer_addr.ip(), num_attempts);
+            if num_attempts >= Router::<N>::MAX_CONNECTION_ATTEMPTS
+            {
+                self.update_ip_ban(peer_addr.ip());
+                trace!("Rejected a consecutive connection request from IP '{}'", peer_addr.ip());
+                return Err(error(format!("'{}' appears to be spamming connections", peer_addr.ip())));
+            }
+        }
+
         // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
         let handshake_result = if peer_side == ConnectionSide::Responder {
             self.handshake_inner_initiator(peer_addr, &mut peer_ip, stream, genesis_header, restrictions_id).await

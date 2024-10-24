@@ -144,7 +144,7 @@ impl<R: Reading> ReadingInternal for R {
             while let Some(msg) = inbound_message_receiver.recv().await {
                 if let Err(e) = self_clone.process_message(addr, msg).await {
                     error!(parent: node.span(), "can't process a message from {addr}: {e}");
-                    node.known_peers().register_failure(addr);
+                    node.known_peers().register_failure(addr.ip());
                 }
                 #[cfg(feature = "metrics")]
                 metrics::decrement_gauge(metrics::tcp::TCP_TASKS, 1f64);
@@ -179,7 +179,7 @@ impl<R: Reading> ReadingInternal for R {
                     }
                     Err(e) => {
                         error!(parent: node.span(), "can't read from {addr}: {e}");
-                        node.known_peers().register_failure(addr);
+                        node.known_peers().register_failure(addr.ip());
                         if node.config().fatal_io_errors.contains(&e.kind()) {
                             break;
                         }
@@ -230,7 +230,7 @@ impl<D: Decoder> Decoder for CountingCodec<D> {
 
             if ret.is_some() {
                 self.acc = 0;
-                self.node.known_peers().register_received_message(self.addr, read_len);
+                self.node.known_peers().register_received_message(self.addr.ip(), read_len);
                 self.node.stats().register_received_message(read_len);
             } else {
                 self.acc = read_len;
