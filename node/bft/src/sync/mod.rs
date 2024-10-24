@@ -23,7 +23,8 @@ use crate::{
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_sync::{BlockSync, BlockSyncMode, locators::BlockLocators};
+use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
+use snarkos_node_tcp::P2P;
 use snarkvm::{
     console::{network::Network, types::Field},
     ledger::{authority::Authority, block::Block, narwhal::BatchCertificate},
@@ -67,7 +68,7 @@ impl<N: Network> Sync<N> {
     /// Initializes a new sync instance.
     pub fn new(gateway: Gateway<N>, storage: Storage<N>, ledger: Arc<dyn LedgerService<N>>) -> Self {
         // Initialize the block sync module.
-        let block_sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone());
+        let block_sync = BlockSync::new(BlockSyncMode::Gateway, ledger.clone(), gateway.tcp().clone());
         // Return the sync instance.
         Self {
             gateway,

@@ -66,6 +66,10 @@ version = "=3.0.0"
 path = "locators"
 version = "=3.0.0"
 
+[dependencies.snarkos-node-tcp]
+path = "../tcp"
+version = "=2.2.7"
+
 [dependencies.snarkvm]
 workspace = true
 
